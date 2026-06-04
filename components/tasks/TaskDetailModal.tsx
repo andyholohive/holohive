@@ -288,21 +288,21 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
 
       if (task) {
         await TaskService.updateTask(task.id, payload);
-        toast({ title: 'Updated', description: 'Task updated successfully.' });
+        toast({ title: 'Task updated' });
       } else {
         await TaskService.createTask({
           ...payload,
           created_by: user.id,
           created_by_name: userProfile.name || userProfile.email || 'Unknown',
         });
-        toast({ title: 'Created', description: 'Task created successfully.' });
+        toast({ title: 'Task created' });
       }
 
       onOpenChange(false);
       onSaved();
     } catch (err) {
       console.error('Error saving task:', err);
-      toast({ title: 'Error', description: 'Failed to save task.', variant: 'destructive' });
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Failed to save task', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -318,11 +318,11 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         user?.id || null
       );
       if (template) {
-        toast({ title: 'Template Saved', description: `"${template.name}" template created.` });
+        toast({ title: 'Template saved', description: `"${template.name}" template created.` });
       }
     } catch (err) {
       console.error('Error saving as template:', err);
-      toast({ title: 'Error', description: 'Failed to save as template.', variant: 'destructive' });
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Failed to save as template', variant: 'destructive' });
     } finally {
       setSavingTemplate(false);
     }
@@ -383,7 +383,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           </div>
         )}
 
-        <DialogFooter className="flex-wrap gap-2">
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0 flex-wrap gap-2">
           {isEditing && (
             <Button
               variant="outline"

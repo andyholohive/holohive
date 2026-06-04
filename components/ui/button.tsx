@@ -12,11 +12,23 @@ const buttonVariants = cva(
         default: 'bg-primary text-primary-foreground hover:bg-primary/90',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        // [2026-06-03] `hover:text-accent-foreground` removed from
+        // both `outline` and `ghost` variants. Per Andy: "the action
+        // buttons all change font color when hovering. Can you fix
+        // this for all existing pages so that this never happens?".
+        // The `hover:bg-accent` tint is the hover affordance; the
+        // text should stay stable so the user's eye doesn't track a
+        // flicker between text colors. Pages that previously layered
+        // an inline `hover:text-X` to *override* this baked-in shift
+        // had it stripped in the same audit — those overrides are now
+        // unnecessary, and any future page that wants a hover text
+        // color should add it explicitly rather than getting it
+        // surprise-by-default.
         outline:
-          'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+          'border border-input bg-background hover:bg-accent',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        ghost: 'hover:bg-accent',
         link: 'text-primary underline-offset-4 hover:underline',
         // [Design system, May 2026] HoloHive brand teal CTA. Replaces
         // the 264 inline `style={{ backgroundColor: '#3e8692' }}` hex

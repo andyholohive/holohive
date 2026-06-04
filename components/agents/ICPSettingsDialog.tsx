@@ -122,9 +122,9 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
           }),
         }),
       ]);
-      toast({ title: 'Saved', description: 'ICP scoring settings updated' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
+      toast({ title: 'ICP settings saved' });
+    } catch (err) {
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Failed to save settings', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -138,13 +138,13 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
       const res = await fetch('/api/prospects/score', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: 'Scores Updated', description: `Rescored ${data.scored} prospects` });
+        toast({ title: 'Scores updated', description: `Rescored ${data.scored} prospects.` });
         onScoresUpdated?.();
       } else {
-        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        toast({ title: 'Rescore failed', description: data.error ?? 'Unknown error', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to rescore', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Rescore failed', description: err instanceof Error ? err.message : 'Failed to rescore', variant: 'destructive' });
     } finally {
       setRescoring(false);
     }
@@ -173,7 +173,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
           </button>
         </span>
       ))}
-      {items.length === 0 && <span className="text-xs text-gray-400 italic">None selected</span>}
+      {items.length === 0 && <span className="text-xs text-ink-warm-400 italic">None selected</span>}
     </div>
   );
 
@@ -201,7 +201,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-lg">
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            <Loader2 className="w-6 h-6 animate-spin text-ink-warm-400" />
           </div>
         </DialogContent>
       </Dialog>
@@ -210,7 +210,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-brand"/>
@@ -221,7 +221,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-5 py-4">
+        <div className="flex-1 overflow-y-auto px-1 py-2 grid gap-5">
           {/* Category Tiers */}
           <div className="grid gap-3">
             <Label className="text-sm font-semibold">Category Priority</Label>
@@ -230,7 +230,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Tier 1</span>
-                  <span className="text-[10px] text-gray-400">25 points — highest priority</span>
+                  <span className="text-[10px] text-ink-warm-400">25 points — highest priority</span>
                 </div>
                 <TagList items={tier1} setItems={setTier1} color="bg-emerald-50 text-emerald-700" />
                 <CategorySelect list={tier1} setList={setTier1} placeholder="+ Add category to Tier 1" />
@@ -239,7 +239,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Tier 2</span>
-                  <span className="text-[10px] text-gray-400">15 points — good fit</span>
+                  <span className="text-[10px] text-ink-warm-400">15 points — good fit</span>
                 </div>
                 <TagList items={tier2} setItems={setTier2} color="bg-blue-50 text-blue-700" />
                 <CategorySelect list={tier2} setList={setTier2} placeholder="+ Add category to Tier 2" />
@@ -248,7 +248,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">Tier 3</span>
-                  <span className="text-[10px] text-gray-400">5 points — okay</span>
+                  <span className="text-[10px] text-ink-warm-400">5 points — okay</span>
                 </div>
                 <TagList items={tier3} setItems={setTier3} color="bg-amber-50 text-amber-700" />
                 <CategorySelect list={tier3} setList={setTier3} placeholder="+ Add category to Tier 3" />
@@ -257,7 +257,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">Skip</span>
-                  <span className="text-[10px] text-gray-400">0 points — not a fit</span>
+                  <span className="text-[10px] text-ink-warm-400">0 points — not a fit</span>
                 </div>
                 <TagList items={skipCats} setItems={setSkipCats} color="bg-rose-50 text-rose-700" />
                 <CategorySelect list={skipCats} setList={setSkipCats} placeholder="+ Add category to Skip" />
@@ -265,7 +265,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
             </div>
 
             {availableCategories.length > 0 && assignedCategories.size < availableCategories.length && (
-              <p className="text-[10px] text-gray-400 pl-1">
+              <p className="text-[10px] text-ink-warm-400 pl-1">
                 {availableCategories.length - assignedCategories.size} categories not yet assigned to a tier
               </p>
             )}
@@ -273,10 +273,10 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
 
           {/* Market Cap Range */}
           <div className="grid gap-2">
-            <Label className="text-sm font-semibold">Market Cap Sweet Spot <span className="font-normal text-gray-400">(25 points if in range)</span></Label>
+            <Label className="text-sm font-semibold">Market Cap Sweet Spot <span className="font-normal text-ink-warm-400">(25 points if in range)</span></Label>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-gray-500 font-normal">Minimum ($)</Label>
+                <Label className="text-xs text-ink-warm-500 font-normal">Minimum ($)</Label>
                 <Input
                   type="number"
                   value={mcMin}
@@ -284,10 +284,10 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
                   placeholder="e.g. 10000000"
                   className="focus-brand"
                 />
-                {mcMin && <span className="text-[10px] text-gray-400">${Number(mcMin).toLocaleString()}</span>}
+                {mcMin && <span className="text-[10px] text-ink-warm-400">${Number(mcMin).toLocaleString()}</span>}
               </div>
               <div>
-                <Label className="text-xs text-gray-500 font-normal">Maximum ($)</Label>
+                <Label className="text-xs text-ink-warm-500 font-normal">Maximum ($)</Label>
                 <Input
                   type="number"
                   value={mcMax}
@@ -295,14 +295,14 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
                   placeholder="e.g. 500000000"
                   className="focus-brand"
                 />
-                {mcMax && <span className="text-[10px] text-gray-400">${Number(mcMax).toLocaleString()}</span>}
+                {mcMax && <span className="text-[10px] text-ink-warm-400">${Number(mcMax).toLocaleString()}</span>}
               </div>
             </div>
           </div>
 
           {/* Disqualify Keywords */}
           <div className="grid gap-2">
-            <Label className="text-sm font-semibold">Auto-Disqualify Keywords <span className="font-normal text-gray-400">(score = 0 if name contains any)</span></Label>
+            <Label className="text-sm font-semibold">Auto-Disqualify Keywords <span className="font-normal text-ink-warm-400">(score = 0 if name contains any)</span></Label>
             <TagList items={disqualifyKeywords} setItems={setDisqualifyKeywords} color="bg-rose-50 text-rose-600" />
             <div className="flex gap-1.5 mt-1.5">
               <Input
@@ -340,8 +340,8 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
           </div>
 
           {/* Score Breakdown */}
-          <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
-            <div className="font-semibold text-gray-700 mb-1.5">Score Breakdown (max 100)</div>
+          <div className="bg-cream-50 rounded-lg p-3 text-xs text-ink-warm-500">
+            <div className="font-semibold text-ink-warm-700 mb-1.5">Score Breakdown (max 100)</div>
             <div className="grid grid-cols-2 gap-1">
               <span>Category match: 5-25 pts</span>
               <span>Market cap in range: 25 pts</span>
@@ -353,7 +353,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0 gap-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             variant="outline"

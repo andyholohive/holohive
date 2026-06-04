@@ -179,7 +179,13 @@ export function CampaignDetailViewLayout({
   };
 
   return (
-    <div className="pt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
+    // [2026-06-05] `pt-6` removed — left the layout with 24px extra
+    // top padding that no other tab (KOLs, Contents, Payments) had,
+    // because they use `CardContent pt-0 px-0` after their toolbar
+    // row. View mode has no toolbar row, so the layout sits directly
+    // under TabsContent's `mt-4` — same as the other tabs' content
+    // surface relative to the tab strip.
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       {/* ── Main column ──────────────────────────────────────────── */}
       <div className="lg:col-span-2 space-y-5">
 
@@ -194,7 +200,7 @@ export function CampaignDetailViewLayout({
                 variant="ghost"
                 size="sm"
                 onClick={() => setEditingCard('engagement')}
-                className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+                className="h-7 px-2 text-xs font-medium text-brand-deep hover:bg-cream-50"
               >
                 <Edit className="w-3 h-3 mr-1" />
                 Edit
@@ -313,7 +319,7 @@ export function CampaignDetailViewLayout({
                   variant="ghost"
                   size="sm"
                   onClick={() => setEditingCard('budget')}
-                  className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+                  className="h-7 px-2 text-xs font-medium text-brand-deep hover:bg-cream-50"
                 >
                   <Edit className="w-3 h-3 mr-1" />
                   Edit
@@ -581,7 +587,7 @@ export function ResourcesCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+            className="h-7 px-2 text-xs font-medium text-brand-deep hover:bg-cream-50"
             onClick={() => setAdding(true)}
           >
             <Plus className="w-3 h-3 mr-1" />
@@ -769,7 +775,7 @@ export function ApprovedAccessCard({
               variant="ghost"
               size="sm"
               onClick={onDone}
-              className="h-7 px-2 text-xs font-medium text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+              className="h-7 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
             >
               Done
             </Button>
@@ -778,7 +784,7 @@ export function ApprovedAccessCard({
               variant="ghost"
               size="sm"
               onClick={onStartEdit}
-              className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+              className="h-7 px-2 text-xs font-medium text-brand-deep hover:bg-cream-50"
             >
               <Plus className="w-3 h-3 mr-1" />
               Add

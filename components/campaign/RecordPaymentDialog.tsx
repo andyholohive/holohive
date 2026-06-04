@@ -232,7 +232,7 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
   //    update each KOL's `paid` total and refetch the payment list.
   const handleAddMultiKOLPayments = async () => {
     if (selectedKOLsForPayment.length === 0) {
-      toast({ title: 'Error', description: 'Please select at least one KOL.', variant: 'destructive' });
+      toast({ title: 'No KOL selected', description: 'Select at least one KOL.', variant: 'destructive' });
       return;
     }
 
@@ -243,7 +243,7 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
     });
 
     if (missingData.length > 0) {
-      toast({ title: 'Error', description: 'Please fill in amount for all payments.', variant: 'destructive' });
+      toast({ title: 'Missing amounts', description: 'Fill in amount for all payments.', variant: 'destructive' });
       return;
     }
 
@@ -300,22 +300,22 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
       resetForm();
       onOpenChange(false);
       toast({
-        title: 'Success',
+        title: 'Payments recorded',
         description: `${paymentInserts.length} payment record(s) created for ${selectedKOLsForPayment.length} KOL(s).`,
       });
     } catch (err) {
       console.error('Error adding payments:', err);
-      toast({ title: 'Error', description: 'Failed to record payments.', variant: 'destructive' });
+      toast({ title: 'Record failed', description: err instanceof Error ? err.message : 'Failed to record payments', variant: 'destructive' });
     }
   };
 
   const handleAddNonKOLPayment = async () => {
     if (!nonKOLPayment.recipient_name.trim()) {
-      toast({ title: 'Error', description: 'Please enter a recipient name.', variant: 'destructive' });
+      toast({ title: 'Recipient required', variant: 'destructive' });
       return;
     }
     if (!nonKOLPayment.amount || nonKOLPayment.amount <= 0) {
-      toast({ title: 'Error', description: 'Please enter a valid amount.', variant: 'destructive' });
+      toast({ title: 'Valid amount required', variant: 'destructive' });
       return;
     }
 
@@ -341,10 +341,10 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
       fetchPayments();
       resetForm();
       onOpenChange(false);
-      toast({ title: 'Success', description: 'Non-KOL payment recorded successfully.' });
+      toast({ title: 'Payment recorded' });
     } catch (err) {
       console.error('Error adding non-KOL payment:', err);
-      toast({ title: 'Error', description: 'Failed to record payment.', variant: 'destructive' });
+      toast({ title: 'Record failed', description: err instanceof Error ? err.message : 'Failed to record payment', variant: 'destructive' });
     }
   };
 

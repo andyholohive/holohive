@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import {
-  Search, Inbox, Clock, DollarSign, User, Mail, MessageSquare,
-  Target, Calendar, ChevronDown, ChevronUp, ExternalLink, RefreshCw, Loader2,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Search, Inbox, Clock, User, Mail, MessageSquare,
+  Target, Calendar, ChevronDown, ChevronUp, RefreshCw, Loader2,
   ArrowRight, CheckCircle2, Download,
 } from 'lucide-react';
 import { downloadCsv, todayStamp } from '@/lib/csvExport';
@@ -19,6 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
 
@@ -63,6 +67,26 @@ const timelineBucketOf = (raw: string | null | undefined): TimelineBucket => {
   if (s.includes('3-6') || s.includes('quarter')) return 'quarter';
   if (s.includes('6+') || s.includes('later') || s.includes('year')) return 'later';
   return 'unspecified';
+};
+
+// v11 tone maps — replace the per-page inline pill colors with the
+// shared StatusBadge palette so this page reads like the rest of CRM.
+// 2026-06-03.
+const fundingTone = (raw: string | null | undefined): BadgeTone => {
+  if (!raw) return 'neutral';
+  if (raw.includes('10M') || raw.includes('50M') || raw.includes('100M')) return 'success';
+  if (raw.includes('2M') || raw.includes('5M')) return 'brand';
+  if (raw.includes('500K') || raw.includes('1M')) return 'info';
+  return 'neutral';
+};
+
+const timelineTone = (raw: string | null | undefined): BadgeTone => {
+  if (!raw) return 'neutral';
+  const s = raw.toLowerCase();
+  if (s.includes('asap') || s.includes('immediately')) return 'danger';
+  if (s.includes('soon') || s.includes('1-2')) return 'warning';
+  if (s.includes('3-6') || s.includes('quarter')) return 'info';
+  return 'neutral';
 };
 
 export default function SubmissionsPage() {
@@ -127,8 +151,8 @@ export default function SubmissionsPage() {
     } catch (error) {
       console.error('Error fetching submissions:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load submissions',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load submissions',
         variant: 'destructive',
       });
     } finally {
@@ -235,6 +259,45 @@ export default function SubmissionsPage() {
     });
   }, [submissions, searchTerm, sortField, sortDir, fundingFilter, timelineFilter, convertedFilter, convertedIds]);
 
+  // Counts for the tab chips — derived from the search-filtered pool
+  // but BEFORE the converted tab itself filters, so the chip count
+  // reflects "what you'd see if you switched". Funding/timeline
+  // filters also apply so the tab counts stay coherent with the
+  // active narrowing.
+  const tabCounts = useMemo(() => {
+    let pool = submissions;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      pool = pool.filter(s =>
+        s.name?.toLowerCase().includes(term) ||
+        s.project_name?.toLowerCase().includes(term) ||
+        s.email?.toLowerCase().includes(term) ||
+        s.telegram?.toLowerCase().includes(term) ||
+        s.role?.toLowerCase().includes(term)
+      );
+    }
+    if (fundingFilter !== 'all') pool = pool.filter(s => fundingBucketOf(s.funding) === fundingFilter);
+    if (timelineFilter !== 'all') pool = pool.filter(s => timelineBucketOf(s.timeline) === timelineFilter);
+    return {
+      all: pool.length,
+      pending: pool.filter(s => !convertedIds.has(s.id)).length,
+      converted: pool.filter(s => convertedIds.has(s.id)).length,
+    };
+  }, [submissions, searchTerm, fundingFilter, timelineFilter, convertedIds]);
+
+  // Active-filter pretty-string for the SectionHeader counter. Empty
+  // when no filters are applied so the counter reads as a clean
+  // "N of M submissions".
+  const activeFilterText = useMemo(() => {
+    const parts: string[] = [];
+    if (convertedFilter === 'pending') parts.push('pending');
+    if (convertedFilter === 'converted') parts.push('converted');
+    if (fundingFilter !== 'all') parts.push(fundingFilter);
+    if (timelineFilter !== 'all') parts.push(timelineFilter);
+    if (searchTerm) parts.push(`"${searchTerm}"`);
+    return parts.join(' · ');
+  }, [convertedFilter, fundingFilter, timelineFilter, searchTerm]);
+
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -261,20 +324,6 @@ export default function SubmissionsPage() {
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  const timelineColor = (timeline: string) => {
-    if (timeline?.toLowerCase().includes('asap') || timeline?.toLowerCase().includes('immediately')) return 'bg-rose-100 text-rose-700 border-rose-200';
-    if (timeline?.toLowerCase().includes('soon') || timeline?.toLowerCase().includes('1-2')) return 'bg-amber-100 text-amber-700 border-amber-200';
-    if (timeline?.toLowerCase().includes('3-6') || timeline?.toLowerCase().includes('quarter')) return 'bg-blue-100 text-blue-700 border-blue-200';
-    return 'bg-gray-100 text-gray-700 border-gray-200';
-  };
-
-  const fundingColor = (funding: string) => {
-    if (funding?.includes('10M') || funding?.includes('50M') || funding?.includes('100M')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    if (funding?.includes('2M') || funding?.includes('5M')) return 'bg-teal-100 text-teal-700 border-teal-200';
-    if (funding?.includes('500K') || funding?.includes('1M')) return 'bg-blue-100 text-blue-700 border-blue-200';
-    return 'bg-gray-100 text-gray-700 border-gray-200';
-  };
-
   // Stats
   const stats = useMemo(() => {
     const now = new Date();
@@ -284,6 +333,53 @@ export default function SubmissionsPage() {
     return { total: submissions.length, thisWeek, pending };
   }, [submissions, convertedIds]);
 
+  // Header actions — extracted so the loading + loaded states share
+  // identical shape (only `disabled` flips). Prevents the action row
+  // from reflowing when data arrives.
+  const headerActions = (disabled: boolean) => (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => downloadCsv(filtered, [
+          { header: 'Date', accessor: r => new Date(r.created_at).toISOString() },
+          { header: 'Name', accessor: r => r.name },
+          { header: 'Project', accessor: r => r.project_name },
+          { header: 'Role', accessor: r => r.role },
+          { header: 'Email', accessor: r => r.email },
+          { header: 'Telegram', accessor: r => r.telegram },
+          { header: 'Funding', accessor: r => r.funding },
+          { header: 'Timeline', accessor: r => r.timeline },
+          { header: 'Goals', accessor: r => r.goals },
+          { header: 'Converted', accessor: r => convertedIds.has(r.id) ? 'yes' : 'no' },
+        ], `contact-submissions-${todayStamp()}`)}
+        disabled={disabled || filtered.length === 0}
+        title="Download current view as CSV"
+      >
+        <Download className="h-4 w-4 mr-1.5" />
+        Export
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => fetchSubmissions(true)}
+        disabled={disabled || refreshing}
+        title="Refresh submissions"
+      >
+        {refreshing
+          ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+          : <RefreshCw className="h-4 w-4 mr-1.5" />}
+        Refresh
+      </Button>
+    </>
+  );
+
+  // ── Loading branch ────────────────────────────────────────────────
+  // Renders PageHeader + SectionHeader skeletons that mirror the
+  // loaded shape exactly so the title strip + chapter divider don't
+  // shift when data arrives. KPI grid uses h-24 rounded-xl (matches
+  // KpiCard); filter toolbar mirrors tabs + search + selects; table
+  // skeleton has the v11 header row + 5 body rows.
   if (loading) {
     return (
       <div className="space-y-6">
@@ -291,320 +387,422 @@ export default function SubmissionsPage() {
           icon={Inbox}
           title="Contact Submissions"
           subtitle="Inbound inquiries from the contact form"
+          kicker="CRM · Submissions"
+          kickerDot="brand"
+          actions={headerActions(true)}
         />
-        <div className="grid grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
+
+        {/* 4 KPI tiles — matches the loaded grid-cols-1 md:grid-cols-4
+            (previous version mismatched with grid-cols-3 + 3 cards,
+            which caused the row to reshape when data landed). */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
-        <Skeleton className="h-10 w-80" />
-        <Skeleton className="h-96 rounded-lg" />
+
+        <div className="space-y-4">
+          {/* SectionHeader skeleton — dot + label width + counter,
+              `.first` so the top hairline is suppressed. */}
+          <div className="section-head first flex items-center gap-3">
+            <span className="dot bg-brand/30" aria-hidden />
+            <Skeleton className="h-3 w-24" />
+            <span className="flex-1 h-px bg-cream-200" aria-hidden />
+            <Skeleton className="h-3 w-40" />
+          </div>
+
+          {/* Filter toolbar skeleton — tabs left, search middle, selects right. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+              <Skeleton className="h-8 w-14 rounded" />
+              <Skeleton className="h-8 w-20 rounded" />
+              <Skeleton className="h-8 w-24 rounded" />
+            </div>
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400" aria-hidden />
+              <Input
+                placeholder="Search by name, project, email..."
+                className="pl-10 focus-brand"
+                disabled
+              />
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <Skeleton className="h-9 w-32 rounded-md" />
+              <Skeleton className="h-9 w-32 rounded-md" />
+            </div>
+          </div>
+
+          {/* Table skeleton — v11 header strip + 5 body rows shaped
+              like real submission rows. */}
+          <Card className="overflow-hidden">
+            <div className="border-b border-cream-200 bg-cream-50/80 py-2.5 px-5 flex items-center gap-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className={`h-3 ${i === 1 || i === 2 ? 'flex-1' : 'w-16'}`} />
+              ))}
+            </div>
+            <div>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 py-3.5 px-5 border-b border-cream-100 last:border-0">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 flex-1 max-w-[180px]" />
+                  <Skeleton className="h-4 flex-1 max-w-[160px]" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     );
   }
 
+  // ── Loaded branch ─────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Inbox}
         title="Contact Submissions"
         subtitle="Inbound inquiries from the contact form"
-        actions={(
-          <>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by name, project, email..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-            />
-          </div>
-          <Select value={fundingFilter} onValueChange={(v) => setFundingFilter(v as FundingBucket)}>
-            <SelectTrigger className="h-9 w-32 text-sm focus-brand"><SelectValue placeholder="Funding" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All funding</SelectItem>
-              <SelectItem value="<500K">&lt; $500K</SelectItem>
-              <SelectItem value="500K-2M">$500K – $2M</SelectItem>
-              <SelectItem value="2M-10M">$2M – $10M</SelectItem>
-              <SelectItem value="10M+">$10M+</SelectItem>
-              <SelectItem value="unspecified">Unspecified</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={timelineFilter} onValueChange={(v) => setTimelineFilter(v as TimelineBucket)}>
-            <SelectTrigger className="h-9 w-32 text-sm focus-brand"><SelectValue placeholder="Timeline" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All timelines</SelectItem>
-              <SelectItem value="asap">ASAP</SelectItem>
-              <SelectItem value="soon">Within 1–2 mo</SelectItem>
-              <SelectItem value="quarter">3–6 months</SelectItem>
-              <SelectItem value="later">6+ months</SelectItem>
-              <SelectItem value="unspecified">Unspecified</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={convertedFilter} onValueChange={(v) => setConvertedFilter(v as any)}>
-            <SelectTrigger className="h-9 w-36 text-sm focus-brand"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="converted">Converted</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => downloadCsv(filtered, [
-              { header: 'Date', accessor: r => new Date(r.created_at).toISOString() },
-              { header: 'Name', accessor: r => r.name },
-              { header: 'Project', accessor: r => r.project_name },
-              { header: 'Role', accessor: r => r.role },
-              { header: 'Email', accessor: r => r.email },
-              { header: 'Telegram', accessor: r => r.telegram },
-              { header: 'Funding', accessor: r => r.funding },
-              { header: 'Timeline', accessor: r => r.timeline },
-              { header: 'Goals', accessor: r => r.goals },
-              { header: 'Converted', accessor: r => convertedIds.has(r.id) ? 'yes' : 'no' },
-            ], `contact-submissions-${todayStamp()}`)}
-            disabled={filtered.length === 0}
-            title="Download current view as CSV"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchSubmissions(true)}
-            disabled={refreshing}
-            title="Refresh submissions"
-          >
-            {refreshing
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <RefreshCw className="h-4 w-4" />}
-          </Button>
-          </>
-        )}
+        kicker="CRM · Submissions"
+        kickerDot="brand"
+        actions={headerActions(false)}
       />
 
-      {/* Stats — flat KpiCard baseline (was 3 ad-hoc Cards before
-          2026-05-06). Total uses brand teal as the primary metric;
-          This Week uses sky for "fresh / recent" semantics; Latest is
-          gray since it's a date, not a count. */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* 4 KPI tiles — Total in brand teal as the headline; This Week
+          in sky (recency); Pending amber when there's a backlog else
+          gray; Latest as a soft gray date. */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <KpiCard
           icon={Inbox}
           label="Total"
           value={stats.total}
-          sub="All submissions"
+          sub="all submissions"
           accent="brand"
         />
         <KpiCard
           icon={Clock}
           label="This Week"
           value={stats.thisWeek}
-          sub="Last 7 days"
+          sub="last 7 days"
           accent="sky"
         />
         <KpiCard
           icon={Target}
           label="Pending"
           value={stats.pending}
-          sub="Not yet converted"
+          sub="not yet converted"
           accent={stats.pending > 0 ? 'amber' : 'gray'}
         />
         <KpiCard
           icon={Calendar}
           label="Latest"
           value={submissions.length > 0 ? formatDate(submissions[0].created_at) : '—'}
-          sub="Most recent submission"
+          sub="most recent"
           accent="gray"
         />
       </div>
 
-      {/* Search bar moved into the header above on 2026-05-06 (was a
-          standalone row below the stats). */}
+      <div className="space-y-4">
+        {/* v11 chapter divider above the filter row + table. Counter
+            reflects the live narrowing so it doubles as a "what's
+            applied" readout. */}
+        <SectionHeader
+          label="Inquiries"
+          dot="brand"
+          counter={`${filtered.length} of ${submissions.length} submissions${activeFilterText ? ` · ${activeFilterText}` : ''}`}
+          first
+        />
 
-      {/* Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                className="cursor-pointer hover:text-gray-900 w-[180px]"
-                onClick={() => handleSort('created_at')}
+        {/* v11 filter toolbar — Tabs (left) + Search (middle, flex-1
+            min-w-[220px] max-w-sm) + power-user selects (right). */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tabs value={convertedFilter} onValueChange={(v) => setConvertedFilter(v as typeof convertedFilter)}>
+            <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+              <TabsTrigger
+                value="all"
+                className="px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
               >
-                Date <SortIcon field="created_at" />
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:text-gray-900"
-                onClick={() => handleSort('name')}
+                All
+                <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-2 tabular-nums">
+                  {tabCounts.all}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="pending"
+                className="px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
               >
-                Name <SortIcon field="name" />
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:text-gray-900"
-                onClick={() => handleSort('project_name')}
+                Pending
+                <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-2 tabular-nums">
+                  {tabCounts.pending}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="converted"
+                className="px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
               >
-                Project <SortIcon field="project_name" />
-              </TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Telegram</TableHead>
-              <TableHead>Funding</TableHead>
-              <TableHead>Timeline</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                {/* colSpan must match the column count above (8) so the
-                    empty cell spans the whole table — narrowing this
-                    would push the icon to the leftmost column only. */}
-                <TableCell colSpan={8} className="p-0">
-                  <EmptyState
-                    icon={Inbox}
-                    title={searchTerm ? 'No submissions match your search.' : 'No submissions yet.'}
-                    className="py-12"
-                  />
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map(s => (
-                <TableRow
-                  key={s.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => setSelectedSubmission(s)}
+                Converted
+                <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-2 tabular-nums">
+                  {tabCounts.converted}
+                </span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400 pointer-events-none" aria-hidden />
+            <Input
+              placeholder="Search by name, project, email..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-10 focus-brand"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <Select value={fundingFilter} onValueChange={(v) => setFundingFilter(v as FundingBucket)}>
+              <SelectTrigger className="h-9 w-36 text-sm focus-brand"><SelectValue placeholder="Funding" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All funding</SelectItem>
+                <SelectItem value="<500K">&lt; $500K</SelectItem>
+                <SelectItem value="500K-2M">$500K – $2M</SelectItem>
+                <SelectItem value="2M-10M">$2M – $10M</SelectItem>
+                <SelectItem value="10M+">$10M+</SelectItem>
+                <SelectItem value="unspecified">Unspecified</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={timelineFilter} onValueChange={(v) => setTimelineFilter(v as TimelineBucket)}>
+              <SelectTrigger className="h-9 w-36 text-sm focus-brand"><SelectValue placeholder="Timeline" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All timelines</SelectItem>
+                <SelectItem value="asap">ASAP</SelectItem>
+                <SelectItem value="soon">Within 1–2 mo</SelectItem>
+                <SelectItem value="quarter">3–6 months</SelectItem>
+                <SelectItem value="later">6+ months</SelectItem>
+                <SelectItem value="unspecified">Unspecified</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Table — v11 chrome: cream-50 header strip + ink-warm-500
+            tracked-out column headers + per-row border-cream-100. */}
+        <Card className="overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                <TableHead
+                  className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer w-[180px]"
+                  onClick={() => handleSort('created_at')}
                 >
-                  <TableCell className="text-sm text-gray-500">
-                    <div>{formatDate(s.created_at)}</div>
-                    <div className="text-xs text-gray-400">{formatTime(s.created_at)}</div>
-                  </TableCell>
-                  <TableCell className="font-medium text-gray-900">
-                    <div className="flex items-center gap-2">
-                      <span>{s.name}</span>
-                      {convertedIds.has(s.id) && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"
-                          title="Converted to opportunity"
-                        >
-                          <CheckCircle2 className="h-2.5 w-2.5" /> In pipeline
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-700">{s.project_name}</TableCell>
-                  <TableCell className="text-gray-500 text-sm">{s.role}</TableCell>
-                  <TableCell>
-                    <a
-                      href={`mailto:${s.email}`}
-                      onClick={e => e.stopPropagation()}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      {s.email}
-                    </a>
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-600">{s.telegram}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`text-xs ${fundingColor(s.funding)}`}>
-                      {s.funding}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`text-xs ${timelineColor(s.timeline)}`}>
-                      {s.timeline}
-                    </Badge>
+                  Date <SortIcon field="created_at" />
+                </TableHead>
+                <TableHead
+                  className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer"
+                  onClick={() => handleSort('name')}
+                >
+                  Name <SortIcon field="name" />
+                </TableHead>
+                <TableHead
+                  className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer"
+                  onClick={() => handleSort('project_name')}
+                >
+                  Project <SortIcon field="project_name" />
+                </TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Role</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Email</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Telegram</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Funding</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Timeline</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  {/* colSpan must match the column count above (8) so the
+                      empty cell spans the whole table — narrowing this
+                      would push the icon to the leftmost column only. */}
+                  <TableCell colSpan={8} className="p-0">
+                    <EmptyState
+                      icon={Inbox}
+                      title={
+                        searchTerm || fundingFilter !== 'all' || timelineFilter !== 'all' || convertedFilter !== 'all'
+                          ? 'No submissions match your filters.'
+                          : 'No submissions yet.'
+                      }
+                      description={
+                        searchTerm || fundingFilter !== 'all' || timelineFilter !== 'all' || convertedFilter !== 'all'
+                          ? 'Try widening the filter or clearing the search.'
+                          : 'When someone submits the contact form, the inquiry will appear here.'
+                      }
+                      className="py-12"
+                    />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+              ) : (
+                filtered.map(s => (
+                  <TableRow
+                    key={s.id}
+                    className="border-cream-100 row-accent cursor-pointer"
+                    onClick={() => setSelectedSubmission(s)}
+                  >
+                    <TableCell className="py-3.5 px-5 text-sm text-ink-warm-500 tabular-nums">
+                      <div>{formatDate(s.created_at)}</div>
+                      <div className="text-xs text-ink-warm-400">{formatTime(s.created_at)}</div>
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 font-medium text-ink-warm-900">
+                      <div className="flex items-center gap-2">
+                        <span>{s.name}</span>
+                        {convertedIds.has(s.id) && (
+                          <StatusBadge tone="success" size="sm">
+                            <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
+                            In pipeline
+                          </StatusBadge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-ink-warm-700">{s.project_name}</TableCell>
+                    <TableCell className="py-3.5 px-5 text-ink-warm-500 text-sm">{s.role}</TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      <a
+                        href={`mailto:${s.email}`}
+                        onClick={e => e.stopPropagation()}
+                        className="text-sm text-brand hover:text-brand-dark hover:underline"
+                      >
+                        {s.email}
+                      </a>
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">{s.telegram}</TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      {s.funding ? (
+                        <StatusBadge tone={fundingTone(s.funding)} size="sm">{s.funding}</StatusBadge>
+                      ) : (
+                        <span className="text-xs text-ink-warm-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      {s.timeline ? (
+                        <StatusBadge tone={timelineTone(s.timeline)} size="sm">{s.timeline}</StatusBadge>
+                      ) : (
+                        <span className="text-xs text-ink-warm-400">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
 
-      {/* Detail Dialog */}
+      {/* Detail Dialog — v11 scroll/footer pattern. Body is the sole
+          scroll surface (flex-1 overflow-y-auto), footer pinned with
+          border-t. Convert / Open-in-pipeline action moves into the
+          DialogFooter instead of a free-floating row at the bottom
+          of the body. */}
       <Dialog open={!!selectedSubmission} onOpenChange={open => !open && setSelectedSubmission(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5 text-brand"/>
-              {selectedSubmission?.name}
+              <User className="h-4 w-4 text-brand" />
+              {selectedSubmission?.name || 'Submission'}
             </DialogTitle>
+            {selectedSubmission && (
+              <DialogDescription>
+                Submitted {formatDate(selectedSubmission.created_at)} at {formatTime(selectedSubmission.created_at)}
+              </DialogDescription>
+            )}
           </DialogHeader>
           {selectedSubmission && (
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Project</p>
-                  <p className="text-sm font-medium text-gray-900">{selectedSubmission.project_name}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Project</p>
+                  <p className="text-sm font-medium text-ink-warm-900">{selectedSubmission.project_name || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Role</p>
-                  <p className="text-sm text-gray-700">{selectedSubmission.role}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Role</p>
+                  <p className="text-sm text-ink-warm-700">{selectedSubmission.role || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Email</p>
-                  <a href={`mailto:${selectedSubmission.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                    <Mail className="h-3.5 w-3.5" />
-                    {selectedSubmission.email}
-                  </a>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Email</p>
+                  {selectedSubmission.email ? (
+                    <a
+                      href={`mailto:${selectedSubmission.email}`}
+                      className="text-sm text-brand hover:text-brand-dark hover:underline inline-flex items-center gap-1"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      {selectedSubmission.email}
+                    </a>
+                  ) : (
+                    <p className="text-sm text-ink-warm-400">—</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Telegram</p>
-                  <p className="text-sm text-gray-700 flex items-center gap-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Telegram</p>
+                  <p className="text-sm text-ink-warm-700 flex items-center gap-1">
                     <MessageSquare className="h-3.5 w-3.5" />
-                    {selectedSubmission.telegram}
+                    {selectedSubmission.telegram || '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Funding</p>
-                  <Badge variant="outline" className={`text-xs ${fundingColor(selectedSubmission.funding)}`}>
-                    <DollarSign className="h-3 w-3 mr-1" />
-                    {selectedSubmission.funding}
-                  </Badge>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Funding</p>
+                  {selectedSubmission.funding ? (
+                    <StatusBadge tone={fundingTone(selectedSubmission.funding)} size="sm">
+                      {selectedSubmission.funding}
+                    </StatusBadge>
+                  ) : (
+                    <p className="text-sm text-ink-warm-400">—</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Timeline</p>
-                  <Badge variant="outline" className={`text-xs ${timelineColor(selectedSubmission.timeline)}`}>
-                    <Clock className="h-3 w-3 mr-1" />
-                    {selectedSubmission.timeline}
-                  </Badge>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Timeline</p>
+                  {selectedSubmission.timeline ? (
+                    <StatusBadge tone={timelineTone(selectedSubmission.timeline)} size="sm">
+                      {selectedSubmission.timeline}
+                    </StatusBadge>
+                  ) : (
+                    <p className="text-sm text-ink-warm-400">—</p>
+                  )}
                 </div>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Goals</p>
-                <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed border">
+                <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-400 mb-1">Goals</p>
+                <div className="bg-cream-50 rounded-lg p-3 text-sm text-ink-warm-700 leading-relaxed border border-cream-200">
                   {selectedSubmission.goals || '—'}
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-2 border-t text-xs text-gray-400">
-                <span>Submitted {formatDate(selectedSubmission.created_at)} at {formatTime(selectedSubmission.created_at)}</span>
-              </div>
-
-              {/* Convert / open-existing action — closes the funnel by
-                  pulling the submission into the actual sales pipeline. */}
-              <div className="pt-3 border-t flex justify-end gap-2">
-                {convertedIds.has(selectedSubmission.id) ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const oppId = convertedOppMap.get(selectedSubmission.id);
-                      if (oppId) router.push(`/crm/sales-pipeline?opp=${oppId}`);
-                    }}
-                  >
-                    <ArrowRight className="h-4 w-4 mr-1.5" /> Open in pipeline
-                  </Button>
-                ) : (
-                  <Button onClick={() => convertToOpportunity(selectedSubmission)} disabled={converting} className="bg-brand text-white">
-                    {converting ? (
-                      <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Converting…</>
-                    ) : (
-                      <><Target className="h-4 w-4 mr-1.5" /> Convert to opportunity</>
-                    )}
-                  </Button>
-                )}
-              </div>
             </div>
           )}
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            {selectedSubmission && convertedIds.has(selectedSubmission.id) ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const oppId = convertedOppMap.get(selectedSubmission.id);
+                  if (oppId) router.push(`/crm/sales-pipeline?opp=${oppId}`);
+                }}
+              >
+                <ArrowRight className="h-4 w-4 mr-1.5" /> Open in pipeline
+              </Button>
+            ) : selectedSubmission ? (
+              <Button
+                variant="brand"
+                onClick={() => convertToOpportunity(selectedSubmission)}
+                disabled={converting}
+              >
+                {converting ? (
+                  <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Converting…</>
+                ) : (
+                  <><Target className="h-4 w-4 mr-1.5" /> Convert to opportunity</>
+                )}
+              </Button>
+            ) : null}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

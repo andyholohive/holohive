@@ -87,8 +87,8 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
       }, 1000);
 
       toast({
-        title: 'Success',
-        description: `${file.name} uploaded successfully`,
+        title: 'File uploaded',
+        description: file.name,
       });
 
       onUploadSuccess();

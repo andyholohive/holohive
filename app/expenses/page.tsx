@@ -21,7 +21,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { KpiCard } from '@/components/ui/kpi-card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -35,6 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
@@ -96,11 +97,14 @@ const TYPE_LABEL: Record<ExpenseType, string> = {
   meals_drinks: 'Meals / Drinks',
   others: 'Others',
 };
-const TYPE_COLOR: Record<ExpenseType, string> = {
-  travel:        'bg-sky-100 text-sky-800',
-  software:      'bg-violet-100 text-violet-800',
-  meals_drinks:  'bg-amber-100 text-amber-800',
-  others:        'bg-gray-200 text-gray-800',
+// v11: route expense types through the central StatusBadge tone palette
+// instead of inline `bg-X-100 text-X-800` pairs. travel→info, software→purple,
+// meals_drinks→warning, others→neutral preserves the original color intent.
+const TYPE_TONES: Record<ExpenseType, BadgeTone> = {
+  travel:        'info',
+  software:      'purple',
+  meals_drinks:  'warning',
+  others:        'neutral',
 };
 
 const formatUSD = (n: number) => new Intl.NumberFormat('en-US', {
@@ -316,9 +320,11 @@ export default function ExpensesPage() {
           icon={DollarSign}
           title="Expenses"
           subtitle="Reimbursable spend tracking · super-admin only"
+          kicker="Documents · Expenses"
+          kickerDot="brand"
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       </div>
     );
@@ -330,6 +336,8 @@ export default function ExpensesPage() {
           icon={DollarSign}
           title="Expenses"
           subtitle="Reimbursable spend tracking · super-admin only"
+          kicker="Documents · Expenses"
+          kickerDot="brand"
         />
         <EmptyState
           icon={AlertCircle}
@@ -346,6 +354,8 @@ export default function ExpensesPage() {
         icon={DollarSign}
         title="Expenses"
         subtitle="Reimbursable spend tracking · super-admin only"
+        kicker="Documents · Expenses"
+        kickerDot="brand"
         actions={(
           <>
             <Button variant="outline" size="sm" onClick={exportCsv}>
@@ -381,27 +391,57 @@ export default function ExpensesPage() {
         />
       </div>
 
-      {/* ─── Bulk action bar (sticky when selection exists) ─── */}
+      {/* ─── Bulk action bar (sticky when selection exists) ───
+          v11 canonical bulk-bar: Card with `accent-l-brand` left stripe +
+          `dot bg-brand` indicator + `mono uppercase tracking-[0.14em]`
+          sub-label. Mirrors the pattern in /kols and /campaigns. Sticky
+          so it follows the user as the table scrolls. */}
       {selected.size > 0 && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm">
-          <span className="text-sm font-medium text-emerald-800">{selected.size} selected</span>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={selectAllVisible}>Select all visible</Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clearSelection}>Clear</Button>
-          <div className="flex-1" />
-          <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => bulkMarkPaid(false)}>
-            <Check className="h-3 w-3 mr-1" /> Mark paid
-          </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bulkMarkPaid(true)}>
-            Mark unpaid
-          </Button>
-        </div>
+        <Card className="sticky top-0 z-20 p-4 accent-l-brand">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="dot bg-brand" aria-hidden />
+              <span className="text-sm font-semibold text-ink-warm-900">
+                {selected.size} expense{selected.size === 1 ? '' : 's'} selected
+              </span>
+            </div>
+            <div className="h-4 w-px bg-cream-200" />
+            <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
+              Bulk Actions
+            </span>
+            <Button size="sm" variant="outline" onClick={selectAllVisible}>Select All Visible</Button>
+            <Button size="sm" variant="outline" onClick={clearSelection}>Clear</Button>
+            <div className="ml-auto flex items-center gap-2">
+              {/* deliberate emerald variant for Mark Paid affordance — not the brand CTA.
+                  Mirrors the Mark Paid button in DetailDialog's status row. */}
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => bulkMarkPaid(false)}>
+                <Check className="h-3.5 w-3.5 mr-1" /> Mark Paid
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => bulkMarkPaid(true)}>
+                Mark Unpaid
+              </Button>
+            </div>
+          </div>
+        </Card>
       )}
 
+      {/* ─── Section header (v11 chapter divider) ─── */}
+      <SectionHeader
+        label="Expenses"
+        dot="brand"
+        counter={`${expenses.length} of ${expenses.length} expense${expenses.length === 1 ? '' : 's'}${
+          (filterUserId !== 'all' || filterType !== 'all' || filterFrequency !== 'all' || filterPaid !== 'all' || filterPeriod !== 'all')
+            ? ' · filtered'
+            : ''
+        }`}
+        first
+      />
+
       {/* ─── Filters + Table in one card (matches /wallets pattern) ─── */}
-      <Card className="border-gray-200 overflow-hidden">
+      <Card className="border-cream-200 overflow-hidden">
         {/* Filter bar */}
-        <div className="p-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
-          <FilterIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+        <div className="p-4 border-b border-cream-100 flex items-center gap-3 flex-wrap">
+          <FilterIcon className="h-4 w-4 text-ink-warm-400 flex-shrink-0" />
           <Select value={filterPeriod} onValueChange={setFilterPeriod}>
             <SelectTrigger className="w-[140px] h-9 text-sm focus-brand"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -442,7 +482,7 @@ export default function ExpensesPage() {
               <SelectItem value="unpaid">Unpaid only</SelectItem>
             </SelectContent>
           </Select>
-          <div className="ml-auto text-xs text-gray-500">{expenses.length} expenses</div>
+          <div className="ml-auto text-xs text-ink-warm-500">{expenses.length} expenses</div>
         </div>
 
         {/* Table body */}
@@ -461,16 +501,16 @@ export default function ExpensesPage() {
         ) : (
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50/70">
-                <TableHead className="w-10"></TableHead>
-                <TableHead className="w-[110px]">Date</TableHead>
-                <TableHead className="w-[140px]">User</TableHead>
-                <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[140px]">Type</TableHead>
-                <TableHead className="w-[110px]">Frequency</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[90px]">Paid?</TableHead>
-                <TableHead className="w-[60px]"></TableHead>
+              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-10"></TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px]">Date</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[140px]">User</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px] text-right">Amount</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[140px]">Type</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px]">Frequency</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Description</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[90px]">Paid?</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -480,21 +520,21 @@ export default function ExpensesPage() {
                 return (
                   <TableRow
                     key={e.id}
-                    className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-emerald-50' : ''}`}
+                    className={`border-cream-100 hover:bg-cream-50 cursor-pointer ${isSelected ? 'bg-brand-light/40' : ''}`}
                     onClick={() => openDetail(e)}
                   >
-                    <TableCell className="w-10" onClick={(ev) => ev.stopPropagation()}>
+                    <TableCell className="py-3.5 px-5 w-10" onClick={(ev) => ev.stopPropagation()}>
                       <Checkbox checked={isSelected} onCheckedChange={() => toggleSelected(e.id)} />
                     </TableCell>
-                    <TableCell className="text-sm text-gray-700">{formatDate(e.expense_date)}</TableCell>
-                    <TableCell className="text-sm">{u?.name || <span className="text-gray-400">{e.user_id.slice(0, 8)}…</span>}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">{formatUSD(Number(e.amount_usd))}</TableCell>
-                    <TableCell>
-                      <Badge className={`${TYPE_COLOR[e.expense_type]} hover:${TYPE_COLOR[e.expense_type]} text-xs`}>
+                    <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">{formatDate(e.expense_date)}</TableCell>
+                    <TableCell className="py-3.5 px-5 text-sm">{u?.name || <span className="text-ink-warm-400">{e.user_id.slice(0, 8)}…</span>}</TableCell>
+                    <TableCell className="py-3.5 px-5 text-right font-semibold tabular-nums">{formatUSD(Number(e.amount_usd))}</TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      <StatusBadge tone={TYPE_TONES[e.expense_type]}>
                         {TYPE_LABEL[e.expense_type]}
-                      </Badge>
+                      </StatusBadge>
                     </TableCell>
-                    <TableCell className="text-xs text-gray-600">
+                    <TableCell className="py-3.5 px-5 text-xs text-ink-warm-700">
                       {e.frequency === 'one_time' ? (
                         FREQ_LABEL[e.frequency]
                       ) : (
@@ -503,19 +543,17 @@ export default function ExpensesPage() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-gray-800 max-w-md truncate" title={e.description}>{e.description}</TableCell>
-                    <TableCell>
+                    <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700 max-w-md truncate" title={e.description}>{e.description}</TableCell>
+                    <TableCell className="py-3.5 px-5">
                       {e.is_paid ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <Check className="h-3 w-3" /> Paid
-                        </span>
+                        <StatusBadge tone="success">Paid</StatusBadge>
                       ) : (
-                        <span className="text-xs text-amber-600 font-medium">Unpaid</span>
+                        <StatusBadge tone="warning">Unpaid</StatusBadge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
+                    <TableCell className="py-3.5 px-5 text-right" onClick={(ev) => ev.stopPropagation()}>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openDetail(e)}>
-                        <Eye className="h-3.5 w-3.5 text-gray-500" />
+                        <Eye className="h-3.5 w-3.5 text-ink-warm-500" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -697,17 +735,22 @@ function AddExpenseDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-[520px]">
+      {/* v11 canonical scroll model: flex-col so the footer stays visible
+          while the body scrolls on short viewports. */}
+      <DialogContent className="sm:max-w-[520px] max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Add expense</DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogTitle className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-brand" />
+            Add Expense
+          </DialogTitle>
+          <DialogDescription>
             Recurring expenses generate a row immediately + one each period via cron.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
           <div>
-            <Label className="text-xs">User <RequiredAsterisk /></Label>
+            <Label>User <RequiredAsterisk /></Label>
             <Select value={userId} onValueChange={setUserId}>
               <SelectTrigger className="h-9 focus-brand"><SelectValue placeholder="Select user…" /></SelectTrigger>
               <SelectContent>
@@ -718,7 +761,7 @@ function AddExpenseDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Amount (USD) <RequiredAsterisk /></Label>
+              <Label>Amount (USD) <RequiredAsterisk /></Label>
               <Input
                 type="number" step="0.01" min="0"
                 value={amount} onChange={e => setAmount(e.target.value)}
@@ -727,7 +770,7 @@ function AddExpenseDialog({
               />
             </div>
             <div>
-              <Label className="text-xs">Frequency <RequiredAsterisk /></Label>
+              <Label>Frequency <RequiredAsterisk /></Label>
               <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
                 <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -740,7 +783,7 @@ function AddExpenseDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Type <RequiredAsterisk /></Label>
+              <Label>Type <RequiredAsterisk /></Label>
               <Select value={expenseType} onValueChange={(v) => setExpenseType(v as ExpenseType)}>
                 <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -751,12 +794,12 @@ function AddExpenseDialog({
             </div>
             {frequency === 'one_time' ? (
               <div>
-                <Label className="text-xs">Date <RequiredAsterisk /></Label>
+                <Label>Date <RequiredAsterisk /></Label>
                 <DateField value={expenseDate} onChange={setExpenseDate} placeholder="Select date" />
               </div>
             ) : (
               <div>
-                <Label className="text-xs">Start date <RequiredAsterisk /></Label>
+                <Label>Start Date <RequiredAsterisk /></Label>
                 <DateField value={recurrenceStart} onChange={setRecurrenceStart} placeholder="Select start date" />
               </div>
             )}
@@ -764,14 +807,14 @@ function AddExpenseDialog({
 
           {frequency !== 'one_time' && (
             <div>
-              <Label className="text-xs">End date (optional)</Label>
+              <Label>End Date (Optional)</Label>
               <DateField value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder="No end date" allowClear />
-              <p className="text-[11px] text-gray-500 mt-1">Leave empty for indefinite. Cron stops generating after this date.</p>
+              <p className="text-[11px] text-ink-warm-500 mt-1">Leave empty for indefinite. Cron stops generating after this date.</p>
             </div>
           )}
 
           <div>
-            <Label className="text-xs">Description <RequiredAsterisk /></Label>
+            <Label>Description <RequiredAsterisk /></Label>
             <Input
               value={description} onChange={e => setDescription(e.target.value)}
               placeholder="What was this for?"
@@ -780,7 +823,7 @@ function AddExpenseDialog({
           </div>
 
           <div>
-            <Label className="text-xs">Notes (optional)</Label>
+            <Label>Notes (Optional)</Label>
             <Textarea
               value={notes} onChange={e => setNotes(e.target.value)} rows={2}
               placeholder="Anything else worth knowing"
@@ -788,15 +831,15 @@ function AddExpenseDialog({
             />
           </div>
 
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[11px] text-ink-warm-500">
             Attachments can be added after creating — open the detail view.
           </p>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
           <Button variant="brand" onClick={submit} disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create expense'}
+            {submitting ? 'Creating…' : 'Create Expense'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -836,7 +879,7 @@ function DetailDialog({
       toast({ title: expense.is_paid ? 'Marked unpaid' : 'Marked paid' });
       await onRefresh();
     } catch (err: any) {
-      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+      toast({ title: 'Update failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     }
   };
 
@@ -895,80 +938,95 @@ function DetailDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+      {/* v11 canonical scroll model: header + scrolling body + sticky footer.
+          DialogContent itself is flex-col so the footer's `border-t` stays
+          visible while the body content scrolls. */}
+      <DialogContent className="sm:max-w-[560px] max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-brand" />
-              {formatUSD(Number(expense.amount_usd))}
-            </span>
-            <Badge className={`${TYPE_COLOR[expense.expense_type]} hover:${TYPE_COLOR[expense.expense_type]}`}>
-              {TYPE_LABEL[expense.expense_type]}
-            </Badge>
+          <DialogTitle className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-brand" />
+            Expense Details
           </DialogTitle>
+          <DialogDescription>
+            Submitted by {user?.name || 'Unknown'} · {formatDate(expense.expense_date)}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
+          {/* Amount + type — read-view equivalent of the AddExpenseDialog's
+              first form fields, made prominent because it's the most-glance-
+              worthy info on this surface. */}
+          <div className="flex items-baseline justify-between pb-3 border-b border-cream-100">
+            <span className="text-2xl font-semibold text-ink-warm-900 tabular-nums">
+              {formatUSD(Number(expense.amount_usd))}
+            </span>
+            <StatusBadge tone={TYPE_TONES[expense.expense_type]}>
+              {TYPE_LABEL[expense.expense_type]}
+            </StatusBadge>
+          </div>
+
           {/* Status row */}
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-cream-50 border border-cream-200">
             {expense.is_paid ? (
               <>
-                <div className="p-1.5 bg-emerald-100 rounded-full">
-                  <Check className="h-4 w-4 text-emerald-700" />
-                </div>
+                <StatusBadge tone="success">
+                  <Check className="h-3 w-3" /> Paid
+                </StatusBadge>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-emerald-800">Paid</p>
-                  <p className="text-xs text-gray-500">{formatDate(expense.paid_at)}</p>
+                  <p className="text-xs text-ink-warm-500">{formatDate(expense.paid_at)}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={togglePaid}>Mark unpaid</Button>
+                <Button variant="outline" size="sm" onClick={togglePaid}>Mark Unpaid</Button>
               </>
             ) : (
               <>
-                <div className="p-1.5 bg-amber-100 rounded-full">
-                  <AlertCircle className="h-4 w-4 text-amber-700" />
-                </div>
+                <StatusBadge tone="warning">
+                  <AlertCircle className="h-3 w-3" /> Unpaid
+                </StatusBadge>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-800">Unpaid</p>
-                  <p className="text-xs text-gray-500">Reimbursement pending</p>
+                  <p className="text-xs text-ink-warm-500">Reimbursement pending</p>
                 </div>
+                {/* deliberate emerald variant for Mark Paid affordance — matches the
+                    Mark Paid button in the bulk action bar; not the brand CTA. */}
                 <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={togglePaid}>
-                  <Check className="h-3.5 w-3.5 mr-1" /> Mark paid
+                  <Check className="h-3.5 w-3.5 mr-1" /> Mark Paid
                 </Button>
               </>
             )}
           </div>
 
-          {/* Details */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          {/* Details — read-view fields mirror the AddExpenseDialog's form
+              labels (same <Label> component, same default size) so the two
+              dialogs feel like two faces of the same surface. */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">User</p>
-              <p className="text-gray-900">{user?.name || expense.user_id}</p>
-              {user?.email && <p className="text-xs text-gray-500">{user.email}</p>}
+              <Label className="text-ink-warm-500 font-normal">User</Label>
+              <p className="text-sm text-ink-warm-900 mt-1">{user?.name || expense.user_id}</p>
+              {user?.email && <p className="text-xs text-ink-warm-500">{user.email}</p>}
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Date</p>
-              <p className="text-gray-900 flex items-center gap-1.5">
-                <CalendarIcon className="h-3.5 w-3.5 text-gray-400" />
+              <Label className="text-ink-warm-500 font-normal">Date</Label>
+              <p className="text-sm text-ink-warm-900 mt-1 flex items-center gap-1.5">
+                <CalendarIcon className="h-3.5 w-3.5 text-ink-warm-400" />
                 {formatDate(expense.expense_date)}
               </p>
             </div>
             <div className="col-span-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Description</p>
-              <p className="text-gray-900">{expense.description}</p>
+              <Label className="text-ink-warm-500 font-normal">Description</Label>
+              <p className="text-sm text-ink-warm-900 mt-1">{expense.description}</p>
             </div>
             {expense.notes && (
               <div className="col-span-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Notes</p>
-                <p className="text-gray-800 text-sm whitespace-pre-wrap">{expense.notes}</p>
+                <Label className="text-ink-warm-500 font-normal">Notes</Label>
+                <p className="text-sm text-ink-warm-700 mt-1 whitespace-pre-wrap">{expense.notes}</p>
               </div>
             )}
             <div className="col-span-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Frequency</p>
-              <p className="text-gray-900 flex items-center gap-1.5">
+              <Label className="text-ink-warm-500 font-normal">Frequency</Label>
+              <p className="text-sm text-ink-warm-900 mt-1 flex items-center gap-1.5">
                 {expense.frequency !== 'one_time' && <RefreshCw className="h-3.5 w-3.5 text-violet-500" />}
                 {FREQ_LABEL[expense.frequency]}
                 {expense.template_id && (
-                  <span className="text-xs text-gray-500 ml-2">(instance of a recurring template)</span>
+                  <span className="text-xs text-ink-warm-500 ml-2">(instance of a recurring template)</span>
                 )}
               </p>
             </div>
@@ -977,9 +1035,9 @@ function DetailDialog({
           {/* Attachments */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+              <Label className="text-ink-warm-500 font-normal">
                 Attachments ({attachments.length}/5)
-              </p>
+              </Label>
               <Button
                 variant="outline"
                 size="sm"
@@ -988,7 +1046,7 @@ function DetailDialog({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-3 w-3 mr-1" />
-                {uploading ? 'Uploading…' : 'Add receipt'}
+                {uploading ? 'Uploading…' : 'Add Receipt'}
               </Button>
               <input
                 ref={fileInputRef}
@@ -1003,18 +1061,22 @@ function DetailDialog({
               />
             </div>
             {loading ? (
-              <p className="text-xs text-gray-400 py-3">Loading…</p>
+              <div className="space-y-1.5 py-1">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-9 w-full rounded-lg" />
+                ))}
+              </div>
             ) : attachments.length === 0 ? (
-              <p className="text-xs text-gray-400 py-3">No receipts yet. Max 5 files, 10MB each. JPG/PNG/GIF/WebP/PDF.</p>
+              <p className="text-xs text-ink-warm-500 py-3">No receipts yet. Max 5 files, 10MB each. JPG/PNG/GIF/WebP/PDF.</p>
             ) : (
               <div className="space-y-1.5">
                 {attachments.map(att => {
                   const isImage = att.mime_type?.startsWith('image/');
                   return (
-                    <div key={att.id} className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                    <div key={att.id} className="flex items-center gap-2 p-2 bg-cream-50 border border-cream-200 rounded-lg text-sm">
                       {isImage ? <ImageIcon className="h-4 w-4 text-violet-500" /> : <FileText className="h-4 w-4 text-rose-500" />}
                       <span className="flex-1 truncate" title={att.file_name}>{att.file_name}</span>
-                      <span className="text-xs text-gray-500 tabular-nums">
+                      <span className="text-xs text-ink-warm-500 tabular-nums">
                         {att.file_size_bytes ? `${Math.round(att.file_size_bytes / 1024)}KB` : '—'}
                       </span>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => viewAttachment(att)}>
@@ -1031,11 +1093,11 @@ function DetailDialog({
           </div>
         </div>
 
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <Button variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={softDelete}>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0 flex justify-between sm:justify-between">
+          <Button variant="ghost" size="sm" className="text-rose-600 hover:bg-rose-50" onClick={softDelete}>
             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
           </Button>
-          <Button onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

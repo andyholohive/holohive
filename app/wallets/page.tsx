@@ -23,7 +23,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +30,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Wallet, Users, Activity, Repeat, Search, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -117,13 +118,15 @@ export default function WalletsPage() {
         icon={Wallet}
         title="Wallet Analytics"
         subtitle="Cross-campaign wallet participation, retention, and audience overlap."
+        kicker="Documents · Wallet Analytics"
+        kickerDot="brand"
       />
 
       {/* KPI strip — four headline numbers. */}
       {summaryLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-lg" />
+            <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
       ) : summaryError ? (
@@ -158,30 +161,63 @@ export default function WalletsPage() {
         <EmptyState icon={Wallet} title="Couldn't load summary" description="Check console for fetch error." />
       )}
 
-      {/* Tabs: Overview / By campaign / Wallets list */}
+      {/* Tabs: Overview / By campaign / Wallets list — v11 chrome
+          (cream-100 outer, white active tile with shadow-card). */}
       <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="by_campaign">By Campaign</TabsTrigger>
-          <TabsTrigger value="wallets">Wallets</TabsTrigger>
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+          <TabsTrigger
+            value="overview"
+            className="data-[state=active]:bg-white data-[state=active]:shadow-card px-4 py-2"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="by_campaign"
+            className="data-[state=active]:bg-white data-[state=active]:shadow-card px-4 py-2"
+          >
+            By Campaign
+          </TabsTrigger>
+          <TabsTrigger
+            value="wallets"
+            className="data-[state=active]:bg-white data-[state=active]:shadow-card px-4 py-2"
+          >
+            Wallets
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
           {summary && (
             <>
-              <RetentionFunnel summary={summary} />
-              <OverlapMatrix summary={summary} />
+              <div className="space-y-3">
+                <SectionHeader label="Retention" dot="brand" first />
+                <RetentionFunnel summary={summary} />
+              </div>
+              <div className="space-y-3">
+                <SectionHeader label="Campaign Overlap" dot="sky" />
+                <OverlapMatrix summary={summary} />
+              </div>
             </>
           )}
         </TabsContent>
 
-        <TabsContent value="by_campaign" className="mt-4">
-          {summary && <ByCampaign summary={summary} />}
+        <TabsContent value="by_campaign" className="mt-4 space-y-3">
+          {summary && (
+            <>
+              <SectionHeader
+                label="By Campaign"
+                dot="brand"
+                counter={`${summary.events_by_reach.length} campaign${summary.events_by_reach.length === 1 ? '' : 's'}`}
+                first
+              />
+              <ByCampaign summary={summary} />
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="wallets" className="mt-4">
           <WalletsTable summary={summary} />
         </TabsContent>
+
       </Tabs>
     </div>
   );
@@ -203,11 +239,11 @@ function RetentionFunnel({ summary }: { summary: Summary }) {
     { label: '3+ events', count: summary.retention.three_plus_events, pct: summary.retention_pct.three_plus_events, color: 'bg-emerald-500', text: 'text-white' },
   ];
   return (
-    <Card className="border border-gray-200 shadow-sm p-5">
+    <Card className="border border-cream-200 shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Retention funnel</h3>
-          <p className="text-xs text-gray-500">How many wallets came back for more than one campaign.</p>
+          <h3 className="text-sm font-semibold text-ink-warm-900">Retention funnel</h3>
+          <p className="text-xs text-ink-warm-500">How many wallets came back for more than one campaign.</p>
         </div>
       </div>
       <div className="space-y-2">
@@ -215,8 +251,8 @@ function RetentionFunnel({ summary }: { summary: Summary }) {
           const width = (b.count / max) * 100;
           return (
             <div key={b.label} className="flex items-center gap-3">
-              <div className="w-20 text-xs text-gray-600 flex-shrink-0">{b.label}</div>
-              <div className="flex-1 h-7 bg-gray-50 rounded overflow-hidden relative">
+              <div className="w-20 text-xs text-ink-warm-700 flex-shrink-0">{b.label}</div>
+              <div className="flex-1 h-7 bg-cream-50 rounded overflow-hidden relative">
                 <div
                   className={`h-full ${b.color} flex items-center px-2 text-xs font-medium ${b.text} transition-all`}
                   style={{ width: `${width}%`, minWidth: '60px' }}
@@ -224,7 +260,7 @@ function RetentionFunnel({ summary }: { summary: Summary }) {
                   {b.count.toLocaleString()}
                 </div>
               </div>
-              <div className="w-14 text-right text-xs tabular-nums text-gray-600 flex-shrink-0">{b.pct.toFixed(1)}%</div>
+              <div className="w-14 text-right text-xs tabular-nums text-ink-warm-700 flex-shrink-0">{b.pct.toFixed(1)}%</div>
             </div>
           );
         })}
@@ -253,17 +289,21 @@ function OverlapMatrix({ summary }: { summary: Summary }) {
   }, [events, summary.overlap]);
 
   return (
-    <Card className="border border-gray-200 shadow-sm p-5 overflow-x-auto">
+    <Card className="border border-cream-200 shadow-sm p-5 overflow-x-auto">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-gray-900">Campaign overlap</h3>
-        <p className="text-xs text-gray-500">Wallets appearing in both row and column campaigns. Diagonal shows each campaign&apos;s own reach.</p>
+        <h3 className="text-sm font-semibold text-ink-warm-900">Campaign overlap</h3>
+        <p className="text-xs text-ink-warm-500">Wallets appearing in both row and column campaigns. Diagonal shows each campaign&apos;s own reach.</p>
       </div>
+      {/* Raw <table> intentional — this is a fixed-axis 2D overlap matrix.
+          The shared <Table> primitive models a 1D list-of-rows shape and
+          doesn't cleanly express a symmetric N×N grid with matching row +
+          column headers. */}
       <table className="min-w-[600px] text-xs">
         <thead>
           <tr>
-            <th className="text-left p-2 font-semibold text-gray-500"></th>
+            <th className="text-left p-2 font-semibold text-ink-warm-500"></th>
             {events.map(e => (
-              <th key={e} className="p-2 text-center font-semibold text-gray-700 max-w-[120px]">
+              <th key={e} className="p-2 text-center font-semibold text-ink-warm-700 max-w-[120px]">
                 <div className="truncate" title={e}>{e}</div>
               </th>
             ))}
@@ -272,7 +312,7 @@ function OverlapMatrix({ summary }: { summary: Summary }) {
         <tbody>
           {events.map(rowEvt => (
             <tr key={rowEvt}>
-              <td className="p-2 font-semibold text-gray-700 whitespace-nowrap">{rowEvt}</td>
+              <td className="p-2 font-semibold text-ink-warm-700 whitespace-nowrap">{rowEvt}</td>
               {events.map(colEvt => {
                 const val = summary.overlap[rowEvt]?.[colEvt] || 0;
                 const isDiag = rowEvt === colEvt;
@@ -281,10 +321,10 @@ function OverlapMatrix({ summary }: { summary: Summary }) {
                 // doesn't confuse "this event's reach" with "overlap".
                 const intensity = isDiag ? 0 : Math.min(1, val / offDiagMax);
                 const bg = isDiag
-                  ? 'bg-gray-100 text-gray-700'
+                  ? 'bg-cream-100 text-ink-warm-700'
                   : intensity === 0
-                    ? 'bg-white text-gray-300'
-                    : `text-gray-900`;
+                    ? 'bg-white text-ink-warm-300'
+                    : `text-ink-warm-900`;
                 const inlineBg = isDiag || intensity === 0 ? undefined : {
                   // Brand teal at variable opacity. CSS opacity on the
                   // background-color via rgba.
@@ -293,7 +333,7 @@ function OverlapMatrix({ summary }: { summary: Summary }) {
                 return (
                   <td
                     key={colEvt}
-                    className={`p-2 text-center tabular-nums border border-gray-100 ${bg}`}
+                    className={`p-2 text-center tabular-nums border border-cream-100 ${bg}`}
                     style={inlineBg}
                     title={isDiag
                       ? `${rowEvt}: ${val} total wallets`
@@ -324,21 +364,21 @@ function ByCampaign({ summary }: { summary: Summary }) {
       {summary.events_by_reach.map(e => {
         const evmPct = e.total > 0 ? (100 * e.evm / e.total) : 0;
         return (
-          <Card key={e.name} className="border border-gray-200 shadow-sm p-4">
+          <Card key={e.name} className="border border-cream-200 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <h4 className="font-semibold text-gray-900">{e.name}</h4>
-              <Badge variant="outline" className="text-xs">{e.total.toLocaleString()} wallets</Badge>
+              <h4 className="font-semibold text-ink-warm-900">{e.name}</h4>
+              <StatusBadge tone="neutral">{e.total.toLocaleString()} wallets</StatusBadge>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-gray-50 rounded p-3">
-                <p className="text-gray-500 mb-1">EVM</p>
+              <div className="bg-cream-50 rounded p-3">
+                <p className="text-ink-warm-500 mb-1">EVM</p>
                 <p className="text-lg font-bold tabular-nums">{e.evm.toLocaleString()}</p>
-                <p className="text-gray-500 mt-0.5">{evmPct.toFixed(1)}%</p>
+                <p className="text-ink-warm-500 mt-0.5">{evmPct.toFixed(1)}%</p>
               </div>
-              <div className="bg-gray-50 rounded p-3">
-                <p className="text-gray-500 mb-1">Solana</p>
+              <div className="bg-cream-50 rounded p-3">
+                <p className="text-ink-warm-500 mb-1">Solana</p>
                 <p className="text-lg font-bold tabular-nums">{e.solana.toLocaleString()}</p>
-                <p className="text-gray-500 mt-0.5">{(100 - evmPct).toFixed(1)}%</p>
+                <p className="text-ink-warm-500 mt-0.5">{(100 - evmPct).toFixed(1)}%</p>
               </div>
             </div>
           </Card>
@@ -387,18 +427,27 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
   useEffect(() => { setPage(1); }, [chain, event, minEvents, search]);
 
   const events = summary?.events_by_reach.map(e => e.name) || [];
+  const visibleCount = data?.items.length ?? 0;
+  const totalCount = data?.total ?? 0;
 
   return (
-    <Card className="border border-gray-200 shadow-sm">
+    <div className="space-y-3">
+      <SectionHeader
+        label="Wallets"
+        dot="brand"
+        counter={`${visibleCount} of ${totalCount} wallet${totalCount === 1 ? '' : 's'}`}
+        first
+      />
+      <Card className="border border-cream-200 shadow-sm">
       {/* Filter bar */}
-      <div className="p-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+      <div className="p-4 border-b border-cream-100 flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
           <Input
             placeholder="Search address (prefix)…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9 text-sm focus-brand"
+            className="pl-10 h-9 text-sm focus-brand"
           />
         </div>
         <Select value={chain} onValueChange={setChain}>
@@ -430,15 +479,15 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
       <div className="overflow-x-auto">
         <Table className="min-w-[900px]">
           <TableHeader>
-            <TableRow className="bg-gray-50/60">
-              <TableHead>Wallet address</TableHead>
-              <TableHead className="w-[90px]">Chain</TableHead>
-              <TableHead className="w-[80px] text-right">Events</TableHead>
-              <TableHead>Event labels</TableHead>
-              <TableHead className="w-[110px] text-right">Net worth</TableHead>
-              <TableHead className="w-[80px]">Tier</TableHead>
-              <TableHead className="w-[70px] text-center">DeFi</TableHead>
-              <TableHead className="w-[70px] text-center">NFT</TableHead>
+            <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Wallet address</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[90px]">Chain</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[80px] text-right">Events</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Event labels</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px] text-right">Net worth</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[80px]">Tier</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[70px] text-center">DeFi</TableHead>
+              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[70px] text-center">NFT</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -460,8 +509,8 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
                 </TableCell>
               </TableRow>
             ) : data.items.map(w => (
-              <TableRow key={w.id} className="hover:bg-gray-50/60">
-                <TableCell className="font-mono text-xs">
+              <TableRow key={w.id} className="border-cream-100 hover:bg-cream-50/60">
+                <TableCell className="py-3.5 px-5 font-mono text-xs">
                   <a
                     href={w.chain === 'evm'
                       ? `https://debank.com/profile/${w.wallet_address.toLowerCase()}`
@@ -469,35 +518,35 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-gray-700 hover:text-brand inline-flex items-center gap-1"
+                    className="text-ink-warm-700 hover:text-brand inline-flex items-center gap-1"
                     title="Open on DeBank / Solscan"
                   >
                     <span className="truncate max-w-[260px]">{w.wallet_address}</span>
-                    <ExternalLink className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                    <ExternalLink className="h-3 w-3 text-ink-warm-400 flex-shrink-0" />
                   </a>
                 </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={`text-[10px] uppercase ${
-                    w.chain === 'evm' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
-                  }`}>{w.chain}</Badge>
+                <TableCell className="py-3.5 px-5">
+                  <StatusBadge tone={w.chain === 'evm' ? 'info' : 'purple'} size="sm" className="uppercase">
+                    {w.chain}
+                  </StatusBadge>
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{w.num_events}</TableCell>
-                <TableCell className="text-xs text-gray-600 truncate max-w-[280px]" title={w.event_labels}>
+                <TableCell className="py-3.5 px-5 text-right tabular-nums">{w.num_events}</TableCell>
+                <TableCell className="py-3.5 px-5 text-xs text-ink-warm-700 truncate max-w-[280px]" title={w.event_labels}>
                   {w.event_labels}
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-gray-600">
-                  {w.net_worth_usd != null ? `$${w.net_worth_usd.toLocaleString()}` : <span className="text-gray-300">—</span>}
+                <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
+                  {w.net_worth_usd != null ? `$${w.net_worth_usd.toLocaleString()}` : <span className="text-ink-warm-300">—</span>}
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-3.5 px-5">
                   {w.wallet_tier ? (
-                    <Badge variant="outline" className="text-[10px] capitalize">{w.wallet_tier}</Badge>
-                  ) : <span className="text-gray-300">—</span>}
+                    <StatusBadge tone="neutral" size="sm" className="capitalize">{w.wallet_tier}</StatusBadge>
+                  ) : <span className="text-ink-warm-300">—</span>}
                 </TableCell>
-                <TableCell className="text-center">
-                  {w.defi_active == null ? <span className="text-gray-300">—</span> : w.defi_active ? '✓' : '✕'}
+                <TableCell className="py-3.5 px-5 text-center">
+                  {w.defi_active == null ? <span className="text-ink-warm-300">—</span> : w.defi_active ? '✓' : '✕'}
                 </TableCell>
-                <TableCell className="text-center">
-                  {w.nft_holder == null ? <span className="text-gray-300">—</span> : w.nft_holder ? '✓' : '✕'}
+                <TableCell className="py-3.5 px-5 text-center">
+                  {w.nft_holder == null ? <span className="text-ink-warm-300">—</span> : w.nft_holder ? '✓' : '✕'}
                 </TableCell>
               </TableRow>
             ))}
@@ -507,7 +556,7 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
 
       {/* Pagination */}
       {data && data.total_pages > 1 && (
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600">
+        <div className="px-4 py-3 border-t border-cream-100 flex items-center justify-between text-xs text-ink-warm-700">
           <span>
             Showing {((data.page - 1) * data.page_size) + 1}–{Math.min(data.page * data.page_size, data.total)} of {data.total.toLocaleString()}
           </span>
@@ -534,6 +583,7 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
           </div>
         </div>
       )}
-    </Card>
+      </Card>
+    </div>
   );
 }

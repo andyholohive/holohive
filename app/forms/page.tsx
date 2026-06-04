@@ -14,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2, ClipboardList } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -76,6 +78,14 @@ const formatCategory = (category: string | null | undefined): string => {
   return categoryDisplayMap[category] || formatFieldValue(category);
 };
 
+// Form status tone map (replaces FormService.getStatusColor which returns
+// inline bg-X-100 text-X-800 pills). Use with <StatusBadge tone={...}>.
+const FORM_STATUS_TONES: Record<string, BadgeTone> = {
+  draft: 'neutral',
+  published: 'success',
+  closed: 'danger',
+};
+
 export default function FormsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -134,8 +144,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error fetching forms:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load forms',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load forms',
         variant: 'destructive',
       });
     } finally {
@@ -158,8 +168,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load lead submissions',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load lead submissions',
         variant: 'destructive',
       });
     } finally {
@@ -182,8 +192,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error fetching partners:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load partner submissions',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load partner submissions',
         variant: 'destructive',
       });
     } finally {
@@ -206,8 +216,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error fetching links:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load link submissions',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load link submissions',
         variant: 'destructive',
       });
     } finally {
@@ -229,8 +239,7 @@ export default function FormsPage() {
   const handleCreateForm = async () => {
     if (!newFormName.trim()) {
       toast({
-        title: 'Error',
-        description: 'Please enter a form name',
+        title: 'Form name required',
         variant: 'destructive',
       });
       return;
@@ -244,10 +253,7 @@ export default function FormsPage() {
         status: newFormStatus,
       });
 
-      toast({
-        title: 'Success',
-        description: 'Form created successfully',
-      });
+      toast({ title: 'Form created' });
 
       // Reset form and close dialog
       setNewFormName('');
@@ -263,8 +269,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error creating form:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create form',
+        title: 'Create failed',
+        description: error instanceof Error ? error.message : 'Failed to create form',
         variant: 'destructive',
       });
     } finally {
@@ -280,15 +286,15 @@ export default function FormsPage() {
     try {
       await FormService.archiveForm(formId);
       toast({
-        title: 'Success',
-        description: 'Form archived successfully. You can restore it from the Archive page.',
+        title: 'Form archived',
+        description: 'You can restore it from the Archive page.',
       });
       await fetchForms();
     } catch (error) {
       console.error('Error archiving form:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to archive form',
+        title: 'Archive failed',
+        description: error instanceof Error ? error.message : 'Failed to archive form',
         variant: 'destructive',
       });
     }
@@ -300,8 +306,8 @@ export default function FormsPage() {
     navigator.clipboard.writeText(shareUrl);
     setCopiedFormId(form.id);
     toast({
-      title: 'Copied!',
-      description: 'Share link copied to clipboard',
+      title: 'Link copied',
+      description: 'Share link copied to clipboard.',
     });
     setTimeout(() => setCopiedFormId(null), 2000);
   };
@@ -326,8 +332,7 @@ export default function FormsPage() {
   const handleDuplicateForm = async () => {
     if (!duplicatingForm || !duplicateFormName.trim()) {
       toast({
-        title: 'Error',
-        description: 'Please enter a form name',
+        title: 'Form name required',
         variant: 'destructive',
       });
       return;
@@ -367,10 +372,7 @@ export default function FormsPage() {
         }
       }
 
-      toast({
-        title: 'Success',
-        description: 'Form duplicated successfully',
-      });
+      toast({ title: 'Form duplicated' });
 
       // Reset and close dialog
       setDuplicateFormName('');
@@ -385,8 +387,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error duplicating form:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to duplicate form',
+        title: 'Duplicate failed',
+        description: error instanceof Error ? error.message : 'Failed to duplicate form',
         variant: 'destructive',
       });
     } finally {
@@ -404,8 +406,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error fetching responses:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load responses',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load responses',
         variant: 'destructive',
       });
     } finally {
@@ -424,8 +426,8 @@ export default function FormsPage() {
       } catch (error) {
         console.error('Error fetching form:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to load form details',
+          title: 'Load failed',
+          description: error instanceof Error ? error.message : 'Failed to load form details',
           variant: 'destructive',
         });
         return;
@@ -441,10 +443,7 @@ export default function FormsPage() {
 
     try {
       await FormService.deleteResponse(responseId);
-      toast({
-        title: 'Success',
-        description: 'Response deleted successfully',
-      });
+      toast({ title: 'Response deleted' });
       // Refresh responses
       setResponses(prev => prev.filter(r => r.id !== responseId));
       // Update response count in forms list
@@ -458,8 +457,8 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error deleting response:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to delete response',
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete response',
         variant: 'destructive',
       });
     }
@@ -477,8 +476,8 @@ export default function FormsPage() {
       } catch (error) {
         console.error('Error fetching form:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to load form details',
+          title: 'Load failed',
+          description: error instanceof Error ? error.message : 'Failed to load form details',
           variant: 'destructive',
         });
         return;
@@ -564,6 +563,8 @@ export default function FormsPage() {
           icon={ClipboardList}
           title="Forms & Submissions"
           subtitle="Create forms and view external submissions"
+          kicker="Documents · Forms"
+          kickerDot="brand"
           actions={(activeTab === 'forms' ? (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
@@ -615,7 +616,7 @@ export default function FormsPage() {
                   </Select>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
@@ -628,33 +629,64 @@ export default function FormsPage() {
           ) : undefined)}
         />
 
-        {/* Tabs */}
+        {/* Tabs — v11 chrome (cream-100 outer, white active tile with
+            shadow-card, brand-light count chip). */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="forms" className="flex items-center gap-2">
+          <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 mb-6">
+            <TabsTrigger
+              value="forms"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
               <FileText className="h-4 w-4" />
               Forms
+              <span className="ml-1 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                {forms.length}
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="leads" className="flex items-center gap-2">
+            <TabsTrigger
+              value="leads"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
               <Users className="h-4 w-4" />
               Leads
+              <span className="ml-1 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                {leads.length}
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="partners" className="flex items-center gap-2">
+            <TabsTrigger
+              value="partners"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
               <Handshake className="h-4 w-4" />
               Partners
+              <span className="ml-1 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                {partners.length}
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="links" className="flex items-center gap-2">
+            <TabsTrigger
+              value="links"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
               <Link2 className="h-4 w-4" />
               Links
+              <span className="ml-1 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                {links.length}
+              </span>
             </TabsTrigger>
           </TabsList>
 
           {/* Forms Tab */}
           <TabsContent value="forms" className="space-y-6">
+            <SectionHeader
+              label="Forms"
+              dot="brand"
+              counter={`${filteredForms.length} of ${forms.length} form${forms.length === 1 ? '' : 's'}`}
+              first
+            />
             {/* Search and Filters */}
-            <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input
               placeholder="Search forms..."
               value={searchTerm}
@@ -678,7 +710,7 @@ export default function FormsPage() {
         {/* Loading State */}
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader>
                   <Skeleton className="h-6 w-3/4 mb-2" />
@@ -699,23 +731,24 @@ export default function FormsPage() {
 
         {/* Forms Grid */}
         {!loading && filteredForms.length === 0 && (
-          <div className="text-center py-12">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {searchTerm || statusFilter !== 'all' ? 'No forms found' : 'No forms yet'}
-            </h3>
-            <p className="text-gray-600 mb-6">
-              {searchTerm || statusFilter !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Create your first form to start collecting data'}
-            </p>
-            {!searchTerm && statusFilter === 'all' && (
-              <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Form
-              </Button>
-            )}
-          </div>
+          <Card className="border-cream-200">
+            <EmptyState
+              icon={FileText}
+              title={searchTerm || statusFilter !== 'all' ? 'No forms found' : 'No forms yet'}
+              description={
+                searchTerm || statusFilter !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'Create your first form to start collecting data'
+              }
+            >
+              {!searchTerm && statusFilter === 'all' && (
+                <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Form
+                </Button>
+              )}
+            </EmptyState>
+          </Card>
         )}
 
         {!loading && filteredForms.length > 0 && (
@@ -725,20 +758,20 @@ export default function FormsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-lg text-gray-900 mb-1">{form.name}</h3>
-                      <Badge className={`${FormService.getStatusColor(form.status)} pointer-events-none`}>
+                      <h3 className="font-semibold text-lg text-ink-warm-900 mb-1">{form.name}</h3>
+                      <StatusBadge tone={FORM_STATUS_TONES[form.status] ?? 'neutral'}>
                         {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
-                      </Badge>
+                      </StatusBadge>
                     </div>
                   </div>
                   {form.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2">{form.description}</p>
+                    <p className="text-sm text-ink-warm-700 line-clamp-2">{form.description}</p>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {/* Stats */}
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-4 text-sm text-ink-warm-700">
                       <button
                         onClick={() => handleViewResponses(form)}
                         className="flex items-center gap-1 hover:text-brand transition-colors"
@@ -748,7 +781,7 @@ export default function FormsPage() {
                         <span>{form.response_count} responses</span>
                         <Eye className="h-3 w-3 ml-1" />
                       </button>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-ink-warm-500">
                         {new Date(form.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                     </div>
@@ -811,49 +844,79 @@ export default function FormsPage() {
 
           {/* Leads Tab */}
           <TabsContent value="leads" className="space-y-4">
+            <SectionHeader
+              label="Leads"
+              dot="brand"
+              counter={`${leads.length} lead${leads.length === 1 ? '' : 's'}`}
+              first
+            />
             {loadingLeads ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-              </div>
-            ) : leads.length === 0 ? (
-              <EmptyState
-                icon={Users}
-                title="No lead submissions"
-                description="Lead form submissions will appear here."
-                className="py-12"
-              />
-            ) : (
-              <Card>
+              <Card className="border-cream-200">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Stage</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Deal Value</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Stage</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Source</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Deal Value</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-8 w-24" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ) : leads.length === 0 ? (
+              <Card className="border-cream-200">
+                <EmptyState
+                  icon={Users}
+                  title="No lead submissions"
+                  description="Lead form submissions will appear here."
+                />
+              </Card>
+            ) : (
+              <Card className="border-cream-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Stage</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Source</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Deal Value</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {leads.map((lead) => (
-                      <TableRow key={lead.id}>
-                        <TableCell className="font-medium">{lead.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
+                      <TableRow key={lead.id} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5 font-medium">{lead.name}</TableCell>
+                        <TableCell className="py-3.5 px-5">
+                          <StatusBadge tone="neutral">
                             {formatFieldValue(lead.stage)}
-                          </Badge>
+                          </StatusBadge>
                         </TableCell>
-                        <TableCell>{formatFieldValue(lead.source)}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">{formatFieldValue(lead.source)}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           {lead.deal_value ? `$${lead.deal_value.toLocaleString()}` : '-'}
                         </TableCell>
-                        <TableCell>{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => router.push('/crm/pipeline')}
+                            onClick={() => router.push('/crm/sales-pipeline')}
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View in CRM
@@ -869,48 +932,78 @@ export default function FormsPage() {
 
           {/* Partners Tab */}
           <TabsContent value="partners" className="space-y-4">
+            <SectionHeader
+              label="Partners"
+              dot="brand"
+              counter={`${partners.length} partner application${partners.length === 1 ? '' : 's'}`}
+              first
+            />
             {loadingPartners ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-              </div>
-            ) : partners.length === 0 ? (
-              <EmptyState
-                icon={Handshake}
-                title="No partner submissions"
-                description="Partner application submissions will appear here."
-                className="py-12"
-              />
-            ) : (
-              <Card>
+              <Card className="border-cream-200">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Category</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Contact</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-8 w-40" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-8 w-24" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ) : partners.length === 0 ? (
+              <Card className="border-cream-200">
+                <EmptyState
+                  icon={Handshake}
+                  title="No partner submissions"
+                  description="Partner application submissions will appear here."
+                />
+              </Card>
+            ) : (
+              <Card className="border-cream-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Category</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Contact</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {partners.map((partner) => (
-                      <TableRow key={partner.id}>
-                        <TableCell className="font-medium">{partner.name}</TableCell>
-                        <TableCell>{formatCategory(partner.category)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
+                      <TableRow key={partner.id} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5 font-medium">{partner.name}</TableCell>
+                        <TableCell className="py-3.5 px-5">{formatCategory(partner.category)}</TableCell>
+                        <TableCell className="py-3.5 px-5">
+                          <StatusBadge tone="neutral">
                             {formatFieldValue(partner.status)}
-                          </Badge>
+                          </StatusBadge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <div className="text-sm">
                             {partner.poc_name && <div>{partner.poc_name}</div>}
-                            {partner.poc_email && <div className="text-gray-500">{partner.poc_email}</div>}
+                            {partner.poc_email && <div className="text-ink-warm-500">{partner.poc_email}</div>}
                           </div>
                         </TableCell>
-                        <TableCell>{new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">{new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <Button
                             variant="outline"
                             size="sm"
@@ -930,36 +1023,66 @@ export default function FormsPage() {
 
           {/* Links Tab */}
           <TabsContent value="links" className="space-y-4">
+            <SectionHeader
+              label="Link Submissions"
+              dot="brand"
+              counter={`${links.length} submission${links.length === 1 ? '' : 's'}`}
+              first
+            />
             {loadingLinks ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-              </div>
-            ) : links.length === 0 ? (
-              <EmptyState
-                icon={Link2}
-                title="No link submissions"
-                description="Link form submissions will appear here."
-                className="py-12"
-              />
-            ) : (
-              <Card>
+              <Card className="border-cream-200">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>URL</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Type</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">URL</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-40" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-8 w-28" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ) : links.length === 0 ? (
+              <Card className="border-cream-200">
+                <EmptyState
+                  icon={Link2}
+                  title="No link submissions"
+                  description="Link form submissions will appear here."
+                />
+              </Card>
+            ) : (
+              <Card className="border-cream-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Type</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">URL</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {links.map((link) => (
-                      <TableRow key={link.id}>
-                        <TableCell className="font-medium">{link.name}</TableCell>
-                        <TableCell>{link.client || '-'}</TableCell>
-                        <TableCell>
+                      <TableRow key={link.id} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5 font-medium">{link.name}</TableCell>
+                        <TableCell className="py-3.5 px-5">{link.client || '-'}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           {link.link_types && link.link_types.length > 0 ? (
                             link.link_types.map((type, i) => (
                               <Badge key={i} variant="outline" className="mr-1">
@@ -968,19 +1091,19 @@ export default function FormsPage() {
                             ))
                           ) : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <a
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex items-center gap-1 max-w-[200px] truncate"
+                            className="text-brand hover:underline flex items-center gap-1 max-w-[200px] truncate"
                           >
                             {link.url}
                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
                           </a>
                         </TableCell>
-                        <TableCell>{new Date(link.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">{new Date(link.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <Button
                             variant="outline"
                             size="sm"
@@ -1011,25 +1134,25 @@ export default function FormsPage() {
             {sharingForm && (
               <div className="space-y-4">
                 {/* Form Details */}
-                <div className="border-l-4 border-brand bg-gray-50 p-4 rounded">
-                  <h4 className="font-semibold text-gray-900 mb-2">{sharingForm.name}</h4>
+                <div className="border-l-4 border-brand bg-cream-50 p-4 rounded">
+                  <h4 className="font-semibold text-ink-warm-900 mb-2">{sharingForm.name}</h4>
                   {sharingForm.description && (
-                    <p className="text-sm text-gray-600 mb-3">{sharingForm.description}</p>
+                    <p className="text-sm text-ink-warm-700 mb-3">{sharingForm.description}</p>
                   )}
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-4 text-sm text-ink-warm-700">
                     <div className="flex items-center gap-1">
                       <FileText className="h-4 w-4" />
                       <span>{sharingForm.response_count} responses</span>
                     </div>
-                    <Badge className={`${FormService.getStatusColor(sharingForm.status)} pointer-events-none`}>
+                    <StatusBadge tone={FORM_STATUS_TONES[sharingForm.status] ?? 'neutral'}>
                       {sharingForm.status.charAt(0).toUpperCase() + sharingForm.status.slice(1)}
-                    </Badge>
+                    </StatusBadge>
                   </div>
                 </div>
 
                 {/* Share Link */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                  <Label className="text-sm font-medium text-ink-warm-700 mb-2 block">
                     Share Link
                   </Label>
                   <div className="flex gap-2">
@@ -1059,13 +1182,13 @@ export default function FormsPage() {
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-ink-warm-500 mt-2">
                     Anyone with this link can submit a response to this form.
                   </p>
                 </div>
               </div>
             )}
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>
                 Close
               </Button>
@@ -1085,9 +1208,9 @@ export default function FormsPage() {
             {duplicatingForm && (
               <div className="space-y-4">
                 {/* Original Form Info */}
-                <div className="border-l-4 border-brand bg-gray-50 p-4 rounded">
-                  <p className="text-sm text-gray-600 mb-1">Duplicating from:</p>
-                  <h4 className="font-semibold text-gray-900">{duplicatingForm.name}</h4>
+                <div className="border-l-4 border-brand bg-cream-50 p-4 rounded">
+                  <p className="text-sm text-ink-warm-700 mb-1">Duplicating from:</p>
+                  <h4 className="font-semibold text-ink-warm-900">{duplicatingForm.name}</h4>
                 </div>
 
                 {/* New Form Name */}
@@ -1103,7 +1226,7 @@ export default function FormsPage() {
                 </div>
               </div>
             )}
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1123,42 +1246,43 @@ export default function FormsPage() {
 
         {/* View Responses Dialog */}
         <Dialog open={isResponsesDialogOpen} onOpenChange={setIsResponsesDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Responses</DialogTitle>
               <DialogDescription>
                 {viewingResponsesForm?.name} - {responses.length} responses
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-y-auto px-1">
               {loadingResponses ? (
                 <div className="space-y-2 p-4">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                  {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
               ) : responses.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No responses yet</p>
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  title="No responses yet"
+                  description="Submitted responses will appear here."
+                />
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Email</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {responses.map((response) => (
-                      <TableRow key={response.id}>
-                        <TableCell>
+                      <TableRow key={response.id} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5">
                           {new Date(response.submitted_at).toLocaleString()}
                         </TableCell>
-                        <TableCell>{response.submitted_by_name || '-'}</TableCell>
-                        <TableCell>{response.submitted_by_email || '-'}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-3.5 px-5">{response.submitted_by_name || '-'}</TableCell>
+                        <TableCell className="py-3.5 px-5">{response.submitted_by_email || '-'}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
@@ -1192,7 +1316,7 @@ export default function FormsPage() {
                 </Table>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button
                 variant="outline"
                 onClick={() => router.push(`/forms/${viewingResponsesForm?.slug || viewingResponsesForm?.id}?tab=responses`)}
@@ -1208,30 +1332,30 @@ export default function FormsPage() {
 
         {/* Response Detail Dialog */}
         <Dialog open={isResponseDetailOpen} onOpenChange={setIsResponseDetailOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold">Response Details</DialogTitle>
             </DialogHeader>
             {selectedResponse && formWithFields && (
-              <div className="space-y-6">
+              <div className="flex-1 overflow-y-auto px-1 py-2 space-y-6">
                 {/* Submission Info */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="bg-cream-50 rounded-lg p-4 border border-cream-200">
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label className="text-xs font-semibold text-gray-600 uppercase">Submitted</Label>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
+                      <Label className="text-xs font-semibold text-ink-warm-700 uppercase">Submitted</Label>
+                      <p className="text-sm font-medium text-ink-warm-900 mt-1">
                         {new Date(selectedResponse.submitted_at).toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <Label className="text-xs font-semibold text-gray-600 uppercase">Name</Label>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
+                      <Label className="text-xs font-semibold text-ink-warm-700 uppercase">Name</Label>
+                      <p className="text-sm font-medium text-ink-warm-900 mt-1">
                         {selectedResponse.submitted_by_name || '-'}
                       </p>
                     </div>
                     <div>
-                      <Label className="text-xs font-semibold text-gray-600 uppercase">Email</Label>
-                      <p className="text-sm font-medium text-gray-900 mt-1">
+                      <Label className="text-xs font-semibold text-ink-warm-700 uppercase">Email</Label>
+                      <p className="text-sm font-medium text-ink-warm-900 mt-1">
                         {selectedResponse.submitted_by_email || '-'}
                       </p>
                     </div>
@@ -1254,34 +1378,30 @@ export default function FormsPage() {
                       const isDisplayOnly = displayOnlyTypes.includes(field.field_type);
 
                       return (
-                        <div key={field.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div key={field.id} className="bg-white p-4 rounded-lg border border-cream-200">
                           <div className="mb-3 flex items-start gap-1">
                             <div
-                              className="text-sm text-gray-900 flex-1"
+                              className="text-sm text-ink-warm-900 flex-1"
                               dangerouslySetInnerHTML={{ __html: field.label }}
                             />
-                            {field.required && !isDisplayOnly && <span className="text-rose-500">*</span>}
+                            {field.required && !isDisplayOnly && <RequiredAsterisk />}
                           </div>
 
                           {/* Value Display - Only show for actual input fields */}
                           {!isDisplayOnly && (
-                            <div className="text-sm text-gray-900 mt-2">
+                            <div className="text-sm text-ink-warm-900 mt-2">
                               {/* Show the main field value */}
                               {field.field_type === 'yes_no' ? (
                                 <div>
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                    value === 'Yes'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : value === 'No'
-                                      ? 'bg-rose-100 text-rose-800'
-                                      : 'bg-gray-100 text-gray-800'
-                                  }`}>
+                                  <StatusBadge
+                                    tone={value === 'Yes' ? 'success' : value === 'No' ? 'danger' : 'neutral'}
+                                  >
                                     {value || '-'}
-                                  </span>
+                                  </StatusBadge>
                                   {reason && (
-                                    <div className="mt-2 pl-4 border-l-2 border-gray-300">
-                                      <Label className="text-xs text-gray-600">Reason:</Label>
-                                      <p className="text-sm text-gray-900 mt-1">{reason}</p>
+                                    <div className="mt-2 pl-4 border-l-2 border-cream-300">
+                                      <Label className="text-xs text-ink-warm-700">Reason:</Label>
+                                      <p className="text-sm text-ink-warm-900 mt-1">{reason}</p>
                                     </div>
                                   )}
                                 </div>
@@ -1290,35 +1410,35 @@ export default function FormsPage() {
                                   {value.length > 0 ? (
                                     value.map((item: string, idx: number) => (
                                       <div key={idx} className="flex gap-2">
-                                        <span className="font-medium text-gray-700">{idx + 1}.</span>
-                                        <span className="text-gray-900">{item}</span>
+                                        <span className="font-medium text-ink-warm-700">{idx + 1}.</span>
+                                        <span className="text-ink-warm-900">{item}</span>
                                       </div>
                                     ))
                                   ) : (
-                                    <span className="text-gray-400 italic">No selection</span>
+                                    <span className="text-ink-warm-400 italic">No selection</span>
                                   )}
                                 </div>
                               ) : field.field_type === 'long_text' || field.field_type === 'textarea' ? (
-                                <p className="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
-                                  {value || <span className="text-gray-400 italic">No response</span>}
+                                <p className="whitespace-pre-wrap bg-cream-50 p-3 rounded border border-cream-200">
+                                  {value || <span className="text-ink-warm-400 italic">No response</span>}
                                 </p>
                               ) : (
                                 <p className="font-medium">
-                                  {value || <span className="text-gray-400 italic">No response</span>}
+                                  {value || <span className="text-ink-warm-400 italic">No response</span>}
                                 </p>
                               )}
 
                               {/* Display attachments if any exist for this field */}
                               {attachments && Array.isArray(attachments) && attachments.length > 0 && (
                                 <div className="mt-3 space-y-2">
-                                  <p className="text-xs font-medium text-gray-500 uppercase">Attachments:</p>
+                                  <p className="text-xs font-medium text-ink-warm-500 uppercase">Attachments:</p>
                                   {attachments.map((url: string, idx: number) => (
                                     <div key={idx} className="flex items-center gap-2">
                                       <a
                                         href={url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline text-sm"
+                                        className="flex items-center gap-2 text-brand hover:text-brand-dark underline text-sm"
                                       >
                                         <Upload className="h-4 w-4" />
                                         Attachment {idx + 1}
@@ -1358,7 +1478,7 @@ export default function FormsPage() {
                 </div>
               </div>
             )}
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsResponseDetailOpen(false)}>
                 Close
               </Button>

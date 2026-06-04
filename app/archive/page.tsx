@@ -295,7 +295,7 @@ export default function ArchivePage() {
         <Skeleton className="h-4 w-32 mb-2" />
         <Skeleton className="h-4 w-24" />
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100">
+      <CardContent className="pt-4 border-t border-cream-100">
         <div className="flex gap-2">
           <Skeleton className="h-8 w-full rounded" />
           <Skeleton className="h-8 w-full rounded" />
@@ -311,6 +311,8 @@ export default function ArchivePage() {
           icon={ArchiveIcon}
           title="Archive"
           subtitle="Manage archived items - restore or permanently delete"
+          kicker="Admin · Archive"
+          kickerDot="brand"
         />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -327,6 +329,8 @@ export default function ArchivePage() {
         icon={ArchiveIcon}
         title="Archive"
         subtitle="Manage archived items - restore or permanently delete"
+        kicker="Admin · Archive"
+        kickerDot="brand"
       />
 
         {error && (
@@ -337,7 +341,7 @@ export default function ArchivePage() {
 
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input
               placeholder="Search archived items..."
               className="pl-10 focus-brand"
@@ -472,8 +476,8 @@ export default function ArchivePage() {
                         {/* Budget row uses $ prefix instead of an icon — render
                             inline rather than via ArchivedMetaRow so the layout
                             matches the other money-style rows in the app. */}
-                        <div className="flex items-center text-sm text-gray-600">
-                          <span className="text-gray-400 mr-2">$</span>
+                        <div className="flex items-center text-sm text-ink-warm-700">
+                          <span className="text-ink-warm-400 mr-2">$</span>
                           <span>{campaign.total_budget?.toLocaleString()}</span>
                         </div>
                       </>
@@ -564,7 +568,7 @@ export default function ArchivePage() {
                 It will be moved back to its original location.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} disabled={isProcessing}>
                 Cancel
               </Button>
@@ -588,7 +592,7 @@ export default function ArchivePage() {
                 This action cannot be undone and all associated data will be lost forever.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isProcessing}>
                 Cancel
               </Button>
@@ -653,9 +657,9 @@ function ArchivedItemCard({
     <Card className="transition-shadow">
       <CardHeader className="pb-4">
         <div className="mb-3">
-          <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
-            <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-              <Icon className="h-5 w-5 text-gray-600" />
+          <div className="flex items-center text-lg font-semibold text-ink-warm-700 mb-2">
+            <div className="bg-cream-100 p-1.5 rounded-lg mr-2">
+              <Icon className="h-5 w-5 text-ink-warm-700" />
             </div>
             {name}
           </div>
@@ -668,18 +672,18 @@ function ArchivedItemCard({
         </div>
         <div className="space-y-2">
           {description && (
-            <p className="text-sm text-gray-600 line-clamp-2">{description}</p>
+            <p className="text-sm text-ink-warm-700 line-clamp-2">{description}</p>
           )}
           {meta}
           {archivedAt && (
-            <div className="flex items-center text-sm text-gray-500">
-              <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+            <div className="flex items-center text-sm text-ink-warm-500">
+              <Calendar className="h-4 w-4 mr-2 text-ink-warm-400" />
               <span>Archived: {formatDate(archivedAt)}</span>
             </div>
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100">
+      <CardContent className="pt-4 border-t border-cream-100">
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="w-full" onClick={onRestore}>
             <RotateCcw className="h-4 w-4 mr-2" />
@@ -688,7 +692,7 @@ function ArchivedItemCard({
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            className="w-full text-rose-600 hover:bg-rose-50"
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4 mr-2" />
@@ -712,8 +716,8 @@ function ArchivedMetaRow({
   variant?: 'value' | 'meta';
 }) {
   return (
-    <div className={`flex items-center text-sm ${variant === 'value' ? 'text-gray-600' : 'text-gray-500'}`}>
-      <Icon className="h-4 w-4 mr-2 text-gray-400" />
+    <div className={`flex items-center text-sm ${variant === 'value' ? 'text-ink-warm-700' : 'text-ink-warm-500'}`}>
+      <Icon className="h-4 w-4 mr-2 text-ink-warm-400" />
       <span>{children}</span>
     </div>
   );

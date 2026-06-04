@@ -131,7 +131,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                   onCheckedChange={(v) => setAutoCreate(v === true)}
                   className="data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                 />
-                <Label htmlFor="autoCreate" className="text-sm text-gray-600 cursor-pointer font-normal">
+                <Label htmlFor="autoCreate" className="text-sm text-ink-warm-700 cursor-pointer font-normal">
                   Auto-create opportunity if qualified
                 </Label>
               </div>
@@ -142,7 +142,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" type="button" onClick={handleClose}>Cancel</Button>
               <Button variant="brand" type="submit" disabled={loading || (!url && !companyName)}>
                 {loading ? (
@@ -169,7 +169,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-semibold text-gray-900">{report.project_name}</h3>
+                    <h3 className="text-base font-semibold text-ink-warm-900">{report.project_name}</h3>
                     {report.report?.url_analyzed && (
                       <a href={report.report.url_analyzed} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline flex items-center gap-1 text-brand">
                         {report.report.url_analyzed}
@@ -186,27 +186,27 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
 
                 {/* Score Summary */}
                 <div className="grid grid-cols-4 gap-2">
-                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                  <div className="bg-cream-50 rounded-lg p-2.5 text-center">
                     <div className="text-xl font-bold text-brand">{report.composite_score}</div>
-                    <div className="text-[10px] text-gray-500 font-medium">Score</div>
+                    <div className="text-[10px] text-ink-warm-500 font-medium">Score</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                    <div className="text-sm font-semibold text-gray-700">{report.report?.scores?.icp_fit || 0}/40</div>
-                    <div className="text-[10px] text-gray-500 font-medium">ICP Fit</div>
+                  <div className="bg-cream-50 rounded-lg p-2.5 text-center">
+                    <div className="text-sm font-semibold text-ink-warm-700">{report.report?.scores?.icp_fit || 0}/40</div>
+                    <div className="text-[10px] text-ink-warm-500 font-medium">ICP Fit</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                    <div className="text-sm font-semibold text-gray-700">{report.report?.scores?.signal_strength || 0}/35</div>
-                    <div className="text-[10px] text-gray-500 font-medium">Signal</div>
+                  <div className="bg-cream-50 rounded-lg p-2.5 text-center">
+                    <div className="text-sm font-semibold text-ink-warm-700">{report.report?.scores?.signal_strength || 0}/35</div>
+                    <div className="text-[10px] text-ink-warm-500 font-medium">Signal</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                    <div className="text-sm font-semibold text-gray-700">{report.report?.scores?.timing || 0}/25</div>
-                    <div className="text-[10px] text-gray-500 font-medium">Timing</div>
+                  <div className="bg-cream-50 rounded-lg p-2.5 text-center">
+                    <div className="text-sm font-semibold text-ink-warm-700">{report.report?.scores?.timing || 0}/25</div>
+                    <div className="text-[10px] text-ink-warm-500 font-medium">Timing</div>
                   </div>
                 </div>
 
                 {/* Action Tier */}
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm text-gray-500">Action Tier</Label>
+                  <Label className="text-sm text-ink-warm-500">Action Tier</Label>
                   <Badge className="text-white text-xs bg-brand">{formatLabel(report.action_tier)}</Badge>
                 </div>
 
@@ -229,9 +229,9 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                             <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                           )}
                           <div>
-                            <span className="font-medium text-gray-700">{formatLabel(key)}</span>
+                            <span className="font-medium text-ink-warm-700">{formatLabel(key)}</span>
                             {val?.detail && (
-                              <p className="text-xs text-gray-500">{val.detail}</p>
+                              <p className="text-xs text-ink-warm-500">{val.detail}</p>
                             )}
                           </div>
                         </div>
@@ -246,28 +246,28 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                     <Label>Enrichment Data</Label>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                       {enrichment.category && (
-                        <div><span className="text-gray-500">Category:</span> <span className="font-medium">{enrichment.category}</span></div>
+                        <div><span className="text-ink-warm-500">Category:</span> <span className="font-medium">{enrichment.category}</span></div>
                       )}
                       {enrichment.funding_amount && (
-                        <div><span className="text-gray-500">Funding:</span> <span className="font-medium">{enrichment.funding_amount}</span></div>
+                        <div><span className="text-ink-warm-500">Funding:</span> <span className="font-medium">{enrichment.funding_amount}</span></div>
                       )}
                       {enrichment.token_status && (
-                        <div><span className="text-gray-500">Token:</span> <span className="font-medium">{formatLabel(enrichment.token_status)}</span></div>
+                        <div><span className="text-ink-warm-500">Token:</span> <span className="font-medium">{formatLabel(enrichment.token_status)}</span></div>
                       )}
                       {enrichment.product_status && (
-                        <div><span className="text-gray-500">Product:</span> <span className="font-medium">{formatLabel(enrichment.product_status)}</span></div>
+                        <div><span className="text-ink-warm-500">Product:</span> <span className="font-medium">{formatLabel(enrichment.product_status)}</span></div>
                       )}
                       {enrichment.korea_presence && (
-                        <div><span className="text-gray-500">Korea:</span> <span className="font-medium">{formatLabel(enrichment.korea_presence)}</span></div>
+                        <div><span className="text-ink-warm-500">Korea:</span> <span className="font-medium">{formatLabel(enrichment.korea_presence)}</span></div>
                       )}
                       {enrichment.narrative_fit && (
-                        <div><span className="text-gray-500">Narrative:</span> <span className="font-medium">{formatLabel(enrichment.narrative_fit)}</span></div>
+                        <div><span className="text-ink-warm-500">Narrative:</span> <span className="font-medium">{formatLabel(enrichment.narrative_fit)}</span></div>
                       )}
                       {enrichment.twitter_followers && (
-                        <div><span className="text-gray-500">Twitter:</span> <span className="font-medium">{enrichment.twitter_followers?.toLocaleString()} followers</span></div>
+                        <div><span className="text-ink-warm-500">Twitter:</span> <span className="font-medium">{enrichment.twitter_followers?.toLocaleString()} followers</span></div>
                       )}
                       {enrichment.team_doxxed !== undefined && (
-                        <div><span className="text-gray-500">Team Doxxed:</span> <span className="font-medium">{enrichment.team_doxxed ? 'Yes' : 'No'}</span></div>
+                        <div><span className="text-ink-warm-500">Team Doxxed:</span> <span className="font-medium">{enrichment.team_doxxed ? 'Yes' : 'No'}</span></div>
                       )}
                     </div>
                   </div>
@@ -279,7 +279,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                     <Label>Detected Signals ({signals.length})</Label>
                     <div className="space-y-2">
                       {signals.map((s: any, i: number) => (
-                        <div key={i} className="flex items-start gap-2 p-2 bg-gray-50 rounded-md text-sm border border-gray-100">
+                        <div key={i} className="flex items-start gap-2 p-2 bg-cream-50 rounded-md text-sm border border-cream-100">
                           <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
                             s.tier === 1 ? 'text-rose-500' : s.tier === 2 ? 'text-amber-500' : 'text-blue-500'
                           }`} />
@@ -294,10 +294,10 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                               <Badge className={`text-[10px] border ${
                                 s.confidence === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                 s.confidence === 'LIKELY' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                'bg-gray-50 text-gray-600 border-gray-200'
+                                'bg-cream-50 text-ink-warm-700 border-cream-200'
                               }`}>{formatLabel(s.confidence)}</Badge>
                             </div>
-                            <p className="text-gray-600 mt-0.5">{s.signal_detail}</p>
+                            <p className="text-ink-warm-700 mt-0.5">{s.signal_detail}</p>
                           </div>
                         </div>
                       ))}
@@ -321,9 +321,9 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                 )}
               </div>
             </ScrollArea>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={handleClose}>Close</Button>
-              <Button onClick={() => { setReport(null); setUrl(''); setCompanyName(''); }} className="bg-brand text-white">
+              <Button variant="brand" onClick={() => { setReport(null); setUrl(''); setCompanyName(''); }}>
                 Qualify Another
               </Button>
             </DialogFooter>

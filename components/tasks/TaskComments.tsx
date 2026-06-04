@@ -62,8 +62,8 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
         setNewComment('');
       }
       await loadComments();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to add comment.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Add failed', description: err instanceof Error ? err.message : 'Failed to add comment', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -77,8 +77,8 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
       setEditingCommentId(null);
       setEditContent('');
       await loadComments();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to update comment.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Update failed', description: err instanceof Error ? err.message : 'Failed to update comment', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -88,8 +88,8 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
     try {
       await TaskService.deleteComment(commentId);
       await loadComments();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to delete comment.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed to delete comment', variant: 'destructive' });
     }
   };
 
@@ -134,7 +134,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                   autoFocus
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleEditComment(comment.id)} disabled={submitting} className="h-7 text-xs bg-brand text-white">
+                  <Button variant="brand" size="sm" onClick={() => handleEditComment(comment.id)} disabled={submitting} className="h-7 text-xs">
                     Save
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingCommentId(null); setEditContent(''); }} className="h-7 text-xs">
@@ -158,7 +158,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                   </Button>
                 )}
                 {(isOwner || isAdmin) && (
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-rose-500 hover:text-rose-700" onClick={() => handleDeleteComment(comment.id)}>
+                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-rose-500" onClick={() => handleDeleteComment(comment.id)}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 )}
@@ -180,7 +180,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                 autoFocus
               />
               <div className="flex gap-2 mt-1.5">
-                <Button size="sm" onClick={() => handleAddComment(comment.id)} disabled={!replyContent.trim() || submitting} className="h-7 text-xs bg-brand text-white">
+                <Button variant="brand" size="sm" onClick={() => handleAddComment(comment.id)} disabled={!replyContent.trim() || submitting} className="h-7 text-xs">
                   <Send className="h-3 w-3 mr-1" /> Reply
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => { setReplyingTo(null); setReplyContent(''); }} className="h-7 text-xs">
@@ -239,7 +239,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-gray-400">Cmd+Enter to send</span>
-          <Button size="sm" onClick={() => handleAddComment()} disabled={!newComment.trim() || submitting} className="h-7 text-xs bg-brand text-white">
+          <Button variant="brand" size="sm" onClick={() => handleAddComment()} disabled={!newComment.trim() || submitting} className="h-7 text-xs">
             <Send className="h-3 w-3 mr-1" /> Comment
           </Button>
         </div>

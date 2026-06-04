@@ -126,7 +126,7 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
 
         {/* Action Buttons */}
         <div className="flex space-x-2 pt-2">
-          <Button onClick={() => onApply(suggestion)} className="flex-1 bg-brand text-white">
+          <Button variant="brand" onClick={() => onApply(suggestion)} className="flex-1">
             <Plus className="h-4 w-4 mr-2" />
             {isCampaign ? 'Create Campaign' : 'Create List'}
           </Button>

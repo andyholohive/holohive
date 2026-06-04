@@ -152,8 +152,8 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
     try {
       const data = await DeliverableService.getTemplates();
       setTemplates(data);
-    } catch {
-      toast({ title: 'Error', description: 'Failed to load templates', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to load templates', variant: 'destructive' });
     } finally {
       setLoadingTemplates(false);
     }
@@ -258,7 +258,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
       onCreated();
     } catch (err: any) {
       console.error('Error creating deliverable:', err);
-      toast({ title: 'Error', description: err.message || 'Failed to create deliverable', variant: 'destructive' });
+      toast({ title: 'Create failed', description: err?.message ?? 'Failed to create deliverable', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }

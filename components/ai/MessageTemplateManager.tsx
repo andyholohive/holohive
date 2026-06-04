@@ -52,9 +52,9 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
     } catch (error) {
       console.error('Error loading templates:', error);
       toast({
-        title: "Error",
-        description: "Failed to load message templates.",
-        variant: "destructive",
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load message templates',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -95,10 +95,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
     try {
       const created = await MessageTrainingService.createMessageTemplate(newTemplate);
       if (created) {
-        toast({
-          title: "Success",
-          description: "Message template created successfully.",
-        });
+        toast({ title: 'Template created' });
         setIsCreateDialogOpen(false);
         setNewTemplate({
           name: '',
@@ -113,9 +110,9 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
     } catch (error) {
       console.error('Error creating template:', error);
       toast({
-        title: "Error",
-        description: "Failed to create message template.",
-        variant: "destructive",
+        title: 'Create failed',
+        description: error instanceof Error ? error.message : 'Failed to create message template',
+        variant: 'destructive',
       });
     }
   };
@@ -157,8 +154,8 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
       <>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Message Templates</h2>
-            <p className="text-gray-600">Create, manage, and organize your message templates</p>
+            <h2 className="text-2xl font-bold text-ink-warm-900">Message Templates</h2>
+            <p className="text-ink-warm-700">Create, manage, and organize your message templates</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" disabled>
@@ -173,7 +170,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
         </div>
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input placeholder="Search templates by name, content, or tags..." className="pl-10 focus-brand" disabled />
           </div>
           <div className="flex gap-2">
@@ -196,7 +193,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <Card key={i} className="hover:shadow-md transition-shadow">
+            <Card key={i}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -246,14 +243,14 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Message Templates</h2>
-          <p className="text-gray-600">Create, manage, and organize your message templates</p>
+          <h2 className="text-2xl font-bold text-ink-warm-900">Message Templates</h2>
+          <p className="text-ink-warm-700">Create, manage, and organize your message templates</p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={handleTrainOnData}
-            className="flex items-center gap-2 hover:bg-gray-50"
+            className="flex items-center gap-2 hover:bg-cream-50"
           >
             <MessageSquare className="w-4 h-4" />
             Train on Data
@@ -265,15 +262,15 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                 New Template
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden">
+            <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New Message Template</DialogTitle>
                 <DialogDescription>
                   Create a new message template for your campaigns and outreach.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); handleCreateTemplate(); }}>
-                <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateTemplate(); }} className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-1 py-2 grid gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="name">Template Name</Label>
                     <Input
@@ -350,7 +347,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                     </div>
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
@@ -367,7 +364,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
       {/* Filters */}
       <div className="flex items-center space-x-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
           <Input
             placeholder="Search templates by name, content, or tags..."
             value={searchTerm}
@@ -417,15 +414,15 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
       {/* Templates Grid */}
       {filteredTemplates.length === 0 ? (
         <div className="text-center py-8">
-          <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
-          <p className="text-gray-600 mb-4">
+          <MessageSquare className="w-12 h-12 text-ink-warm-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-ink-warm-900 mb-2">No templates found</h3>
+          <p className="text-ink-warm-700 mb-4">
             {searchTerm || categoryFilter !== 'all' || toneFilter !== 'all' || audienceFilter !== 'all'
               ? 'Try adjusting your filters or search terms.'
               : 'Create your first message template to get started.'}
           </p>
           {!searchTerm && categoryFilter === 'all' && toneFilter === 'all' && audienceFilter === 'all' && (
-                          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-brand text-white">
+                          <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Template
               </Button>

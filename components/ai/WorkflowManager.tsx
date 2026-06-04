@@ -79,9 +79,9 @@ export function WorkflowManager() {
     } catch (error) {
       console.error('Error loading workflows:', error);
       toast({
-        title: "Error",
-        description: "Failed to load workflows.",
-        variant: "destructive",
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load workflows',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -100,16 +100,13 @@ export function WorkflowManager() {
         actions: [],
         enabled: true
       });
-      toast({
-        title: "Success",
-        description: "Workflow created successfully.",
-      });
+      toast({ title: 'Workflow created' });
     } catch (error) {
       console.error('Error creating workflow:', error);
       toast({
-        title: "Error",
-        description: "Failed to create workflow.",
-        variant: "destructive",
+        title: 'Create failed',
+        description: error instanceof Error ? error.message : 'Failed to create workflow',
+        variant: 'destructive',
       });
     }
   };
@@ -118,24 +115,21 @@ export function WorkflowManager() {
     try {
       const success = await AdvancedAIService.executeWorkflow(workflowId);
       if (success) {
-        toast({
-          title: "Success",
-          description: "Workflow executed successfully.",
-        });
+        toast({ title: 'Workflow executed' });
         loadWorkflows(); // Refresh to get updated success rate
       } else {
         toast({
-          title: "Warning",
-          description: "Workflow execution completed with some errors.",
-          variant: "destructive",
+          title: 'Workflow completed with errors',
+          description: 'Some steps failed during execution.',
+          variant: 'destructive',
         });
       }
     } catch (error) {
       console.error('Error executing workflow:', error);
       toast({
-        title: "Error",
-        description: "Failed to execute workflow.",
-        variant: "destructive",
+        title: 'Execute failed',
+        description: error instanceof Error ? error.message : 'Failed to execute workflow',
+        variant: 'destructive',
       });
     }
   };
@@ -147,15 +141,14 @@ export function WorkflowManager() {
         w.id === workflowId ? { ...w, enabled } : w
       ));
       toast({
-        title: "Success",
-        description: `Workflow ${enabled ? 'enabled' : 'disabled'} successfully.`,
+        title: enabled ? 'Workflow enabled' : 'Workflow disabled',
       });
     } catch (error) {
       console.error('Error toggling workflow:', error);
       toast({
-        title: "Error",
-        description: "Failed to update workflow status.",
-        variant: "destructive",
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Failed to update workflow status',
+        variant: 'destructive',
       });
     }
   };
@@ -206,7 +199,7 @@ export function WorkflowManager() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Automated Workflows</h2>
+          <h2 className="text-xl font-semibold text-ink-warm-900">Automated Workflows</h2>
           <Button disabled>
             <Plus className="w-4 h-4 mr-2" />
             New Workflow
@@ -214,7 +207,7 @@ export function WorkflowManager() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="hover:shadow-md transition-shadow">
+            <Card key={i}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -269,7 +262,7 @@ export function WorkflowManager() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Automated Workflows</h2>
+        <h2 className="text-xl font-semibold text-ink-warm-900">Automated Workflows</h2>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="brand">
@@ -277,11 +270,11 @@ export function WorkflowManager() {
               New Workflow
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Create New Workflow</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6">
+            <div className="flex-1 overflow-y-auto px-1 py-2 space-y-6">
               {/* Basic Info */}
               <div className="space-y-4">
                 <div>
@@ -416,14 +409,14 @@ export function WorkflowManager() {
       {/* Workflows Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {workflows.map((workflow) => (
-          <Card key={workflow.id} className="hover:shadow-md transition-shadow">
+          <Card key={workflow.id}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardTitle className="text-lg font-semibold text-ink-warm-900">
                     {workflow.name}
                   </CardTitle>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-ink-warm-700 mt-1">
                     {workflow.description}
                   </p>
                 </div>
@@ -440,7 +433,7 @@ export function WorkflowManager() {
             <CardContent className="space-y-4">
               {/* Triggers */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Triggers</h4>
+                <h4 className="text-sm font-medium text-ink-warm-700 mb-2">Triggers</h4>
                 <div className="flex flex-wrap gap-1">
                   {workflow.triggers.map((trigger) => (
                     <Badge key={trigger} variant="outline" className="text-xs">
@@ -452,10 +445,10 @@ export function WorkflowManager() {
 
               {/* Actions */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Actions</h4>
+                <h4 className="text-sm font-medium text-ink-warm-700 mb-2">Actions</h4>
                 <div className="space-y-2">
                   {workflow.actions.map((action, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
+                    <div key={index} className="flex items-center gap-2 text-sm text-ink-warm-700">
                       {getActionIcon(action.type)}
                       <span className="capitalize">{action.type.replace('_', ' ')}</span>
                     </div>
@@ -473,7 +466,7 @@ export function WorkflowManager() {
                     </span>
                   </div>
                   {workflow.lastRun && (
-                    <div className="flex items-center gap-1 text-gray-500">
+                    <div className="flex items-center gap-1 text-ink-warm-500">
                       <Clock className="w-4 h-4" />
                       <span>{new Date(workflow.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
@@ -500,12 +493,12 @@ export function WorkflowManager() {
 
       {workflows.length === 0 && (
         <div className="text-center py-8">
-          <Zap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
-          <p className="text-gray-600 mb-4">
+          <Zap className="w-12 h-12 text-ink-warm-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-ink-warm-900 mb-2">No workflows yet</h3>
+          <p className="text-ink-warm-700 mb-4">
             Create your first automated workflow to streamline campaign management tasks.
           </p>
-          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-brand text-white">
+          <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Create Workflow
           </Button>

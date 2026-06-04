@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,7 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
-import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
+import { SectionHeader } from '@/components/ui/section-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 
 // Access-level tone map. Module-scope so the closure-captured object
 // isn't reallocated each render. See components/ui/status-badge.tsx.
@@ -61,6 +63,7 @@ interface Link {
 type ClientOption = {
   id: string;
   name: string;
+  logo_url: string | null;
 };
 
 const LINK_TYPES = [
@@ -146,6 +149,17 @@ export default function LinksPage() {
     return map;
   }, [clients]);
 
+  // Logo-by-name lookup so client-group headers can render the real
+  // brand logo instead of a generic Building2 icon. Indexed by name
+  // because the `groups` array keys off `clientName` (which can come
+  // from either `client_id` resolved via clientMap, or a free-text
+  // `client` field on the link itself).
+  const clientLogoByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    clients.forEach(c => { if (c.logo_url) map[c.name] = c.logo_url; });
+    return map;
+  }, [clients]);
+
   useEffect(() => {
     fetchLinks();
   }, []);
@@ -186,7 +200,7 @@ export default function LinksPage() {
         // Skip archived clients — they shouldn't appear as options when
         // adding/editing links. Existing links pointing to archived
         // clients still resolve their stored client_id via clientMap.
-        supabase.from('clients').select('id, name').is('archived_at', null).order('name'),
+        supabase.from('clients').select('id, name, logo_url').is('archived_at', null).order('name'),
       ]);
       setClients(clientData || []);
 
@@ -198,8 +212,8 @@ export default function LinksPage() {
     } catch (error) {
       console.error('Error fetching links:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load links',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load links',
         variant: 'destructive',
       });
     } finally {
@@ -239,8 +253,7 @@ export default function LinksPage() {
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.url.trim()) {
       toast({
-        title: 'Error',
-        description: 'Name and URL are required',
+        title: 'Name and URL required',
         variant: 'destructive',
       });
       return;
@@ -248,8 +261,7 @@ export default function LinksPage() {
 
     if (!formData.client_id && !formData.client.trim()) {
       toast({
-        title: 'Error',
-        description: 'Client is required',
+        title: 'Client required',
         variant: 'destructive',
       });
       return;
@@ -257,8 +269,8 @@ export default function LinksPage() {
 
     if (formData.link_types.length === 0) {
       toast({
-        title: 'Error',
-        description: 'At least one link type is required',
+        title: 'Link type required',
+        description: 'Select at least one link type.',
         variant: 'destructive',
       });
       return;
@@ -335,8 +347,8 @@ export default function LinksPage() {
     } catch (error) {
       console.error('Error saving link:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save link',
+        title: 'Save failed',
+        description: error instanceof Error ? error.message : 'Failed to save link',
         variant: 'destructive',
       });
     } finally {
@@ -359,8 +371,8 @@ export default function LinksPage() {
     } catch (error) {
       console.error('Error deleting link:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to delete link',
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete link',
         variant: 'destructive',
       });
     }
@@ -475,12 +487,6 @@ export default function LinksPage() {
     setFilterType('all');
   };
 
-  // Access tones — migrated to centralized palette 2026-05-06.
-  // 'orange' isn't in the shared palette; mapped client → warning (amber)
-  // as the closest visual neighbor.
-  const getAccessBadgeColor = (access: string) =>
-    toneClassName(ACCESS_TONES[access] ?? 'neutral');
-
   const getLinkTypeLabel = (value: string) => {
     const type = LINK_TYPES.find(t => t.value === value);
     return type?.label || value;
@@ -507,7 +513,7 @@ export default function LinksPage() {
   /** Renders a small ▲/▼ indicator on the active sort column header. */
   const sortIndicator = (col: 'name' | 'created_at') => {
     if (sortColumn !== col) return null;
-    return <span className="ml-1 text-[10px] text-gray-400">{sortDirection === 'asc' ? '▲' : '▼'}</span>;
+    return <span className="ml-1 text-[10px] text-ink-warm-400">{sortDirection === 'asc' ? '▲' : '▼'}</span>;
   };
 
   // Count links per tab
@@ -522,12 +528,31 @@ export default function LinksPage() {
           icon={LinkIcon}
           title="Links"
           subtitle="Manage all your important links"
+          kicker="Documents · Links"
+          kickerDot="brand"
           actions={<Skeleton className="h-10 w-32" />}
         />
-        <Skeleton className="h-10 w-80" />
+        {/* SectionHeader skeleton — matches the loaded chapter divider. */}
+        <div className="section-head first flex items-center gap-3">
+          <span className="dot bg-brand/30 inline-block w-1.5 h-1.5 rounded-full" />
+          <Skeleton className="h-3 w-24" />
+          <span className="flex-1 h-px bg-cream-200" />
+          <Skeleton className="h-3 w-32" />
+        </div>
+        {/* Filter toolbar skeleton — single-row tabs + search + filters. */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <Skeleton className="h-9 w-[280px] rounded-md" />
+          <Skeleton className="h-9 flex-1 min-w-[220px] max-w-sm rounded-md" />
+          <Skeleton className="h-9 w-[140px] rounded-md" />
+          <Skeleton className="h-9 w-[160px] rounded-md" />
+        </div>
+        {/* Client-group cards: header bar + table-shaped body. */}
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-lg" />
+            <div key={i} className="space-y-0">
+              <Skeleton className="h-12 w-full rounded-t-lg rounded-b-none" />
+              <Skeleton className="h-40 w-full rounded-b-lg rounded-t-none" />
+            </div>
           ))}
         </div>
       </div>
@@ -542,6 +567,8 @@ export default function LinksPage() {
         icon={LinkIcon}
         title="Links"
         subtitle={`Manage all your important links (${links.length} total)`}
+        kicker="Documents · Links"
+        kickerDot="brand"
         actions={(
           <>
             <Button
@@ -559,31 +586,56 @@ export default function LinksPage() {
         )}
       />
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList>
-          <TabsTrigger value="holohive" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Holo Hive
-            <Badge variant="secondary" className="ml-1 text-xs">{holoHiveCount}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="guide" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Guide
-            <Badge variant="secondary" className="ml-1 text-xs">{guideCount}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="clients" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Clients
-            <Badge variant="secondary" className="ml-1 text-xs">{clientsCount}</Badge>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {/* Chapter divider above the grouped client links sections. */}
+      <SectionHeader
+        label="Links"
+        dot="brand"
+        counter={`${groups.length} of ${
+          activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : clientsCount
+        } link${
+          (activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : clientsCount) === 1
+            ? ''
+            : 's'
+        } shown`}
+        first
+      />
 
-      {/* Search and Filters */}
-      <div className="flex items-center space-x-4 flex-wrap gap-y-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      {/* Filter toolbar — tabs + search + filters on a single row. */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+          <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+            <TabsTrigger
+              value="holohive"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm px-4 py-2"
+            >
+              {/* Use the company logo (same asset Sidebar.tsx uses) so the
+                  Holo Hive tab visually anchors to brand identity instead
+                  of a generic Building2 icon. */}
+              <img src="/images/logo.png" alt="" className="h-4 w-4 object-contain" />
+              Holo Hive
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{holoHiveCount}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="guide"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm px-4 py-2"
+            >
+              <BookOpen className="h-4 w-4" />
+              Guide
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{guideCount}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="clients"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm px-4 py-2"
+            >
+              <Users className="h-4 w-4" />
+              Clients
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{clientsCount}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
           <Input
             placeholder="Search links..."
             value={searchTerm}
@@ -626,16 +678,16 @@ export default function LinksPage() {
 
       {/* Grouped Links by Client */}
       {groups.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <LinkIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p className="text-lg font-medium text-gray-900">No links found</p>
-            <p className="text-sm text-gray-500 mt-1">
-              {links.length === 0
+        <Card className="border-cream-200">
+          <EmptyState
+            icon={LinkIcon}
+            title="No links found"
+            description={
+              links.length === 0
                 ? 'Add your first link to get started'
-                : 'Try adjusting your filters or switch tabs'}
-            </p>
-          </CardContent>
+                : 'Try adjusting your filters or switch tabs'
+            }
+          />
         </Card>
       ) : (
         <div className="space-y-4">
@@ -647,17 +699,38 @@ export default function LinksPage() {
               <div key={group.clientName}>
                 {/* Client Header */}
                 <div
-                  className={`flex items-center justify-between px-4 py-3 bg-gray-100 ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} border border-gray-200 ${isCollapsed ? '' : 'border-b-0'} cursor-pointer select-none transition-all hover:bg-gray-150`}
+                  className={`flex items-center justify-between px-4 py-3 bg-cream-100 ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} border border-cream-200 ${isCollapsed ? '' : 'border-b-0'} cursor-pointer select-none transition-all hover:bg-cream-200`}
                   onClick={() => toggleClientCollapse(group.clientName)}
                 >
                   <div className="flex items-center gap-3">
                     {isCollapsed ? (
-                      <ChevronRight className="w-4 h-4 text-gray-600" />
+                      <ChevronRight className="w-4 h-4 text-ink-warm-700" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-600" />
+                      <ChevronDown className="w-4 h-4 text-ink-warm-700" />
                     )}
-                    <Building2 className={`w-4 h-4 ${isNoClient ? 'text-gray-400' : 'text-gray-600'}`} />
-                    <h3 className={`font-semibold ${isNoClient ? 'text-gray-500 italic' : 'text-gray-800'}`}>
+                    {/* Logo resolution order:
+                        1. "Holo Hive" virtual group → company logo asset
+                           (it's not a real client row, so the lookup map
+                           below can't resolve it)
+                        2. Real client with uploaded logo → that logo
+                        3. Fallback Building2 (no-client pseudo-group +
+                           clients that haven't uploaded a logo) */}
+                    {group.clientName === 'Holo Hive' ? (
+                      <img
+                        src="/images/logo.png"
+                        alt=""
+                        className="w-5 h-5 rounded object-contain bg-white border border-cream-200"
+                      />
+                    ) : !isNoClient && clientLogoByName[group.clientName] ? (
+                      <img
+                        src={clientLogoByName[group.clientName]}
+                        alt=""
+                        className="w-5 h-5 rounded object-contain bg-white border border-cream-200"
+                      />
+                    ) : (
+                      <Building2 className={`w-4 h-4 ${isNoClient ? 'text-ink-warm-400' : 'text-ink-warm-700'}`} />
+                    )}
+                    <h3 className={`font-semibold ${isNoClient ? 'text-ink-warm-500 italic' : 'text-ink-warm-700'}`}>
                       {group.clientName}
                     </h3>
                     <Badge variant="secondary" className="text-xs font-medium">
@@ -667,7 +740,7 @@ export default function LinksPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-gray-600 hover:bg-gray-200"
+                    className="h-7 px-2 text-ink-warm-700 hover:bg-cream-200"
                     onClick={(e) => {
                       e.stopPropagation();
                       openDialog(undefined, isNoClient ? '' : group.clientName);
@@ -683,50 +756,50 @@ export default function LinksPage() {
                     horizontally on narrow viewports instead of overflowing
                     the card. */}
                 {!isCollapsed && (
-                  <div className="bg-white rounded-b-lg border border-gray-200 border-t-0 overflow-x-auto">
+                  <Card className="border-cream-200 border-t-0 rounded-t-none overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50/50">
-                          <TableHead className="w-[200px]">
+                        <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                          <TableHead className="w-[200px] py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                             <button
                               type="button"
                               onClick={() => toggleSort('name')}
-                              className="inline-flex items-center hover:text-gray-900"
+                              className="inline-flex items-center hover:text-ink-warm-900"
                             >
                               Name{sortIndicator('name')}
                             </button>
                           </TableHead>
-                          <TableHead className="w-[200px]">URL</TableHead>
-                          <TableHead className="w-[230px]">Link Type</TableHead>
-                          <TableHead className="w-[100px]">Access</TableHead>
-                          <TableHead className="w-[120px]">
+                          <TableHead className="w-[200px] py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">URL</TableHead>
+                          <TableHead className="w-[230px] py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Link Type</TableHead>
+                          <TableHead className="w-[100px] py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Access</TableHead>
+                          <TableHead className="w-[120px] py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                             <button
                               type="button"
                               onClick={() => toggleSort('created_at')}
-                              className="inline-flex items-center hover:text-gray-900"
+                              className="inline-flex items-center hover:text-ink-warm-900"
                             >
                               Added{sortIndicator('created_at')}
                             </button>
                           </TableHead>
-                          <TableHead className="w-16 text-right">Actions</TableHead>
+                          <TableHead className="w-16 py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {group.links.map(link => (
-                          <TableRow key={link.id} className="hover:bg-gray-50">
-                            <TableCell className="font-medium">
+                          <TableRow key={link.id} className="border-cream-100 hover:bg-cream-50">
+                            <TableCell className="py-3.5 px-5 font-medium">
                               {link.description ? (
                                 <HoverCard>
                                   <HoverCardTrigger asChild>
                                     <span className="cursor-help flex items-center gap-1">
                                       {link.name}
-                                      <Info className="h-3 w-3 text-gray-400" />
+                                      <Info className="h-3 w-3 text-ink-warm-400" />
                                     </span>
                                   </HoverCardTrigger>
                                   <HoverCardContent className="w-80">
                                     <div className="space-y-1">
                                       <h4 className="text-sm font-semibold">{link.name}</h4>
-                                      <p className="text-sm text-gray-600">{link.description}</p>
+                                      <p className="text-sm text-ink-warm-700">{link.description}</p>
                                     </div>
                                   </HoverCardContent>
                                 </HoverCard>
@@ -734,42 +807,45 @@ export default function LinksPage() {
                                 link.name
                               )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-3.5 px-5">
                               <a
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline flex items-center gap-1 max-w-[200px] truncate"
+                                className="text-brand hover:underline flex items-center gap-1 max-w-[200px] truncate"
                               >
                                 {link.url.replace(/^https?:\/\//, '').substring(0, 30)}
                                 {link.url.length > 30 ? '...' : ''}
                                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
                               </a>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-3.5 px-5">
                               <div className="flex flex-wrap gap-1">
                                 {(link.link_types ?? []).length > 0 ? (
                                   (link.link_types ?? []).map(type => (
-                                    <Badge key={type} variant="outline" className="text-xs cursor-default">
+                                    <StatusBadge key={type} tone="neutral" size="sm" className="cursor-default">
                                       {getLinkTypeLabel(type)}
-                                    </Badge>
+                                    </StatusBadge>
                                   ))
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-ink-warm-400">-</span>
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <Badge className={`${getAccessBadgeColor(link.access)} cursor-default`}>
+                            <TableCell className="py-3.5 px-5">
+                              <StatusBadge
+                                tone={ACCESS_TONES[link.access] ?? 'neutral'}
+                                className="cursor-default"
+                              >
                                 {getAccessLabel(link.access)}
-                              </Badge>
+                              </StatusBadge>
                             </TableCell>
-                            <TableCell className="text-xs text-gray-500 whitespace-nowrap" title={link.created_at || ''}>
+                            <TableCell className="py-3.5 px-5 text-xs text-ink-warm-500 whitespace-nowrap" title={link.created_at || ''}>
                               {link.created_at
                                 ? formatDistanceToNow(new Date(link.created_at), { addSuffix: true })
                                 : '—'}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="py-3.5 px-5 text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="sm">
@@ -799,7 +875,7 @@ export default function LinksPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  </Card>
                 )}
               </div>
             );
@@ -970,7 +1046,7 @@ export default function LinksPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>

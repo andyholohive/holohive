@@ -216,7 +216,7 @@ function OverviewTab({
       onKolChanged?.(updated);
       toast({ title: "Notes saved" });
     } catch (err) {
-      toast({ title: "Failed to save notes", variant: "destructive" });
+      toast({ title: "Failed to save notes", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
       console.error(err);
     } finally {
       setSavingNotes(false);
@@ -405,7 +405,7 @@ function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetrics
         if (!cancelled) setList((data || []) as ContentDeliverableRow[]);
       } catch (err) {
         console.error('[KolProfileModal] failed to load contents:', err);
-        if (!cancelled) toast({ title: 'Failed to load deliverables', variant: 'destructive' });
+        if (!cancelled) toast({ title: 'Failed to load deliverables', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -515,7 +515,7 @@ function ContentDeliverableRowView({
       toast({ title: 'Saved' });
     } catch (err) {
       console.error('[KolProfileModal] save content patch failed:', err);
-      toast({ title: 'Save failed', variant: 'destructive' });
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -691,8 +691,8 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
     try {
       const rows = await KolChannelSnapshotService.getForKol(kolId);
       setList(rows);
-    } catch {
-      toast({ title: "Failed to load snapshots", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed to load snapshots", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -721,9 +721,9 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
     try {
       await KolChannelSnapshotService.delete(id);
       onMetricsChanged?.();
-    } catch {
+    } catch (err) {
       setList(previous);
-      toast({ title: "Failed to delete", variant: "destructive" });
+      toast({ title: "Failed to delete snapshot", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     }
   };
 
@@ -897,8 +897,8 @@ function SnapshotForm({
     try {
       const row = await KolChannelSnapshotService.upsert(input);
       onSaved(row);
-    } catch {
-      toast({ title: "Failed to save snapshot", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed to save snapshot", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -950,8 +950,8 @@ function CallLogsTab({ kolId }: { kolId: string }) {
       try {
         const rows = await KolCallLogService.getForKol(kolId);
         if (!cancelled) setList(rows);
-      } catch {
-        if (!cancelled) toast({ title: "Failed to load call logs", variant: "destructive" });
+      } catch (err) {
+        if (!cancelled) toast({ title: "Failed to load call logs", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -971,9 +971,9 @@ function CallLogsTab({ kolId }: { kolId: string }) {
     setList((prev) => prev.filter((c) => c.id !== id));
     try {
       await KolCallLogService.delete(id);
-    } catch {
+    } catch (err) {
       setList(previous);
-      toast({ title: "Failed to delete", variant: "destructive" });
+      toast({ title: "Failed to delete call log", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     }
   };
 
@@ -1097,8 +1097,8 @@ function CallLogForm({
     try {
       const row = await KolCallLogService.create(input);
       onSaved(row);
-    } catch {
-      toast({ title: "Failed to save call log", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed to save call log", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
       setSaving(false);
     }

@@ -76,6 +76,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -226,6 +227,15 @@ export function KolDashboardTableView({
   const [editingKolValue, setEditingKolValue] = useState<any>(null);
   const [kolsToDelete, setKolsToDelete] = useState<string[]>([]);
   const [showKOLDeleteDialog, setShowKOLDeleteDialog] = useState(false);
+  // [2026-06-05] Hidden KOL just got moved to Onboarded → prompt the
+  // user to also unhide them. The Projects field on /kols filters out
+  // hidden links, so an onboarded-but-still-hidden KOL would silently
+  // not show up on that KOL's row. Almost always a mistake; almost
+  // always the user wants to unhide. We ask rather than auto-toggle
+  // because there are legitimate edge cases (e.g. onboarding a KOL we
+  // still want suppressed from the public dashboard temporarily).
+  const [unhidePromptKol, setUnhidePromptKol] = useState<CampaignKOLWithDetails | null>(null);
+  const [unhiding, setUnhiding] = useState(false);
   const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: 'hh_status', dir: 'asc' });
   const kolTableRef = useRef<HTMLDivElement>(null);
 
@@ -302,6 +312,13 @@ export function KolDashboardTableView({
     // Prompt for payment terms when a KOL is newly onboarded.
     if (field === 'hh_status' && newValue === 'Onboarded') {
       openPaymentTermsForKol(kol.id, updatedKOLs);
+      // If this KOL was hidden, prompt to unhide. The Projects field
+      // on /kols filters hidden links, so onboarded-but-hidden is
+      // almost certainly a mistake. Reads from `kol` (pre-update
+      // snapshot) since hidden didn't change in this transition.
+      if (kol.hidden === true) {
+        setUnhidePromptKol(kol);
+      }
     }
 
     setEditingKolCell(null);
@@ -420,6 +437,13 @@ export function KolDashboardTableView({
       // Newly-onboarded KOL with no rate yet → prompt for payment terms.
       if (status === 'Onboarded') {
         openPaymentTermsForKol(kolId, updatedKOLs);
+        // Also prompt to unhide if the KOL was hidden. See the
+        // matching block in handleKolCellSaveImmediate for rationale.
+        const wasHidden = campaignKOLs.find(k => k.id === kolId)?.hidden === true;
+        if (wasHidden) {
+          const target = updatedKOLs.find(k => k.id === kolId);
+          if (target) setUnhidePromptKol(target);
+        }
       }
 
       // Auto-complete the campaign when every KOL is concluded.
@@ -1470,8 +1494,8 @@ export function KolDashboardTableView({
                                                   if (error) {
                                                     console.error('Error creating contents:', error);
                                                     toast({
-                                                      title: 'Error',
-                                                      description: `Failed to create contents: ${error.message}`,
+                                                      title: 'Create failed',
+                                                      description: error.message || 'Failed to create contents',
                                                       variant: 'destructive'
                                                     });
                                                     return;
@@ -1509,8 +1533,8 @@ export function KolDashboardTableView({
                                                     if (paymentError) {
                                                       console.error('Error creating payments:', paymentError);
                                                       toast({
-                                                        title: 'Warning',
-                                                        description: 'Contents created but failed to create payment records',
+                                                        title: 'Payment records failed',
+                                                        description: 'Contents created but payment records failed.',
                                                         variant: 'destructive'
                                                       });
                                                     } else {
@@ -1542,8 +1566,8 @@ export function KolDashboardTableView({
                                                   setQuickAddContentKolId(null);
                                                   setQuickAddContentCount(1);
                                                   toast({
-                                                    title: 'Success',
-                                                    description: `${count} ${type}${count > 1 ? 's' : ''} and payment${count > 1 ? 's' : ''} created successfully`,
+                                                    title: 'Content created',
+                                                    description: `${count} ${type}${count > 1 ? 's' : ''} and payment${count > 1 ? 's' : ''} created.`,
                                                   });
                                                 } catch (err) {
                                                   console.error('Unexpected error:', err);
@@ -1616,7 +1640,7 @@ export function KolDashboardTableView({
           the entire bulk-delete flow is self-contained. Was previously
           rendered in the page's trailing dialog cluster. */}
       <Dialog open={showKOLDeleteDialog} onOpenChange={setShowKOLDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Confirm Delete</DialogTitle>
           </DialogHeader>
@@ -1631,20 +1655,76 @@ export function KolDashboardTableView({
               try {
                 await Promise.all(kolsToDelete.map(kolId => handleDeleteKOL(kolId)));
                 toast({
-                  title: 'KOL(s) deleted',
-                  description: `${kolsToDelete.length} KOL${kolsToDelete.length !== 1 ? 's' : ''} deleted successfully.`,
+                  title: 'KOLs deleted',
+                  description: `${kolsToDelete.length} KOL${kolsToDelete.length !== 1 ? 's' : ''} deleted.`,
                   variant: 'destructive',
                 });
                 setSelectedKOLs([]);
                 setKolsToDelete([]);
               } catch (error) {
                 toast({
-                  title: 'Error',
-                  description: 'Failed to delete KOL(s).',
+                  title: 'Delete failed',
+                  description: error instanceof Error ? error.message : 'Failed to delete KOL(s)',
                   variant: 'destructive',
                 });
               }
             }}>Delete KOL{kolsToDelete.length !== 1 ? 's' : ''}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unhide prompt — fired when a hidden KOL's status transitions
+          to Onboarded. Confirms the user really meant to keep the KOL
+          hidden (default action: unhide). 2026-06-05. */}
+      <Dialog open={!!unhidePromptKol} onOpenChange={(open) => { if (!open) setUnhidePromptKol(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Eye className="h-4 w-4 text-brand" />
+              Unhide KOL?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{unhidePromptKol?.master_kol?.name || 'This KOL'}</strong> was just moved to <strong>Onboarded</strong> but is still hidden from the dashboard. Unhide them so they show up everywhere?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button
+              variant="outline"
+              onClick={() => setUnhidePromptKol(null)}
+              disabled={unhiding}
+            >
+              Keep Hidden
+            </Button>
+            <Button
+              variant="brand"
+              disabled={unhiding}
+              onClick={async () => {
+                if (!unhidePromptKol) return;
+                setUnhiding(true);
+                try {
+                  await CampaignKOLService.updateCampaignKOL(unhidePromptKol.id, { hidden: false } as any);
+                  setCampaignKOLs(prev => prev.map(k =>
+                    k.id === unhidePromptKol.id ? { ...k, hidden: false } : k
+                  ));
+                  toast({
+                    title: 'KOL Unhidden',
+                    description: `${unhidePromptKol.master_kol?.name || 'KOL'} is now visible on the dashboard.`,
+                  });
+                  setUnhidePromptKol(null);
+                } catch (err) {
+                  toast({
+                    title: 'Unhide failed',
+                    description: err instanceof Error ? err.message : 'Unknown error',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setUnhiding(false);
+                }
+              }}
+            >
+              <Eye className="h-3.5 w-3.5 mr-1.5" />
+              {unhiding ? 'Unhiding…' : 'Unhide'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

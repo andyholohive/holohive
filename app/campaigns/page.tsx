@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import Link from "next/link";
 import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
@@ -101,7 +102,7 @@ export default function CampaignsPage() {
       fetchAvailableClients();
       fetchAvailableTemplates();
       fetchAvailableLists();
-      UserService.getAllUsers().then(setAllUsers);
+      UserService.getActiveUsers().then(setAllUsers);
       // Set default manager to current user every time dialog opens
       setNewCampaign(prev => ({ ...prev, manager: user.id }));
     } else if (!isNewCampaignOpen) {
@@ -332,15 +333,20 @@ export default function CampaignsPage() {
     clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true
   );
 
-  // Build (status -> [campaign names]) once. Used both for the badge
-  // counts AND for the hover tooltips that preview which campaigns
+  // Build (status -> [{id, name, slug}]) once. Used both for the badge
+  // counts AND for the hover popovers that preview which campaigns
   // are in each status. Sorted alphabetically for predictable display.
-  const campaignsByStatus: Record<'all' | 'Planning' | 'Active' | 'Paused' | 'Completed', string[]> = {
-    all:       scopedCampaigns.map(c => c.name).sort((a, b) => a.localeCompare(b)),
-    Planning:  scopedCampaigns.filter(c => c.status === 'Planning').map(c => c.name).sort((a, b) => a.localeCompare(b)),
-    Active:    scopedCampaigns.filter(c => c.status === 'Active').map(c => c.name).sort((a, b) => a.localeCompare(b)),
-    Paused:    scopedCampaigns.filter(c => c.status === 'Paused').map(c => c.name).sort((a, b) => a.localeCompare(b)),
-    Completed: scopedCampaigns.filter(c => c.status === 'Completed').map(c => c.name).sort((a, b) => a.localeCompare(b)),
+  // Storing id + slug (not just name) so each row in the hover popover
+  // can be a clickable Link to /campaigns/{slug || id}.
+  type CampaignRef = { id: string; name: string; slug: string | null };
+  const toRef = (c: CampaignWithDetails): CampaignRef => ({ id: c.id, name: c.name, slug: c.slug ?? null });
+  const byName = (a: CampaignRef, b: CampaignRef) => a.name.localeCompare(b.name);
+  const campaignsByStatus: Record<'all' | 'Planning' | 'Active' | 'Paused' | 'Completed', CampaignRef[]> = {
+    all:       scopedCampaigns.map(toRef).sort(byName),
+    Planning:  scopedCampaigns.filter(c => c.status === 'Planning').map(toRef).sort(byName),
+    Active:    scopedCampaigns.filter(c => c.status === 'Active').map(toRef).sort(byName),
+    Paused:    scopedCampaigns.filter(c => c.status === 'Paused').map(toRef).sort(byName),
+    Completed: scopedCampaigns.filter(c => c.status === 'Completed').map(toRef).sort(byName),
   };
 
   // Count campaigns by status for tab badges (derived from the names map)
@@ -1051,69 +1057,76 @@ export default function CampaignsPage() {
         />
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Each tab shows a hover tooltip with the campaign names
-              in that status — handy for the manager to scan what's
-              where without clicking through. Tone palette aligned to
-              v11: Planning sky (info), Active brand, Paused amber
-              (warning), Completed emerald (success). */}
+          {/* Each tab shows a hover popover with the campaigns in that
+              status — handy for the manager to scan what's where, and
+              each row is a clickable Link to the campaign detail page.
+              Uses HoverCard (not Tooltip) so the content is
+              interactive. Tone palette aligned to v11: Planning sky
+              (info), Active brand, Paused amber (warning), Completed
+              emerald (success). */}
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
-              <TooltipProvider delayDuration={250}>
-                {/* We can't use Tailwind's `data-[state=active]:...`
-                    here because <TooltipTrigger asChild> overwrites
-                    Radix Tabs' data-state attribute with Tooltip's
-                    own. Derive active styling from the controlled
-                    statusFilter state instead. */}
-                {([
-                  { value: 'all',       label: 'All',       activeText: 'text-ink-warm-900', countBg: 'bg-cream-200 text-ink-warm-700' },
-                  { value: 'Planning',  label: 'Planning',  activeText: 'text-sky-700',      countBg: 'bg-sky-100 text-sky-700' },
-                  { value: 'Active',    label: 'Active',    activeText: 'text-brand',        countBg: 'bg-brand-light text-brand' },
-                  { value: 'Paused',    label: 'Paused',    activeText: 'text-amber-700',    countBg: 'bg-amber-100 text-amber-800' },
-                  { value: 'Completed', label: 'Completed', activeText: 'text-emerald-700',  countBg: 'bg-emerald-100 text-emerald-800' },
-                ] as const).map((t) => {
-                  const names = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
-                  const isActive = statusFilter === t.value;
-                  return (
-                    <Tooltip key={t.value}>
-                      <TooltipTrigger asChild>
-                        <TabsTrigger
-                          value={t.value}
-                          className={`px-4 py-2 transition-colors ${
-                            isActive
-                              ? `bg-white shadow-card ${t.activeText}`
-                              : 'text-ink-warm-700 hover:bg-cream-50'
-                          }`}
-                        >
-                          {t.label}
-                          <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countBg}`}>{names.length}</span>
-                        </TabsTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" align="start" className="max-w-xs p-0">
-                        {names.length === 0 ? (
-                          <div className="px-3 py-2 text-xs text-ink-warm-500 italic">No campaigns</div>
-                        ) : (
-                          <div className="py-1.5 max-h-72 overflow-y-auto">
-                            <div className="px-3 py-1 text-[10px] mono font-semibold text-ink-warm-400 uppercase tracking-[0.14em] border-b border-cream-100">
-                              {names.length} {t.label.toLowerCase()} campaign{names.length === 1 ? '' : 's'}
-                            </div>
-                            <ul className="text-xs">
-                              {/* Cap at 50 to keep the popover sane —
-                                  anyone with 50+ campaigns in a single
-                                  status should be filtering, not scanning. */}
-                              {names.slice(0, 50).map((n) => (
-                                <li key={n} className="px-3 py-1 truncate">{n}</li>
-                              ))}
-                              {names.length > 50 && (
-                                <li className="px-3 py-1 text-ink-warm-400 italic">…and {names.length - 50} more</li>
-                              )}
-                            </ul>
+              {/* HoverCardTrigger asChild overwrites Radix Tabs'
+                  data-state attribute with HoverCard's own, so we
+                  can't use Tailwind's `data-[state=active]:...`. We
+                  derive active styling from the controlled
+                  statusFilter state instead. */}
+              {([
+                { value: 'all',       label: 'All',       activeText: 'text-ink-warm-900', countBg: 'bg-cream-200 text-ink-warm-700' },
+                { value: 'Planning',  label: 'Planning',  activeText: 'text-sky-700',      countBg: 'bg-sky-100 text-sky-700' },
+                { value: 'Active',    label: 'Active',    activeText: 'text-brand',        countBg: 'bg-brand-light text-brand' },
+                { value: 'Paused',    label: 'Paused',    activeText: 'text-amber-700',    countBg: 'bg-amber-100 text-amber-800' },
+                { value: 'Completed', label: 'Completed', activeText: 'text-emerald-700',  countBg: 'bg-emerald-100 text-emerald-800' },
+              ] as const).map((t) => {
+                const items = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
+                const isActive = statusFilter === t.value;
+                return (
+                  <HoverCard key={t.value} openDelay={150} closeDelay={120}>
+                    <HoverCardTrigger asChild>
+                      <TabsTrigger
+                        value={t.value}
+                        className={`px-4 py-2 transition-colors ${
+                          isActive
+                            ? `bg-white shadow-card ${t.activeText}`
+                            : 'text-ink-warm-700 hover:bg-cream-50'
+                        }`}
+                      >
+                        {t.label}
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countBg}`}>{items.length}</span>
+                      </TabsTrigger>
+                    </HoverCardTrigger>
+                    <HoverCardContent side="bottom" align="start" sideOffset={6} className="w-72 max-w-xs p-0">
+                      {items.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-ink-warm-500 italic">No campaigns</div>
+                      ) : (
+                        <div className="py-1.5 max-h-72 overflow-y-auto">
+                          <div className="px-3 py-1 text-[10px] mono font-semibold text-ink-warm-400 uppercase tracking-[0.14em] border-b border-cream-100">
+                            {items.length} {t.label.toLowerCase()} campaign{items.length === 1 ? '' : 's'}
                           </div>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </TooltipProvider>
+                          <ul className="text-xs py-1">
+                            {/* Cap at 50 to keep the popover sane —
+                                anyone with 50+ campaigns in a single
+                                status should be filtering, not scanning. */}
+                            {items.slice(0, 50).map((c) => (
+                              <li key={c.id}>
+                                <Link
+                                  href={`/campaigns/${c.slug || c.id}`}
+                                  className="block px-3 py-1.5 truncate text-ink-warm-700 hover:bg-cream-50 hover:text-brand transition-colors"
+                                >
+                                  {c.name}
+                                </Link>
+                              </li>
+                            ))}
+                            {items.length > 50 && (
+                              <li className="px-3 py-1 text-ink-warm-400 italic">…and {items.length - 50} more</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </HoverCardContent>
+                  </HoverCard>
+                );
+              })}
             </TabsList>
           </Tabs>
 

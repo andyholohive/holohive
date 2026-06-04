@@ -200,13 +200,13 @@ export default function FundingRadarPanel() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: 'Promoted', description: 'Prospect added to pipeline' });
+        toast({ title: 'Prospect promoted', description: 'Added to pipeline.' });
         fetchData();
       } else {
-        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        toast({ title: 'Promote failed', description: data.error ?? 'Unknown error', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to promote', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Promote failed', description: err instanceof Error ? err.message : 'Failed to promote', variant: 'destructive' });
     } finally {
       setPromoting(null);
     }

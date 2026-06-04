@@ -367,7 +367,7 @@ export function ReportTabContent({
                 {reportFiles.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                    className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg"
                   >
                     {getFileIcon(file.file_type)}
                     <div className="flex-1 min-w-0">

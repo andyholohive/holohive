@@ -296,8 +296,8 @@ function SettingsContent() {
     } catch (error) {
       console.error('Error registering webhook:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to register webhook',
+        title: 'Registration failed',
+        description: error instanceof Error ? error.message : 'Failed to register webhook',
         variant: 'destructive',
       });
     } finally {
@@ -335,8 +335,8 @@ function SettingsContent() {
     } catch (error) {
       console.error('Error deleting webhook:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to disconnect webhook',
+        title: 'Disconnect failed',
+        description: error instanceof Error ? error.message : 'Failed to disconnect webhook',
         variant: 'destructive',
       });
     } finally {

@@ -205,13 +205,13 @@ export default function NetworkPage() {
   // Status colors matching pipeline page styling
   const partnerStatusColors: Record<PartnerStatus, { bg: string; text: string }> = {
     active: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    inactive: { bg: 'bg-gray-50', text: 'text-gray-700' }
+    inactive: { bg: 'bg-cream-50', text: 'text-ink-warm-700' }
   };
 
   const affiliateStatusColors: Record<AffiliateStatus, { bg: string; text: string }> = {
     new: { bg: 'bg-blue-50', text: 'text-blue-700' },
     active: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    inactive: { bg: 'bg-gray-50', text: 'text-gray-700' }
+    inactive: { bg: 'bg-cream-50', text: 'text-ink-warm-700' }
   };
 
   // Partner focus area options
@@ -245,7 +245,7 @@ export default function NetworkPage() {
         CRMService.getAllAffiliates(),
         CRMService.getAllContacts(),
         CRMService.getAllContactLinks(),
-        UserService.getAllUsers(),
+        UserService.getActiveUsers(),
         // Single query: every opportunity with an affiliate_id, with stage
         // so we can split into open/won. ~1k row scan is fine; if this
         // grows we can move it server-side.
@@ -1039,6 +1039,8 @@ export default function NetworkPage() {
           icon={Handshake}
           title="Network"
           subtitle="Manage your partners and affiliates"
+          kicker="CRM · Network"
+          kickerDot="brand"
           actions={(
             <>
               <Skeleton className="h-10 w-64" />
@@ -1066,7 +1068,7 @@ export default function NetworkPage() {
         </div>
         {/* Table skeleton */}
         <div className="flex-1">
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-cream-200 overflow-hidden">
             <Skeleton className="h-12 w-full" />
             {[...Array(5)].map((_, i) => (
               <Skeleton key={i} className="h-14 w-full border-t" />
@@ -1083,10 +1085,12 @@ export default function NetworkPage() {
         icon={Handshake}
         title="Network"
         subtitle="Manage your partners and affiliates"
+        kicker="CRM · Network"
+        kickerDot="brand"
         actions={(
           <>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
               <Input
                 placeholder="Search..."
                 className="pl-10 w-64 focus-brand"
@@ -1144,8 +1148,8 @@ export default function NetworkPage() {
       {/* Filters and Sort */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Filters:</span>
+          <Filter className="h-4 w-4 text-ink-warm-500" />
+          <span className="text-sm text-ink-warm-700">Filters:</span>
         </div>
         {activeTab === 'partners' && (
           <>
@@ -1202,8 +1206,8 @@ export default function NetworkPage() {
         )}
         <div className="h-6 w-px bg-gray-300" />
         <div className="flex items-center gap-2">
-          <ArrowUpDown className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Sort:</span>
+          <ArrowUpDown className="h-4 w-4 text-ink-warm-500" />
+          <span className="text-sm text-ink-warm-700">Sort:</span>
         </div>
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-48 h-9 text-sm focus-brand">
@@ -1219,7 +1223,7 @@ export default function NetworkPage() {
           </SelectContent>
         </Select>
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-gray-500 hover:text-gray-700">
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-ink-warm-500">
             <X className="h-4 w-4 mr-1" />
             Clear Filters
           </Button>
@@ -1307,20 +1311,20 @@ export default function NetworkPage() {
         <TabsContent value="partners" className="mt-0">
           {/* Partners Bulk action bar */}
           {selectedPartners.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-4">
+            <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm mb-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                  <span className="text-sm font-semibold text-gray-700">{selectedPartners.length} partner{selectedPartners.length !== 1 ? 's' : ''} selected</span>
+                  <span className="text-sm font-semibold text-ink-warm-700">{selectedPartners.length} partner{selectedPartners.length !== 1 ? 's' : ''} selected</span>
                 </div>
                 <div className="h-4 w-px bg-gray-300"></div>
-                <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                <span className="text-xs text-ink-warm-700 font-medium">Bulk Edit Fields</span>
               </div>
-              <div className="mb-4 pb-4 border-b border-gray-200">
+              <div className="mb-4 pb-4 border-b border-cream-200">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                  className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
                   onClick={() => {
                     const allIds = filteredPartners.map(p => p.id);
                     if (allIds.every(id => selectedPartners.includes(id))) {
@@ -1336,7 +1340,7 @@ export default function NetworkPage() {
               <div className="flex flex-wrap items-end gap-3">
                 {/* Status */}
                 <div className="min-w-[120px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Status</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Status</span>
                   <Select value={bulkPartnerEdit.status || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, status: v as PartnerStatus }))}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1349,7 +1353,7 @@ export default function NetworkPage() {
                 </div>
                 {/* Category */}
                 <div className="min-w-[140px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Category</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Category</span>
                   <Select value={bulkPartnerEdit.category || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, category: v === 'none' ? null : v }) as Partial<CRMPartner>)}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1364,7 +1368,7 @@ export default function NetworkPage() {
                 </div>
                 {/* Focus */}
                 <div className="min-w-[140px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Focus</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Focus</span>
                   <Select value={bulkPartnerEdit.focus || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, focus: v === 'none' ? null : v }))}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1381,7 +1385,7 @@ export default function NetworkPage() {
                 </div>
                 {/* Owner */}
                 <div className="min-w-[140px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Owner</span>
                   <Select value={bulkPartnerEdit.owner_id || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1425,10 +1429,10 @@ export default function NetworkPage() {
           )}
           {partnersViewMode === 'table' ? (
             /* Partners Table View */
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg border border-cream-200 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/50">
+                  <TableRow className="bg-cream-50/50">
                     <TableHead className="w-10">#</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
@@ -1444,7 +1448,7 @@ export default function NetworkPage() {
                 <TableBody>
                   {filteredPartners.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={9} className="text-center py-8 text-ink-warm-500">
                         No partners found
                       </TableCell>
                     </TableRow>
@@ -1454,8 +1458,8 @@ export default function NetworkPage() {
                       const primaryContact = partnerContactLinks.find(l => l.is_primary)?.contact || partnerContactLinks[0]?.contact;
                       const statusColors = partnerStatusColors[partner.status];
                       return (
-                        <TableRow key={partner.id} className="group hover:bg-gray-50">
-                          <TableCell className="text-gray-500 text-sm">
+                        <TableRow key={partner.id} className="group hover:bg-cream-50">
+                          <TableCell className="text-ink-warm-500 text-sm">
                             {(() => {
                               const isChecked = selectedPartners.includes(partner.id);
                               return (
@@ -1503,9 +1507,9 @@ export default function NetworkPage() {
                             ) : (
                               <div
                                 onClick={() => startEditing(partner.id, 'name', 'partner', partner.name)}
-                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-cream-100 rounded px-2 py-1 -mx-2 -my-1"
                               >
-                                <Building2 className="h-4 w-4 text-gray-400" />
+                                <Building2 className="h-4 w-4 text-ink-warm-400" />
                                 <span className="font-medium">{partner.name}</span>
                               </div>
                             )}
@@ -1531,7 +1535,7 @@ export default function NetworkPage() {
                             >
                               <SelectTrigger className="w-36 h-8 text-xs focus-brand capitalize">
                                 <SelectValue placeholder="Select">
-                                  {partner.category ? formatCategory(partner.category) : <span className="text-gray-400">-</span>}
+                                  {partner.category ? formatCategory(partner.category) : <span className="text-ink-warm-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -1549,7 +1553,7 @@ export default function NetworkPage() {
                             >
                               <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
-                                  {partner.focus ? formatFocusLabel(partner.focus) : <span className="text-gray-400">-</span>}
+                                  {partner.focus ? formatFocusLabel(partner.focus) : <span className="text-ink-warm-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -1569,7 +1573,7 @@ export default function NetworkPage() {
                             >
                               <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
-                                  {partner.owner_id ? (users.find(u => u.id === partner.owner_id)?.name || users.find(u => u.id === partner.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
+                                  {partner.owner_id ? (users.find(u => u.id === partner.owner_id)?.name || users.find(u => u.id === partner.owner_id)?.email || '-') : <span className="text-ink-warm-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -1591,7 +1595,7 @@ export default function NetworkPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 px-2 text-xs text-gray-400 hover:text-gray-600"
+                                className="h-6 px-2 text-xs text-ink-warm-400"
                                 onClick={() => handleOpenPartnerAffiliateLink(partner)}
                               >
                                 + Add
@@ -1603,7 +1607,7 @@ export default function NetworkPage() {
                               <HoverCard>
                                 <HoverCardTrigger asChild>
                                   <div className="flex items-center gap-2 cursor-pointer">
-                                    <span className="text-sm hover:text-blue-600">{primaryContact.name}</span>
+                                    <span className="text-sm hover:text-brand">{primaryContact.name}</span>
                                     {partnerContactLinks.length > 1 && (
                                       <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                         +{partnerContactLinks.length - 1}
@@ -1615,30 +1619,30 @@ export default function NetworkPage() {
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-3">
                                       <div className="p-2 bg-blue-100 rounded-full">
-                                        <Users className="h-4 w-4 text-blue-600" />
+                                        <Users className="h-4 w-4 text-brand" />
                                       </div>
                                       <div>
                                         <p className="font-medium">{primaryContact.name}</p>
                                         {partnerContactLinks[0]?.role && (
-                                          <p className="text-xs text-gray-500">{partnerContactLinks[0].role}</p>
+                                          <p className="text-xs text-ink-warm-500">{partnerContactLinks[0].role}</p>
                                         )}
                                       </div>
                                     </div>
                                     <div className="space-y-1.5 text-sm">
                                       {primaryContact.email && (
-                                        <div className="flex items-center gap-2 text-gray-600">
+                                        <div className="flex items-center gap-2 text-ink-warm-700">
                                           <Mail className="h-3.5 w-3.5" />
                                           <span>{primaryContact.email}</span>
                                         </div>
                                       )}
                                       {primaryContact.telegram_id && (
-                                        <div className="flex items-center gap-2 text-gray-600">
+                                        <div className="flex items-center gap-2 text-ink-warm-700">
                                           <MessageSquare className="h-3.5 w-3.5" />
                                           <span>@{primaryContact.telegram_id}</span>
                                         </div>
                                       )}
                                       {primaryContact.phone && (
-                                        <div className="flex items-center gap-2 text-gray-600">
+                                        <div className="flex items-center gap-2 text-ink-warm-700">
                                           <Phone className="h-3.5 w-3.5" />
                                           <span>{primaryContact.phone}</span>
                                         </div>
@@ -1646,7 +1650,7 @@ export default function NetworkPage() {
                                     </div>
                                     {partnerContactLinks.length > 1 && (
                                       <div className="pt-2 border-t">
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-ink-warm-500">
                                           +{partnerContactLinks.length - 1} more contact{partnerContactLinks.length > 2 ? 's' : ''}
                                         </p>
                                       </div>
@@ -1654,9 +1658,9 @@ export default function NetworkPage() {
                                   </div>
                                 </HoverCardContent>
                               </HoverCard>
-                            ) : <span className="text-gray-400">-</span>}
+                            ) : <span className="text-ink-warm-400">-</span>}
                           </TableCell>
-                          <TableCell className="text-sm text-gray-500">
+                          <TableCell className="text-sm text-ink-warm-500">
                             {partner.last_contacted_at ? formatShortDate(partner.last_contacted_at) : '-'}
                           </TableCell>
                           <TableCell>
@@ -1713,8 +1717,8 @@ export default function NetworkPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gray-100 rounded-lg">
-                          <Building2 className="h-5 w-5 text-gray-600" />
+                        <div className="p-2 bg-cream-100 rounded-lg">
+                          <Building2 className="h-5 w-5 text-ink-warm-700" />
                         </div>
                         <div>
                           <CardTitle className="text-base">{partner.name}</CardTitle>
@@ -1770,7 +1774,7 @@ export default function NetworkPage() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     {partner.focus && (
-                      <p className="text-sm text-gray-600 mb-2">{formatFocusLabel(partner.focus)}</p>
+                      <p className="text-sm text-ink-warm-700 mb-2">{formatFocusLabel(partner.focus)}</p>
                     )}
                                         {partner.is_affiliate && (
                       <Badge variant="secondary" className="mt-2 text-xs bg-purple-100 text-purple-800">
@@ -1783,21 +1787,21 @@ export default function NetworkPage() {
                       if (partnerContactLinks.length === 0) return null;
                       const primaryContact = partnerContactLinks.find(l => l.is_primary)?.contact || partnerContactLinks[0]?.contact;
                       return (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                        <div className="mt-3 pt-3 border-t border-cream-100">
+                          <div className="flex items-center gap-2 text-xs text-ink-warm-700 mb-1">
                             <Users className="h-3 w-3 text-blue-500" />
                             <span className="font-medium">Contacts ({partnerContactLinks.length})</span>
                           </div>
                           <div className="ml-5 space-y-1">
-                            <p className="text-sm font-medium text-gray-700">{primaryContact?.name}</p>
+                            <p className="text-sm font-medium text-ink-warm-700">{primaryContact?.name}</p>
                             {primaryContact?.email && (
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <div className="flex items-center gap-1.5 text-xs text-ink-warm-500">
                                 <Mail className="h-3 w-3" />
                                 <span>{primaryContact.email}</span>
                               </div>
                             )}
                             {primaryContact?.telegram_id && (
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <div className="flex items-center gap-1.5 text-xs text-ink-warm-500">
                                 <MessageSquare className="h-3 w-3" />
                                 <span>@{primaryContact.telegram_id}</span>
                               </div>
@@ -1818,20 +1822,20 @@ export default function NetworkPage() {
         <TabsContent value="affiliates" className="mt-0">
           {/* Affiliates Bulk action bar */}
           {selectedAffiliates.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-4">
+            <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm mb-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                  <span className="text-sm font-semibold text-gray-700">{selectedAffiliates.length} affiliate{selectedAffiliates.length !== 1 ? 's' : ''} selected</span>
+                  <span className="text-sm font-semibold text-ink-warm-700">{selectedAffiliates.length} affiliate{selectedAffiliates.length !== 1 ? 's' : ''} selected</span>
                 </div>
                 <div className="h-4 w-px bg-gray-300"></div>
-                <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                <span className="text-xs text-ink-warm-700 font-medium">Bulk Edit Fields</span>
               </div>
-              <div className="mb-4 pb-4 border-b border-gray-200">
+              <div className="mb-4 pb-4 border-b border-cream-200">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                  className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
                   onClick={() => {
                     const allIds = filteredAffiliates.map(a => a.id);
                     if (allIds.every(id => selectedAffiliates.includes(id))) {
@@ -1847,7 +1851,7 @@ export default function NetworkPage() {
               <div className="flex flex-wrap items-end gap-3">
                 {/* Status */}
                 <div className="min-w-[120px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Status</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Status</span>
                   <Select value={bulkAffiliateEdit.status || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, status: v as AffiliateStatus }))}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1861,7 +1865,7 @@ export default function NetworkPage() {
                 </div>
                 {/* Commission Model */}
                 <div className="min-w-[140px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Commission</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Commission</span>
                   <Select value={bulkAffiliateEdit.commission_model || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, commission_model: v === 'none' ? null : v }))}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1876,7 +1880,7 @@ export default function NetworkPage() {
                 </div>
                 {/* Owner */}
                 <div className="min-w-[140px] flex flex-col">
-                  <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
+                  <span className="text-xs text-ink-warm-700 font-semibold mb-1">Owner</span>
                   <Select value={bulkAffiliateEdit.owner_id || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
                     <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
@@ -1920,10 +1924,10 @@ export default function NetworkPage() {
           )}
           {affiliatesViewMode === 'table' ? (
             /* Affiliates Table View */
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg border border-cream-200 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/50">
+                  <TableRow className="bg-cream-50/50">
                     <TableHead className="w-10">#</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
@@ -1938,7 +1942,7 @@ export default function NetworkPage() {
                 <TableBody>
                   {filteredAffiliates.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={9} className="text-center py-8 text-ink-warm-500">
                         No affiliates found
                       </TableCell>
                     </TableRow>
@@ -1948,8 +1952,8 @@ export default function NetworkPage() {
                       const primaryContact = affiliateContactLinks.find(l => l.is_primary)?.contact || affiliateContactLinks[0]?.contact;
                       const statusColors = affiliateStatusColors[affiliate.status];
                       return (
-                        <TableRow key={affiliate.id} className="group hover:bg-gray-50">
-                          <TableCell className="text-gray-500 text-sm">
+                        <TableRow key={affiliate.id} className="group hover:bg-cream-50">
+                          <TableCell className="text-ink-warm-500 text-sm">
                             {(() => {
                               const isChecked = selectedAffiliates.includes(affiliate.id);
                               return (
@@ -1997,9 +2001,9 @@ export default function NetworkPage() {
                             ) : (
                               <div
                                 onClick={() => startEditing(affiliate.id, 'name', 'affiliate', affiliate.name)}
-                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-cream-100 rounded px-2 py-1 -mx-2 -my-1"
                               >
-                                <Users className="h-4 w-4 text-gray-400" />
+                                <Users className="h-4 w-4 text-ink-warm-400" />
                                 <span className="font-medium">{affiliate.name}</span>
                                 {(() => {
                                   const c = affiliateOppCounts[affiliate.id];
@@ -2051,7 +2055,7 @@ export default function NetworkPage() {
                                     affiliate.category === 'investor_vc' ? 'Investor / VC' :
                                     affiliate.category === 'project' ? 'Project' :
                                     affiliate.category
-                                  ) : <span className="text-gray-400">-</span>}
+                                  ) : <span className="text-ink-warm-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -2069,7 +2073,7 @@ export default function NetworkPage() {
                             >
                               <SelectTrigger className="w-36 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
-                                  {affiliate.affiliation ? formatAffiliation(affiliate.affiliation) : <span className="text-gray-400">-</span>}
+                                  {affiliate.affiliation ? formatAffiliation(affiliate.affiliation) : <span className="text-ink-warm-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -2087,7 +2091,7 @@ export default function NetworkPage() {
                             >
                               <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
-                                  {affiliate.owner_id ? (users.find(u => u.id === affiliate.owner_id)?.name || users.find(u => u.id === affiliate.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
+                                  {affiliate.owner_id ? (users.find(u => u.id === affiliate.owner_id)?.name || users.find(u => u.id === affiliate.owner_id)?.email || '-') : <span className="text-ink-warm-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -2105,7 +2109,7 @@ export default function NetworkPage() {
                               <HoverCard>
                                 <HoverCardTrigger asChild>
                                   <div className="flex items-center gap-2 cursor-pointer">
-                                    <span className="text-sm hover:text-blue-600">{primaryContact.name}</span>
+                                    <span className="text-sm hover:text-brand">{primaryContact.name}</span>
                                     {affiliateContactLinks.length > 1 && (
                                       <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                         +{affiliateContactLinks.length - 1}
@@ -2122,25 +2126,25 @@ export default function NetworkPage() {
                                       <div>
                                         <p className="font-medium">{primaryContact.name}</p>
                                         {affiliateContactLinks[0]?.role && (
-                                          <p className="text-xs text-gray-500">{affiliateContactLinks[0].role}</p>
+                                          <p className="text-xs text-ink-warm-500">{affiliateContactLinks[0].role}</p>
                                         )}
                                       </div>
                                     </div>
                                     <div className="space-y-1.5 text-sm">
                                       {primaryContact.email && (
-                                        <div className="flex items-center gap-2 text-gray-600">
+                                        <div className="flex items-center gap-2 text-ink-warm-700">
                                           <Mail className="h-3.5 w-3.5" />
                                           <span>{primaryContact.email}</span>
                                         </div>
                                       )}
                                       {primaryContact.telegram_id && (
-                                        <div className="flex items-center gap-2 text-gray-600">
+                                        <div className="flex items-center gap-2 text-ink-warm-700">
                                           <MessageSquare className="h-3.5 w-3.5" />
                                           <span>@{primaryContact.telegram_id}</span>
                                         </div>
                                       )}
                                       {primaryContact.phone && (
-                                        <div className="flex items-center gap-2 text-gray-600">
+                                        <div className="flex items-center gap-2 text-ink-warm-700">
                                           <Phone className="h-3.5 w-3.5" />
                                           <span>{primaryContact.phone}</span>
                                         </div>
@@ -2148,7 +2152,7 @@ export default function NetworkPage() {
                                     </div>
                                     {affiliateContactLinks.length > 1 && (
                                       <div className="pt-2 border-t">
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-ink-warm-500">
                                           +{affiliateContactLinks.length - 1} more contact{affiliateContactLinks.length > 2 ? 's' : ''}
                                         </p>
                                       </div>
@@ -2156,9 +2160,9 @@ export default function NetworkPage() {
                                   </div>
                                 </HoverCardContent>
                               </HoverCard>
-                            ) : <span className="text-gray-400">-</span>}
+                            ) : <span className="text-ink-warm-400">-</span>}
                           </TableCell>
-                          <TableCell className="text-sm text-gray-500">
+                          <TableCell className="text-sm text-ink-warm-500">
                             {affiliate.last_contacted_at ? formatShortDate(affiliate.last_contacted_at) : '-'}
                           </TableCell>
                           <TableCell>
@@ -2236,7 +2240,7 @@ export default function NetworkPage() {
                             })()}
                           </CardTitle>
                           {affiliate.affiliation && (
-                            <p className="text-sm text-gray-500">{affiliate.affiliation}</p>
+                            <p className="text-sm text-ink-warm-500">{affiliate.affiliation}</p>
                           )}
                         </div>
                       </div>
@@ -2245,7 +2249,7 @@ export default function NetworkPage() {
                           className={`capitalize cursor-default hover:bg-inherit ${
                             affiliate.status === 'active' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' :
                             affiliate.status === 'new' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' :
-                            'bg-gray-100 text-gray-800 hover:bg-gray-100'
+                            'bg-cream-100 text-ink-warm-700 hover:bg-cream-100'
                           }`}
                         >
                           {affiliate.status}
@@ -2287,7 +2291,7 @@ export default function NetworkPage() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     {affiliate.commission_model && (
-                      <p className="text-sm text-gray-600 mb-2">{affiliate.commission_model}</p>
+                      <p className="text-sm text-ink-warm-700 mb-2">{affiliate.commission_model}</p>
                     )}
                     {affiliate.commission_rate && (
                       <Badge variant="outline" className="text-xs">
@@ -2300,21 +2304,21 @@ export default function NetworkPage() {
                       if (affiliateContactLinks.length === 0) return null;
                       const primaryContact = affiliateContactLinks.find(l => l.is_primary)?.contact || affiliateContactLinks[0]?.contact;
                       return (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+                        <div className="mt-3 pt-3 border-t border-cream-100">
+                          <div className="flex items-center gap-2 text-xs text-ink-warm-700 mb-1">
                             <Users className="h-3 w-3 text-purple-500" />
                             <span className="font-medium">Contacts ({affiliateContactLinks.length})</span>
                           </div>
                           <div className="ml-5 space-y-1">
-                            <p className="text-sm font-medium text-gray-700">{primaryContact?.name}</p>
+                            <p className="text-sm font-medium text-ink-warm-700">{primaryContact?.name}</p>
                             {primaryContact?.email && (
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <div className="flex items-center gap-1.5 text-xs text-ink-warm-500">
                                 <Mail className="h-3 w-3" />
                                 <span>{primaryContact.email}</span>
                               </div>
                             )}
                             {primaryContact?.telegram_id && (
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <div className="flex items-center gap-1.5 text-xs text-ink-warm-500">
                                 <MessageSquare className="h-3 w-3" />
                                 <span>@{primaryContact.telegram_id}</span>
                               </div>
@@ -2430,14 +2434,14 @@ export default function NetworkPage() {
               <div className="grid gap-2">
                 <Label>Affiliate</Label>
                 {/* Toggle between Link and Create */}
-                <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                <div className="flex rounded-lg border border-cream-200 p-1 bg-cream-50">
                   <button
                     type="button"
                     onClick={() => setPartnerDialogAffiliateMode('link')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
                       partnerDialogAffiliateMode === 'link'
-                        ? 'bg-white shadow-sm text-gray-900'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'bg-white shadow-sm text-ink-warm-900'
+                        : 'text-ink-warm-500 hover:text-ink-warm-700'
                     }`}
                   >
                     Link Existing
@@ -2447,8 +2451,8 @@ export default function NetworkPage() {
                     onClick={() => setPartnerDialogAffiliateMode('create')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
                       partnerDialogAffiliateMode === 'create'
-                        ? 'bg-white shadow-sm text-gray-900'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'bg-white shadow-sm text-ink-warm-900'
+                        : 'text-ink-warm-500 hover:text-ink-warm-700'
                     }`}
                   >
                     Create New
@@ -2507,14 +2511,14 @@ export default function NetworkPage() {
               <div className="grid gap-2">
                 <Label>Contact</Label>
                 {/* Toggle between None, Link, and Create */}
-                <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                <div className="flex rounded-lg border border-cream-200 p-1 bg-cream-50">
                   <button
                     type="button"
                     onClick={() => setPartnerDialogContactMode('none')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
                       partnerDialogContactMode === 'none'
-                        ? 'bg-white shadow-sm text-gray-900'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'bg-white shadow-sm text-ink-warm-900'
+                        : 'text-ink-warm-500 hover:text-ink-warm-700'
                     }`}
                   >
                     None
@@ -2524,8 +2528,8 @@ export default function NetworkPage() {
                     onClick={() => setPartnerDialogContactMode('link')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
                       partnerDialogContactMode === 'link'
-                        ? 'bg-white shadow-sm text-gray-900'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'bg-white shadow-sm text-ink-warm-900'
+                        : 'text-ink-warm-500 hover:text-ink-warm-700'
                     }`}
                   >
                     Link Existing
@@ -2535,8 +2539,8 @@ export default function NetworkPage() {
                     onClick={() => setPartnerDialogContactMode('create')}
                     className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
                       partnerDialogContactMode === 'create'
-                        ? 'bg-white shadow-sm text-gray-900'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'bg-white shadow-sm text-ink-warm-900'
+                        : 'text-ink-warm-500 hover:text-ink-warm-700'
                     }`}
                   >
                     Create New
@@ -2637,7 +2641,7 @@ export default function NetworkPage() {
                 />
               </div>
             </div>
-            <DialogFooter className="flex-shrink-0 pt-4">
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0 flex-shrink-0">
               <Button type="button" variant="outline" onClick={() => setIsNewPartnerOpen(false)}>
                 Cancel
               </Button>
@@ -2793,7 +2797,7 @@ export default function NetworkPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button type="button" variant="outline" onClick={() => setIsNewAffiliateOpen(false)}>
                 Cancel
               </Button>
@@ -2824,13 +2828,13 @@ export default function NetworkPage() {
                     <div key={link.id} className="flex items-center justify-between p-3">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-100 rounded-full">
-                          <Users className="h-4 w-4 text-blue-600" />
+                          <Users className="h-4 w-4 text-brand" />
                         </div>
                         <div>
                           <p className="font-medium text-sm">{link.contact?.name}</p>
                           <div className="flex items-center gap-2">
                             {link.role && (
-                              <span className="text-xs text-gray-500">{link.role}</span>
+                              <span className="text-xs text-ink-warm-500">{link.role}</span>
                             )}
                             {link.is_primary && (
                               <Badge variant="secondary" className="text-xs">Primary</Badge>
@@ -2856,14 +2860,14 @@ export default function NetworkPage() {
             <div className="space-y-3 border-t pt-4">
               <Label>Add Contact</Label>
               {/* Toggle between Link and Create */}
-              <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+              <div className="flex rounded-lg border border-cream-200 p-1 bg-cream-50">
                 <button
                   type="button"
                   onClick={() => setContactMode('link')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     contactMode === 'link'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-ink-warm-900'
+                      : 'text-ink-warm-500 hover:text-ink-warm-700'
                   }`}
                 >
                   Link Existing
@@ -2873,8 +2877,8 @@ export default function NetworkPage() {
                   onClick={() => setContactMode('create')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     contactMode === 'create'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-ink-warm-900'
+                      : 'text-ink-warm-500 hover:text-ink-warm-700'
                   }`}
                 >
                   Create New
@@ -2971,7 +2975,7 @@ export default function NetworkPage() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsPartnerContactLinkOpen(false)}>
               Close
             </Button>
@@ -3002,7 +3006,7 @@ export default function NetworkPage() {
                       <div>
                         <p className="font-medium text-sm">{linkingPartnerForAffiliate.affiliate.name}</p>
                         {linkingPartnerForAffiliate.affiliate.commission_model && (
-                          <span className="text-xs text-gray-500">{linkingPartnerForAffiliate.affiliate.commission_model}</span>
+                          <span className="text-xs text-ink-warm-500">{linkingPartnerForAffiliate.affiliate.commission_model}</span>
                         )}
                       </div>
                     </div>
@@ -3024,14 +3028,14 @@ export default function NetworkPage() {
             <div className="space-y-3 border-t pt-4">
               <Label>{linkingPartnerForAffiliate?.affiliate ? 'Change Affiliate' : 'Add Affiliate'}</Label>
               {/* Toggle between Link and Create */}
-              <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+              <div className="flex rounded-lg border border-cream-200 p-1 bg-cream-50">
                 <button
                   type="button"
                   onClick={() => setAffiliateLinkMode('link')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     affiliateLinkMode === 'link'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-ink-warm-900'
+                      : 'text-ink-warm-500 hover:text-ink-warm-700'
                   }`}
                 >
                   Link Existing
@@ -3041,8 +3045,8 @@ export default function NetworkPage() {
                   onClick={() => setAffiliateLinkMode('create')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     affiliateLinkMode === 'create'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-ink-warm-900'
+                      : 'text-ink-warm-500 hover:text-ink-warm-700'
                   }`}
                 >
                   Create New
@@ -3110,7 +3114,7 @@ export default function NetworkPage() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsPartnerAffiliateLinkOpen(false)}>
               Close
             </Button>
@@ -3143,7 +3147,7 @@ export default function NetworkPage() {
                           <p className="font-medium text-sm">{link.contact?.name}</p>
                           <div className="flex items-center gap-2">
                             {link.role && (
-                              <span className="text-xs text-gray-500">{link.role}</span>
+                              <span className="text-xs text-ink-warm-500">{link.role}</span>
                             )}
                             {link.is_primary && (
                               <Badge variant="secondary" className="text-xs">Primary</Badge>
@@ -3169,14 +3173,14 @@ export default function NetworkPage() {
             <div className="space-y-3 border-t pt-4">
               <Label>Add Contact</Label>
               {/* Toggle between Link and Create */}
-              <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+              <div className="flex rounded-lg border border-cream-200 p-1 bg-cream-50">
                 <button
                   type="button"
                   onClick={() => setContactMode('link')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     contactMode === 'link'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-ink-warm-900'
+                      : 'text-ink-warm-500 hover:text-ink-warm-700'
                   }`}
                 >
                   Link Existing
@@ -3186,8 +3190,8 @@ export default function NetworkPage() {
                   onClick={() => setContactMode('create')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     contactMode === 'create'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-ink-warm-900'
+                      : 'text-ink-warm-500 hover:text-ink-warm-700'
                   }`}
                 >
                   Create New
@@ -3284,7 +3288,7 @@ export default function NetworkPage() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsAffiliateContactLinkOpen(false)}>
               Close
             </Button>
@@ -3304,18 +3308,18 @@ export default function NetworkPage() {
           <ScrollArea className="max-h-[400px]">
             <div className="space-y-4 py-4">
               {stageHistory.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No history available</p>
+                <p className="text-center text-ink-warm-500 py-4">No history available</p>
               ) : (
                 <div className="relative">
                   {/* Timeline line */}
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-cream-200" />
 
                   {stageHistory.map((entry) => (
                     <div key={entry.id} className="relative pl-10 pb-4">
                       {/* Timeline dot */}
                       <div className="absolute left-2.5 w-3 h-3 bg-white border-2 border-gray-400 rounded-full" />
 
-                      <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="bg-cream-50 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
                           {entry.from_stage ? (
                             <>
@@ -3325,7 +3329,7 @@ export default function NetworkPage() {
                                   : affiliateStatusLabels[entry.from_stage as AffiliateStatus] || entry.from_stage
                                 }
                               </Badge>
-                              <ArrowRight className="h-3 w-3 text-gray-400" />
+                              <ArrowRight className="h-3 w-3 text-ink-warm-400" />
                               <Badge className="text-xs bg-brand text-white">
                                 {historyType === 'partner'
                                   ? partnerStatusLabels[entry.to_stage as PartnerStatus] || entry.to_stage
@@ -3342,11 +3346,11 @@ export default function NetworkPage() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-ink-warm-500">
                           {formatDate(entry.changed_at)}
                         </p>
                         {entry.notes && (
-                          <p className="text-sm text-gray-600 mt-1">{entry.notes}</p>
+                          <p className="text-sm text-ink-warm-700 mt-1">{entry.notes}</p>
                         )}
                       </div>
                     </div>
@@ -3355,7 +3359,7 @@ export default function NetworkPage() {
               )}
             </div>
           </ScrollArea>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>
               Close
             </Button>
@@ -3370,11 +3374,11 @@ export default function NetworkPage() {
             <DialogTitle>Delete Partner</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Are you sure you want to delete <strong>{partnerToDelete?.name}</strong>? This action cannot be undone.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsDeletePartnerDialogOpen(false)}>
               Cancel
             </Button>
@@ -3395,11 +3399,11 @@ export default function NetworkPage() {
             <DialogTitle>Delete Affiliate</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Are you sure you want to delete <strong>{affiliateToDelete?.name}</strong>? This action cannot be undone.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsDeleteAffiliateDialogOpen(false)}>
               Cancel
             </Button>
@@ -3420,11 +3424,11 @@ export default function NetworkPage() {
             <DialogTitle>Delete {selectedPartners.length} Partners</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Are you sure you want to delete <strong>{selectedPartners.length}</strong> selected partners? This action cannot be undone.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsBulkDeletePartnerDialogOpen(false)}>
               Cancel
             </Button>
@@ -3445,11 +3449,11 @@ export default function NetworkPage() {
             <DialogTitle>Delete {selectedAffiliates.length} Affiliates</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Are you sure you want to delete <strong>{selectedAffiliates.length}</strong> selected affiliates? This action cannot be undone.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsBulkDeleteAffiliateDialogOpen(false)}>
               Cancel
             </Button>

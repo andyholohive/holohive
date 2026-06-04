@@ -8,10 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { ChangelogService, Changelog, CreateChangelogData } from '@/lib/changelogService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +38,10 @@ export default function ChangelogAdminPage() {
     is_published: false
   });
   const [saving, setSaving] = useState(false);
+  // Target for the v11 destructive-confirm dialog (replaces the
+  // native `confirm()` that was here before).
+  const [deletingTarget, setDeletingTarget] = useState<Changelog | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Check if user is super_admin
   const isSuperAdmin = userProfile?.role === 'super_admin';
@@ -89,8 +96,8 @@ export default function ChangelogAdminPage() {
     try {
       if (!formData.version.trim() || !formData.title.trim() || !formData.content.trim()) {
         toast({
-          title: 'Error',
-          description: 'Version, title, and content are required',
+          title: 'Missing fields',
+          description: 'Version, title, and content are required.',
           variant: 'destructive',
         });
         return;
@@ -124,8 +131,8 @@ export default function ChangelogAdminPage() {
         }
 
         toast({
-          title: 'Success',
-          description: 'Changelog updated successfully',
+          title: 'Changelog updated',
+          description: `v${formData.version} — ${formData.title}`,
         });
       } else {
         await ChangelogService.createChangelog({
@@ -152,8 +159,8 @@ export default function ChangelogAdminPage() {
         }
 
         toast({
-          title: 'Success',
-          description: 'Changelog created successfully',
+          title: 'Changelog created',
+          description: `v${formData.version} — ${formData.title}`,
         });
       }
 
@@ -161,8 +168,8 @@ export default function ChangelogAdminPage() {
       setIsDialogOpen(false);
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to save changelog',
+        title: 'Save failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
     } finally {
@@ -170,22 +177,25 @@ export default function ChangelogAdminPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this changelog?')) return;
-
+  const confirmDelete = async () => {
+    if (!deletingTarget) return;
+    setDeleting(true);
     try {
-      await ChangelogService.deleteChangelog(id);
+      await ChangelogService.deleteChangelog(deletingTarget.id);
       await fetchChangelogs();
       toast({
-        title: 'Success',
-        description: 'Changelog deleted successfully',
+        title: 'Changelog deleted',
+        description: `v${deletingTarget.version} — ${deletingTarget.title}`,
       });
+      setDeletingTarget(null);
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to delete changelog',
+        title: 'Delete failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -194,8 +204,8 @@ export default function ChangelogAdminPage() {
       if (changelog.is_published) {
         await ChangelogService.unpublishChangelog(changelog.id);
         toast({
-          title: 'Success',
-          description: 'Changelog unpublished',
+          title: 'Changelog unpublished',
+          description: `v${changelog.version} — ${changelog.title}`,
         });
       } else {
         await ChangelogService.publishChangelog(changelog.id);
@@ -215,15 +225,15 @@ export default function ChangelogAdminPage() {
         }
 
         toast({
-          title: 'Success',
-          description: 'Changelog published',
+          title: 'Changelog published',
+          description: `v${changelog.version} — ${changelog.title}`,
         });
       }
       await fetchChangelogs();
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to update changelog status',
+        title: 'Publish failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
     }
@@ -244,14 +254,19 @@ export default function ChangelogAdminPage() {
   if (userProfile && !isSuperAdmin) {
     return (
       <div className="space-y-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <ShieldAlert className="h-12 w-12 text-rose-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
-            <p className="text-gray-500 max-w-md mx-auto">
-              Only super admins can access the changelog management page.
-            </p>
-          </CardContent>
+        <PageHeader
+          icon={Sparkles}
+          title="Changelog Management"
+          subtitle="Create and manage portal update announcements"
+          kicker="Admin · Changelog"
+          kickerDot="brand"
+        />
+        <Card className="border-cream-200">
+          <EmptyState
+            icon={ShieldAlert}
+            title="Access Denied"
+            description="Only super admins can access the changelog management page."
+          />
         </Card>
       </div>
     );
@@ -264,6 +279,8 @@ export default function ChangelogAdminPage() {
           icon={Sparkles}
           title="Changelog Management"
           subtitle="Create and manage portal update announcements"
+          kicker="Admin · Changelog"
+          kickerDot="brand"
           actions={<Skeleton className="h-10 w-32" />}
         />
         <div className="space-y-4">
@@ -281,6 +298,8 @@ export default function ChangelogAdminPage() {
         icon={Sparkles}
         title="Changelog Management"
         subtitle="Create and manage portal update announcements"
+        kicker="Admin · Changelog"
+        kickerDot="brand"
         actions={(
           <Button variant="brand" onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
@@ -296,95 +315,94 @@ export default function ChangelogAdminPage() {
       )}
 
       {changelogs.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Sparkles className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No changelogs yet</h3>
-            <p className="text-gray-500 max-w-md mx-auto mb-4">
-              Create your first changelog to announce updates to your users.
-            </p>
+        <Card className="border-cream-200">
+          <EmptyState
+            icon={Sparkles}
+            title="No Changelogs Yet"
+            description="Create your first changelog to announce updates to your users."
+          >
             <Button variant="brand" onClick={openCreateDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Create First Changelog
             </Button>
-          </CardContent>
+          </EmptyState>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {changelogs.map((changelog) => (
-            <Card key={changelog.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Badge
-                        variant="secondary"
-                        className="bg-brand/10 text-brand"
-                      >
-                        v{changelog.version}
-                      </Badge>
-                      <Badge
-                        variant={changelog.is_published ? 'default' : 'secondary'}
-                        className={changelog.is_published ? 'bg-brand hover:bg-brand/90' : ''}
-                      >
-                        {changelog.is_published ? 'Published' : 'Draft'}
-                      </Badge>
+        <>
+          <SectionHeader
+            label="Entries"
+            dot="brand"
+            counter={`${changelogs.length} changelog${changelogs.length === 1 ? '' : 's'}`}
+            first
+          />
+          <div className="grid gap-4">
+            {changelogs.map((changelog) => (
+              <Card key={changelog.id} className="border-cream-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <StatusBadge tone="brand">v{changelog.version}</StatusBadge>
+                        <StatusBadge tone={changelog.is_published ? 'success' : 'neutral'}>
+                          {changelog.is_published ? 'Published' : 'Draft'}
+                        </StatusBadge>
+                      </div>
+                      <h3 className="font-semibold text-ink-warm-900 mb-1">
+                        {changelog.title}
+                      </h3>
+                      <p className="text-sm text-ink-warm-500 line-clamp-2 mb-2">
+                        {changelog.content}
+                      </p>
+                      <div className="text-xs text-ink-warm-400">
+                        {changelog.is_published
+                          ? `Published ${formatDate(changelog.published_at)}`
+                          : `Created ${formatDate(changelog.created_at)}`
+                        }
+                      </div>
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-1">
-                      {changelog.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 line-clamp-2 mb-2">
-                      {changelog.content}
-                    </p>
-                    <div className="text-xs text-gray-400">
-                      {changelog.is_published
-                        ? `Published ${formatDate(changelog.published_at)}`
-                        : `Created ${formatDate(changelog.created_at)}`
-                      }
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTogglePublish(changelog)}
-                      title={changelog.is_published ? 'Unpublish' : 'Publish'}
-                    >
-                      {changelog.is_published ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(changelog)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(changelog.id)}
-                      className="hover:bg-rose-50 hover:text-rose-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTogglePublish(changelog)}
+                        title={changelog.is_published ? 'Unpublish' : 'Publish'}
+                      >
+                        {changelog.is_published ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(changelog)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeletingTarget(changelog)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-brand" />
               {editingChangelog ? 'Edit Changelog' : 'Create New Changelog'}
             </DialogTitle>
             <DialogDescription>
@@ -395,10 +413,10 @@ export default function ChangelogAdminPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="version">Version</Label>
+                <Label htmlFor="version">Version <RequiredAsterisk /></Label>
                 <Input
                   id="version"
                   value={formData.version}
@@ -422,7 +440,7 @@ export default function ChangelogAdminPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Title <RequiredAsterisk /></Label>
               <Input
                 id="title"
                 value={formData.title}
@@ -433,7 +451,7 @@ export default function ChangelogAdminPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="content">Content</Label>
+              <Label htmlFor="content">Content <RequiredAsterisk /></Label>
               <Textarea
                 id="content"
                 value={formData.content}
@@ -447,18 +465,44 @@ Use markdown-like formatting:
                 rows={8}
                 className="focus-brand"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 Supports simple formatting: bullet points (- or *), headers (## or ###)
               </p>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
             <Button variant="brand" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : (editingChangelog ? 'Update' : 'Create')}
+              {saving ? 'Saving…' : (editingChangelog ? 'Save Changes' : 'Create Changelog')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm — replaces the native `confirm()` so it
+          matches the v11 destructive-flow pattern (Trash icon in
+          title + variant="destructive" primary). */}
+      <Dialog open={!!deletingTarget} onOpenChange={(open) => { if (!open) setDeletingTarget(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Changelog?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>v{deletingTarget?.version} — {deletingTarget?.title}</strong> will be permanently deleted. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeletingTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

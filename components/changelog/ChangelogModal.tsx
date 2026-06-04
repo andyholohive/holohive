@@ -78,7 +78,7 @@ export default function ChangelogModal() {
       // Handle bullet points
       if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
         return (
-          <li key={index} className="ml-4 text-gray-700">
+          <li key={index} className="ml-4 text-ink-warm-700">
             {line.trim().substring(2)}
           </li>
         );
@@ -86,14 +86,14 @@ export default function ChangelogModal() {
       // Handle headers (## or ###)
       if (line.trim().startsWith('### ')) {
         return (
-          <h4 key={index} className="font-semibold text-gray-900 mt-3 mb-1">
+          <h4 key={index} className="font-semibold text-ink-warm-900 mt-3 mb-1">
             {line.trim().substring(4)}
           </h4>
         );
       }
       if (line.trim().startsWith('## ')) {
         return (
-          <h3 key={index} className="font-bold text-gray-900 mt-4 mb-2">
+          <h3 key={index} className="font-bold text-ink-warm-900 mt-4 mb-2">
             {line.trim().substring(3)}
           </h3>
         );
@@ -104,7 +104,7 @@ export default function ChangelogModal() {
       }
       // Regular paragraphs
       return (
-        <p key={index} className="text-gray-700">
+        <p key={index} className="text-ink-warm-700">
           {line}
         </p>
       );
@@ -115,10 +115,10 @@ export default function ChangelogModal() {
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDismiss()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-5 w-5 text-brand" />
-            <DialogTitle className="text-xl">What's New</DialogTitle>
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand" />
+            What's New
+          </DialogTitle>
           <div className="flex items-center gap-2">
             <Badge
               variant="secondary"
@@ -127,12 +127,12 @@ export default function ChangelogModal() {
               v{currentChangelog.version}
             </Badge>
             {currentChangelog.published_at && (
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-ink-warm-500">
                 {formatDate(currentChangelog.published_at)}
               </span>
             )}
           </div>
-          <DialogDescription className="text-base font-medium text-gray-900 mt-2">
+          <DialogDescription className="text-base font-medium text-ink-warm-900 mt-2">
             {currentChangelog.title}
           </DialogDescription>
         </DialogHeader>
@@ -143,7 +143,7 @@ export default function ChangelogModal() {
           </div>
         </ScrollArea>
 
-        <DialogFooter className="flex-col gap-4">
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0 flex-col gap-4">
           {/* Mark as read checkbox */}
           <div className="flex items-center space-x-2 w-full">
             <Checkbox
@@ -153,7 +153,7 @@ export default function ChangelogModal() {
             />
             <Label
               htmlFor="markAsRead"
-              className="text-sm text-gray-500 cursor-pointer"
+              className="text-sm text-ink-warm-500 cursor-pointer"
             >
               Don't show this update again
             </Label>
@@ -171,7 +171,7 @@ export default function ChangelogModal() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-ink-warm-500">
                   {currentIndex + 1} of {displayedChangelogs.length}
                 </span>
                 <Button
@@ -186,7 +186,7 @@ export default function ChangelogModal() {
             ) : (
               <div />
             )}
-            <Button variant="brand" onClick={handleDismiss} className="text-white">
+            <Button variant="brand" onClick={handleDismiss}>
               Got it!
             </Button>
           </div>

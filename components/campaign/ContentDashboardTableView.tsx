@@ -342,7 +342,7 @@ export function ContentDashboardTableView() {
       console.error('Error deleting contents:', err);
       setContents(prevContents);
       fetchPayments();
-      toast({ title: 'Error', description: 'Failed to delete some content items.', variant: 'destructive' });
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed to delete some content items', variant: 'destructive' });
     }
   };
 
@@ -359,7 +359,7 @@ export function ContentDashboardTableView() {
       toast({ title: 'Status updated' });
     } catch (err) {
       console.error('Error bulk-updating content status:', err);
-      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' });
+      toast({ title: 'Update failed', description: err instanceof Error ? err.message : 'Failed to update status', variant: 'destructive' });
     }
   };
 
@@ -408,7 +408,7 @@ export function ContentDashboardTableView() {
       toast({ title: 'Platform updated' });
     } catch (err) {
       console.error('Error bulk-updating content platform:', err);
-      toast({ title: 'Error', description: 'Failed to update platform', variant: 'destructive' });
+      toast({ title: 'Update failed', description: err instanceof Error ? err.message : 'Failed to update platform', variant: 'destructive' });
     }
   };
 
@@ -451,24 +451,30 @@ export function ContentDashboardTableView() {
       );
     }
 
-    // Platform / Type / Status — always-editable selects
+    // Platform / Type / Status — always-editable selects.
+    // [2026-06-05] Status now uses the {value, label} object form so
+    // the dropdown shows Title Case ("Pending"/"Scheduled"/"Posted")
+    // while still storing the lowercase DB value. Platform / Type
+    // pass through unchanged because their fieldOptions are already
+    // Title Case canonical strings.
     if (field === 'platform' || field === 'type' || field === 'status') {
-      const options = field === 'platform'
-        ? fieldOptions.platforms
+      const options: Array<{ value: string; label: string }> = field === 'platform'
+        ? (fieldOptions.platforms as string[]).map(v => ({ value: v, label: v }))
         : field === 'type'
-          ? fieldOptions.deliverables
-          : contentStatusOptions.map(o => o.value);
+          ? (fieldOptions.deliverables as string[]).map(v => ({ value: v, label: v }))
+          : contentStatusOptions;
       const colorFn = field === 'type' ? getContentTypeColor : null;
+      const currentLabel = options.find(o => o.value === value)?.label ?? value;
       return (
         <Select value={value || ''} onValueChange={async v => {
           await handleContentCellSaveImmediate(content, field, v);
         }}>
           <SelectTrigger className={`border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${colorFn && value ? colorFn(value) : ''}`} style={{ minWidth: 90 }}>
-            <SelectValue>{value || '-'}</SelectValue>
+            <SelectValue>{currentLabel || '-'}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {options.map((opt: string) => (
-              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            {options.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1640,7 +1646,7 @@ export function ContentDashboardTableView() {
           dialog cluster into the component on 2026-06-02 so the
           delete flow is fully Table-view-internal. */}
       <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm Bulk Delete</DialogTitle>
           </DialogHeader>

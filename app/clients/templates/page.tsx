@@ -40,8 +40,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
-  ArrowLeft, Plus, Settings, Trash2, Copy, Star, StarOff, Pencil, ChevronUp, ChevronDown, Search, X, Lock, ListChecks,
+  ArrowLeft, Plus, Settings, Trash2, Copy, Star, StarOff, Pencil, ChevronUp, ChevronDown, Search, X, Lock, ListChecks, MoreHorizontal,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -129,7 +132,7 @@ export default function ActionBoardTemplatesPage() {
       })));
     } catch (err: any) {
       console.error('Failed to load templates:', err);
-      toast({ title: 'Error', description: 'Failed to load templates', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err?.message ?? 'Failed to load templates', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -179,7 +182,7 @@ export default function ActionBoardTemplatesPage() {
       toast({ title: 'Template duplicated' });
       await loadTemplates();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Duplicate failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     }
   };
 
@@ -201,7 +204,7 @@ export default function ActionBoardTemplatesPage() {
       toast({ title: 'Default updated', description: `"${t.name}" is now the default template.` });
       await loadTemplates();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Update failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     }
   };
 
@@ -214,7 +217,7 @@ export default function ActionBoardTemplatesPage() {
       setDeleteTarget(null);
       await loadTemplates();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Delete failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     }
   };
 
@@ -275,7 +278,7 @@ export default function ActionBoardTemplatesPage() {
       setEditorOpen(false);
       await loadTemplates();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Save failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -386,7 +389,7 @@ export default function ActionBoardTemplatesPage() {
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Description</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Milestones</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Created</TableHead>
-                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-[200px]">Actions</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-16">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -435,7 +438,7 @@ export default function ActionBoardTemplatesPage() {
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Description</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Milestones</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Created</TableHead>
-                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-[200px]">Actions</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-16">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -468,46 +471,38 @@ export default function ActionBoardTemplatesPage() {
                         : '—'}
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {!t.is_default && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
-                            title="Set as default"
-                            onClick={() => handleSetDefault(t)}
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Template actions"
                           >
-                            <Star className="h-3.5 w-3.5" />
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
-                          title="Duplicate"
-                          onClick={() => handleDuplicate(t)}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
-                          title="Edit"
-                          onClick={() => openEdit(t)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
-                          title="Delete"
-                          onClick={() => setDeleteTarget(t)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+                          {!t.is_default && (
+                            <DropdownMenuItem onClick={() => handleSetDefault(t)}>
+                              <Star className="h-3.5 w-3.5 mr-2" /> Set as default
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => handleDuplicate(t)}>
+                            <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEdit(t)}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDeleteTarget(t)}
+                            className="text-rose-600 focus:text-rose-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -690,7 +685,7 @@ export default function ActionBoardTemplatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-xs h-7 text-ink-warm-500 hover:text-brand"
+                          className="text-xs h-7 text-ink-warm-500"
                           onClick={() => addItem(idx)}
                         >
                           <Plus className="h-3 w-3 mr-1" /> Add item
@@ -727,7 +722,7 @@ export default function ActionBoardTemplatesPage() {
               <strong>{deleteTarget?.name}</strong> will be permanently deleted. Clients that previously had this template applied will keep their milestones — only the template itself is removed.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-2">
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
             <Button
               variant="destructive"

@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
 import { FieldOptionsService, FieldOption, CreateFieldOptionData } from '@/lib/fieldOptionsService';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, GripVertical, Sliders } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Sliders, MoreHorizontal, Power, PowerOff } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -60,24 +61,34 @@ function SortableRow({ option, onToggleActive, onDelete }: SortableRowProps) {
         {new Date(option.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
       </TableCell>
       <TableCell className="text-right">
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onToggleActive(option)}
-           
-          >
-            {option.is_active ? 'Deactivate' : 'Activate'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onDelete(option.id)}
-            className="hover:bg-rose-50 hover:text-rose-700"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Field option actions"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={() => onToggleActive(option)}>
+              {option.is_active ? (
+                <><PowerOff className="h-3.5 w-3.5 mr-2" /> Deactivate</>
+              ) : (
+                <><Power className="h-3.5 w-3.5 mr-2" /> Activate</>
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onDelete(option.id)}
+              className="text-rose-600 focus:text-rose-600"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );
@@ -161,8 +172,8 @@ export default function FieldOptionsPage() {
       } catch (error) {
         console.error('Error reordering options:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to reorder options',
+          title: 'Reorder failed',
+          description: error instanceof Error ? error.message : 'Failed to reorder options',
           variant: 'destructive',
         });
         // Revert by fetching from server
@@ -175,8 +186,7 @@ export default function FieldOptionsPage() {
     try {
       if (!newOption.option_value.trim()) {
         toast({
-          title: 'Error',
-          description: 'Option value is required',
+          title: 'Option value required',
           variant: 'destructive',
         });
         return;
@@ -191,14 +201,11 @@ export default function FieldOptionsPage() {
         display_order: 0
       });
       
-      toast({
-        title: 'Success',
-        description: 'Field option added successfully',
-      });
+      toast({ title: 'Field option added' });
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to add field option',
+        title: 'Add failed',
+        description: err instanceof Error ? err.message : 'Failed to add field option',
         variant: 'destructive',
       });
     }
@@ -208,15 +215,12 @@ export default function FieldOptionsPage() {
     try {
       await FieldOptionsService.updateFieldOption(id, updateData);
       await fetchFieldOptions();
-      
-      toast({
-        title: 'Success',
-        description: 'Field option updated successfully',
-      });
+
+      toast({ title: 'Field option updated' });
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to update field option',
+        title: 'Update failed',
+        description: err instanceof Error ? err.message : 'Failed to update field option',
         variant: 'destructive',
       });
     }
@@ -226,15 +230,12 @@ export default function FieldOptionsPage() {
     try {
       await FieldOptionsService.deleteFieldOption(id);
       await fetchFieldOptions();
-      
-      toast({
-        title: 'Success',
-        description: 'Field option deleted successfully',
-      });
+
+      toast({ title: 'Field option deleted' });
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to delete field option',
+        title: 'Delete failed',
+        description: err instanceof Error ? err.message : 'Failed to delete field option',
         variant: 'destructive',
       });
     }
@@ -246,15 +247,14 @@ export default function FieldOptionsPage() {
         is_active: !option.is_active
       });
       await fetchFieldOptions();
-      
+
       toast({
-        title: 'Success',
-        description: `Field option ${option.is_active ? 'deactivated' : 'activated'} successfully`,
+        title: option.is_active ? 'Field option deactivated' : 'Field option activated',
       });
     } catch (err) {
       toast({
-        title: 'Error',
-        description: 'Failed to update field option status',
+        title: 'Update failed',
+        description: err instanceof Error ? err.message : 'Failed to update field option status',
         variant: 'destructive',
       });
     }
@@ -293,7 +293,7 @@ export default function FieldOptionsPage() {
                   Add Option
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Add New Field Option</DialogTitle>
                   <DialogDescription>
@@ -332,7 +332,7 @@ export default function FieldOptionsPage() {
                     />
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancel
                   </Button>
@@ -372,7 +372,7 @@ export default function FieldOptionsPage() {
                       <TableHead>Display Order</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right w-16">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <SortableContext

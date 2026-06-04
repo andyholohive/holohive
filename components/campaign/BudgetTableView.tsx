@@ -32,6 +32,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -72,7 +73,16 @@ import {
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { MultiSelect } from '@/components/campaign/MultiSelect';
 
-type PaymentSortField = 'kol' | 'wallet' | 'amount' | 'payment_date' | 'date' | 'payment_method' | 'method' | 'content' | 'notes' | null;
+// Sort-field union must match the strings passed to togglePaymentSort()
+// from the column headers. The duplicates `'payment_date'` and
+// `'payment_method'` that used to live here were never hit by any header
+// click — the headers pass the short `'date'` / `'method'` names — so
+// they were dead code and have been removed (2026-06-05). Their absence
+// surfaced the original bug: clicking the date/method/content headers
+// set `paymentSort.field` to a string the switch in `getFilteredPayments`
+// didn't handle, so the rows fell through to `default: return 0` and
+// stayed unsorted.
+type PaymentSortField = 'kol' | 'wallet' | 'amount' | 'date' | 'method' | 'content' | 'notes' | null;
 
 export function BudgetTableView() {
   const {
@@ -238,14 +248,27 @@ export function BudgetTableView() {
             av = a.amount ?? 0;
             bv = b.amount ?? 0;
             break;
-          case 'payment_date':
-            av = a.payment_date ? new Date(a.payment_date).getTime() : 0;
-            bv = b.payment_date ? new Date(b.payment_date).getTime() : 0;
+          case 'date':
+            // Unpaid rows (no payment_date) sort LAST regardless of
+            // direction — matches the column-header tooltip "Sort by
+            // payment date (unpaid rows sort last)". Without this guard,
+            // unpaid rows (av=0) would cluster at the start in asc
+            // order and feel like noise.
+            av = a.payment_date ? new Date(a.payment_date).getTime() : Number.POSITIVE_INFINITY;
+            bv = b.payment_date ? new Date(b.payment_date).getTime() : Number.POSITIVE_INFINITY;
             break;
-          case 'payment_method':
+          case 'method':
             av = a.payment_method || '';
             bv = b.payment_method || '';
             break;
+          case 'content': {
+            // Sort by linked-content count, matching the header tooltip.
+            const ac = Array.isArray(a.content_id) ? a.content_id.length : (a.content_id ? 1 : 0);
+            const bc = Array.isArray(b.content_id) ? b.content_id.length : (b.content_id ? 1 : 0);
+            av = ac;
+            bv = bc;
+            break;
+          }
           case 'notes':
             av = a.notes || '';
             bv = b.notes || '';
@@ -285,7 +308,7 @@ export function BudgetTableView() {
       setBulkPaymentMethod('');
     } catch (err) {
       console.error('Error bulk-updating payments:', err);
-      toast({ title: 'Error', description: 'Failed to update payments', variant: 'destructive' });
+      toast({ title: 'Update failed', description: err instanceof Error ? err.message : 'Failed to update payments', variant: 'destructive' });
     }
   };
 
@@ -329,10 +352,10 @@ export function BudgetTableView() {
         }
       }
 
-      toast({ title: 'Success', description: 'Payment updated successfully' });
+      toast({ title: 'Payment updated' });
     } catch (error) {
       console.error('Error updating payment:', error);
-      toast({ title: 'Error', description: 'Failed to update payment', variant: 'destructive' });
+      toast({ title: 'Update failed', description: error instanceof Error ? error.message : 'Failed to update payment', variant: 'destructive' });
     }
   };
 
@@ -458,7 +481,7 @@ export function BudgetTableView() {
       toast({ title: 'Wallet updated' });
     } catch (error) {
       console.error('Error updating wallet:', error);
-      toast({ title: 'Error', description: 'Failed to update wallet', variant: 'destructive' });
+      toast({ title: 'Update failed', description: error instanceof Error ? error.message : 'Failed to update wallet', variant: 'destructive' });
     }
   };
 
@@ -484,7 +507,7 @@ export function BudgetTableView() {
       toast({ title: 'Payment deleted' });
     } catch (err) {
       console.error('Error deleting payment:', err);
-      toast({ title: 'Error', description: 'Failed to delete payment', variant: 'destructive' });
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed to delete payment', variant: 'destructive' });
     }
   };
 
@@ -583,15 +606,24 @@ export function BudgetTableView() {
                       </Button>
                     </div>
                 {selectedPayments.length > 0 && (
-                <div className="mb-6 mt-6">
-                  <div className="bg-white border border-cream-200 rounded-[14px] p-6 shadow-card">
+                /* v11 canonical bulk-bar: Card with `accent-l-brand` left
+                    stripe + `dot bg-brand` indicator + `mono uppercase
+                    tracking-[0.14em]` sub-label. Mirrors /expenses and
+                    /kols so all three feel like one design language.
+                    Was a raw `<div>` with `bg-cream-500` gray dot +
+                    `text-ink-warm-700` count + plain `text-xs` sub-label. */
+                <Card className="mb-6 mt-6 p-6 accent-l-brand">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
-                      <span className="text-sm font-semibold text-ink-warm-700">{selectedPayments.length} Payment{selectedPayments.length !== 1 ? 's' : ''} selected</span>
+                      <span className="dot bg-brand" aria-hidden />
+                      <span className="text-sm font-semibold text-ink-warm-900">
+                        {selectedPayments.length} payment{selectedPayments.length === 1 ? '' : 's'} selected
+                      </span>
                     </div>
-                    <div className="h-4 w-px bg-cream-300"></div>
-                    <span className="text-xs text-ink-warm-700 font-medium">Bulk Edit Fields</span>
+                    <div className="h-4 w-px bg-cream-200" />
+                    <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
+                      Bulk Edit Fields
+                    </span>
                   </div>
                   <div className="flex flex-wrap items-end gap-4">
                     <div className="flex flex-col items-end justify-end">
@@ -599,7 +631,6 @@ export function BudgetTableView() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
                         onClick={handleSelectAllPayments}
                       >
                         {(() => {
@@ -636,7 +667,7 @@ export function BudgetTableView() {
                         </Select>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="ml-auto flex items-end gap-2">
                       <div className="flex flex-col items-end justify-end">
                         <div className="h-5"></div>
                         <Button
@@ -660,12 +691,8 @@ export function BudgetTableView() {
                         </Button>
                       </div>
                     </div>
-                    <div className="text-xs text-ink-warm-500 font-medium ml-auto whitespace-nowrap">
-                      {selectedPayments.length > 0 && `${selectedPayments.length} item${selectedPayments.length !== 1 ? 's' : ''} selected`}
-                    </div>
                   </div>
-                  </div>
-                </div>
+                </Card>
                 )}
                 {loadingPayments ? (
                   <div className="space-y-4">
@@ -1254,15 +1281,12 @@ export function BudgetTableView() {
                                           p.id === payment.id ? { ...p, content_id: newContentIds } : p
                                         ));
 
-                                        toast({
-                                          title: 'Success',
-                                          description: 'Content link updated successfully'
-                                        });
+                                        toast({ title: 'Content link updated' });
                                       } catch (error) {
                                         console.error('Error updating content link:', error);
                                         toast({
-                                          title: 'Error',
-                                          description: 'Failed to update content link',
+                                          title: 'Update failed',
+                                          description: error instanceof Error ? error.message : 'Failed to update content link',
                                           variant: 'destructive'
                                         });
                                       }
@@ -1327,7 +1351,7 @@ export function BudgetTableView() {
 
       {/* Delete confirmation — single payment */}
       <Dialog open={showPaymentDeleteDialog} onOpenChange={setShowPaymentDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete payment?</DialogTitle>
           </DialogHeader>
@@ -1349,7 +1373,7 @@ export function BudgetTableView() {
 
       {/* Delete confirmation — bulk */}
       <Dialog open={showBulkDeletePaymentsDialog} onOpenChange={setShowBulkDeletePaymentsDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete {selectedPayments.length} payment{selectedPayments.length !== 1 ? 's' : ''}?</DialogTitle>
           </DialogHeader>
@@ -1362,10 +1386,10 @@ export function BudgetTableView() {
               setShowBulkDeletePaymentsDialog(false);
               try {
                 await Promise.all(selectedPayments.map(id => handleDeletePayment(id)));
-                toast({ title: `${selectedPayments.length} payment${selectedPayments.length !== 1 ? 's' : ''} deleted`, variant: 'destructive' });
+                toast({ title: 'Payments deleted', description: `${selectedPayments.length} payment${selectedPayments.length !== 1 ? 's' : ''} removed.` });
                 setSelectedPayments([]);
               } catch (err) {
-                toast({ title: 'Error', description: 'Failed to delete payments', variant: 'destructive' });
+                toast({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed to delete payments', variant: 'destructive' });
               }
             }}>Delete</Button>
           </DialogFooter>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -176,7 +177,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
         setDraft(data.schedule);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to load', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err?.message ?? 'Failed to load', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -221,10 +222,10 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
       } else {
         setSchedule(data.schedule);
         setDraft(data.schedule);
-        toast({ title: 'Saved', description: 'Schedule updated. Next cron run uses these settings.' });
+        toast({ title: 'Schedule saved', description: 'Next cron run uses these settings.' });
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Save failed', variant: 'destructive' });
+      toast({ title: 'Save failed', description: err?.message ?? 'Save failed', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -274,7 +275,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
       // Reload to refresh last-run UI regardless of pass/fail
       load();
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Run failed', variant: 'destructive' });
+      toast({ title: 'Run failed', description: err?.message ?? 'Run failed', variant: 'destructive' });
     } finally {
       setRunning(false);
     }
@@ -305,7 +306,9 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      {/* v11 dialog: max-h-[85vh] + flex-col, inner scroll surface
+          flex-1 overflow-y-auto, footer pinned with border-t. */}
+      <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-brand" />
@@ -319,14 +322,20 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
         </DialogHeader>
 
         {loading || !draft ? (
-          <div className="py-8 flex items-center justify-center text-gray-500 text-sm">
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Loading schedule…
+          // Structural skeleton — master toggle + 4 setting rows.
+          <div className="flex-1 overflow-y-auto px-1 space-y-5 py-2">
+            <Skeleton className="h-16 w-full rounded-lg" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className="h-3 w-24 mb-1" />
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="space-y-5 py-2">
+          <div className="flex-1 overflow-y-auto px-1 space-y-5 py-2">
             {/* Master enable toggle */}
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-cream-200 bg-cream-50">
               <Switch
                 id="schedule-enabled"
                 checked={draft.is_enabled}
@@ -334,7 +343,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
               />
               <Label htmlFor="schedule-enabled" className="text-sm cursor-pointer flex-1">
                 <div className="font-medium">{draft.is_enabled ? 'Auto-scan ON' : 'Auto-scan OFF'}</div>
-                <div className="text-xs text-gray-500 font-normal">
+                <div className="text-xs text-ink-warm-500 font-normal">
                   {draft.is_enabled
                     ? 'Cron will run on the cadence below'
                     : 'No automatic scans will run until enabled'}
@@ -346,7 +355,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
             <div>
               <Label htmlFor="cadence">Cadence</Label>
               <Select value={draft.cadence} onValueChange={v => updateDraft({ cadence: v as Cadence })}>
-                <SelectTrigger id="cadence" className="mt-1">
+                <SelectTrigger id="cadence" className="mt-1 focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -372,8 +381,8 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                         onClick={() => updateDraft({ weekly_day: day })}
                         className={`text-xs py-2 rounded-md border transition-colors ${
                           selected
-                            ? 'border-brand bg-brand-light text-gray-900 font-semibold'
-                            : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            ? 'border-brand bg-brand-light text-ink-warm-900 font-semibold'
+                            : 'border-cream-200 text-ink-warm-700 hover:border-cream-300'
                         }`}
                       >
                         {label}
@@ -392,7 +401,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   value={String(draft.scan_params.recency_days ?? 30)}
                   onValueChange={v => updateScanParam('recency_days', Number(v))}
                 >
-                  <SelectTrigger id="recency" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="recency" className="mt-1 focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {RECENCY_OPTIONS.map(o => <SelectItem key={o.v} value={String(o.v)}>{o.label}</SelectItem>)}
                   </SelectContent>
@@ -404,7 +413,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   value={String(draft.scan_params.min_raise_usd ?? 1_000_000)}
                   onValueChange={v => updateScanParam('min_raise_usd', Number(v))}
                 >
-                  <SelectTrigger id="minraise" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="minraise" className="mt-1 focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MIN_RAISE_OPTIONS.map(o => <SelectItem key={o.v} value={String(o.v)}>{o.label}</SelectItem>)}
                   </SelectContent>
@@ -416,7 +425,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   value={String(draft.scan_params.max_projects ?? 10)}
                   onValueChange={v => updateScanParam('max_projects', Number(v))}
                 >
-                  <SelectTrigger id="maxproj" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="maxproj" className="mt-1 focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MAX_PROJECTS_OPTIONS.map(o => <SelectItem key={o.v} value={String(o.v)}>{o.label}</SelectItem>)}
                   </SelectContent>
@@ -428,7 +437,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   value={draft.scan_params.model ?? 'sonnet'}
                   onValueChange={v => updateScanParam('model', v as Model)}
                 >
-                  <SelectTrigger id="model" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="model" className="mt-1 focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="sonnet">Sonnet (cheap, fast)</SelectItem>
                     <SelectItem value="opus">Opus (more thorough, ~5× cost)</SelectItem>
@@ -450,11 +459,11 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                       onClick={() => toggleSource(opt.id)}
                       className={`flex items-center gap-2 text-left rounded-lg border p-2 text-xs transition-colors ${
                         selected
-                          ? 'border-brand bg-brand-light text-gray-900'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          ? 'border-brand bg-brand-light text-ink-warm-900'
+                          : 'border-cream-200 text-ink-warm-700 hover:border-cream-300'
                       }`}
                     >
-                      <span className={`h-3 w-3 rounded-sm border ${selected ? 'bg-brand border-brand' : 'border-gray-300'}`}>
+                      <span className={`h-3 w-3 rounded-sm border ${selected ? 'bg-brand border-brand' : 'border-cream-300'}`}>
                         {selected && <CheckCircle className="h-3 w-3 text-white" />}
                       </span>
                       <span className="font-medium">{opt.label}</span>
@@ -462,7 +471,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   );
                 })}
               </div>
-              <p className="text-[10px] text-gray-500 mt-1">
+              <p className="text-[10px] text-ink-warm-500 mt-1">
                 At least one source must stay selected. Adding sources adds ~20% cost per run.
               </p>
             </div>
@@ -473,7 +482,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                 <span className="text-xs font-bold uppercase tracking-wider text-brand">
                   Volume Controls
                 </span>
-                <span className="text-[10px] text-gray-500">— more prospects per day</span>
+                <span className="text-[10px] text-ink-warm-500">— more prospects per day</span>
               </div>
 
               {/* Runs per day */}
@@ -483,7 +492,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   value={String(draft.runs_per_day ?? 1)}
                   onValueChange={v => updateDraft({ runs_per_day: Number(v) })}
                 >
-                  <SelectTrigger id="runs-per-day" className="mt-1">
+                  <SelectTrigger id="runs-per-day" className="mt-1 focus-brand">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -492,9 +501,9 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-gray-500 mt-1">
+                <p className="text-[10px] text-ink-warm-500 mt-1">
                   2× runs catch funding announcements that drop during US business hours.
-                  <strong className="text-gray-700"> Doubles cost.</strong>
+                  <strong className="text-ink-warm-700"> Doubles cost.</strong>
                 </p>
               </div>
 
@@ -505,7 +514,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   value={String(draft.cooldown_days ?? 14)}
                   onValueChange={v => updateDraft({ cooldown_days: Number(v) })}
                 >
-                  <SelectTrigger id="cooldown" className="mt-1">
+                  <SelectTrigger id="cooldown" className="mt-1 focus-brand">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -514,7 +523,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-gray-500 mt-1">
+                <p className="text-[10px] text-ink-warm-500 mt-1">
                   How many days a prospect must NOT be re-scanned. Lower = catches prospects
                   whose Korea signal fired AFTER their last scan, but increases re-research cost.
                 </p>
@@ -539,22 +548,22 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
             )}
 
             {/* Weekly cost cap (kill switch) */}
-            <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="rounded-lg border border-cream-200 bg-white p-3">
               <div className="flex items-baseline justify-between gap-2 mb-2">
                 <Label htmlFor="cost-cap" className="cursor-pointer">
                   Weekly cost cap
-                  <span className="font-normal text-[10px] text-gray-500 ml-1">
+                  <span className="font-normal text-[10px] text-ink-warm-500 ml-1">
                     — kill switch
                   </span>
                 </Label>
                 {currentSpend != null && (
-                  <span className="text-[11px] text-gray-500 tabular-nums">
-                    Current 7d: <span className="font-semibold text-gray-800">${currentSpend.toFixed(2)}</span>
+                  <span className="text-[11px] text-ink-warm-500 tabular-nums">
+                    Current 7d: <span className="font-semibold text-ink-warm-700">${currentSpend.toFixed(2)}</span>
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">$</span>
+                <span className="text-sm text-ink-warm-500">$</span>
                 <input
                   id="cost-cap"
                   type="number"
@@ -580,7 +589,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs text-gray-500"
+                    className="h-7 text-xs text-ink-warm-500"
                     onClick={() => updateDraft({ weekly_cost_cap_usd: null })}
                     title="Remove the cap (no auto-disable)"
                   >
@@ -588,7 +597,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                   </Button>
                 )}
               </div>
-              <p className="text-[11px] text-gray-500 mt-2">
+              <p className="text-[11px] text-ink-warm-500 mt-2">
                 When the rolling 7-day Discovery spend reaches this amount, the cron
                 auto-disables the schedule and sends a Telegram alert. Manual scans
                 (Run Discovery, Find POCs, Deep Dive, Run-now) <strong>are not capped</strong> —
@@ -605,11 +614,11 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                 waiting for tomorrow's cron. Bypasses cadence + is_enabled
                 gates but uses the saved params, NOT the unsaved draft, so
                 what runs matches what the cron will run. */}
-            <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="rounded-lg border border-cream-200 bg-white p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-gray-800">Test the config now</div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
+                  <div className="text-xs font-semibold text-ink-warm-700">Test the config now</div>
+                  <p className="text-[11px] text-ink-warm-500 mt-0.5">
                     Fires the scan immediately with the saved params. Costs ~$0.10–$0.80
                     depending on model and max projects. Result lands in the Last run section below.
                   </p>
@@ -631,8 +640,8 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
 
             {/* Last run */}
             {schedule?.last_run_at && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
-                <div className="flex items-center gap-2 font-semibold text-gray-700 flex-wrap">
+              <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-xs space-y-1">
+                <div className="flex items-center gap-2 font-semibold text-ink-warm-700 flex-wrap">
                   Last run
                   <Badge variant="outline" className="text-[10px]">
                     {schedule.last_run_status}
@@ -642,10 +651,10 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                       manual
                     </Badge>
                   )}
-                  <span className="text-gray-500 font-normal">{relativeTime(schedule.last_run_at)}</span>
+                  <span className="text-ink-warm-500 font-normal">{relativeTime(schedule.last_run_at)}</span>
                 </div>
                 {schedule.last_run_summary && (
-                  <div className="text-gray-600">
+                  <div className="text-ink-warm-700">
                     {typeof schedule.last_run_summary.candidates_found === 'number' && (
                       <span>{schedule.last_run_summary.candidates_found} candidates · </span>
                     )}
@@ -673,15 +682,14 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || running}>
             Close
           </Button>
           <Button
+            variant="brand"
             onClick={save}
             disabled={saving || running || !dirty || loading}
-            style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-           
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {saving ? 'Saving…' : 'Save'}

@@ -334,6 +334,46 @@ export class DeliverableService {
     }
   }
 
+  /**
+   * Delete a deliverable and the entire workflow it owns (parent task
+   * + all subtasks). The `deliverables` row is removed first, then the
+   * parent task; subtasks cascade via the parent_task_id FK on
+   * `tasks`. Idempotent — missing rows just return without error.
+   *
+   * Added 2026-06-03 so users can purge mis-created deliverables from
+   * the /tasks/deliverables list without going to the DB. */
+  static async deleteDeliverable(deliverableId: string): Promise<void> {
+    try {
+      // Need parent_task_id BEFORE deleting the deliverable row, so
+      // fetch once up front.
+      const { data: del, error: fetchErr } = await supabase
+        .from('deliverables')
+        .select('parent_task_id')
+        .eq('id', deliverableId)
+        .single();
+      if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr; // PGRST116 = not found
+      const parentTaskId = del?.parent_task_id as string | undefined;
+
+      // Delete the deliverable row first so the parent-task delete
+      // doesn't trip any "deliverable still references this task" FK
+      // constraint (depends on the schema's ON DELETE setup; safest
+      // to delete in dependency order).
+      const { error: delErr } = await supabase
+        .from('deliverables')
+        .delete()
+        .eq('id', deliverableId);
+      if (delErr) throw delErr;
+
+      // Delete the parent task — subtasks cascade via parent_task_id.
+      if (parentTaskId) {
+        await TaskService.deleteTask(parentTaskId);
+      }
+    } catch (error) {
+      console.error('Error deleting deliverable:', error);
+      throw error;
+    }
+  }
+
   // ---- Auto-complete ----
 
   static async checkAndUpdateStatus(parentTaskId: string): Promise<boolean> {

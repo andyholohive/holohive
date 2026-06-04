@@ -137,7 +137,7 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                   variant="ghost"
                   size="sm"
                   onClick={resetFilters}
-                  className="h-7 text-xs text-ink-warm-500 hover:text-rose-600"
+                  className="h-7 text-xs text-ink-warm-500"
                 >
                   Clear all
                 </Button>

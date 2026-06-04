@@ -32,7 +32,8 @@ import {
 } from '@/components/ui/table';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { useToast } from '@/hooks/use-toast';
-import { Compass, Plus, Edit, Trash2 } from 'lucide-react';
+import { Compass, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 
 type Status = 'active' | 'completed' | 'parked';
@@ -78,7 +79,9 @@ export default function InitiativesPage() {
     try {
       const [iRes, usersRes] = await Promise.all([
         fetch('/api/initiatives'),
-        supabase.from('users').select('id, name').in('role', ['admin', 'super_admin', 'member']).order('name'),
+        // is_active filter excludes deactivated teammates + pending
+        // sign-ups from the Owner picker. 2026-06-04.
+        supabase.from('users').select('id, name').in('role', ['admin', 'super_admin', 'member']).eq('is_active', true).order('name'),
       ]);
       const iJson = await iRes.json();
       setInitiatives(iJson.initiatives || []);
@@ -132,11 +135,11 @@ export default function InitiativesPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast({ title: editing ? 'Updated' : 'Created', description: `Initiative ${editing ? 'updated' : 'created'}.` });
+      toast({ title: editing ? 'Initiative updated' : 'Initiative created' });
       setModalOpen(false);
       await fetchAll();
     } catch (err) {
-      toast({ title: 'Failed', description: (err as Error).message, variant: 'destructive' });
+      toast({ title: 'Save failed', description: (err as Error).message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -147,10 +150,10 @@ export default function InitiativesPage() {
     try {
       const res = await fetch(`/api/initiatives/${i.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast({ title: 'Deleted', description: `"${i.name}" removed.` });
+      toast({ title: 'Initiative deleted', description: `"${i.name}" removed.` });
       await fetchAll();
     } catch (err) {
-      toast({ title: 'Failed', description: (err as Error).message, variant: 'destructive' });
+      toast({ title: 'Delete failed', description: (err as Error).message, variant: 'destructive' });
     }
   };
 
@@ -208,7 +211,7 @@ export default function InitiativesPage() {
                   <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Tags</TableHead>
                   <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
                   <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Freshness</TableHead>
-                  <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500"></TableHead>
+                  <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-16">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -234,15 +237,33 @@ export default function InitiativesPage() {
                       <TableCell className="py-3">
                         <StatusBadge tone={stale.tone} size="sm" bordered withDot={stale.tone === 'danger' ? 'pulse' : true}>{stale.label}</StatusBadge>
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(i)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDelete(i)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                      {/* Canonical row-action menu (2026-06-03): single
+                          ⋯ trigger in the last column opening a
+                          DropdownMenu align="end". Replaces the inline
+                          Edit + Delete buttons. Matches /crm/contacts,
+                          /crm/network, /links, /admin/field-options. */}
+                      <TableCell className="py-3 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="Initiative actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={() => openEdit(i)}>
+                              <Edit className="h-3.5 w-3.5 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDelete(i)} className="text-rose-600 focus:text-rose-600">
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
@@ -294,7 +315,7 @@ export default function InitiativesPage() {
               <Input id="ini-tags" value={form.category_tags} onChange={e => setForm({ ...form, category_tags: e.target.value })} className="focus-brand" placeholder="growth, partnerships, content" />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button variant="brand" onClick={handleSubmit} disabled={!form.name.trim() || submitting}>
               {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create initiative'}

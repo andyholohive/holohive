@@ -199,8 +199,8 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Error initializing chat:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to initialize chat.',
+        title: 'Chat init failed',
+        description: error instanceof Error ? error.message : 'Failed to initialize chat',
         variant: 'destructive',
       });
     } finally {
@@ -220,8 +220,8 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Error creating new session:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create new chat session.',
+        title: 'Create session failed',
+        description: error instanceof Error ? error.message : 'Failed to create new chat session',
         variant: 'destructive',
       });
     }
@@ -239,9 +239,9 @@ export default function ChatPage() {
     } catch (error) {
       console.error("Error switching session:", error);
       toast({
-        title: "Error",
-        description: "Failed to switch chat session.",
-        variant: "destructive",
+        title: 'Switch session failed',
+        description: error instanceof Error ? error.message : 'Failed to switch chat session',
+        variant: 'destructive',
       });
     }
   };
@@ -267,16 +267,13 @@ export default function ChatPage() {
         setCurrentSession(null);
       }
 
-      toast({
-        title: "Success",
-        description: "Chat session deleted successfully.",
-      });
+      toast({ title: 'Chat session deleted' });
     } catch (error) {
       console.error('Error deleting session:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete chat session.",
-        variant: "destructive",
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete chat session',
+        variant: 'destructive',
       });
     } finally {
       setDeleteDialogOpen(false);
@@ -394,8 +391,8 @@ export default function ChatPage() {
       console.error('Error sending message:', error);
       setAgentStatus('error');
       toast({
-        title: 'Error',
-        description: 'Failed to send message.',
+        title: 'Send failed',
+        description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       });
       setTimeout(() => setAgentStatus(null), 3000);
@@ -419,10 +416,7 @@ export default function ChatPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: 'Action undone successfully',
-        });
+        toast({ title: 'Action undone' });
 
         // Refresh reversible actions
         if (currentSession) {
@@ -445,8 +439,8 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Error undoing action:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to undo action',
+        title: 'Undo failed',
+        description: error instanceof Error ? error.message : 'Failed to undo action',
         variant: 'destructive',
       });
     }
@@ -475,8 +469,8 @@ export default function ChatPage() {
 
   const handleApplySuggestion = (suggestion: CampaignSuggestion | ListSuggestion) => {
     toast({
-      title: 'Suggestion Applied',
-      description: 'Redirecting to creation form...',
+      title: 'Suggestion applied',
+      description: 'Redirecting to creation form…',
     });
     setAiSuggestion(null);
   };
@@ -488,8 +482,7 @@ export default function ChatPage() {
   const handleCreateListFromKOLs = async () => {
     if (!newListName.trim() || pendingListKOLs.length === 0) {
       toast({
-        title: 'Error',
-        description: 'Please enter a list name',
+        title: 'List name required',
         variant: 'destructive',
       });
       return;
@@ -529,8 +522,8 @@ export default function ChatPage() {
       }
 
       toast({
-        title: 'List Created',
-        description: `Successfully created "${newListName}" with ${pendingListKOLs.length} KOLs`,
+        title: 'List created',
+        description: `Created "${newListName}" with ${pendingListKOLs.length} KOLs.`,
       });
 
       // Close dialog and reset
@@ -540,7 +533,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error('[CreateList] Error:', error);
       toast({
-        title: 'Error',
+        title: 'Create failed',
         description: error instanceof Error ? error.message : 'Failed to create list',
         variant: 'destructive',
       });
@@ -736,7 +729,7 @@ export default function ChatPage() {
                   className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
-                <Button onClick={async () => { if (message.trim()) { await createNewSession(); } }} disabled={!message.trim()} size="sm" className="h-12 w-12 p-0 rounded-xl transition-all duration-200 flex-shrink-0 bg-brand text-white">
+                <Button variant="brand" onClick={async () => { if (message.trim()) { await createNewSession(); } }} disabled={!message.trim()} size="sm" className="h-12 w-12 p-0 rounded-xl transition-all duration-200 flex-shrink-0">
                   <Send className="h-5 w-5" />
                 </Button>
               </div>
@@ -856,7 +849,9 @@ export default function ChatPage() {
                                 <div className="mt-3 p-3 bg-gray-50 border border-gray-300 rounded-lg relative">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-xs font-semibold text-brand">Client Message (Telegram)</span>
-                                    <button
+                                    <Button
+                                      variant="brand"
+                                      size="sm"
                                       onClick={() => {
                                         navigator.clipboard.writeText(generatedMessageContent);
                                         const btn = document.activeElement as HTMLElement;
@@ -866,10 +861,10 @@ export default function ChatPage() {
                                           btn.innerText = originalText;
                                         }, 2000);
                                       }}
-                                      className="text-xs px-2 py-1 bg-brand text-white rounded hover:bg-[#2d5a63] transition-colors flex items-center gap-1"
+                                      className="text-xs px-2 py-1 flex items-center gap-1"
                                     >
                                       Copy
-                                    </button>
+                                    </Button>
                                   </div>
                                   <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans overflow-x-auto mb-3">
                                     {generatedMessageContent}
@@ -921,15 +916,17 @@ export default function ChatPage() {
                             {/* Create List button for KOL search results */}
                             {isKOLSearchResult && searchResultKOLIds.length > 0 && (
                               <div className="mt-3">
-                                <button
+                                <Button
+                                  variant="brand"
+                                  size="sm"
                                   onClick={() => {
                                     setPendingListKOLs(searchResultKOLIds);
                                     setCreateListDialogOpen(true);
                                   }}
-                                  className="text-xs px-3 py-2 bg-brand text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center gap-2"
+                                  className="text-xs px-3 py-2 rounded-lg flex items-center gap-2"
                                 >
                                   Create List from {searchResultKOLIds.length} KOLs
-                                </button>
+                                </Button>
                               </div>
                             )}
 
@@ -1035,7 +1032,7 @@ export default function ChatPage() {
               Are you sure you want to delete this chat session? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
@@ -1044,7 +1041,7 @@ export default function ChatPage() {
             </Button>
             <Button
               onClick={handleDeleteSession}
-             
+
               style={{ backgroundColor: "#dc2626", color: "white" }}
             >
               Delete
@@ -1076,7 +1073,7 @@ export default function ChatPage() {
               autoFocus
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => {

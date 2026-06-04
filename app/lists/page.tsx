@@ -19,7 +19,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight, Shield, Mail, Activity, Clock } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight, Shield, Mail, Activity, Clock, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import ListAccessDialog from '@/components/lists/ListAccessDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -821,8 +822,8 @@ export default function ListsPage() {
     } catch (err) {
       console.error('Error fetching email views:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to load email views',
+        title: 'Load failed',
+        description: err instanceof Error ? err.message : 'Failed to load email views',
         variant: 'destructive',
       });
     } finally {
@@ -867,9 +868,9 @@ export default function ListsPage() {
     } catch (error) {
       console.error('Error saving sort order:', error);
       toast({
-        title: "Error",
-        description: "Failed to save sort order.",
-        variant: "destructive",
+        title: 'Save failed',
+        description: error instanceof Error ? error.message : 'Failed to save sort order',
+        variant: 'destructive',
       });
     }
   };
@@ -1014,17 +1015,14 @@ export default function ListsPage() {
       await fetchLists();
       
       toast({
-        title: isEditMode ? "List Updated" : "List Created",
-        description: isEditMode 
-          ? "Your list has been updated successfully." 
-          : "Your list has been created successfully.",
+        title: isEditMode ? 'List updated' : 'List created',
       });
     } catch (err) {
       console.error('Error saving list:', err);
       toast({
-        title: "Error",
-        description: "Failed to save list. Please try again.",
-        variant: "destructive",
+        title: 'Save failed',
+        description: err instanceof Error ? err.message : 'Failed to save list',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -1050,15 +1048,15 @@ export default function ListsPage() {
       await fetchLists();
 
       toast({
-        title: "List Archived",
-        description: "The list has been archived. You can restore it from the Archive page.",
+        title: 'List archived',
+        description: 'You can restore it from the Archive page.',
       });
     } catch (err) {
       console.error('Error archiving list:', err);
       toast({
-        title: "Error",
-        description: "Failed to archive list. Please try again.",
-        variant: "destructive",
+        title: 'Archive failed',
+        description: err instanceof Error ? err.message : 'Failed to archive list',
+        variant: 'destructive',
       });
     } finally {
       setIsDeleteListDialogOpen(false);
@@ -1085,15 +1083,15 @@ export default function ListsPage() {
       await fetchLists();
       
       toast({
-        title: "KOL Removed",
-        description: `${kolToDelete.kolName} has been removed from the list.`,
+        title: 'KOL removed',
+        description: `${kolToDelete.kolName} removed from the list.`,
       });
     } catch (err) {
       console.error('Error removing KOL from list:', err);
       toast({
-        title: "Error",
-        description: "Failed to remove KOL from list. Please try again.",
-        variant: "destructive",
+        title: 'Remove failed',
+        description: err instanceof Error ? err.message : 'Failed to remove KOL from list',
+        variant: 'destructive',
       });
     } finally {
       setIsDeleteKOLDialogOpen(false);
@@ -1134,16 +1132,13 @@ export default function ListsPage() {
         } : list
       ));
 
-      toast({
-        title: "Status Updated",
-        description: "KOL status has been updated successfully.",
-      });
+      toast({ title: 'Status updated' });
     } catch (err) {
       console.error('Error updating KOL status:', err);
       toast({
-        title: "Error",
-        description: "Failed to update KOL status. Please try again.",
-        variant: "destructive",
+        title: 'Update failed',
+        description: err instanceof Error ? err.message : 'Failed to update KOL status',
+        variant: 'destructive',
       });
     }
   };
@@ -1195,16 +1190,13 @@ export default function ListsPage() {
       );
 
       setEditingKolNotes(null);
-      toast({
-        title: "Notes Updated",
-        description: "KOL notes have been updated successfully.",
-      });
+      toast({ title: 'Notes updated' });
     } catch (err) {
       console.error('Error updating KOL notes:', err);
       toast({
-        title: "Error",
-        description: "Failed to update KOL notes. Please try again.",
-        variant: "destructive",
+        title: 'Update failed',
+        description: err instanceof Error ? err.message : 'Failed to update KOL notes',
+        variant: 'destructive',
       });
     }
   };
@@ -1265,15 +1257,15 @@ export default function ListsPage() {
       await fetchLists();
 
       toast({
-        title: "Lists Combined",
-        description: `Successfully created "${combinedListName}" with ${allKolIds.size} unique KOLs.`,
+        title: 'Lists combined',
+        description: `Created "${combinedListName}" with ${allKolIds.size} unique KOLs.`,
       });
     } catch (err) {
       console.error('Error combining lists:', err);
       toast({
-        title: "Error",
-        description: "Failed to combine lists. Please try again.",
-        variant: "destructive",
+        title: 'Combine failed',
+        description: err instanceof Error ? err.message : 'Failed to combine lists',
+        variant: 'destructive',
       });
     } finally {
       setIsCombining(false);
@@ -2955,7 +2947,7 @@ export default function ListsPage() {
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">KOLs</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Created</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
-                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-16">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2985,44 +2977,36 @@ export default function ListsPage() {
                       {list.notes || '-'}
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleViewList(list)}
-                          title="View list"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleShareList(list)}
-                          title="Share list"
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleEditList(list)}
-                          title="Edit list"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                          onClick={() => handleDeleteList(list.id)}
-                          title="Delete list"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="List actions"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={() => handleViewList(list)}>
+                            <Eye className="h-3.5 w-3.5 mr-2" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleShareList(list)}>
+                            <Share2 className="h-3.5 w-3.5 mr-2" /> Share
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditList(list)}>
+                            <Edit className="h-3.5 w-3.5 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteList(list.id)}
+                            className="text-rose-600 focus:text-rose-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}

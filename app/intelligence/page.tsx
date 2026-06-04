@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Radar, Sparkles, Building2, DollarSign, Activity, Bell, Clock } from 'lucide-react';
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
@@ -12,6 +13,7 @@ import ExchangeListingsPanel from '@/components/agents/ExchangeListingsPanel';
 import RecentSignalsPanel from '@/components/agents/RecentSignalsPanel';
 import IntelligenceAlertsDialog from '@/components/agents/IntelligenceAlertsDialog';
 import IntelligenceScheduleDialog from '@/components/agents/IntelligenceScheduleDialog';
+import { InfoChip } from '@/components/intelligence/InfoChip';
 
 // NOTE: Prospects, Korea Signals, Funding Radar, and AI Agents tabs are
 // temporarily hidden while the team focuses on Discovery + KR Exchanges.
@@ -83,103 +85,100 @@ export default function IntelligencePage() {
         icon={Radar}
         title="Intelligence"
         subtitle="Prospect discovery and Korean exchange listings"
+        kicker="CRM · Intelligence"
+        kickerDot="brand"
         actions={(
           <>
-        {/* Schedule indicator — paired with Alerts + Cost as info chips. */}
-        <button
-          type="button"
-          onClick={() => setScheduleDialogOpen(true)}
-          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 cursor-pointer select-none transition-colors"
-          title={scheduleEnabled ? 'Auto-scan ON · click to configure' : 'Auto-scan OFF · click to set up'}
-          aria-label="Configure scheduled discovery scan"
-        >
-          <Clock className={`h-3.5 w-3.5 ${scheduleEnabled ? 'text-brand' : 'text-gray-500'}`} />
-          <div className="flex flex-col text-left">
-            <span className="text-[10px] text-gray-500 leading-none">Auto-scan</span>
-            <span className="text-sm font-semibold text-gray-900 leading-tight">
-              {scheduleEnabled ? 'On' : 'Off'}
-            </span>
-          </div>
-          <span className={`h-1.5 w-1.5 rounded-full ml-0.5 ${scheduleEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-        </button>
-
-        {/* Alerts indicator — styled identically to the cost badge so they
-            visually pair as a row of "info chips" instead of one button +
-            one card. The dot color encodes state. */}
-        <button
-          type="button"
-          onClick={() => setAlertsDialogOpen(true)}
-          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 cursor-pointer select-none transition-colors"
-          title={alertsConfigured ? 'Alerts ON · click to configure' : 'Alerts OFF · click to set up'}
-          aria-label="Configure intelligence alerts"
-        >
-          <Bell className={`h-3.5 w-3.5 ${alertsConfigured ? 'text-brand' : 'text-gray-500'}`} />
-          <div className="flex flex-col text-left">
-            <span className="text-[10px] text-gray-500 leading-none">Alerts</span>
-            <span className="text-sm font-semibold text-gray-900 leading-tight">
-              {alertsConfigured ? 'On' : 'Off'}
-            </span>
-          </div>
-          <span className={`h-1.5 w-1.5 rounded-full ml-0.5 ${alertsConfigured ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-        </button>
-
-        {/* Weekly cost badge — hovers to reveal per-run-type breakdown.
-            Hidden if no runs in the window so the page isn't cluttered by
-            a "$0.00 this week" on a fresh install. */}
-        {cost && cost.runs > 0 && (
-          <HoverCard openDelay={100} closeDelay={50}>
-            <HoverCardTrigger asChild>
-              <div
-                className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 cursor-help select-none"
-                aria-label="This week's Intelligence spend"
-              >
-                <DollarSign className="h-3.5 w-3.5 text-gray-500" />
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-gray-500 leading-none">This week</span>
-                  <span className="text-sm font-semibold text-gray-900 leading-tight tabular-nums">
-                    ${cost.total_cost_usd.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </HoverCardTrigger>
-            <HoverCardContent side="bottom" align="end" className="w-72 text-xs">
-              <div className="font-semibold text-gray-800 mb-1.5">
-                Last {cost.window_days} days · {cost.runs} run{cost.runs !== 1 ? 's' : ''}
-              </div>
-              <div className="space-y-1">
-                {Object.entries(cost.by_run_type).map(([type, v]) => (
-                  <div key={type} className="flex items-baseline justify-between gap-2">
-                    <span className="text-gray-700">
-                      {RUN_TYPE_LABEL[type] || type}
-                    </span>
-                    <span className="tabular-nums text-gray-600">
-                      <span className="font-semibold text-gray-900">${v.cost.toFixed(2)}</span>
-                      <span className="text-gray-400 ml-1.5">× {v.count}</span>
-                    </span>
+            {/* Schedule, Alerts, Cost — same chip shape (label + value,
+                cream background, icon-tinted by state). The colored
+                state dot was dropped 2026-06-03; the icon tint already
+                encodes on/off, the dot was the same signal twice. */}
+            <InfoChip
+              icon={Clock}
+              label="Auto-scan"
+              value={scheduleEnabled ? 'On' : 'Off'}
+              active={scheduleEnabled}
+              onClick={() => setScheduleDialogOpen(true)}
+              title={scheduleEnabled ? 'Auto-scan ON · click to configure' : 'Auto-scan OFF · click to set up'}
+              ariaLabel="Configure scheduled discovery scan"
+            />
+            <InfoChip
+              icon={Bell}
+              label="Alerts"
+              value={alertsConfigured ? 'On' : 'Off'}
+              active={alertsConfigured}
+              onClick={() => setAlertsDialogOpen(true)}
+              title={alertsConfigured ? 'Alerts ON · click to configure' : 'Alerts OFF · click to set up'}
+              ariaLabel="Configure intelligence alerts"
+            />
+            {/* Weekly cost — hidden when there are no runs in the
+                window so a fresh install doesn't render "$0.00". */}
+            {cost && cost.runs > 0 && (
+              <HoverCard openDelay={100} closeDelay={50}>
+                <HoverCardTrigger asChild>
+                  <div>
+                    <InfoChip
+                      icon={DollarSign}
+                      label="This week"
+                      value={<span className="tabular-nums">${cost.total_cost_usd.toFixed(2)}</span>}
+                      title="This week's Intelligence spend"
+                      ariaLabel="This week's Intelligence spend"
+                    />
                   </div>
-                ))}
-                {Object.keys(cost.by_run_type).length === 0 && (
-                  <div className="text-gray-500 italic">No runs this week.</div>
-                )}
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-        )}
+                </HoverCardTrigger>
+                <HoverCardContent side="bottom" align="end" className="w-72 text-xs">
+                  <div className="font-semibold text-ink-warm-700 mb-1.5">
+                    Last {cost.window_days} days · {cost.runs} run{cost.runs !== 1 ? 's' : ''}
+                  </div>
+                  <div className="space-y-1">
+                    {Object.entries(cost.by_run_type).map(([type, v]) => (
+                      <div key={type} className="flex items-baseline justify-between gap-2">
+                        <span className="text-ink-warm-700">
+                          {RUN_TYPE_LABEL[type] || type}
+                        </span>
+                        <span className="tabular-nums text-ink-warm-700">
+                          <span className="font-semibold text-ink-warm-900">${v.cost.toFixed(2)}</span>
+                          <span className="text-ink-warm-400 ml-1.5">× {v.count}</span>
+                        </span>
+                      </div>
+                    ))}
+                    {Object.keys(cost.by_run_type).length === 0 && (
+                      <div className="text-ink-warm-500 italic">No runs this week.</div>
+                    )}
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            )}
           </>
         )}
       />
 
+      {/* v11 main tab strip — matches the padding + active treatment
+          used elsewhere in the app (cream-100 container, white tile
+          on active, brand text). The previous per-tab semantic colors
+          (Discovery=violet, Signals=sky, KR Exchanges=emerald) were
+          arbitrary — these aren't distinct workflows like the sales
+          tabs are, so the unified brand tone reads cleaner. */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="discovery" className="flex items-center gap-2">
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+          <TabsTrigger
+            value="discovery"
+            className="flex items-center gap-2 px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+          >
             <Sparkles className="h-4 w-4" />
             Discovery
           </TabsTrigger>
-          <TabsTrigger value="signals" className="flex items-center gap-2">
+          <TabsTrigger
+            value="signals"
+            className="flex items-center gap-2 px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+          >
             <Activity className="h-4 w-4" />
             Signals
           </TabsTrigger>
-          <TabsTrigger value="kr_exchanges" className="flex items-center gap-2">
+          <TabsTrigger
+            value="kr_exchanges"
+            className="flex items-center gap-2 px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+          >
             <Building2 className="h-4 w-4" />
             KR Exchanges
           </TabsTrigger>

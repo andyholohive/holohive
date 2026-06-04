@@ -111,8 +111,8 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
     try {
       await TaskService.deleteAttachment(attachmentId);
       await loadAttachments();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to delete attachment.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed to delete attachment', variant: 'destructive' });
     }
   };
 

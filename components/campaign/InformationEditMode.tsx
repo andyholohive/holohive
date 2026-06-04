@@ -203,7 +203,14 @@ export function InformationEditMode({
 
   return (
     <>
-                <CardContent className="pt-6">
+                {/* [2026-06-05] `pt-6` override removed — `CardContent`
+                    defaults to `p-6 pt-0`, which leaves 24px on the
+                    sides + bottom (right for the form grid) and 0 on
+                    top (so the form sits flush below the "Editing"
+                    toolbar above, matching KOLs/Contents/Payments tab
+                    spacing). The override added 24px of dead top
+                    space the other tabs don't have. */}
+                <CardContent>
                     <div className="grid grid-cols-2 gap-x-8 gap-y-8">
                                 {/* [May 2026 audit] Recent Updates carousel
                                     hidden — feature had near-zero usage and
@@ -306,8 +313,8 @@ export function InformationEditMode({
                                         } catch (error) {
                                           console.error('Error deleting update:', error);
                                           toast({
-                                            title: 'Error',
-                                            description: 'Failed to delete update.',
+                                            title: 'Delete failed',
+                                            description: error instanceof Error ? error.message : 'Failed to delete update',
                                             variant: 'destructive',
                                             duration: 3000,
                                           });
@@ -412,17 +419,16 @@ export function InformationEditMode({
                                   if (error) {
                                     console.error('Error adding update:', error);
                                     toast({
-                                      title: 'Error',
-                                      description: 'Failed to add update.',
+                                      title: 'Add failed',
+                                      description: error.message || 'Failed to add update',
                                       variant: 'destructive',
                                       duration: 3000,
                                     });
                                     return;
                                   }
-                                  
+
                                   toast({
                                     title: 'Update added',
-                                    description: 'Campaign update added successfully.',
                                     duration: 3000,
                                   });
                                   
@@ -434,8 +440,8 @@ export function InformationEditMode({
                                 } catch (err) {
                                   console.error('Unexpected error:', err);
                                   toast({
-                                    title: 'Error',
-                                    description: 'Failed to add update.',
+                                    title: 'Add failed',
+                                    description: err instanceof Error ? err.message : 'Failed to add update',
                                     variant: 'destructive',
                                     duration: 3000,
                                   });

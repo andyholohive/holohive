@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   ArrowLeft, ExternalLink, RefreshCw, Loader2, Twitter, Send, Globe,
   Radar, CheckCircle, XCircle, AlertTriangle, Clock, DollarSign,
@@ -32,8 +33,8 @@ const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = 
   PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
   RESEARCH:            { label: 'RESEARCH',           className: 'bg-blue-100 text-blue-700 border-blue-200' },
   WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  NURTURE:             { label: 'NURTURE',            className: 'bg-gray-100 text-gray-700 border-gray-200' },
-  SKIP:                { label: 'SKIP',               className: 'bg-gray-50 text-gray-400 border-gray-200 line-through' },
+  NURTURE:             { label: 'NURTURE',            className: 'bg-cream-100 text-ink-warm-700 border-cream-200' },
+  SKIP:                { label: 'SKIP',               className: 'bg-cream-50 text-ink-warm-400 border-cream-200 line-through' },
 };
 
 const RUN_TYPE_LABEL: Record<string, string> = {
@@ -98,13 +99,13 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       const res = await fetch(`/api/prospects/discovery/${id}`);
       const d = await res.json();
       if (!res.ok || d.error) {
-        toast({ title: 'Failed to load', description: d.error || 'Unknown error', variant: 'destructive' });
+        toast({ title: 'Load failed', description: d.error || 'Unknown error', variant: 'destructive' });
         setData(null);
       } else {
         setData(d);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to load', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err?.message ?? 'Failed to load', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
   if (!data) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-900 font-medium">Prospect not found.</p>
+        <p className="text-ink-warm-900 font-medium">Prospect not found.</p>
         <Button variant="outline" className="mt-4" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Go back
@@ -144,60 +145,62 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-5 pb-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-start gap-3 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/intelligence')}
-            className="h-9 shrink-0"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1.5" />
-            Back
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-2xl font-bold text-gray-900 truncate">{p.name}</h2>
-              {p.symbol && <span className="text-sm text-gray-500 font-mono">{p.symbol}</span>}
-              {p.discovery_action_tier && (
-                <span
-                  className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
-                >
-                  {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
-                </span>
-              )}
-              {maxKoreaScore >= 70 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 pointer-events-none">
-                  <Radar className="h-2.5 w-2.5" />
-                  GROK-HOT {maxKoreaScore}
-                </span>
-              )}
-            </div>
-            <p className="text-gray-600 text-sm mt-0.5">
-              {p.category || 'Uncategorized'} · Status: <span className="font-medium">{p.status.replace('_', ' ')}</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+      {/* Back affordance */}
+      <button
+        type="button"
+        onClick={() => router.push('/intelligence')}
+        className="inline-flex items-center text-xs text-ink-warm-500 hover:text-brand transition-colors w-fit"
+      >
+        <ArrowLeft className="h-3 w-3 mr-1" />
+        Back to Intelligence
+      </button>
+
+      <PageHeader
+        icon={Radar}
+        title={p.name}
+        subtitle="Discovered prospect · score / triggers / outreach context"
+        kicker="CRM · Intelligence · Prospect"
+        kickerDot="brand"
+        actions={(
           <Button variant="outline" size="sm" onClick={fetchDetail} disabled={loading} className="h-9">
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-        </div>
+        )}
+      />
+
+      {/* Title-adjacent meta — symbol + action tier chip + grok-hot chip + status */}
+      <div className="flex items-center gap-2 flex-wrap -mt-2">
+        {p.symbol && <span className="text-sm text-ink-warm-500 font-mono">{p.symbol}</span>}
+        {p.discovery_action_tier && (
+          <span
+            className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
+          >
+            {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
+          </span>
+        )}
+        {maxKoreaScore >= 70 && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 pointer-events-none">
+            <Radar className="h-2.5 w-2.5" />
+            GROK-HOT {maxKoreaScore}
+          </span>
+        )}
+        <span className="text-ink-warm-700 text-xs">
+          {p.category || 'Uncategorized'} · Status: <span className="font-medium">{p.status.replace('_', ' ')}</span>
+        </span>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Score</div>
-            <div className="text-2xl font-bold text-gray-900 tabular-nums">
+            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Score</div>
+            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">
               {p.prospect_score?.total ?? '—'}
-              <span className="text-sm text-gray-400 font-normal">/100</span>
+              <span className="text-sm text-ink-warm-400 font-normal">/100</span>
             </div>
             {p.prospect_score && (
-              <div className="text-[10px] text-gray-500 mt-0.5">
+              <div className="text-[10px] text-ink-warm-500 mt-0.5">
                 {p.prospect_score.icp_fit} + {p.prospect_score.signal_strength} + {p.prospect_score.timing}
               </div>
             )}
@@ -205,31 +208,31 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Funding</div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Funding</div>
+            <div className="text-2xl font-bold text-ink-warm-900">
               {formatMoney(p.funding?.amount_usd)}
             </div>
             {p.funding?.round && (
-              <div className="text-[10px] text-gray-500 mt-0.5">{p.funding.round}</div>
+              <div className="text-[10px] text-ink-warm-500 mt-0.5">{p.funding.round}</div>
             )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Triggers</div>
-            <div className="text-2xl font-bold text-gray-900 tabular-nums">{signals.length}</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
+            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Triggers</div>
+            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{signals.length}</div>
+            <div className="text-[10px] text-ink-warm-500 mt-0.5">
               {grokSignals.length} Grok · {claudeSignals.length} Claude
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Scan history</div>
-            <div className="text-2xl font-bold text-gray-900 tabular-nums">
+            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Scan history</div>
+            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">
               ${totalRunCost.toFixed(2)}
             </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">
+            <div className="text-[10px] text-ink-warm-500 mt-0.5">
               {runs.length} run{runs.length !== 1 ? 's' : ''} recorded
             </div>
           </CardContent>
@@ -242,22 +245,22 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
           <CardContent className="p-3">
             <div className="flex items-center gap-4 flex-wrap text-sm">
               {p.website_url && (
-                <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-ink-warm-900 flex items-center gap-1">
                   <Globe className="h-3.5 w-3.5" /> Website
                 </a>
               )}
               {p.twitter_url && (
-                <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#1DA1F2] flex items-center gap-1">
+                <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-[#1DA1F2] flex items-center gap-1">
                   <Twitter className="h-3.5 w-3.5" /> Project X
                 </a>
               )}
               {p.telegram_url && (
-                <a href={p.telegram_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#229ED9] flex items-center gap-1">
+                <a href={p.telegram_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-[#229ED9] flex items-center gap-1">
                   <Send className="h-3.5 w-3.5" /> Community TG
                 </a>
               )}
               {p.source_url && (
-                <a href={p.source_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-900 flex items-center gap-1 ml-auto text-xs">
+                <a href={p.source_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-ink-warm-900 flex items-center gap-1 ml-auto text-xs">
                   <ExternalLink className="h-3 w-3" /> View on DropsTab
                 </a>
               )}
@@ -270,11 +273,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4">
-            <h3 className="font-semibold text-gray-800 mb-2 text-sm">Why they're a fit</h3>
+            <h3 className="font-semibold text-ink-warm-700 mb-2 text-sm">Why they're a fit</h3>
             {p.fit_reasoning ? (
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{p.fit_reasoning}</p>
+              <p className="text-sm text-ink-warm-700 whitespace-pre-wrap">{p.fit_reasoning}</p>
             ) : (
-              <p className="text-sm text-gray-400 italic">No reasoning recorded yet.</p>
+              <p className="text-sm text-ink-warm-400 italic">No reasoning recorded yet.</p>
             )}
             {p.disqualification_reason && (
               <div className="mt-3 bg-rose-50 border border-rose-200 rounded p-2 text-xs">
@@ -293,7 +296,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
 
         <Card>
           <CardContent className="p-4">
-            <h3 className="font-semibold text-gray-800 mb-2 text-sm">ICP checklist</h3>
+            <h3 className="font-semibold text-ink-warm-700 mb-2 text-sm">ICP checklist</h3>
             {p.icp_checks ? (
               <div className="space-y-1.5">
                 {Object.entries(p.icp_checks).map(([key, raw]) => {
@@ -307,15 +310,15 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                         <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-rose-700'}`}>{label}</div>
-                        <div className="text-gray-600 text-[11px]">{check.evidence}</div>
+                        <div className={`font-medium ${check.pass ? 'text-ink-warm-900' : 'text-rose-700'}`}>{label}</div>
+                        <div className="text-ink-warm-700 text-[11px]">{check.evidence}</div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic">No ICP checks recorded.</p>
+              <p className="text-sm text-ink-warm-400 italic">No ICP checks recorded.</p>
             )}
           </CardContent>
         </Card>
@@ -324,11 +327,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       {/* POCs */}
       <Card>
         <CardContent className="p-4">
-          <h3 className="font-semibold text-gray-800 mb-2 text-sm">
+          <h3 className="font-semibold text-ink-warm-700 mb-2 text-sm">
             Outreach POCs ({(p.outreach_contacts || []).length})
           </h3>
           {!p.outreach_contacts || p.outreach_contacts.length === 0 ? (
-            <p className="text-sm text-gray-500 italic">No POCs found yet.</p>
+            <p className="text-sm text-ink-warm-500 italic">No POCs found yet.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {p.outreach_contacts.map((c: any, i: number) => (
@@ -339,12 +342,12 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                   }`}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-gray-900">{c.name}</span>
+                    <span className="font-semibold text-ink-warm-900">{c.name}</span>
                     {c.confidence && (
                       <span className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${
                         c.confidence === 'high' ? 'bg-emerald-100 text-emerald-700' :
                         c.confidence === 'medium' ? 'bg-amber-100 text-amber-700' :
-                        'bg-gray-100 text-gray-600'
+                        'bg-cream-100 text-ink-warm-700'
                       }`}>
                         {c.confidence}
                       </span>
@@ -356,17 +359,17 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                       </span>
                     )}
                   </div>
-                  <div className="text-gray-500 text-[11px] mt-0.5">{c.role}</div>
-                  {c.notes && <p className="text-gray-600 text-[11px] mt-1">{c.notes}</p>}
+                  <div className="text-ink-warm-500 text-[11px] mt-0.5">{c.role}</div>
+                  {c.notes && <p className="text-ink-warm-700 text-[11px] mt-1">{c.notes}</p>}
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                     {twitterUrl(c.twitter_handle) && (
-                      <a href={twitterUrl(c.twitter_handle)!} target="_blank" rel="noopener noreferrer" className="text-[11px] text-gray-600 hover:text-[#1DA1F2] flex items-center gap-1">
+                      <a href={twitterUrl(c.twitter_handle)!} target="_blank" rel="noopener noreferrer" className="text-[11px] text-ink-warm-700 hover:text-[#1DA1F2] flex items-center gap-1">
                         <Twitter className="h-3 w-3" />
                         {c.twitter_handle?.replace(/^https?:\/\/[^/]+\//, '@').replace(/^@@/, '@')}
                       </a>
                     )}
                     {telegramUrl(c.telegram_handle) ? (
-                      <a href={telegramUrl(c.telegram_handle)!} target="_blank" rel="noopener noreferrer" className="text-[11px] text-gray-600 hover:text-[#229ED9] flex items-center gap-1">
+                      <a href={telegramUrl(c.telegram_handle)!} target="_blank" rel="noopener noreferrer" className="text-[11px] text-ink-warm-700 hover:text-[#229ED9] flex items-center gap-1">
                         <Send className="h-3 w-3" />
                         {c.telegram_handle?.replace(/^https?:\/\/[^/]+\//, '@').replace(/^@@/, '@')}
                       </a>
@@ -378,7 +381,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
               ))}
             </div>
           )}
-          <p className="text-[10px] text-gray-500 mt-2 italic">
+          <p className="text-[10px] text-ink-warm-500 mt-2 italic">
             To add / verify / deep-dive individual POCs, go back to the Discovery tab and use the row's action buttons.
           </p>
         </CardContent>
@@ -387,12 +390,12 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       {/* Scan-run timeline */}
       <Card>
         <CardContent className="p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-gray-500" />
+          <h3 className="font-semibold text-ink-warm-700 mb-3 text-sm flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-ink-warm-500" />
             Scan history ({runs.length})
           </h3>
           {runs.length === 0 ? (
-            <p className="text-sm text-gray-500 italic">
+            <p className="text-sm text-ink-warm-500 italic">
               No recorded runs for this prospect yet. Older runs may not appear —
               attribution only started when input_params was populated.
             </p>
@@ -415,14 +418,14 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                       <span className={`text-[10px] font-semibold ${
                         r.status === 'completed' ? 'text-emerald-700' :
                         r.status === 'failed' ? 'text-rose-700' :
-                        'text-gray-600'
+                        'text-ink-warm-700'
                       }`}>
                         {r.status}
                       </span>
-                      <span className="text-[10px] text-gray-500">· {timeAgo(r.started_at)}</span>
+                      <span className="text-[10px] text-ink-warm-500">· {timeAgo(r.started_at)}</span>
                     </div>
                     {r.output_summary && (
-                      <div className="text-[11px] text-gray-600 mt-1 flex items-center gap-3 flex-wrap">
+                      <div className="text-[11px] text-ink-warm-700 mt-1 flex items-center gap-3 flex-wrap">
                         {typeof r.output_summary.pocs_scanned === 'number' && (
                           <span>{r.output_summary.pocs_scanned} POCs scanned</span>
                         )}
@@ -440,7 +443,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                     )}
                   </div>
                   {typeof r.output_summary?.cost_usd === 'number' && (
-                    <div className="text-xs font-semibold text-gray-700 tabular-nums shrink-0">
+                    <div className="text-xs font-semibold text-ink-warm-700 tabular-nums shrink-0">
                       ${r.output_summary.cost_usd.toFixed(2)}
                     </div>
                   )}
@@ -454,12 +457,12 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       {/* Signals */}
       <Card>
         <CardContent className="p-4">
-          <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-1.5">
-            <Activity className="h-3.5 w-3.5 text-gray-500" />
+          <h3 className="font-semibold text-ink-warm-700 mb-3 text-sm flex items-center gap-1.5">
+            <Activity className="h-3.5 w-3.5 text-ink-warm-500" />
             Triggers ({signals.length})
           </h3>
           {signals.length === 0 ? (
-            <p className="text-sm text-gray-500 italic">No active triggers for this prospect.</p>
+            <p className="text-sm text-ink-warm-500 italic">No active triggers for this prospect.</p>
           ) : (
             <div className="space-y-2">
               {signals.map((s: any) => (
@@ -482,15 +485,15 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                           </span>
                         )}
                         {s.relevancy_weight && (
-                          <span className="text-[10px] text-gray-500">w:{s.relevancy_weight}</span>
+                          <span className="text-[10px] text-ink-warm-500">w:{s.relevancy_weight}</span>
                         )}
-                        <span className="text-[10px] text-gray-400">· {timeAgo(s.detected_at)}</span>
+                        <span className="text-[10px] text-ink-warm-400">· {timeAgo(s.detected_at)}</span>
                       </div>
-                      <div className="font-medium text-gray-900 mt-1">{s.headline}</div>
-                      {s.snippet && <p className="text-gray-600 mt-0.5">{s.snippet}</p>}
+                      <div className="font-medium text-ink-warm-900 mt-1">{s.headline}</div>
+                      {s.snippet && <p className="text-ink-warm-700 mt-0.5">{s.snippet}</p>}
                     </div>
                     {s.source_url && (
-                      <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-700 shrink-0 p-0.5">
+                      <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-400 hover:text-ink-warm-700 shrink-0 p-0.5">
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     )}

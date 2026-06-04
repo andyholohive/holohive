@@ -251,7 +251,7 @@ export default function ResetPasswordPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
               
-              <Button onClick={() => router.push('/auth')} className="w-full mt-4 bg-brand text-white">
+              <Button variant="brand" onClick={() => router.push('/auth')} className="w-full mt-4">
                 Back to Sign In
               </Button>
             </CardContent>

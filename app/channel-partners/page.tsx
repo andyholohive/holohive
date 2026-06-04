@@ -185,7 +185,7 @@ export default function PartnersPage() {
     <Card className="transition-shadow">
       <CardHeader className="pb-4">
         <div className="mb-3">
-          <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
+          <div className="flex items-center justify-between text-lg font-semibold text-ink-warm-700 mb-2">
             <div className="flex items-center">
               <Skeleton className="h-8 w-8 rounded-lg mr-2" />
               <Skeleton className="h-5 w-40" />
@@ -195,17 +195,17 @@ export default function PartnersPage() {
           <Skeleton className="h-6 w-16 rounded-full" />
         </div>
         <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-600">
+          <div className="flex items-center text-sm text-ink-warm-700">
             <Skeleton className="h-4 w-4 mr-2" />
             <Skeleton className="h-4 w-36" />
           </div>
-          <div className="flex items-center text-sm text-gray-600 min-h-[20px]">
+          <div className="flex items-center text-sm text-ink-warm-700 min-h-[20px]">
             <Skeleton className="h-4 w-4 mr-2" />
             <Skeleton className="h-4 w-28" />
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100">
+      <CardContent className="pt-4 border-t border-cream-100">
         <Skeleton className="h-20 w-full mb-4" />
         <div className="flex gap-2">
           <Skeleton className="h-8 w-full rounded" />
@@ -223,6 +223,8 @@ export default function PartnersPage() {
             icon={Handshake}
             title="Channel Partners"
             subtitle="Manage your channel partner relationships"
+            kicker="CRM · Channel Partners"
+            kickerDot="brand"
             actions={(
               <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
@@ -231,7 +233,7 @@ export default function PartnersPage() {
             )}
           />
           <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input placeholder="Search partners by name, email, or website..." className="pl-10 focus-brand" disabled />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -251,6 +253,8 @@ export default function PartnersPage() {
           icon={Handshake}
           title="Channel Partners"
           subtitle="Manage your channel partner relationships"
+          kicker="CRM · Channel Partners"
+          kickerDot="brand"
           actions={((userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
             <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" />
@@ -261,7 +265,7 @@ export default function PartnersPage() {
 
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input 
               placeholder="Search partners by name, email, or website..." 
               className="pl-10 focus-brand" 
@@ -274,7 +278,7 @@ export default function PartnersPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredPartners.length === 0 ? (
             <div className="col-span-full text-center py-8">
-              <p className="text-gray-600">
+              <p className="text-ink-warm-700">
                 {searchTerm ? 'No partners found matching your search.' : 'No partners found.'}
               </p>
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && (
@@ -290,10 +294,10 @@ export default function PartnersPage() {
               <Card key={partner.id} className="transition-shadow group">
                 <CardHeader className="pb-4">
                   <div className="mb-3">
-                    <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
+                    <div className="flex items-center justify-between text-lg font-semibold text-ink-warm-700 mb-2">
                       <div className="flex items-center">
-                        <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                          <Building2 className="h-5 w-5 text-gray-600" />
+                        <div className="bg-cream-100 p-1.5 rounded-lg mr-2">
+                          <Building2 className="h-5 w-5 text-ink-warm-700" />
                         </div>
                         {partner.name}
                       </div>
@@ -303,10 +307,10 @@ export default function PartnersPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEditPartner(partner)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-cream-100 w-auto px-2"
                             title="Edit partner"
                           >
-                            <Edit className="h-4 w-4 text-gray-600" />
+                            <Edit className="h-4 w-4 text-ink-warm-700" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -329,33 +333,33 @@ export default function PartnersPage() {
                   </div>
                   <div className="space-y-2">
                     {partner.email && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Mail className="h-4 w-4 mr-2 text-gray-600" />
-                        <span className="text-gray-600">{partner.email}</span>
+                      <div className="flex items-center text-sm text-ink-warm-700">
+                        <Mail className="h-4 w-4 mr-2 text-ink-warm-700" />
+                        <span className="text-ink-warm-700">{partner.email}</span>
                       </div>
                     )}
                     {partner.website && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Globe className="h-4 w-4 mr-2 text-gray-600" />
+                      <div className="flex items-center text-sm text-ink-warm-700">
+                        <Globe className="h-4 w-4 mr-2 text-ink-warm-700" />
                         <a 
                           href={partner.website.startsWith('http') ? partner.website : `https://${partner.website}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-brand hover:text-blue-800"
                         >
                           {partner.website}
                         </a>
                       </div>
                     )}
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-600" />
-                      <span className="text-gray-600">{partner.created_at ? new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown'}</span>
+                    <div className="flex items-center text-sm text-ink-warm-700">
+                      <Calendar className="h-4 w-4 mr-2 text-ink-warm-700" />
+                      <span className="text-ink-warm-700">{partner.created_at ? new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown'}</span>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4 border-t border-gray-100">
+                <CardContent className="pt-4 border-t border-cream-100">
                   {partner.description && (
-                    <div className="text-sm text-gray-600 mb-4">
+                    <div className="text-sm text-ink-warm-700 mb-4">
                       <p className="line-clamp-3">{partner.description}</p>
                     </div>
                   )}
@@ -445,7 +449,7 @@ export default function PartnersPage() {
                   </Select>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                 <Button type="button" variant="outline" onClick={handleClosePartnerModal}>
                   Cancel
                 </Button>
@@ -464,16 +468,16 @@ export default function PartnersPage() {
               <DialogTitle>Delete Partner</DialogTitle>
             </DialogHeader>
             <div className="py-4">
-              <p className="text-gray-600">
+              <p className="text-ink-warm-700">
                 Are you sure you want to delete this partner? This action cannot be undone.
               </p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={confirmDeletePartner}
               >
                 Delete Partner

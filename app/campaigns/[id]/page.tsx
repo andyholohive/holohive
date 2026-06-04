@@ -408,7 +408,7 @@ const CampaignDetailsPage = () => {
   }, [id]);
 
   useEffect(() => {
-    UserService.getAllUsers().then(setAllUsers);
+    UserService.getActiveUsers().then(setAllUsers);
     ClientService.getAllClients().then(setAllClients);
   }, []);
 
@@ -594,8 +594,8 @@ const CampaignDetailsPage = () => {
         } catch (err) {
           console.error('Failed to paste:', err);
           toast({
-            title: 'Error',
-            description: 'Failed to paste value',
+            title: 'Paste failed',
+            description: err instanceof Error ? err.message : 'Failed to paste value',
             variant: 'destructive',
           });
         }
@@ -1009,7 +1009,7 @@ const CampaignDetailsPage = () => {
       setReportFiles(data || []);
     } catch (err) {
       console.error('Error fetching report files:', err);
-      toast({ title: "Error", description: "Failed to fetch report files.", variant: "destructive" });
+      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to fetch report files', variant: 'destructive' });
     } finally {
       setLoadingReportFiles(false);
     }
@@ -1046,14 +1046,14 @@ const CampaignDetailsPage = () => {
       );
 
       toast({
-        title: 'Success',
-        description: `File ${isPublic ? 'shown in' : 'hidden from'} public report`,
+        title: isPublic ? 'File made public' : 'File hidden',
+        description: `File ${isPublic ? 'shown in' : 'hidden from'} public report.`,
       });
     } catch (err: any) {
       console.error('Error updating file visibility:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to update file visibility',
+        title: 'Update failed',
+        description: err?.message ?? 'Failed to update file visibility',
         variant: 'destructive',
       });
     }
@@ -1079,15 +1079,12 @@ const CampaignDetailsPage = () => {
 
       setReportFiles(prev => prev.filter(file => file.id !== fileId));
 
-      toast({
-        title: 'Success',
-        description: 'File deleted successfully',
-      });
+      toast({ title: 'File deleted' });
     } catch (err: any) {
       console.error('Error deleting file:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to delete file',
+        title: 'Delete failed',
+        description: err?.message ?? 'Failed to delete file',
         variant: 'destructive',
       });
     }
@@ -1120,15 +1117,12 @@ const CampaignDetailsPage = () => {
         if (error) throw error;
       }
 
-      toast({
-        title: 'Success',
-        description: 'Custom message saved',
-      });
+      toast({ title: 'Custom message saved' });
     } catch (err: any) {
       console.error('Error saving custom message:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to save custom message',
+        title: 'Save failed',
+        description: err?.message ?? 'Failed to save custom message',
         variant: 'destructive',
       });
     }
@@ -1160,14 +1154,13 @@ const CampaignDetailsPage = () => {
       }
 
       toast({
-        title: 'Success',
-        description: `Public report ${enabled ? 'enabled' : 'disabled'}`,
+        title: enabled ? 'Public report enabled' : 'Public report disabled',
       });
     } catch (err: any) {
       console.error('Error toggling public report:', err);
       toast({
-        title: 'Error',
-        description: err?.message || 'Failed to update public report setting',
+        title: 'Update failed',
+        description: err?.message ?? 'Failed to update public report setting',
         variant: 'destructive',
       });
     }
@@ -1337,7 +1330,7 @@ const CampaignDetailsPage = () => {
       setCampaignKOLs(prev => prev.map(k => ({ ...k, paid: sums[k.id] || 0 })));
     } catch (err) {
       console.error('Error fetching payments:', err);
-      toast({ title: "Error", description: "Failed to fetch payments.", variant: "destructive" });
+      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to fetch payments', variant: 'destructive' });
     } finally {
       setLoadingPayments(false);
     }
@@ -1426,8 +1419,8 @@ const CampaignDetailsPage = () => {
     } catch (error: any) {
       console.error('Error sending payment notification:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to send notification',
+        title: 'Send failed',
+        description: error?.message ?? 'Failed to send notification',
         variant: 'destructive',
       });
     } finally {
@@ -1460,8 +1453,8 @@ const CampaignDetailsPage = () => {
     } catch (err) {
       console.error('Error fetching email views:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to load email views',
+        title: 'Load failed',
+        description: err instanceof Error ? err.message : 'Failed to load email views',
         variant: 'destructive'
       });
     } finally {
@@ -2155,7 +2148,7 @@ const CampaignDetailsPage = () => {
                   the content (or per-card for view mode). Cuts ~70px
                   of header weight from every tab. */}
               {editMode && (
-                <div className="mb-4 flex items-center justify-end gap-2">
+                <div className="mb-3 flex items-center justify-end gap-2">
                   <span className="text-[10px] mono uppercase tracking-[0.14em] text-amber-700">Editing</span>
                   <Select
                     value={form?.status || ""}

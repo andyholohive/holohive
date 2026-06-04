@@ -20,7 +20,6 @@
 import React, { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Star,
   Eye,
@@ -183,78 +182,82 @@ export function SidebarCustomizeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* v11 dialog: max-h-[85vh] + flex-col, inner scroll surface
+          flex-1 overflow-y-auto, footer pinned with border-t. Matches
+          IntelligenceAlertsDialog / IntelligenceScheduleDialog. The
+          icon now sits inside DialogTitle (not a side div) so it
+          aligns with the title baseline like other v11 dialogs.
+          2026-06-03. */}
       <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-brand" />
-            <DialogTitle>Customize Sidebar</DialogTitle>
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-brand" />
+            Customize Sidebar
+          </DialogTitle>
           <DialogDescription>
             Star items to pin them to the top. Hide items you don't use.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-4 py-2">
-            {sections.map(({ name, items }) => (
-              <div key={name}>
-                <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-2">
-                  {name}
-                </h4>
-                <div className="space-y-0.5">
-                  {items.map((item) => {
-                    const isBookmarked = bookmarkedHrefs.includes(item.href);
-                    const isHidden = hiddenHrefs.includes(item.href);
-                    const Icon = item.icon;
-                    return (
-                      <div
-                        key={item.href}
-                        className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50"
-                      >
-                        <div className={`flex items-center gap-2 text-sm ${isHidden ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-                          <Icon className={`h-4 w-4 ${isHidden ? 'text-gray-300' : 'text-gray-500'}`} />
-                          <span>{item.label}</span>
-                        </div>
-                        <div className="flex items-center gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => onToggleBookmark(item.href)}
-                            title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
-                          >
-                            <Star
-                              className={`h-3.5 w-3.5 ${
-                                isBookmarked
-                                  ? 'fill-yellow-400 text-yellow-500'
-                                  : 'text-gray-300'
-                              }`}
-                            />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => onToggleHidden(item.href)}
-                            title={isHidden ? 'Show in sidebar' : 'Hide from sidebar'}
-                          >
-                            {isHidden ? (
-                              <EyeOff className="h-3.5 w-3.5 text-rose-500" />
-                            ) : (
-                              <Eye className="h-3.5 w-3.5 text-gray-300" />
-                            )}
-                          </Button>
-                        </div>
+        <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
+          {sections.map(({ name, items }) => (
+            <div key={name}>
+              <h4 className="text-[11px] font-semibold text-ink-warm-500 uppercase tracking-wider mb-1.5 px-2">
+                {name}
+              </h4>
+              <div className="space-y-0.5">
+                {items.map((item) => {
+                  const isBookmarked = bookmarkedHrefs.includes(item.href);
+                  const isHidden = hiddenHrefs.includes(item.href);
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.href}
+                      className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-cream-50"
+                    >
+                      <div className={`flex items-center gap-2 text-sm ${isHidden ? 'text-ink-warm-400 line-through' : 'text-ink-warm-800'}`}>
+                        <Icon className={`h-4 w-4 ${isHidden ? 'text-ink-warm-300' : 'text-ink-warm-500'}`} />
+                        <span>{item.label}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => onToggleBookmark(item.href)}
+                          title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                        >
+                          <Star
+                            className={`h-3.5 w-3.5 ${
+                              isBookmarked
+                                ? 'fill-yellow-400 text-yellow-500'
+                                : 'text-ink-warm-300'
+                            }`}
+                          />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => onToggleHidden(item.href)}
+                          title={isHidden ? 'Show in sidebar' : 'Hide from sidebar'}
+                        >
+                          {isHidden ? (
+                            <EyeOff className="h-3.5 w-3.5 text-rose-500" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5 text-ink-warm-300" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </ScrollArea>
+            </div>
+          ))}
+        </div>
 
-        <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0 flex-row justify-between sm:justify-between gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -264,7 +267,7 @@ export function SidebarCustomizeDialog({
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Reset
           </Button>
-          <Button onClick={() => onOpenChange(false)} className="bg-brand text-white">
+          <Button variant="brand" onClick={() => onOpenChange(false)}>
             Done
           </Button>
         </DialogFooter>

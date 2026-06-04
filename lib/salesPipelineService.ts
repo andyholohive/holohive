@@ -943,24 +943,29 @@ export class SalesPipelineService {
   // METRICS
   // ----------------------------------------
 
+  /**
+   * Roll-up powering the Sales Dashboard's Bucket Breakdown row +
+   * the BAMFAM-violations alert tile.
+   *
+   * 2026-06-03: `totalCount` and `activeValue` removed from the
+   * return shape — they were computed but never consumed. If a UI
+   * surface needs them again, recompute from `opportunities` in
+   * the consumer (cheaper than refetching).
+   */
   static async getMetrics(): Promise<{
-    totalCount: number;
     bucketA: number;
     bucketB: number;
     bucketC: number;
-    activeValue: number;
     bamfamViolations: number;
   }> {
     const { data, error } = await supabase
       .from('crm_opportunities')
-      .select('stage, bucket, deal_value, next_meeting_at')
+      .select('stage, bucket, next_meeting_at')
       .in('stage', ALL_V2_STAGES);
 
     if (error) throw error;
 
     const opps = data || [];
-    const activeStages = PIPELINE_STAGES;
-    const active = opps.filter(o => activeStages.includes(o.stage as SalesPipelineStage));
 
     const postDiscovery = ['discovery_done', 'proposal_call', 'v2_contract'];
     const now = new Date().toISOString();
@@ -970,11 +975,9 @@ export class SalesPipelineService {
     );
 
     return {
-      totalCount: opps.length,
       bucketA: opps.filter(o => o.bucket === 'A').length,
       bucketB: opps.filter(o => o.bucket === 'B').length,
       bucketC: opps.filter(o => o.bucket === 'C').length,
-      activeValue: active.reduce((sum, o) => sum + (o.deal_value || 0), 0),
       bamfamViolations: bamfam.length,
     };
   }

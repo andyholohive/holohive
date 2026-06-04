@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,9 +23,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Plus, UserPlus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp, HelpCircle,
-  Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
+  MessageSquare, Calendar, FileText, Zap, RotateCcw, Clock, Copy, Check, ChevronsUpDown,
   Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image,
-  Sparkles, Twitter, Download, History,
+  Sparkles, Download, History,
 } from 'lucide-react';
 import { downloadCsv, todayStamp } from '@/lib/csvExport';
 import {
@@ -46,17 +44,60 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
-  useDroppable,
 } from '@dnd-kit/core';
 import {
-  useSortable,
   SortableContext,
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { CRMService, CRMAffiliate, OpportunityStage } from '@/lib/crmService';
-import DiscoveryTab from '@/components/sales/DiscoveryTab';
+// DiscoveryTab + per-tab body components moved into SalesPipelineTabs
+// on 2026-06-03 — page no longer renders any TabsContent directly, so
+// these imports moved with the JSX.
+// DnD helpers — extracted 2026-06-02 as Phase 1 of the structural
+// split. Pure presentational wrappers over @dnd-kit/core primitives,
+// no state dependencies.
+import { DroppableColumn } from '@/components/crm/sales-pipeline/dnd/DroppableColumn';
+import { SortableCard } from '@/components/crm/sales-pipeline/dnd/SortableCard';
+import { SortableTableRow } from '@/components/crm/sales-pipeline/dnd/SortableTableRow';
+// Header panels — extracted 2026-06-02. Consume the
+// SalesPipelineContext for shared state instead of taking 5+ props.
+// SalesFunnelStrip + AlertCardsStrip moved into ActionsTab on
+// 2026-06-03 — no longer rendered at page level.
+import { ForecastPanel } from '@/components/crm/sales-pipeline/panels/ForecastPanel';
+import { MetricsPanel } from '@/components/crm/sales-pipeline/panels/MetricsPanel';
+import { SalesDashboard } from '@/components/crm/sales-pipeline/SalesDashboard';
+import { SalesPipelineHeaderActions } from '@/components/crm/sales-pipeline/HeaderActions';
+import { SalesPipelineTabs } from '@/components/crm/sales-pipeline/SalesPipelineTabs';
+// Phase 3 dialogs — extracted 2026-06-02. Visibility driven by their
+// non-null prompt-state in SalesPipelineContext.
+import { TgHandleDialog } from '@/components/crm/sales-pipeline/dialogs/TgHandleDialog';
+import { OrbitDialog } from '@/components/crm/sales-pipeline/dialogs/OrbitDialog';
+import { ClosedLostDialog } from '@/components/crm/sales-pipeline/dialogs/ClosedLostDialog';
+import { ClosedWonDialog } from '@/components/crm/sales-pipeline/dialogs/ClosedWonDialog';
+import { BucketDialog } from '@/components/crm/sales-pipeline/dialogs/BucketDialog';
+import { StageHistoryDialog } from '@/components/crm/sales-pipeline/dialogs/StageHistoryDialog';
+import { ActivityLogDialog } from '@/components/crm/sales-pipeline/dialogs/ActivityLogDialog';
+import { CreateEditOpportunityDialog } from '@/components/crm/sales-pipeline/dialogs/CreateEditOpportunityDialog';
+// Phase 2 tab bodies — extracted 2026-06-02.
+import { CommandPalette } from '@/components/crm/sales-pipeline/CommandPalette';
+// Phase 4 — kanban + table views for the Pipeline tab.
+// The opportunity slide-over — biggest single Phase 3 extraction
+// (~1,300 LOC). Portals to document.body internally.
+import { OpportunitySlideOver } from '@/components/crm/sales-pipeline/slideovers/OpportunitySlideOver';
+import { SalesPipelineProvider, type AlertCardFilter } from '@/contexts/SalesPipelineContext';
+// Pure helpers moved out of page.tsx so the extracted panels (Forecast,
+// Metrics, etc.) can share the same definitions as the forecastKpis
+// memo here without prop-drilling. `ACTION_GUIDANCE` + `ActionPriority`
+// were lifted here when the ActionsTab was extracted (2026-06-02) — the
+// page's `handleActionExecute` + `getNextAction` consume them too.
+import {
+  STAGE_WIN_PROB,
+  isOppAtRisk,
+  ACTION_GUIDANCE,
+  cleanPocHandle,
+  type ActionPriority,
+} from '@/lib/salesPipelineHelpers';
 import { ClientService } from '@/lib/clientService';
 import {
   SalesPipelineService,
@@ -92,64 +133,37 @@ import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow, format, endOfWeek, endOfMonth, addDays, addMonths, differenceInDays } from 'date-fns';
 
 // ============================================
-// DnD Components
-// ============================================
-
-function DroppableColumn({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  // Drop-target highlight: brand teal (was ring-blue-400 before
-  // 2026-05-06). Brand color is the right semantic here — drag-drop is
-  // an active app interaction, not a category indicator.
-  return (
-    <div ref={setNodeRef} className={`${className} ${isOver ? 'ring-2 ring-brand ring-offset-2' : ''}`}>
-      {children}
-    </div>
-  );
-}
-
-function SortableCard({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
-    </div>
-  );
-}
-
-function SortableTableRow({ id, children, className, onClick }: { id: string; children: React.ReactNode; className?: string; onClick?: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    position: 'relative' as const,
-    zIndex: isDragging ? 1 : 0,
-  };
-  return (
-    <TableRow ref={setNodeRef} style={style} className={`${className || ''} ${isDragging ? 'bg-blue-50 shadow-lg' : ''}`} onClick={onClick}>
-      <TableCell className="w-10">
-        <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded"
-          onClick={e => e.stopPropagation()}
-        >
-          <GripVertical className="h-4 w-4 text-gray-400" />
-        </div>
-      </TableCell>
-      {children}
-    </TableRow>
-  );
-}
-
-// ============================================
 // Main Page
 // ============================================
+// DnD wrappers (DroppableColumn, SortableCard, SortableTableRow)
+// extracted to `components/crm/sales-pipeline/dnd/*` on 2026-06-02
+// as Phase 1 of the structural split.
+
+/**
+ * SP_CSV_COLUMNS — column config for the page's "Export CSV" action.
+ * Hoisted from the inline arrays at 2026-06-03 — the same 12 columns
+ * were duplicated in two places (the PageHeader overflow menu + the
+ * CommandPalette `onExportCsv` callback). Now both spread the same
+ * source.
+ *
+ * Typed as `any` accessor input because the runtime row shape mixes
+ * `SalesPipelineOpportunity` (typed) with denormalized backend fields
+ * (`owner.name`, etc.) that don't live on the v2 type.
+ */
+const SP_CSV_COLUMNS = [
+  { header: 'Name', accessor: (r: any) => r.name },
+  { header: 'Stage', accessor: (r: any) => r.stage || '' },
+  { header: 'Bucket', accessor: (r: any) => r.bucket || '' },
+  { header: 'Source', accessor: (r: any) => r.source || '' },
+  { header: 'Owner', accessor: (r: any) => r.owner?.name || r.owner_id || '' },
+  { header: 'POC Handle', accessor: (r: any) => r.poc_handle || '' },
+  { header: 'POC Platform', accessor: (r: any) => r.poc_platform || '' },
+  { header: 'Deal Value', accessor: (r: any) => r.deal_value ?? '' },
+  { header: 'Currency', accessor: (r: any) => r.currency || '' },
+  { header: 'Last Contacted', accessor: (r: any) => r.last_contacted_at ? new Date(r.last_contacted_at).toISOString().slice(0, 10) : '' },
+  { header: 'Next Action', accessor: (r: any) => r.next_action_at ? new Date(r.next_action_at).toISOString().slice(0, 10) : '' },
+  { header: 'Created', accessor: (r: any) => new Date(r.created_at).toISOString().slice(0, 10) },
+];
 
 export default function SalesPipelinePage() {
   const { user } = useAuth();
@@ -170,69 +184,34 @@ export default function SalesPipelinePage() {
     () => users.filter(u => u.is_active !== false),
     [users],
   );
-  const [metrics, setMetrics] = useState({ totalCount: 0, bucketA: 0, bucketB: 0, bucketC: 0, activeValue: 0, bamfamViolations: 0 });
-
-  // Weekly Activity Funnel (header) — canonical 5-stage outbound funnel.
-  // Backed by migration 044's `direction` column on crm_activities +
-  // auto-stamped milestones (proposal_sent_at, etc.) from createActivity.
-  // Counts distinct opportunities per stage — one prospect DM'd 5x = 1.
-  type SalesFunnelData = {
-    window_days: number;
-    outreach: number;
-    replies: number;
-    calls_booked: number;
-    calls_taken: number;
-    proposals_sent: number;
-  };
-  const [salesFunnel, setSalesFunnel] = useState<SalesFunnelData | null>(null);
-  const [salesFunnelWindow, setSalesFunnelWindow] = useState<7 | 14 | 30>(7);
-  // [Funnel-not-loading fix, May 2026] Previously the fetch swallowed
-  // every failure silently (.catch(() => {})), so a 401 from the API
-  // auth middleware or any other non-2xx left the user staring at
-  // perpetual skeleton cards with no clue why. Now: log on non-ok so
-  // we can see the cause in DevTools, and set a fallback zero-state
-  // so the cards render instead of staying as skeletons forever.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch(`/api/analytics/sales-funnel?days=${salesFunnelWindow}`);
-        if (!r.ok) {
-          console.error(`[sales-funnel] fetch failed: ${r.status} ${r.statusText}`);
-          if (!cancelled) {
-            // Render zeros instead of skeleton so the funnel doesn't
-            // appear permanently broken — the user can see something
-            // happened and the rest of the page is functional.
-            setSalesFunnel({ outreach: 0, replies: 0, calls_booked: 0, calls_taken: 0, proposals_sent: 0 } as SalesFunnelData);
-          }
-          return;
-        }
-        const d = await r.json();
-        if (!cancelled && d && typeof d.outreach === 'number') setSalesFunnel(d);
-      } catch (err) {
-        console.error('[sales-funnel] fetch threw:', err);
-        if (!cancelled) {
-          setSalesFunnel({ outreach: 0, replies: 0, calls_booked: 0, calls_taken: 0, proposals_sent: 0 } as SalesFunnelData);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [salesFunnelWindow]);
+  // Server-fetched roll-up. `totalCount` + `activeValue` were also
+  // returned by the service but never read by any consumer — dropped
+  // from the state shape 2026-06-03 (service still computes them as
+  // long as they remain on the return type; trim those next pass).
+  const [metrics, setMetrics] = useState({ bucketA: 0, bucketB: 0, bucketC: 0, bamfamViolations: 0 });
 
   // UI state
-  const [searchTerm, setSearchTerm] = useState('');
+  // `searchTerm` was the predecessor of `overallSearch` — kept around
+  // for months after the unified-search migration. Removed 2026-06-03.
   const [actionsSearch, setActionsSearch] = useState('');
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [orbitSearch, setOrbitSearch] = useState('');
-  // [Actions consolidation, May 2026] Default landed on 'actions' but
-  // the Actions tab was removed in commit b3addd4 — Radix Tabs was
-  // getting value="actions" with no matching TabsTrigger/TabsContent
-  // (silent no-op but visually the page reads as 'nothing selected').
-  // Default is now 'overview' to match the new tab strip. 'actions'
-  // stays in the union because setActiveTab('actions') is still called
-  // from a few legacy alert-card click handlers we haven't migrated.
-  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('overview');
-  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
+  // Active tab — Actions is the default landing surface (was
+  // 'overview' / Overall until that tab was merged into Actions on
+  // 2026-06-03).
+  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'templates' | 'discovery'>('actions');
+  // Pipeline view-mode persisted to localStorage 2026-06-03 — was
+  // re-defaulting to 'table' on every reload, which surprised kanban
+  // users. SSR guard: localStorage only exists in the browser.
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>(() => {
+    if (typeof window === 'undefined') return 'table';
+    const stored = window.localStorage.getItem('sp:viewMode');
+    return stored === 'kanban' || stored === 'table' ? stored : 'table';
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('sp:viewMode', viewMode);
+  }, [viewMode]);
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
   // Overall-tab unified search — broadcasts into Outreach/Pipeline/Orbit
   // filters when the user types here, so one query scopes the whole Overall
@@ -273,7 +252,34 @@ export default function SalesPipelinePage() {
   // container above the main tab strip (between Weekly Activity Funnel
   // and Attention Cards). Independent of `activeTab` so users can keep
   // both views in mind without one resetting the other.
-  const [topSectionTab, setTopSectionTab] = useState<'forecast' | 'metrics'>('forecast');
+  const [topSectionTab, setTopSectionTab] = useState<'forecast' | 'metrics' | 'dashboard'>('forecast');
+
+  // [Header compression, 2026-06-02] Single-toggle for the funnel +
+  // attention cards in the header card. Default 'attention' because
+  // that's the urgency signal reps come here to triage; managers
+  // can toggle to 'activity' to scan the 7-day throughput funnel.
+  // The previous design had both stacked vertically inside one
+  // container, forcing both sets of numbers into the viewport.
+  // `headerStrip` (Attention/Activity toggle) moved to ActionsTab
+  // local state on 2026-06-03 when the card itself moved off the
+  // page level. No remaining page-level consumer.
+
+  // [Cmd+K palette, 2026-06-02] Open/close state for the
+  // CommandPalette. Cmd+K (Mac) or Ctrl+K (PC/Linux) toggles. Esc
+  // dismiss is built into the cmdk primitive. The keybinding mounts
+  // once at the page level so it works no matter which tab the
+  // user is on.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPaletteOpen(open => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // [Sales-pipeline space optimization, May 2026] The Forecast/Metrics
   // block can be 400-1200px tall depending on proposal count and team
@@ -295,6 +301,29 @@ export default function SalesPipelinePage() {
         window.localStorage.setItem('sp_showAnalytics', next ? '1' : '0');
       }
       return next;
+    });
+  }, []);
+
+  /**
+   * Open the F&M Metrics sub-tab from anywhere — used by OutreachTab's
+   * "View team metrics →" link. Sets the F&M sub-tab to 'metrics',
+   * force-opens the F&M panel (persisting that to localStorage so the
+   * choice survives a reload), and scrolls the panel into view.
+   *
+   * Lives here (not in OutreachTab) so the consumer doesn't need to
+   * know the localStorage key, the DOM id, or the F&M sub-tab union.
+   * Replaces the previous pattern of exposing raw `setTopSectionTab` +
+   * `setShowAnalytics` setters through context.
+   */
+  const openMetricsView = useCallback(() => {
+    setTopSectionTab('metrics');
+    setShowAnalytics(true);
+    if (typeof window === 'undefined') return;
+    try { window.localStorage.setItem('sp_showAnalytics', '1'); } catch {}
+    requestAnimationFrame(() => {
+      const el = document.getElementById('sp-analytics-panel');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }, []);
 
@@ -404,8 +433,9 @@ export default function SalesPipelinePage() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState('');
 
-  // Dashboard
-  const [showDashboard, setShowDashboard] = useState(false);
+  // Recalc state stays here because handleRecalculateAll touches
+  // multiple page-local fetch fns; SalesDashboard owns its own
+  // collapse + period-filter state (extracted 2026-06-03).
   const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Outreach state
@@ -413,13 +443,16 @@ export default function SalesPipelinePage() {
   const [outreachTotal, setOutreachTotal] = useState(0);
   const [outreachPage, setOutreachPage] = useState(1);
   const [outreachLoading, setOutreachLoading] = useState(false);
+  // 2026-06-03: dropped `searchTerm` from this shape — the unified
+  // page-level `overallSearch` is now the single source of truth for
+  // the Outreach search term. OutreachTab reads it directly via
+  // context; the broadcast write that kept these in lockstep is gone.
   const [outreachFilters, setOutreachFilters] = useState<{
     dm_account?: DmAccount;
     bucket?: Bucket;
     bumpRange?: 'none' | '1-2' | '3+';
-    searchTerm: string;
     owner_id?: string | 'mine';
-  }>({ searchTerm: '', owner_id: 'mine' });
+  }>({ owner_id: 'mine' });
   const [outreachAllTotal, setOutreachAllTotal] = useState(0);
   const [selectedOutreach, setSelectedOutreach] = useState<string[]>([]);
   const [isBulkBumping, setIsBulkBumping] = useState(false);
@@ -429,8 +462,9 @@ export default function SalesPipelinePage() {
   // Orbit-tab multi-select — mirrors selectedOutreach. Bulk handlers below.
   const [selectedOrbit, setSelectedOrbit] = useState<string[]>([]);
   const [isOrbitBulkMoving, setIsOrbitBulkMoving] = useState(false);
-  const outreachSearchTimeout = useRef<NodeJS.Timeout | null>(null);
-  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // outreachSearchTimeout + searchDebounceRef removed 2026-06-03 —
+  // they powered per-tab search inputs that were dropped in the
+  // unified-search migration. No live consumer of either.
   const OUTREACH_PAGE_SIZE = 50;
 
   // Actions tab state
@@ -455,7 +489,12 @@ export default function SalesPipelinePage() {
   // Outreach tab has been removed — landing on Overall should show the
   // primary work surfaces (Actions + Outreach) immediately. Pipeline,
   // Orbit, Nurture stay default-closed to keep first-paint compact.
-  const [overviewSections, setOverviewSections] = useState<{ actions: boolean; outreach: boolean; pipeline: boolean; orbit: boolean; nurture: boolean }>({ actions: true, outreach: true, pipeline: false, orbit: false, nurture: false });
+  // `overviewSections` was per-section collapse state for the old
+  // sandwich Overall layout (Actions / Outreach / Pipeline / Orbit /
+  // Nurture as expandable sections). The 2026-06-03 OverviewTab
+  // redesign dropped that layout for a thin digest (stats strip +
+  // queue), so the state had no consumer left. Removed along with the
+  // fetch-trigger reads that referenced its `outreach` flag.
 
   // Templates tab state
   const [templates, setTemplates] = useState<SalesDmTemplate[]>([]);
@@ -488,11 +527,6 @@ export default function SalesPipelinePage() {
   }>({ title: '', description: '', outcome: '', next_step: '' });
   const [isActivityLogSubmitting, setIsActivityLogSubmitting] = useState(false);
   const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
-
-  // Dashboard time period filter
-  const [dashboardPeriod, setDashboardPeriod] = useState<'today' | '7d' | '30d' | 'all' | 'custom'>('all');
-  const [dashboardCustomFrom, setDashboardCustomFrom] = useState('');
-  const [dashboardCustomTo, setDashboardCustomTo] = useState('');
 
   // DnD sensors
   const sensors = useSensors(
@@ -535,185 +569,6 @@ export default function SalesPipelinePage() {
     return { bamfamViolations: metrics.bamfamViolations, overdueFollowups, staleDeals, dealsAtRisk, meetingsThisWeek, meetingsToday };
   }, [opportunities, metrics.bamfamViolations]);
 
-  const dashboardMetrics = useMemo(() => {
-    // Filter opportunities by selected time period
-    let all = opportunities;
-    if (dashboardPeriod !== 'all') {
-      const now = new Date();
-      let fromDate: Date | null = null;
-      let toDate: Date | null = null;
-      if (dashboardPeriod === 'today') {
-        fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      } else if (dashboardPeriod === '7d') {
-        fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (dashboardPeriod === '30d') {
-        fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      } else if (dashboardPeriod === 'custom') {
-        if (dashboardCustomFrom) fromDate = new Date(dashboardCustomFrom);
-        if (dashboardCustomTo) {
-          toDate = new Date(dashboardCustomTo);
-          toDate.setHours(23, 59, 59, 999);
-        }
-      }
-      all = opportunities.filter(o => {
-        if (!o.created_at) return false;
-        const created = new Date(o.created_at);
-        if (fromDate && created < fromDate) return false;
-        if (toDate && created > toDate) return false;
-        return true;
-      });
-    }
-
-    // Single pass to bucket opportunities by stage and accumulate metrics
-    const pipelineSet = new Set(PIPELINE_STAGES as string[]);
-    const bookedSet = new Set(['booked', 'discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won']);
-    const discoverySet = new Set(['discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won']);
-    const proposalSet = new Set(['proposal_call', 'v2_contract', 'v2_closed_won']);
-    const closingSet = new Set(['discovery_done', 'proposal_call', 'v2_contract']);
-    const stageProbability: Record<string, number> = {
-      cold_dm: 0.05, warm: 0.1, tg_intro: 0.15, booked: 0.25,
-      discovery_done: 0.4, proposal_call: 0.7, v2_contract: 0.9,
-    };
-
-    let coldDmCount = 0, pastColdDm = 0, meetingsBooked = 0, discoveryCalls = 0, proposalsSent = 0;
-    let closedWonCount = 0, closedLostCount = 0, orbitCount = 0;
-    let pipelineValue = 0, weightedPipeline = 0;
-    let wonValueSum = 0, wonValueCount = 0, closeTimeSum = 0, closeTimeCount = 0;
-    let qualifiedCount = 0, bucketACount = 0;
-    let overdueFollowups = 0, staleDeals = 0, dealsAtRisk = 0;
-    let meetingsThisWeek = 0, meetingsToday = 0;
-    const closedWonOpps: typeof all = [];
-    const pipelineActiveOpps: typeof all = [];
-
-    const nowMs = Date.now();
-    const nowIso = new Date().toISOString();
-    const nowDate = new Date();
-    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
-    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-    const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    for (const o of all) {
-      const stage = o.stage;
-      const isPipeline = pipelineSet.has(stage);
-
-      // Stage buckets
-      if (stage === 'cold_dm') coldDmCount++;
-      else pastColdDm++;
-      if (bookedSet.has(stage)) meetingsBooked++;
-      if (discoverySet.has(stage)) discoveryCalls++;
-      if (proposalSet.has(stage)) proposalsSent++;
-      if (stage === 'v2_closed_won') { closedWonCount++; closedWonOpps.push(o); }
-      if (stage === 'v2_closed_lost') closedLostCount++;
-      if (stage === 'orbit') orbitCount++;
-
-      // Pipeline active metrics
-      if (isPipeline) {
-        pipelineActiveOpps.push(o);
-        pipelineValue += o.deal_value || 0;
-        weightedPipeline += (o.deal_value || 0) * (stageProbability[stage] || 0.1);
-        if (o.next_meeting_at) {
-          if (o.next_meeting_at < nowIso) overdueFollowups++;
-          const mt = new Date(o.next_meeting_at);
-          if (mt >= todayStart && mt < weekEnd) meetingsThisWeek++;
-          if (mt >= todayStart && mt < tomorrowStart) meetingsToday++;
-        }
-        const lastDate = o.last_contacted_at || o.last_bump_date || o.created_at;
-        if (!lastDate || Math.floor((nowMs - new Date(lastDate).getTime()) / 86400000) >= 7) staleDeals++;
-      }
-
-      // Deals at risk
-      if (closingSet.has(stage) && o.temperature_score < 40) dealsAtRisk++;
-
-      // Bucket counts
-      if (o.bucket === 'A' || o.bucket === 'B') qualifiedCount++;
-      if (o.bucket === 'A') bucketACount++;
-
-      // Won deal value + close time
-      if (stage === 'v2_closed_won') {
-        const val = o.deal_value || 0;
-        if (val > 0) { wonValueSum += val; wonValueCount++; }
-        if (o.created_at && o.closed_at) {
-          closeTimeSum += (new Date(o.closed_at).getTime() - new Date(o.created_at).getTime()) / 86400000;
-          closeTimeCount++;
-        }
-      }
-    }
-
-    const totalDmsSent = all.length;
-    const totalClosed = closedWonCount + closedLostCount;
-    const totalRevenue = closedWonOpps.reduce((sum, o) => sum + (o.deal_value || 0), 0);
-
-    // Bottleneck analysis (kept as multi-pass — runs on period-filtered data which is smaller)
-    const funnelStages: SalesPipelineStage[] = ['cold_dm', 'warm', 'tg_intro', 'booked', 'discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won'];
-    const stageOrder: Record<string, number> = {};
-    funnelStages.forEach((s, i) => { stageOrder[s] = i; });
-
-    const reachedStage = funnelStages.map(stage => {
-      const idx = stageOrder[stage];
-      return all.filter(o => {
-        const oIdx = stageOrder[o.stage];
-        if (oIdx !== undefined) return oIdx >= idx;
-        if (o.stage === 'orbit' || o.stage === 'v2_closed_lost') {
-          if (o.proposal_sent_at && idx <= stageOrder['proposal_call']) return true;
-          if (o.discovery_call_at && idx <= stageOrder['discovery_done']) return true;
-          if (o.calendly_booked_date && idx <= stageOrder['booked']) return true;
-          if (o.tg_handle && idx <= stageOrder['tg_intro']) return true;
-          if ((o.last_contacted_at || o.last_bump_date) && idx <= stageOrder['warm']) return true;
-          return idx <= stageOrder['cold_dm'];
-        }
-        return false;
-      }).length;
-    });
-
-    const stageConversions = funnelStages.slice(0, -1).map((stage, i) => {
-      const from = reachedStage[i];
-      const to = reachedStage[i + 1];
-      return { stage, nextStage: funnelStages[i + 1], from, to, rate: from > 0 ? (to / from) * 100 : 0, dropoff: from - to };
-    });
-
-    const avgDaysInStage = funnelStages.slice(0, -1).map(stage => {
-      const oppsInStage = pipelineActiveOpps.filter(o => o.stage === stage);
-      if (oppsInStage.length === 0) return { stage, avgDays: 0, count: 0 };
-      const totalDays = oppsInStage.reduce((sum, o) => sum + Math.floor((nowMs - new Date(o.updated_at).getTime()) / 86400000), 0);
-      return { stage, avgDays: Math.round(totalDays / oppsInStage.length), count: oppsInStage.length };
-    });
-
-    const significantConversions = stageConversions.filter(c => c.from >= 3);
-    const worstConversion = significantConversions.length > 0 ? significantConversions.reduce((w, c) => c.rate < w.rate ? c : w) : null;
-    const significantStages = avgDaysInStage.filter(s => s.count >= 2);
-    const slowestStage = significantStages.length > 0 ? significantStages.reduce((s, c) => c.avgDays > s.avgDays ? c : s) : null;
-
-    return {
-      totalDmsSent,
-      responseRate: totalDmsSent > 0 ? (pastColdDm / totalDmsSent) * 100 : 0,
-      meetingsBooked,
-      discoveryCalls,
-      closeRate: totalClosed > 0 ? (closedWonCount / totalClosed) * 100 : 0,
-      avgDealSize: wonValueCount > 0 ? wonValueSum / wonValueCount : 0,
-      avgCloseTime: closeTimeCount > 0 ? closeTimeSum / closeTimeCount : 0,
-      qualifiedPct: all.length > 0 ? (qualifiedCount / all.length) * 100 : 0,
-      bucketAPct: all.length > 0 ? (bucketACount / all.length) * 100 : 0,
-      pipelineValue,
-      activeDeals: pipelineActiveOpps.length,
-      overdueFollowups,
-      bamfamViolations: metrics.bamfamViolations,
-      closedWon: closedWonCount,
-      closedLost: closedLostCount,
-      inOrbit: orbitCount,
-      proposalsSent,
-      coldDmCount: outreachTotal > 0 ? outreachTotal : coldDmCount,
-      meetingsThisWeek,
-      meetingsToday,
-      staleDeals,
-      dealsAtRisk,
-      totalRevenue,
-      weightedPipeline,
-      stageConversions,
-      avgDaysInStage,
-      worstConversion,
-      slowestStage,
-    };
-  }, [opportunities, metrics.bamfamViolations, outreachTotal, dashboardPeriod, dashboardCustomFrom, dashboardCustomTo]);
 
   // ============================================
   // Data Fetching
@@ -796,7 +651,7 @@ export default function SalesPipelinePage() {
       const [opps, affs, usrs, met, outreachCount, tmpls, engagedIds] = await Promise.all([
         SalesPipelineService.getAll(),
         CRMService.getAllAffiliates(),
-        UserService.getAllUsers(),
+        UserService.getActiveUsers(),
         SalesPipelineService.getMetrics(),
         SalesPipelineService.getColdDmsPaginated(1, 1, {}),
         SalesPipelineService.getTemplates(),
@@ -868,9 +723,12 @@ export default function SalesPipelinePage() {
   const fetchOutreach = useCallback(async () => {
     setOutreachLoading(true);
     try {
+      // `searchTerm` is no longer stored on `outreachFilters` — pulled
+      // from the page-level unified search at fetch time.
       const resolvedFilters = {
         ...outreachFilters,
         owner_id: outreachFilters.owner_id === 'mine' ? (user?.id || undefined) : outreachFilters.owner_id,
+        searchTerm: overallSearch || undefined,
       };
       const result = await SalesPipelineService.getColdDmsPaginated(outreachPage, OUTREACH_PAGE_SIZE, resolvedFilters);
       setOutreachOpps(result.data);
@@ -880,31 +738,33 @@ export default function SalesPipelinePage() {
     } finally {
       setOutreachLoading(false);
     }
-  }, [outreachPage, outreachFilters, user?.id]);
+  }, [outreachPage, outreachFilters, overallSearch, user?.id]);
 
   useEffect(() => {
-    // [Tab merge May 2026] Standalone Outreach tab is gone; the only
-    // way to land on the outreach surface is via Overall's Outreach
-    // section. We keep the 'outreach' branch for any legacy redirect
-    // that hasn't been migrated yet (setActiveTab('outreach') is a
-    // no-op against the new tab strip but doesn't error).
-    if (activeTab === 'outreach' || (activeTab === 'overview' && overviewSections.outreach)) {
+    // 2026-06-03: Outreach was re-added as its own tab + the Overall
+    // collapsible Outreach section is gone, so the only reason to
+    // fetch is when the user lands on the Outreach tab itself.
+    if (activeTab === 'outreach') {
       fetchOutreach();
     }
-  }, [activeTab, fetchOutreach, overviewSections.outreach]);
+  }, [activeTab, fetchOutreach]);
 
-  // Broadcast Overall search → all three subsection filters. The Overall
-  // search input ONLY renders on the overview tab, so this effect only
-  // fires when the user is actively typing there — and importantly, it
-  // does NOT fire on tab switches (which would otherwise clobber per-tab
-  // searches with the empty initial value). User mental model: typing in
-  // Overall pushes that query down to each section; per-tab searches keep
-  // working independently when the user is on a specific tab.
+  // Unified search — broadcasts the single page-level input into
+  // every per-tab filter. Was previously a "broadcast from Overall"
+  // effect that only fired while the Overall tab was active; per-tab
+  // search inputs lived alongside it. 2026-06-03: pulled the search
+  // up to the page header, dropped the per-tab inputs, and added
+  // Actions to the broadcast (was missing). User mental model: there
+  // is ONE search bar; everything filters from it.
   useEffect(() => {
     const term = overallSearch;
     setPipelineSearch(term);
     setOrbitSearch(term);
-    setOutreachFilters(prev => prev.searchTerm === term ? prev : { ...prev, searchTerm: term });
+    setActionsSearch(term);
+    // Outreach: reset to page 1 when the term changes. The actual
+    // filter is read directly from `overallSearch` in OutreachTab —
+    // the redundant copy on `outreachFilters.searchTerm` was dropped
+    // 2026-06-03.
     setOutreachPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overallSearch]);
@@ -1047,30 +907,13 @@ export default function SalesPipelinePage() {
     [],
   );
 
-  // Stage win-probability heuristic for weighted forecast. Conservative
-  // numbers — easy to tune later if your team starts tracking actuals.
-  const STAGE_WIN_PROB: Record<string, number> = useMemo(() => ({
-    proposal_sent: 0.20,
-    proposal_call: 0.40,
-    v2_contract: 0.70,
-  }), []);
-
+  // STAGE_WIN_PROB and isOppAtRisk moved to `lib/salesPipelineHelpers.ts`
+  // on 2026-06-02 so the extracted ForecastPanel + future MetricsPanel
+  // share the same definitions as the forecastKpis memo below.
   const forecastOpps = useMemo(
     () => opportunities.filter(o => POST_PROPOSAL_STAGES.includes(o.stage as SalesPipelineStage)),
     [opportunities, POST_PROPOSAL_STAGES],
   );
-
-  // At-risk = proposal sent 14+ days ago AND no activity (updated_at)
-  // in the last 7 days. updated_at is a reasonable proxy for "last
-  // touched" without joining activities. Tune thresholds if needed.
-  const isOppAtRisk = (opp: SalesPipelineOpportunity): boolean => {
-    if (!opp.proposal_sent_at) return false;
-    const proposalAgeDays = differenceInDays(new Date(), new Date(opp.proposal_sent_at));
-    if (proposalAgeDays < 14) return false;
-    if (!opp.updated_at) return true;
-    const inactivityDays = differenceInDays(new Date(), new Date(opp.updated_at));
-    return inactivityDays > 7;
-  };
 
   // Group by expected close period. Bucket boundaries match Calendly /
   // Salesforce conventions. "No Date" sits last because that's the
@@ -1222,9 +1065,11 @@ export default function SalesPipelinePage() {
   // — matches the funnel API's heuristic) so both range toggles work
   // without a refetch.
   useEffect(() => {
-    const wantsMetrics = topSectionTab === 'metrics' ||
-      (activeTab === 'overview' && overviewSections.outreach) ||
-      activeTab === 'outreach'; // legacy redirect
+    // Metrics data feeds the F&M Metrics sub-tab AND the Outreach
+    // tab's "My outreach · last 30 days" strip. Fetch when either is
+    // in view. The old Overall.outreach-section branch was dropped
+    // with the 2026-06-03 redesign.
+    const wantsMetrics = topSectionTab === 'metrics' || activeTab === 'outreach';
     if (!wantsMetrics) return;
 
     if (metricsBookings.length === 0 && !metricsBookingsLoading) {
@@ -1259,9 +1104,25 @@ export default function SalesPipelinePage() {
 
     if (!metricsUserId && user?.id) setMetricsUserId(user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, topSectionTab, overviewSections.outreach]);
+  }, [activeTab, topSectionTab]);
 
-  // KPI roll-up at top of Forecast tab.
+  /**
+   * forecastKpis — KPI roll-up powering THREE consumer surfaces (all
+   * showing the same numbers, which is intentional — these are the
+   * standup commit numbers):
+   *
+   *   1. OverviewTab's one-line stats strip (Pipeline / Weighted /
+   *      This month / At risk)
+   *   2. Forecast & Metrics collapsed-state inline summary (same
+   *      four numbers, repeated)
+   *   3. ForecastPanel's KPI strip inside the expanded F&M section
+   *
+   * Scope: **post-proposal opps only** (`forecastOpps` = stages where
+   * a proposal has been sent). Conservative weighting via
+   * `STAGE_WIN_PROB`. See `dashboardMetrics` above for the broader
+   * "all pipeline stages" view — that one uses `STAGE_WIN_PROB_BROAD`
+   * and produces aspirational rather than commit numbers.
+   */
   const forecastKpis = useMemo(() => {
     const totalValue = forecastOpps.reduce((s, o) => s + (o.deal_value || 0), 0);
     const atRisk = forecastOpps.filter(isOppAtRisk);
@@ -1276,7 +1137,9 @@ export default function SalesPipelinePage() {
       0,
     );
     return { totalValue, atRiskCount: atRisk.length, atRiskValue, thisMonthValue, weighted };
-  }, [forecastOpps, forecastByPeriod, STAGE_WIN_PROB]);
+    // STAGE_WIN_PROB is now a module-level const (lib/salesPipelineHelpers.ts)
+    // so it's stable across renders — no need to list it as a dep.
+  }, [forecastOpps, forecastByPeriod]);
 
   // ============================================
   // CRUD Handlers
@@ -1357,8 +1220,8 @@ export default function SalesPipelinePage() {
       } else {
         toast({ title: 'No booking page', description: 'This team member does not have a booking page set up.', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to get booking link.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Booking link failed', description: err instanceof Error ? err.message : 'Failed to get booking link', variant: 'destructive' });
     }
   };
 
@@ -1901,7 +1764,10 @@ export default function SalesPipelinePage() {
   // Actions Tab: getNextAction helper
   // ============================================
 
-  type ActionPriority = 'urgent' | 'high' | 'medium' | 'low' | 'wait';
+  // ActionPriority + ACTION_GUIDANCE moved to lib/salesPipelineHelpers.ts
+  // on 2026-06-02 — imported at the top of this file. Local declaration
+  // below is intentionally removed; if reverting, restore the
+  // 'urgent' | 'high' | 'medium' | 'low' | 'wait' union.
   type ActionExecutionType = 'bump' | 'stage_change' | 'open_detail' | 'none';
 
   type ActionAlternative = { label: string; actionType: ActionExecutionType; targetStage?: SalesPipelineStage; variant: 'default' | 'warn' | 'danger'; quick?: boolean };
@@ -2272,27 +2138,9 @@ export default function SalesPipelinePage() {
   // Actions Tab: Execute handler
   // ============================================
 
-  const ACTION_GUIDANCE: Record<string, { label: string; hint: string }> = {
-    'Book Next Meeting!': { label: 'Book Next Meeting', hint: 'Click the pencil icon (Edit) → set the Next Meeting date field. No deal should exist without a future meeting (BAMFAM).' },
-    'Book Meeting': { label: 'Book Meeting', hint: 'Click the pencil icon (Edit) → set the Next Meeting date field to stay BAMFAM-compliant.' },
-    'Get TG Handle': { label: 'Get TG Handle', hint: 'DM them asking for their Telegram handle, then click Edit → fill in the TG Handle field. Once entered, click "Got TG!" to advance.' },
-    'Follow Up': { label: 'Follow Up', hint: 'Send a follow-up DM. After messaging, log it as an activity below so the team knows.' },
-    'Schedule Meeting': { label: 'Schedule Meeting', hint: 'Send Calendly or propose a time. Click the pencil icon (Edit) → set the Next Meeting date field once confirmed.' },
-    'Prep for Meeting': { label: 'Prep for Meeting', hint: 'Review their notes, bucket, and past activity below. Update Notes with talking points before the call.' },
-    'Follow Up Proposal': { label: 'Follow Up Proposal', hint: 'Message them to check if they reviewed the proposal. Log their response as an activity below.' },
-    'Send Proposal': { label: 'Send Proposal', hint: 'Draft & send the pricing proposal based on discovery call notes. This will mark the proposal as sent.' },
-    'Need More Info': { label: 'Need More Info', hint: 'They need more details before a proposal. Add notes on what they need, then follow up.' },
-    'Resurrect': { label: 'Resurrect Check', hint: 'It\'s been 90+ days. Review their notes — DM to re-engage, or move to Lost if no longer viable.' },
-    'Chase Signature': { label: 'Chase Signature', hint: 'Follow up on the contract. Once they sign, use the "Signed!" button to close the deal.' },
-    'Schedule Call': { label: 'Schedule Call', hint: 'Book a call to discuss the contract. Click Edit → set the Next Meeting date field.' },
-    'Log Meeting Outcome': { label: 'Log Meeting Outcome', hint: 'A meeting just happened — add an activity below with the outcome, key takeaways, and next steps. Update the Next Meeting date if another was scheduled.' },
-    'Reschedule': { label: 'Reschedule Meeting', hint: 'Meeting needs rescheduling. Click the pencil icon (Edit) → update the Next Meeting date field.' },
-    'No Show': { label: 'No Show', hint: 'They didn\'t show up. Log a "No Show" activity below and decide whether to reschedule or orbit.' },
-    'Keep Bumping': { label: 'Keep Bumping', hint: 'Override the orbit suggestion — review notes and continue follow-up DMs.' },
-    'Re-engage or Orbit': { label: 'Re-engage', hint: 'It\'s been 7+ days with no progress on TG. Send them a nudge — if still no reply, consider orbiting.' },
-    'Update Stage': { label: 'Fix Stage', hint: 'Proposal was already sent but this deal is still in Discovery Done. Move it to the correct stage.' },
-    'Check In': { label: 'Nurture Check-In', hint: 'It\'s been 30+ days. Send a light touch — share content, ask how things are going, or see if timing is better now.' },
-  };
+  // ACTION_GUIDANCE moved to lib/salesPipelineHelpers.ts on 2026-06-02.
+  // Imported at the top of this file. Both the page (handleActionExecute
+  // below) and the extracted ActionsTab consume the same map.
 
   const openActivityLogPrompt = (oppId: string, oppName: string, type: ActivityType, title: string, showMeetingPicker?: boolean, ownerId?: string) => {
     setActivityLogPrompt({ oppId, oppName, type, title, showMeetingPicker, ownerId });
@@ -2425,671 +2273,25 @@ export default function SalesPipelinePage() {
     return u?.name || u?.email || '—';
   };
 
-  const getCoOwnerNames = (coOwnerIds: string[] | undefined | null) => {
-    if (!coOwnerIds || coOwnerIds.length === 0) return null;
-    return coOwnerIds.map(id => {
-      const u = users.find(u => u.id === id);
-      return u?.name || u?.email || '—';
-    });
-  };
-
-  const renderOwnerCell = (opp: SalesPipelineOpportunity) => {
-    const ownerName = getUserName(opp.owner_id);
-    const coNames = getCoOwnerNames(opp.co_owner_ids);
-    return (
-      <div>
-        <span>{ownerName}</span>
-        {coNames && coNames.length > 0 && (
-          <span className="text-[10px] text-gray-400 block">+{coNames.join(', ')}</span>
-        )}
-      </div>
-    );
-  };
-
-  const cleanPocHandle = (handle: string): string => {
-    // Strip common URL prefixes to show just the handle
-    return handle
-      .replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com|instagram\.com|linkedin\.com\/in|t\.me|discord\.gg|discord\.com\/users)\/?/i, '@')
-      .replace(/^https?:\/\/(www\.)?[^/]+\/?/i, '')
-      .replace(/\/+$/, '');
-  };
-
-  /**
-   * Render a project name with an inline Twitter/X link icon when a
-   * twitter_handle is set. When missing, shows a "+" pill (visible on
-   * row hover) that opens the edit dialog so the user can fill it in.
-   *
-   * Used in every table renderer (Outreach, Pipeline, Orbit, Nurture)
-   * for visual consistency. The clickable area is just the icon — the
-   * project name itself keeps whatever click behavior the row defines
-   * (row-click for slide-over, name-click for inline edit, etc).
-   */
-  const renderProjectNameSuffix = (twitterHandle: string | null | undefined, onAddTwitter?: () => void) => {
-    if (twitterHandle) {
-      const handle = twitterHandle.replace(/^@/, '').replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//, '').replace(/\/$/, '');
-      return (
-        <a
-          href={`https://x.com/${handle}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="flex-shrink-0 inline-flex items-center justify-center h-4 w-4 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-          title={`Open @${handle} on X`}
-        >
-          <Twitter className="h-3 w-3" />
-        </a>
-      );
-    }
-    if (onAddTwitter) {
-      return (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onAddTwitter(); }}
-          className="flex-shrink-0 opacity-0 group-hover:opacity-100 inline-flex items-center justify-center h-4 w-4 rounded text-gray-400 hover:text-brand hover:bg-brand-light transition-all"
-          title="Add Twitter/X handle"
-        >
-          <Plus className="h-3 w-3" />
-        </button>
-      );
-    }
-    return null;
-  };
-
-  /**
-   * Render the POC cell — platform badge + handle. When platform is
-   * 'twitter' the handle becomes a clickable link to x.com that opens
-   * in a new tab. For other platforms the handle stays as plain text
-   * (we don't have URL builders for IG/LinkedIn/Telegram handles).
-   */
-  const renderPocCell = (opp: SalesPipelineOpportunity, maxWidthClass = 'max-w-[120px]') => {
-    if (!opp.poc_handle) return <span className="text-gray-400 text-xs">—</span>;
-    const cleanHandle = cleanPocHandle(opp.poc_handle);
-    const isTwitter = opp.poc_platform === 'twitter';
-    const xHandle = cleanHandle.replace(/^@/, '');
-    return (
-      <div className="flex items-center gap-1.5 overflow-hidden">
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize shrink-0">
-          {opp.poc_platform || 'other'}
-        </Badge>
-        {isTwitter && xHandle ? (
-          <a
-            href={`https://x.com/${xHandle}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className={`text-xs text-blue-600 hover:underline truncate ${maxWidthClass}`}
-            title={cleanHandle}
-          >
-            {cleanHandle}
-          </a>
-        ) : (
-          <span className={`text-xs text-gray-600 truncate ${maxWidthClass}`}>
-            {cleanHandle}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const linkifyText = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
-    if (parts.length === 1) return text;
-    return parts.map((part, i) =>
-      urlRegex.test(part) ? (
-        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline break-all" onClick={e => e.stopPropagation()}>{part}</a>
-      ) : part
-    );
-  };
-
-  // [Auto-stamp, May 2026] Accepts the union 'ActivityType | "stage_change"'
-  // so synthetic timeline entries from crm_stage_history can render
-  // their own icon. The render layer never relies on the helper's
-  // return being non-null — JSX renders {undefined} as nothing — so
-  // an unhandled type just shows no icon.
-  const activityIcon = (type: ActivityType | 'stage_change') => {
-    switch (type) {
-      case 'call': return <Phone className="h-3.5 w-3.5" />;
-      case 'message': return <MessageSquare className="h-3.5 w-3.5" />;
-      case 'meeting': return <Calendar className="h-3.5 w-3.5" />;
-      case 'proposal': return <FileText className="h-3.5 w-3.5" />;
-      case 'note': return <StickyNote className="h-3.5 w-3.5" />;
-      case 'bump': return <Zap className="h-3.5 w-3.5" />;
-      case 'stage_change': return <ArrowRight className="h-3.5 w-3.5" />;
-    }
-  };
-
-  // ============================================
-  // RENDER: Opportunity Card (Kanban)
-  // ============================================
-
-  const renderCard = (opp: SalesPipelineOpportunity, isDragging: boolean = false) => {
-    const colors = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
-    const bamfam = isBAMFAM(opp);
-
-    return (
-      <Card
-        className={`group hover:shadow-md transition-all duration-200 border-l-4 ${colors.border} ${isDragging ? 'shadow-lg ring-2 ring-brand opacity-90' : ''} ${bamfam ? 'bg-rose-50/30' : ''}`}
-        onClick={() => openSlideOver(opp)}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              {/* Name with drag handle */}
-              <div className="flex items-center gap-2">
-                <GripVertical className="h-4 w-4 text-gray-300 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                <Building2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <p className="font-medium text-gray-900 truncate">{opp.name}</p>
-              </div>
-
-              {/* Deal Value */}
-              {opp.deal_value && (
-                <p className="text-lg font-semibold text-emerald-600 mt-2">
-                  ${opp.deal_value.toLocaleString()}
-                </p>
-              )}
-
-              {/* Badges */}
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {opp.bucket && (
-                  <Badge className={`text-xs ${BUCKET_COLORS[opp.bucket].bg} ${BUCKET_COLORS[opp.bucket].text} border-0`}>
-                    Bucket {opp.bucket}
-                  </Badge>
-                )}
-                {opp.dm_account === 'closer' && (
-                  <Badge variant="outline" className="text-xs bg-white border-blue-300 text-blue-600">Closer</Badge>
-                )}
-                {opp.dm_account === 'sdr' && (
-                  <Badge variant="outline" className="text-xs bg-white border-emerald-300 text-emerald-600">SDR</Badge>
-                )}
-                {opp.source && (
-                  <Badge variant="outline" className="text-xs bg-white capitalize">
-                    {opp.source.replace('_', ' ')}
-                  </Badge>
-                )}
-              </div>
-
-              {/* Details */}
-              <div className="mt-3 space-y-1.5 text-xs text-gray-500">
-                {/* Bump progress (cold_dm only) */}
-                {opp.stage === 'cold_dm' && (
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="h-3 w-3 flex-shrink-0 text-sky-500" />
-                    <span>Bump {opp.bump_number}/4</span>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4].map(i => (
-                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= opp.bump_number ? 'bg-sky-500' : 'bg-gray-200'}`} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Warm sub-state */}
-                {opp.stage === 'warm' && opp.warm_sub_state && (
-                  <div className="flex items-center gap-1.5">
-                    <MessageSquare className="h-3 w-3 flex-shrink-0" />
-                    <span className={opp.warm_sub_state === 'interested' ? 'text-emerald-600 font-medium' : 'text-gray-500'}>
-                      {opp.warm_sub_state === 'interested' ? 'Interested' : 'Silent'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Temperature bar */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-rose-400'}`}
-                      style={{ width: `${opp.temperature_score}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-gray-400">{opp.temperature_score}</span>
-                </div>
-
-                {/* BAMFAM warning */}
-                {bamfam && (
-                  <div className="flex items-center gap-1.5 text-rose-600">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span className="font-medium">BAMFAM</span>
-                  </div>
-                )}
-
-                {/* Last bumped */}
-                {(opp.last_bump_date || opp.last_contacted_at) && (
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3 w-3 flex-shrink-0" />
-                    <span>
-                      {opp.last_bump_date
-                        ? `Bumped ${formatDistanceToNow(new Date(opp.last_bump_date), { addSuffix: true })}`
-                        : `Contacted ${formatDistanceToNow(new Date(opp.last_contacted_at!), { addSuffix: true })}`}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {!isDragging && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 z-[80]">
-                  <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(opp); }}>
-                    <Edit className="h-4 w-4 mr-2" /> Edit
-                  </DropdownMenuItem>
-                  {opp.stage === 'cold_dm' && (
-                    <DropdownMenuItem onClick={e => { e.stopPropagation(); handleRecordBump(opp.id); }}>
-                      <Zap className="h-4 w-4 mr-2" /> Record Bump
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleStageChange(opp.id, 'orbit', opp.stage); }} className="text-orange-600">
-                    <RotateCcw className="h-4 w-4 mr-2" /> Move to Orbit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // ============================================
-  // RENDER: Kanban View
-  // ============================================
-
-  const renderKanban = () => (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4 h-full">
-        {visiblePipelineStages.map(stage => {
-          const stageOpps = getStageOpps(stage);
-          const colors = STAGE_COLORS[stage];
-          const isCollapsed = collapsedKanbanStages.has(stage);
-          const stageValue = stageOpps.reduce((sum, o) => sum + (o.deal_value || 0), 0);
-
-          return (
-            <div
-              key={stage}
-              className={`${isCollapsed ? 'w-12' : 'flex-1 min-w-[280px] max-w-[320px]'} flex flex-col h-full transition-all duration-200`}
-            >
-              {/* Column Header */}
-              <div
-                className={`${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} px-4 py-3 ${colors.bg} border ${colors.border} ${isCollapsed ? '' : 'border-b-0'} flex-shrink-0 cursor-pointer select-none`}
-                onClick={() => toggleKanbanCollapse(stage)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {isCollapsed ? (
-                      <ChevronRight className={`w-4 h-4 ${colors.text}`} />
-                    ) : (
-                      <ChevronDown className={`w-4 h-4 ${colors.text}`} />
-                    )}
-                    {!isCollapsed && (
-                      <>
-                        <h4 className={`font-semibold ${colors.text}`}>{STAGE_LABELS[stage]}</h4>
-                        <Badge variant="secondary" className="text-xs font-medium">{stageOpps.length}</Badge>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {!isCollapsed && stageValue > 0 && (
-                  <p className="text-sm font-medium text-gray-600 mt-1">
-                    ${stageValue.toLocaleString()}
-                  </p>
-                )}
-                {isCollapsed && (
-                  <div className="mt-2 flex flex-col items-center gap-1">
-                    <span className={`font-semibold ${colors.text}`} style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-                      {STAGE_LABELS[stage]}
-                    </span>
-                    <Badge variant="secondary" className="text-xs font-medium mt-1">{stageOpps.length}</Badge>
-                  </div>
-                )}
-              </div>
-
-              {/* Column Content - Droppable Area */}
-              {!isCollapsed && (
-                <DroppableColumn id={stage} className={`flex-1 bg-gray-50/50 border border-gray-200 border-t-0 rounded-b-lg p-3 space-y-3 overflow-y-auto transition-colors`}>
-                  <SortableContext items={stageOpps.map(o => o.id)} strategy={verticalListSortingStrategy}>
-                    {stageOpps.length === 0 ? (
-                      <div className="flex items-center justify-center h-24 text-sm text-gray-400">
-                        No opportunities
-                      </div>
-                    ) : (
-                      stageOpps.map(opp => (
-                        <SortableCard key={opp.id} id={opp.id}>
-                          {renderCard(opp)}
-                        </SortableCard>
-                      ))
-                    )}
-                  </SortableContext>
-                </DroppableColumn>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Orbit drop zone */}
-        <div className="w-12 flex flex-col h-full transition-all duration-200">
-          <DroppableColumn id="orbit" className="rounded-lg px-4 py-3 bg-orange-50 border border-orange-200 flex-shrink-0 cursor-pointer select-none">
-            <div className="flex flex-col items-center gap-1">
-              <RotateCcw className="w-4 h-4 text-orange-700" />
-              <span className="font-semibold text-orange-700 mt-2" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-                Orbit
-              </span>
-              <Badge variant="secondary" className="text-xs font-medium mt-1">{allOrbitOpps.length}</Badge>
-            </div>
-          </DroppableColumn>
-        </div>
-
-        {/* Closed Lost drop zone */}
-        <div className="w-12 flex flex-col h-full transition-all duration-200">
-          <DroppableColumn id="v2_closed_lost" className="rounded-lg px-4 py-3 bg-rose-50 border border-rose-200 flex-shrink-0 cursor-pointer select-none">
-            <div className="flex flex-col items-center gap-1">
-              <X className="w-4 h-4 text-rose-700" />
-              <span className="font-semibold text-rose-700 mt-2" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-                Lost
-              </span>
-              <Badge variant="secondary" className="text-xs font-medium mt-1">
-                {filteredOpportunities.filter(o => o.stage === 'v2_closed_lost').length}
-              </Badge>
-            </div>
-          </DroppableColumn>
-        </div>
-      </div>
-
-      <DragOverlay>
-        {activeOpportunity ? (
-          <div className="w-[280px]">
-            {renderCard(activeOpportunity, true)}
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
-  );
-
-  // ============================================
-  // RENDER: Table View
-  // ============================================
-
-  const renderTable = () => (
-    <div className="pb-8">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        {visiblePipelineStages.map(stage => {
-          const stageOpps = getStageOpps(stage);
-          const colors = STAGE_COLORS[stage];
-          const isCollapsed = collapsedStages.has(stage);
-          const stageValue = stageOpps.reduce((s, o) => s + (o.deal_value || 0), 0);
-          // Project-name grouping (mirrors Outreach + Orbit) — same-name
-          // opps cluster, first row per cluster shows the project header,
-          // continuation rows hide the name. Sorting by name supersedes
-          // the previous intra-stage drag-drop reorder; cross-stage drag
-          // still works via the outer DndContext.
-          const sortedStageOpps = [...stageOpps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-          const stageNameCounts = new Map<string, number>();
-          sortedStageOpps.forEach(o => stageNameCounts.set(o.name || '', (stageNameCounts.get(o.name || '') || 0) + 1));
-
-          return (
-            <div key={stage} className="mb-6">
-              {/* Stage Header */}
-              <div
-                onClick={() => {
-                  const next = new Set(collapsedStages);
-                  isCollapsed ? next.delete(stage) : next.add(stage);
-                  setCollapsedStages(next);
-                }}
-                className={`flex items-center justify-between px-4 py-3 ${colors.bg} ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} border ${colors.border} ${isCollapsed ? '' : 'border-b-0'} cursor-pointer select-none transition-all`}
-              >
-                <div className="flex items-center gap-2">
-                  {isCollapsed ? <ChevronRight className={`h-4 w-4 ${colors.text}`} /> : <ChevronDown className={`h-4 w-4 ${colors.text}`} />}
-                  <h4 className={`font-semibold ${colors.text}`}>{STAGE_LABELS[stage]}</h4>
-                  <Badge variant="secondary" className="text-xs font-medium">{stageOpps.length}</Badge>
-                </div>
-                {stageValue > 0 && (
-                  <span className="text-sm font-medium text-gray-600">
-                    ${stageValue.toLocaleString()}
-                  </span>
-                )}
-              </div>
-
-              {!isCollapsed && (
-                <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50/50">
-                        {/* Path / Temp / BAMFAM columns removed 2026-05-13
-                            (manager wanted a cleaner pipeline table).
-                            Underlying fields still live on the opportunity
-                            row — BAMFAM warnings remain in the slide-over
-                            and Actions tab; temperature still drives the
-                            sort options. Just not surfaced as columns. */}
-                        <TableHead className="w-10"></TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="w-[180px]">POC</TableHead>
-                        <TableHead className="w-[70px]">Bucket</TableHead>
-                        <TableHead className="w-[110px]">Value</TableHead>
-                        <TableHead className="w-[100px]">Owner</TableHead>
-                        <TableHead className="w-[100px]">TG Handle</TableHead>
-                        {/* Source surfaced across every stage 2026-05-14 —
-                            previously only the Outreach (cold_dm) table
-                            showed it. Useful in Warm/Pipeline/Closed too
-                            so it's clear where each deal originated. */}
-                        <TableHead className="w-[100px]">Source</TableHead>
-                        {stage === 'cold_dm' && <TableHead className="w-[80px]">Bumps</TableHead>}
-                        {stage === 'warm' && <TableHead className="w-[90px]">Type</TableHead>}
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {sortedStageOpps.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={10} className="text-center text-sm text-gray-400 py-8">
-                              No opportunities in this stage
-                            </TableCell>
-                          </TableRow>
-                        ) : sortedStageOpps.map((opp, index) => {
-                          const prevName = index > 0 ? sortedStageOpps[index - 1].name : null;
-                          const nextName = index < sortedStageOpps.length - 1 ? sortedStageOpps[index + 1].name : null;
-                          const isFirstInGroup = opp.name !== prevName;
-                          const isLastInGroup = opp.name !== nextName;
-                          const groupCount = stageNameCounts.get(opp.name || '') || 1;
-                          return (
-                          <TableRow
-                            key={opp.id}
-                            className={`group hover:bg-gray-50 cursor-pointer ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
-                            onClick={() => openSlideOver(opp)}
-                          >
-                              <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
-                                {editingCell?.id === opp.id && editingCell.field === 'name' ? (
-                                  <Input
-                                    value={editingValue}
-                                    onChange={e => setEditingValue(e.target.value)}
-                                    onBlur={() => handleInlineEdit(opp.id, 'name', editingValue)}
-                                    onKeyDown={e => { if (e.key === 'Enter') handleInlineEdit(opp.id, 'name', editingValue); if (e.key === 'Escape') setEditingCell(null); }}
-                                    className="h-8 text-sm font-medium focus-brand"
-                                    autoFocus
-                                    onClick={e => e.stopPropagation()}
-                                  />
-                                ) : isFirstInGroup ? (
-                                  <div
-                                    onClick={e => { e.stopPropagation(); setEditingCell({ id: opp.id, field: 'name' }); setEditingValue(opp.name); }}
-                                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 whitespace-nowrap overflow-hidden"
-                                  >
-                                    <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                                    <span className="font-medium truncate">{opp.name}</span>
-                                    {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
-                                    {groupCount > 1 && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
-                                    )}
-                                    {/* Add-another-POC affordance — same as
-                                        the Outreach and Orbit tables. */}
-                                    <button
-                                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
-                                      title="Add another POC for this project"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        setForm({
-                                          name: opp.name,
-                                          stage: 'cold_dm' as OpportunityStage,
-                                          dm_account: opp.dm_account,
-                                          bucket: opp.bucket || undefined,
-                                          source: opp.source || undefined,
-                                          owner_id: opp.owner_id || undefined,
-                                          co_owner_ids: opp.co_owner_ids || undefined,
-                                          referrer: opp.referrer || undefined,
-                                          affiliate_id: opp.affiliate_id || undefined,
-                                          twitter_handle: opp.twitter_handle || undefined,
-                                        });
-                                        setIsCreateOpen(true);
-                                      }}
-                                    >
-                                      <UserPlus className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="pl-8 text-gray-300 text-xs">└</div>
-                                )}
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap max-w-[180px] overflow-hidden">
-                                {renderPocCell(opp, 'max-w-[120px]')}
-                              </TableCell>
-                              <TableCell>
-                                {opp.bucket && (
-                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${BUCKET_COLORS[opp.bucket].bg} ${BUCKET_COLORS[opp.bucket].text}`}>
-                                    {opp.bucket}
-                                  </span>
-                                )}
-                              </TableCell>
-                              {/* Path (dm_account) + Temp (temperature_score) columns
-                                  removed from the pipeline table 2026-05-13. */}
-                              <TableCell>
-                                {editingCell?.id === opp.id && editingCell.field === 'deal_value' ? (
-                                  <Input
-                                    type="number"
-                                    value={editingValue}
-                                    onChange={e => setEditingValue(e.target.value)}
-                                    onBlur={() => handleInlineEdit(opp.id, 'deal_value', editingValue)}
-                                    onKeyDown={e => { if (e.key === 'Enter') handleInlineEdit(opp.id, 'deal_value', editingValue); if (e.key === 'Escape') setEditingCell(null); }}
-                                    className="h-8 text-sm text-right focus-brand"
-                                    autoFocus
-                                    onClick={e => e.stopPropagation()}
-                                  />
-                                ) : (
-                                  <div
-                                    onClick={e => { e.stopPropagation(); setEditingCell({ id: opp.id, field: 'deal_value' }); setEditingValue(String(opp.deal_value || '')); }}
-                                    className="cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 min-h-[28px] flex items-center"
-                                  >
-                                    {opp.deal_value ? (
-                                      <span className="font-semibold text-emerald-600">${opp.deal_value.toLocaleString()}</span>
-                                    ) : (
-                                      <span className="text-gray-400">-</span>
-                                    )}
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell>{renderOwnerCell(opp)}</TableCell>
-                              <TableCell className="text-gray-500">{opp.tg_handle || '—'}</TableCell>
-                              <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
-                              {stage === 'cold_dm' && (
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-sm">{opp.bump_number}/4</span>
-                                    <div className="flex gap-0.5">
-                                      {[1, 2, 3, 4].map(i => (
-                                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= opp.bump_number ? 'bg-sky-500' : 'bg-gray-200'}`} />
-                                      ))}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                              )}
-                              {stage === 'warm' && (
-                                <TableCell>
-                                  {opp.warm_sub_state ? (
-                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${opp.warm_sub_state === 'interested' ? 'border-emerald-300 text-emerald-600 bg-emerald-50' : 'border-gray-300 text-gray-500 bg-gray-50'}`}>
-                                      {opp.warm_sub_state === 'interested' ? 'Interested' : 'Silent'}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-gray-400 text-xs">—</span>
-                                  )}
-                                </TableCell>
-                              )}
-                              {/* BAMFAM column removed from the pipeline table
-                                  2026-05-13. The flag is still computed via
-                                  isBAMFAM() and surfaced in the slide-over
-                                  + Actions tab. */}
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48 z-[80]">
-                                    <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(opp); }}>
-                                      <Edit className="h-4 w-4 mr-2" /> Edit
-                                    </DropdownMenuItem>
-                                    {opp.stage === 'cold_dm' && (
-                                      <DropdownMenuItem onClick={e => { e.stopPropagation(); handleRecordBump(opp.id); }}>
-                                        <Zap className="h-4 w-4 mr-2" /> Record Bump
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={e => { e.stopPropagation(); handleStageChange(opp.id, 'orbit', opp.stage); }} className="text-orange-600">
-                                      <RotateCcw className="h-4 w-4 mr-2" /> Move to Orbit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
-                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                          </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <DragOverlay>
-          {activeOpportunity ? (
-            <div className="bg-white border border-gray-300 shadow-lg rounded px-4 py-2 flex items-center gap-3">
-              <GripVertical className="h-4 w-4 text-gray-400" />
-              <Building2 className="h-4 w-4 text-gray-400" />
-              <span className="font-medium">{activeOpportunity.name}</span>
-              <Badge className={`text-xs ${STAGE_COLORS[activeOpportunity.stage as SalesPipelineStage]?.bg || ''} ${STAGE_COLORS[activeOpportunity.stage as SalesPipelineStage]?.text || ''}`}>
-                {STAGE_LABELS[activeOpportunity.stage as SalesPipelineStage] || activeOpportunity.stage}
-              </Badge>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-    </div>
-  );
-
-  // ============================================
-  // RENDER: Outreach Tab
-  // ============================================
+  // Cell renderers (`renderOwnerCell`, `renderPocCell`,
+  // `renderProjectNameSuffix`) + `cleanPocHandle` + `linkifyText` +
+  // `activityIcon` + `getCoOwnerNames` all moved out 2026-06-03:
+  //
+  //   - <OwnerCell /> + <PocCell /> + <ProjectNameSuffix /> are
+  //     standalone components in components/crm/sales-pipeline/cells/
+  //     and components/crm/sales-pipeline/ProjectNameSuffix.tsx
+  //   - cleanPocHandle hoisted to lib/salesPipelineHelpers.ts
+  //   - linkifyText + activityIcon were unused here (slide-over has
+  //     its own local copies)
 
   const outreachTotalPages = Math.ceil(outreachTotal / OUTREACH_PAGE_SIZE);
   const outreachStart = (outreachPage - 1) * OUTREACH_PAGE_SIZE + 1;
   const outreachEnd = Math.min(outreachPage * OUTREACH_PAGE_SIZE, outreachTotal);
 
-  const handleOutreachSearch = (value: string) => {
-    if (outreachSearchTimeout.current) clearTimeout(outreachSearchTimeout.current);
-    outreachSearchTimeout.current = setTimeout(() => {
-      setOutreachFilters(prev => ({ ...prev, searchTerm: value }));
-      setOutreachPage(1);
-      setSelectedOutreach([]);
-    }, 400);
-  };
+  // `handleOutreachSearch` removed 2026-06-03 — was the debounced
+  // setter for the per-tab Outreach search input, which got dropped
+  // in the unified-search migration. `overallSearch` now drives
+  // outreachFilters.searchTerm via the broadcast effect above.
 
   const handleBulkBump = async () => {
     if (selectedOutreach.length === 0 || isBulkBumping) return;
@@ -3292,4125 +2494,180 @@ export default function SalesPipelinePage() {
   // useEffect), so a second search input here would be a duplicate.
   // The standalone Outreach tab doesn't have the unified search, so
   // it keeps its own search bar (default).
-  const renderOutreachTab = (hideSearch: boolean = false) => (
-    <div className="pb-8">
-      {/* Personal metrics strip — shows the current user's last-30-day
-          outreach scorecard above their work surface. Self-feedback loop
-          while they're actually working. Manager-style aggregate view
-          lives on the Metrics tab. */}
-      {user?.id && (() => {
-        const personal = computeOutreachMetrics(user.id, 30);
-        const items = [
-          { label: 'Touch 1s', value: personal.touch1s },
-          { label: 'Replies', value: personal.replies },
-          { label: 'Reply %', value: `${(personal.replyRate * 100).toFixed(0)}%`, tone: personal.replyRate >= 0.2 ? 'good' as const : 'neutral' as const },
-          { label: 'Qualified', value: personal.qualified },
-          { label: 'Booked', value: personal.callsBooked },
-          { label: 'Held', value: personal.callsHeld, tone: 'good' as const },
-          { label: 'No-show', value: personal.noShows, tone: personal.noShows > 0 ? 'bad' as const : 'neutral' as const },
-        ];
-        return (
-          <div className="mb-4 bg-gradient-to-r from-sky-50 to-white border border-sky-100 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">My outreach · last 30 days</span>
-              <button
-                onClick={() => {
-                  // [Fix May 2026] Setting topSectionTab='metrics' alone
-                  // did nothing visible when the analytics panel was
-                  // collapsed (the default) — the Metrics TabsContent
-                  // lives inside `{showAnalytics && (...)}` so the
-                  // whole panel was hidden. Now we also force the
-                  // panel open and persist the choice so it stays open
-                  // on subsequent visits (matching the toggle button's
-                  // localStorage behavior), then scroll the panel into
-                  // view rather than the page top — the analytics panel
-                  // sits between PageHeader and the tab strip and
-                  // scroll-to-top would land above it on tall headers.
-                  setTopSectionTab('metrics');
-                  setShowAnalytics(true);
-                  if (typeof window !== 'undefined') {
-                    try { window.localStorage.setItem('sp_showAnalytics', '1'); } catch {}
-                    // requestAnimationFrame so the panel has rendered
-                    // before we try to scroll to it.
-                    requestAnimationFrame(() => {
-                      const el = document.getElementById('sp-analytics-panel');
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      else window.scrollTo({ top: 0, behavior: 'smooth' });
-                    });
-                  }
-                }}
-                className="text-xs text-sky-700 hover:underline"
-              >
-                View team metrics →
-              </button>
-            </div>
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-              {items.map(it => (
-                <div key={it.label} className="text-center">
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider">{it.label}</div>
-                  <div className={`text-lg font-bold tabular-nums ${
-                    it.tone === 'good' ? 'text-emerald-700' :
-                    it.tone === 'bad' ? 'text-rose-600' :
-                    'text-gray-900'
-                  }`}>{it.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Owner sub-tabs */}
-      <div className="flex items-center gap-1 mb-4">
-        <button
-          onClick={() => { setOutreachFilters(prev => ({ ...prev, owner_id: 'mine' })); setOutreachPage(1); setSelectedOutreach([]); }}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            outreachFilters.owner_id === 'mine'
-              ? 'bg-sky-100 text-sky-700 border border-sky-200'
-              : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-          }`}
-        >
-          My Outreach
-        </button>
-        <button
-          onClick={() => { setOutreachFilters(prev => ({ ...prev, owner_id: undefined })); setOutreachPage(1); setSelectedOutreach([]); }}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            !outreachFilters.owner_id
-              ? 'bg-sky-100 text-sky-700 border border-sky-200'
-              : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-          }`}
-        >
-          All Owners
-          <span className="ml-1.5 text-[10px] font-semibold opacity-70">{outreachAllTotal}</span>
-        </button>
-        {activeUsers.filter(u => u.id !== user?.id).map(u => (
-          <button
-            key={u.id}
-            onClick={() => { setOutreachFilters(prev => ({ ...prev, owner_id: u.id })); setOutreachPage(1); setSelectedOutreach([]); }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              outreachFilters.owner_id === u.id
-                ? 'bg-sky-100 text-sky-700 border border-sky-200'
-                : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-            }`}
-          >
-            {u.name || u.email}
-          </button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        {!hideSearch && (
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search cold DMs..."
-              defaultValue={outreachFilters.searchTerm}
-              onChange={e => handleOutreachSearch(e.target.value)}
-              className="pl-9 h-9 text-sm focus-brand"
-            />
-          </div>
-        )}
-        <Select
-          value={outreachFilters.dm_account || 'all'}
-          onValueChange={v => { setOutreachFilters(prev => ({ ...prev, dm_account: v === 'all' ? undefined : v as DmAccount })); setOutreachPage(1); setSelectedOutreach([]); }}
-        >
-          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Paths</SelectItem>
-            <SelectItem value="closer">Closer</SelectItem>
-            <SelectItem value="sdr">SDR</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={outreachFilters.bucket || 'all'}
-          onValueChange={v => { setOutreachFilters(prev => ({ ...prev, bucket: v === 'all' ? undefined : v as Bucket })); setOutreachPage(1); setSelectedOutreach([]); }}
-        >
-          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Buckets</SelectItem>
-            <SelectItem value="A">Bucket A</SelectItem>
-            <SelectItem value="B">Bucket B</SelectItem>
-            <SelectItem value="C">Bucket C</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={outreachFilters.bumpRange || 'all'}
-          onValueChange={v => { setOutreachFilters(prev => ({ ...prev, bumpRange: v === 'all' ? undefined : v as 'none' | '1-2' | '3+' })); setOutreachPage(1); setSelectedOutreach([]); }}
-        >
-          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Bump Status</SelectItem>
-            <SelectItem value="none">No Bumps</SelectItem>
-            <SelectItem value="1-2">1-2 Bumps</SelectItem>
-            <SelectItem value="3+">3+ Bumps</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Bulk action toolbar — sticky so it stays visible while scrolling.
-          `top-0` pins it to the viewport (or the nearest scrolling ancestor);
-          z-30 keeps it above the table header but below dialogs/dropdowns. */}
-      {selectedOutreach.length > 0 && (
-        <div className="sticky top-0 z-30 flex items-center gap-3 mb-3 px-4 py-2.5 bg-sky-50 border border-sky-200 rounded-lg shadow-sm">
-          <span className="text-sm font-medium text-sky-800">{selectedOutreach.length} selected</span>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectAllOnPage}>
-            Select All on Page
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedOutreach([])}>
-            Deselect All
-          </Button>
-          <div className="flex-1" />
-          <Button
-            size="sm"
-            className="h-7 text-xs bg-sky-600 hover:bg-sky-700 text-white"
-            onClick={handleBulkBump}
-            disabled={isBulkBumping}
-          >
-            {isBulkBumping ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
-            Bump All
-          </Button>
-          <Button
-            size="sm"
-            className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white"
-            onClick={handleBulkMoveToWarm}
-            disabled={isBulkMoving}
-          >
-            {isBulkMoving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
-            Move to Warm
-          </Button>
-          {/* Bulk owner reassign — searchable list of teammates with TG ids
-              first (more useful), then everyone else. "Unassigned" clears
-              the owner. */}
-          <Popover open={bulkOwnerOpen} onOpenChange={setBulkOwnerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                disabled={isBulkReassigning}
-              >
-                {isBulkReassigning
-                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  : <Users className="h-3 w-3 mr-1" />}
-                Reassign
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Reassign to..." />
-                <CommandList>
-                  <CommandEmpty>No matches.</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      value="__unassigned__"
-                      onSelect={() => handleBulkReassignOwner(null, 'Unassigned')}
-                    >
-                      <span className="text-gray-500 italic">Unassigned</span>
-                    </CommandItem>
-                    {activeUsers.map(u => (
-                      <CommandItem
-                        key={u.id}
-                        value={`${u.name || ''} ${u.email}`}
-                        onSelect={() => handleBulkReassignOwner(u.id, u.name || u.email)}
-                      >
-                        <div className="flex flex-col">
-                          <span>{u.name || u.email}</span>
-                          {u.name && <span className="text-[10px] text-gray-400">{u.email}</span>}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
-            onClick={handleBulkDelete}
-          >
-            <Trash2 className="h-3 w-3 mr-1" /> Delete
-          </Button>
-        </div>
-      )}
-
-      {/* Stage Header — matching pipeline table section headers */}
-      <div className={`flex items-center justify-between px-4 py-3 bg-sky-50 rounded-t-lg border border-sky-200 border-b-0`}>
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-sky-700" />
-          <h4 className="font-semibold text-sky-700">Cold DM</h4>
-          <Badge variant="secondary" className="text-xs font-medium">{outreachTotal}</Badge>
-        </div>
-        {outreachTotalPages > 1 && (
-          <span className="text-sm text-gray-500">
-            Page {outreachPage} of {outreachTotalPages}
-          </span>
-        )}
-      </div>
-
-      {/* Table */}
-      {outreachLoading ? (
-        <div className="bg-white rounded-b-lg border border-gray-200 border-t-0 p-4 space-y-2">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50/50">
-                <TableHead className="w-10"></TableHead>
-                <TableHead className="min-w-[160px]">Name</TableHead>
-                <TableHead className="w-[200px] max-w-[200px]">POC</TableHead>
-                <TableHead className="w-[150px]">TG Handle</TableHead>
-                <TableHead className="w-[80px]">Source</TableHead>
-                <TableHead className="w-[100px]">Owner</TableHead>
-                <TableHead className="w-[90px]">Created</TableHead>
-                {/* Combined "Last engaged · next move" — merges the old
-                    Bumps + Last Bump columns and adds the action hint
-                    from getNextAction so users have engagement history
-                    AND the recommended next move in one place. */}
-                <TableHead className="w-[260px]">Last engaged · next move</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {outreachOpps.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-sm text-gray-400 py-8">
-                    No opportunities in this stage
-                  </TableCell>
-                </TableRow>
-              ) : sortedOutreach.map((opp, index) => {
-                const isChecked = selectedOutreach.includes(opp.id);
-                const rowNum = outreachStart + index;
-                const prevName = index > 0 ? sortedOutreach[index - 1].name : null;
-                const isFirstInGroup = opp.name !== prevName;
-                const groupCount = outreachNameCounts.get(opp.name || '') || 1;
-                const nextName = index < sortedOutreach.length - 1 ? sortedOutreach[index + 1].name : null;
-                const isLastInGroup = opp.name !== nextName;
-                return (
-                  <TableRow
-                    key={opp.id}
-                    className={`group hover:bg-gray-50 cursor-pointer ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
-                    onClick={() => openSlideOver(opp)}
-                  >
-                    <TableCell className="text-gray-500 text-sm w-10" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-center">
-                        {isChecked ? (
-                          <Checkbox
-                            checked={true}
-                            onCheckedChange={() => toggleOutreachSelect(opp.id)}
-                          />
-                        ) : (
-                          <>
-                            <span className="block group-hover:hidden text-xs">{rowNum}</span>
-                            <span className="hidden group-hover:flex">
-                              <Checkbox
-                                checked={false}
-                                onCheckedChange={() => toggleOutreachSelect(opp.id)}
-                              />
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className={`${!isFirstInGroup ? 'pt-0' : ''}`}>
-                      {isFirstInGroup ? (
-                        <div className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 whitespace-nowrap overflow-hidden">
-                          <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                          <span className="font-medium truncate">{opp.name}</span>
-                          {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
-                          {groupCount > 1 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
-                          )}
-                          {/* Sits inline right next to the Twitter +
-                              from renderProjectNameSuffix instead of
-                              floating at the far-right of the cell —
-                              the two affordances ("add twitter handle"
-                              and "add another POC") are related, so
-                              grouping them reduces eye travel. Removed
-                              the ml-auto that previously pushed this
-                              all the way right. */}
-                          <button
-                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
-                            title="Add another POC for this project"
-                            onClick={e => {
-                              e.stopPropagation();
-                              setForm({
-                                name: opp.name,
-                                stage: 'cold_dm' as OpportunityStage,
-                                dm_account: opp.dm_account,
-                                bucket: opp.bucket || undefined,
-                                source: opp.source || undefined,
-                                owner_id: opp.owner_id || undefined,
-                                co_owner_ids: opp.co_owner_ids || undefined,
-                                referrer: opp.referrer || undefined,
-                                affiliate_id: opp.affiliate_id || undefined,
-                                twitter_handle: opp.twitter_handle || undefined,
-                              });
-                              setIsCreateOpen(true);
-                            }}
-                          >
-                            {/* UserPlus instead of Plus so the icon matches
-                                the semantics — this adds another contact to
-                                an existing project. The Twitter button next
-                                to it uses Plus (it adds an attribute, not
-                                another row). */}
-                            <UserPlus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="pl-8 text-gray-300 text-xs">└</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap max-w-[200px] overflow-hidden">
-                      {renderPocCell(opp, 'max-w-[150px]')}
-                    </TableCell>
-                    {/* Old Bumps cell removed 2026-05-14 — merged into the
-                        new "Last engaged · next move" cell at the right. */}
-                    <TableCell className="text-gray-500 whitespace-nowrap">{opp.tg_handle || '—'}</TableCell>
-                    <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
-                    <TableCell>{renderOwnerCell(opp)}</TableCell>
-                    <TableCell className="text-gray-500 text-xs">
-                      {opp.created_at ? format(new Date(opp.created_at), 'MMM d') : '—'}
-                    </TableCell>
-                    {/* Combined "Last engaged · next move" cell.
-                        Top row: bump dots + count, last-engagement timestamp,
-                                 and the Zap button to record another bump.
-                        Bottom row: the recommended next move from
-                                 getNextAction (same logic the Actions tab
-                                 uses), color-coded by priority.
-                        Stops click propagation so the inline buttons don't
-                        bubble into openSlideOver. */}
-                    <TableCell className="text-xs" onClick={e => e.stopPropagation()}>
-                      {(() => {
-                        const action = getNextAction(opp);
-                        const lastEngaged = opp.last_bump_date || opp.last_contacted_at;
-                        const lastEngagedLabel = lastEngaged
-                          ? formatDistanceToNow(new Date(lastEngaged), { addSuffix: true })
-                          : 'Not engaged yet';
-                        // Days-since-last for amber-warning at 3+ days.
-                        const daysSinceLast = lastEngaged
-                          ? Math.floor((Date.now() - new Date(lastEngaged).getTime()) / 86_400_000)
-                          : null;
-                        const stale = daysSinceLast !== null && daysSinceLast >= 3;
-                        const priorityColor =
-                          action.priority === 'urgent' ? 'text-rose-600'
-                          : action.priority === 'high' ? 'text-amber-600'
-                          : action.priority === 'medium' ? 'text-sky-700'
-                          : 'text-gray-500';
-                        return (
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            {/* Top row */}
-                            <div className="flex items-center gap-1.5 whitespace-nowrap">
-                              <span className="text-gray-700 tabular-nums">{opp.bump_number}/4</span>
-                              <div className="flex gap-0.5">
-                                {[1, 2, 3, 4].map(i => (
-                                  <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= opp.bump_number ? 'bg-sky-500' : 'bg-gray-200'}`} />
-                                ))}
-                              </div>
-                              <span className={`text-[11px] ${stale ? 'text-amber-600 font-medium' : 'text-gray-500'}`}>
-                                · {lastEngagedLabel}
-                              </span>
-                              <div className="relative group/bump inline-flex ml-auto">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-1.5 text-sky-600 hover:text-sky-700 hover:bg-sky-50"
-                                  onClick={() => handleRecordBump(opp.id)}
-                                  disabled={isBumping}
-                                >
-                                  <Zap className="h-3 w-3" />
-                                </Button>
-                                <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 text-white text-[11px] rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/bump:opacity-100 transition-opacity z-50 bg-brand">
-                                  Record bump #{opp.bump_number + 1}
-                                </div>
-                              </div>
-                            </div>
-                            {/* Next-move hint (from Actions tab logic) */}
-                            <div className={`text-[11px] leading-tight ${priorityColor}`}>
-                              <span className="font-medium">{action.label}</span>
-                              {action.hint && <span className="text-gray-500"> · {action.hint}</span>}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 z-[80]">
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); handleRecordBump(opp.id); }}>
-                            <Zap className="h-4 w-4 mr-2" /> Record Bump
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); handleStageChange(opp.id, 'warm', opp.stage); }}>
-                            <ArrowRight className="h-4 w-4 mr-2" /> Move to Warm
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(opp); }}>
-                            <Edit className="h-4 w-4 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {outreachTotalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <div className="text-sm text-gray-600">
-            Showing {outreachStart}-{outreachEnd} of {outreachTotal}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setOutreachPage(p => Math.max(1, p - 1)); setSelectedOutreach([]); }}
-              disabled={outreachPage === 1}
-              className="flex items-center gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, outreachTotalPages) }, (_, i) => {
-                let pageNum: number;
-                if (outreachTotalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (outreachPage <= 3) {
-                  pageNum = i + 1;
-                } else if (outreachPage >= outreachTotalPages - 2) {
-                  pageNum = outreachTotalPages - 4 + i;
-                } else {
-                  pageNum = outreachPage - 2 + i;
-                }
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={outreachPage === pageNum ? 'brand' : 'outline'}
-                    size="sm"
-                    onClick={() => { setOutreachPage(pageNum); setSelectedOutreach([]); }}
-                    className="w-8 h-8 p-0"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setOutreachPage(p => Math.min(outreachTotalPages, p + 1)); setSelectedOutreach([]); }}
-              disabled={outreachPage === outreachTotalPages}
-              className="flex items-center gap-1"
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   // ============================================
   // RENDER: Actions Tab
   // ============================================
 
-  const renderActionsTab = () => {
-    const getPriorityIcon = (priority: ActionPriority) => {
-      switch (priority) {
-        case 'urgent': return <AlertTriangle className="h-3.5 w-3.5 text-rose-500" />;
-        case 'high': return <Zap className="h-3.5 w-3.5 text-amber-500" />;
-        case 'medium': return <Clock className="h-3.5 w-3.5 text-blue-500" />;
-        case 'low': return <Clock className="h-3.5 w-3.5 text-gray-400" />;
-        default: return null;
-      }
-    };
-
-    const getButtonVariant = (priority: ActionPriority): 'destructive' | 'default' | 'outline' => {
-      if (priority === 'urgent') return 'destructive';
-      if (priority === 'high') return 'default';
-      return 'outline';
-    };
-
-    const getTimingInfo = (opp: SalesPipelineOpportunity): { text: string; color: string } => {
-      const daysAgo = (date: string | null) => {
-        if (!date) return null;
-        return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
-      };
-      const daysUntil = (date: string | null) => {
-        if (!date) return null;
-        return Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      };
-
-      // Cold DM — show last bump timing
-      if (opp.stage === 'cold_dm') {
-        if (opp.bump_number === 0) return { text: 'Not bumped', color: 'text-gray-500' };
-        const d = daysAgo(opp.last_bump_date);
-        if (d === null) return { text: `${opp.bump_number}/4 bumps`, color: 'text-gray-500' };
-        return {
-          text: `Bumped ${d}d ago`,
-          color: d >= 3 ? 'text-amber-500 font-medium' : 'text-gray-500',
-        };
-      }
-
-      // Stages with next_meeting — show meeting timing
-      if (opp.next_meeting_at) {
-        const d = daysUntil(opp.next_meeting_at);
-        if (d !== null) {
-          if (d < 0) return { text: `Meeting ${Math.abs(d)}d ago`, color: 'text-rose-500 font-medium' };
-          if (d === 0) return { text: 'Meeting today', color: 'text-blue-600 font-medium' };
-          return { text: `Meeting in ${d}d`, color: d <= 2 ? 'text-blue-600 font-medium' : 'text-gray-500' };
-        }
-      }
-
-      // Proposal sent — show how long ago
-      if (opp.stage === 'proposal_call' || (opp.stage === 'discovery_done' && opp.proposal_sent_at)) {
-        const d = daysAgo(opp.proposal_sent_at);
-        if (d !== null) return {
-          text: `Sent ${d}d ago`,
-          color: d >= 5 ? 'text-amber-500 font-medium' : 'text-gray-500',
-        };
-      }
-
-      // Orbit — show days remaining until follow-up is due
-      if (opp.stage === 'orbit') {
-        const d = daysAgo(opp.updated_at);
-        if (d !== null) {
-          const threshold = opp.orbit_followup_days || 90;
-          const remaining = threshold - d;
-          if (remaining <= 0) return { text: `Overdue ${Math.abs(remaining)}d`, color: 'text-amber-500 font-medium' };
-          return { text: `${remaining}d left`, color: remaining <= 7 ? 'text-amber-500' : 'text-gray-500' };
-        }
-      }
-
-      // Default — days since last contact
-      const lastDate = opp.last_contacted_at || opp.last_bump_date || opp.created_at;
-      const d = daysAgo(lastDate);
-      if (d === null) return { text: '—', color: 'text-gray-400' };
-      return {
-        text: `${d}d silent`,
-        color: d >= 7 ? 'text-rose-500 font-medium' : d >= 3 ? 'text-amber-500' : 'text-gray-500',
-      };
-    };
-
-    const currentItems = displayedActions;
-    const emptyLabel = alertCardFilter !== 'none' ? 'No matching opportunities found' :
-      actionPhaseFilter === 'outreach' ? 'No outreach actions needed' :
-      actionPhaseFilter === 'closing' ? 'No closing actions needed' :
-      actionPhaseFilter === 'orbit' ? 'No orbit actions needed' :
-      actionPhaseFilter === 'non_urgent' ? 'No opportunities in waiting state' :
-      'No actions needed right now';
-
-    return (
-      <div className="pb-8">
-        {/* Top row: Owner filter + Phase tabs */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-1">
-            {([
-              { key: 'all' as const, label: 'All Actions' },
-              { key: 'mine' as const, label: 'My Actions' },
-              { key: 'urgent' as const, label: 'Urgent Only' },
-            ]).map(f => (
-              <button
-                key={f.key}
-                onClick={() => { setActionFilter(f.key); setAlertCardFilter('none'); }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  actionFilter === f.key
-                    ? 'bg-sky-100 text-sky-700 border border-sky-200'
-                    : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-            {([
-              { key: 'all' as const, label: 'All', count: allActionItems.length },
-              { key: 'outreach' as const, label: 'Outreach', count: allOutreachCount },
-              { key: 'closing' as const, label: 'Closing', count: allClosingCount },
-              { key: 'orbit' as const, label: 'Orbit', count: allOrbitCount },
-              { key: 'non_urgent' as const, label: 'Waiting', count: allNonUrgentCount },
-            ]).map(p => (
-              <button
-                key={p.key}
-                onClick={() => { setActionPhaseFilter(p.key); setAlertCardFilter('none'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  actionPhaseFilter === p.key
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {p.key === 'outreach' && <Send className="h-3.5 w-3.5" />}
-                {p.key === 'closing' && <Target className="h-3.5 w-3.5" />}
-                {p.key === 'orbit' && <RotateCcw className="h-3.5 w-3.5" />}
-                {p.key === 'all' && <Zap className="h-3.5 w-3.5" />}
-                {p.key === 'non_urgent' && <Clock className="h-3.5 w-3.5" />}
-                {p.label}
-                <span className={`ml-0.5 text-[10px] px-1.5 py-0 rounded-full ${
-                  actionPhaseFilter === p.key ? 'bg-gray-100 text-gray-700' : 'bg-transparent text-gray-400'
-                }`}>{p.count}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Search bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search actions..."
-            defaultValue={actionsSearch}
-            onChange={e => {
-              const v = e.target.value;
-              if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-              searchDebounceRef.current = setTimeout(() => setActionsSearch(v), 300);
-            }}
-            className="pl-9 h-9 text-sm focus-brand max-w-xs"
-          />
-        </div>
-
-        {/* Alert Card Filter Banner */}
-        {alertCardFilter !== 'none' && (
-          <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg mb-3 ${
-            alertCardFilter === 'booking_needed' ? 'bg-rose-50 border border-rose-200' :
-            alertCardFilter === 'overdue' ? 'bg-orange-50 border border-orange-200' :
-            alertCardFilter === 'stale' ? 'bg-amber-50 border border-amber-200' :
-            alertCardFilter === 'at_risk' ? 'bg-rose-50 border border-rose-200' :
-            'bg-blue-50 border border-blue-200'
-          }`}>
-            <div className="flex items-center gap-2">
-              {alertCardFilter === 'booking_needed' && <Calendar className="h-4 w-4 text-rose-500" />}
-              {alertCardFilter === 'overdue' && <Clock className="h-4 w-4 text-orange-500" />}
-              {alertCardFilter === 'stale' && <RotateCcw className="h-4 w-4 text-amber-500" />}
-              {alertCardFilter === 'at_risk' && <TrendingUp className="h-4 w-4 text-rose-500" />}
-              {alertCardFilter === 'meetings' && <Calendar className="h-4 w-4 text-blue-500" />}
-              <span className={`text-sm font-medium ${
-                alertCardFilter === 'booking_needed' ? 'text-rose-700' :
-                alertCardFilter === 'overdue' ? 'text-orange-700' :
-                alertCardFilter === 'stale' ? 'text-amber-700' :
-                alertCardFilter === 'at_risk' ? 'text-rose-700' :
-                'text-blue-700'
-              }`}>
-                Showing: {
-                  alertCardFilter === 'booking_needed' ? 'Booking Needed' :
-                  alertCardFilter === 'overdue' ? 'Overdue Follow-ups' :
-                  alertCardFilter === 'stale' ? 'Stale Deals (7d+)' :
-                  alertCardFilter === 'at_risk' ? 'At Risk Deals' :
-                  'Upcoming Meetings'
-                }
-              </span>
-              <Badge variant="secondary" className="text-xs">{alertCardOppIds?.size ?? 0}</Badge>
-            </div>
-            <button
-              onClick={() => setAlertCardFilter('none')}
-              className={`p-1 rounded-md transition-colors ${
-                alertCardFilter === 'booking_needed' ? 'hover:bg-rose-100 text-rose-400' :
-                alertCardFilter === 'overdue' ? 'hover:bg-orange-100 text-orange-400' :
-                alertCardFilter === 'stale' ? 'hover:bg-amber-100 text-amber-400' :
-                alertCardFilter === 'at_risk' ? 'hover:bg-rose-100 text-rose-400' :
-                'hover:bg-blue-100 text-blue-400'
-              }`}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Section Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-violet-50 rounded-t-lg border border-violet-200 border-b-0">
-          <div className="flex items-center gap-2">
-            {actionPhaseFilter === 'outreach' ? <Send className="h-4 w-4 text-violet-700" /> : actionPhaseFilter === 'closing' ? <Target className="h-4 w-4 text-violet-700" /> : actionPhaseFilter === 'orbit' ? <RotateCcw className="h-4 w-4 text-violet-700" /> : actionPhaseFilter === 'non_urgent' ? <Clock className="h-4 w-4 text-violet-700" /> : <Zap className="h-4 w-4 text-violet-700" />}
-            <h4 className="font-semibold text-violet-700">
-              {actionPhaseFilter === 'outreach' ? 'Outreach Actions' : actionPhaseFilter === 'closing' ? 'Closing Actions' : actionPhaseFilter === 'orbit' ? 'Orbit Actions' : actionPhaseFilter === 'non_urgent' ? 'Waiting — Next Steps' : 'All Action Items'}
-            </h4>
-            <Badge variant="secondary" className="text-xs font-medium">{actionPhaseFilter === 'non_urgent' ? allNonUrgentCount : allActionItems.length}</Badge>
-            {actionPhaseFilter === 'outreach' && (
-              <span className="text-[11px] text-violet-500 ml-1">Cold DM, Warm, TG Intro, Booked</span>
-            )}
-            {actionPhaseFilter === 'closing' && (
-              <span className="text-[11px] text-violet-500 ml-1">Discovery Done, Proposal, Contract</span>
-            )}
-            {actionPhaseFilter === 'orbit' && (
-              <span className="text-[11px] text-violet-500 ml-1">Deals in orbit — resurrect or close</span>
-            )}
-            {actionPhaseFilter === 'non_urgent' && (
-              <span className="text-[11px] text-violet-500 ml-1">Opportunities in waiting/cooling period</span>
-            )}
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-600 hover:bg-violet-100 rounded-md transition-colors">
-                <ArrowUpDown className="h-3.5 w-3.5" />
-                Sort: {actionSort === 'priority' ? 'Priority' : actionSort === 'stage' ? 'Stage' : actionSort === 'temperature' ? 'Temp' : actionSort === 'value' ? 'Value' : actionSort === 'newest' ? 'Newest' : actionSort === 'oldest' ? 'Oldest' : actionSort === 'timing' ? 'Timing' : 'Name'}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              {([
-                { key: 'priority' as const, label: 'Priority' },
-                { key: 'stage' as const, label: 'Stage' },
-                { key: 'temperature' as const, label: 'Temperature' },
-                { key: 'value' as const, label: 'Deal Value' },
-                { key: 'name' as const, label: 'Name (A-Z)' },
-                { key: 'timing' as const, label: 'Last Bumped' },
-                { key: 'newest' as const, label: 'Newest First' },
-                { key: 'oldest' as const, label: 'Oldest First' },
-              ]).map(s => (
-                <DropdownMenuItem
-                  key={s.key}
-                  onClick={() => setActionSort(s.key)}
-                  className={actionSort === s.key ? 'bg-violet-50 text-violet-700 font-medium' : ''}
-                >
-                  {s.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50/50">
-                <TableHead>Name</TableHead>
-                <TableHead className="w-[160px]">POC</TableHead>
-                <TableHead className="w-[140px]">Stage</TableHead>
-                <TableHead className="w-[70px]">Bucket</TableHead>
-                {/* [Actions tab consolidation, May 2026] Merged "Next Action"
-                    and "Timing" into one column. They were answering the
-                    same question ("what / when next") and split made both
-                    columns narrow + harder to scan. Now stacked: action
-                    label on top, timing below (red when overdue). */}
-                <TableHead className="w-[280px]">Next Action</TableHead>
-                <TableHead className="w-[90px]">Temp</TableHead>
-                <TableHead className="w-[100px]">Owner</TableHead>
-                <TableHead className="w-[150px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentItems.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
-                    <div className="flex flex-col items-center gap-2 text-gray-400">
-                      <Zap className="h-8 w-8" />
-                      <p className="text-sm font-medium">{emptyLabel}</p>
-                      <p className="text-xs">All caught up — check back later</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : currentItems.map(({ opp, action }, index) => {
-                const timing = getTimingInfo(opp);
-                const stageColors = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
-                // Project-name grouping (mirrors Outreach tab):
-                //   - Show project name + Building icon only on the first
-                //     row of each same-name run.
-                //   - Drop the top border on continuation rows so the group
-                //     reads as one block; add a thicker bottom border on the
-                //     last row of a multi-row group to visually separate.
-                const prevName = index > 0 ? currentItems[index - 1].opp.name : null;
-                const nextName = index < currentItems.length - 1 ? currentItems[index + 1].opp.name : null;
-                const isFirstInGroup = opp.name !== prevName;
-                const isLastInGroup = opp.name !== nextName;
-                const groupCount = actionsNameCounts.get(opp.name || '') || 1;
-                return (
-                  <TableRow
-                    key={opp.id}
-                    className={`group hover:bg-gray-50 cursor-pointer ${action.priority === 'urgent' ? 'bg-rose-50/40' : ''} ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
-                    onClick={() => openSlideOver(opp)}
-                  >
-                    <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
-                      {isFirstInGroup ? (
-                        <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
-                          <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                          <span className="font-medium truncate">{opp.name}</span>
-                          {groupCount > 1 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">
-                              {groupCount} POCs
-                            </span>
-                          )}
-                        </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      {opp.poc_handle ? (
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{opp.poc_platform || 'other'}</Badge>
-                          <span className="text-xs text-gray-600 truncate max-w-[90px]">{cleanPocHandle(opp.poc_handle)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${stageColors.bg} ${stageColors.text} ${stageColors.border}`}>
-                        {STAGE_LABELS[opp.stage as SalesPipelineStage] || opp.stage}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {opp.bucket && (
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${BUCKET_COLORS[opp.bucket].bg} ${BUCKET_COLORS[opp.bucket].text}`}>
-                          {opp.bucket}
-                        </span>
-                      )}
-                    </TableCell>
-                    {/* [Actions tab consolidation, May 2026] Merged cell:
-                        action label on top + timing below (with hint
-                        suppressed since timing is now its own line). */}
-                    <TableCell>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          {getPriorityIcon(action.priority)}
-                          <span className={`text-sm font-medium ${
-                            action.priority === 'urgent' ? 'text-rose-700' :
-                            action.priority === 'high' ? 'text-amber-700' :
-                            'text-gray-600'
-                          }`}>
-                            {action.label}
-                          </span>
-                        </div>
-                        <div className="ml-5 mt-0.5 flex items-center gap-2">
-                          <span className={`text-[11px] ${timing.color}`}>{timing.text}</span>
-                          {action.hint && (
-                            <span className="text-[11px] text-gray-400">· {action.hint}</span>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-rose-400'}`}
-                            style={{ width: `${opp.temperature_score}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-400">{opp.temperature_score}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{renderOwnerCell(opp)}</TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      {/* [Actions consolidation, May 2026] Replaced the
-                          prescriptive '[Primary Action] [Quick Alt] [▼]'
-                          three-button setup with a single 'Set outcome'
-                          dropdown. Per user feedback: in practice the
-                          work (DM sent, call held, etc.) has already
-                          happened elsewhere — they just want to record
-                          the outcome and let stage / bucket / timing
-                          update accordingly, rather than be told what
-                          to do. The dropdown is context-aware: it
-                          surfaces the action engine's primary suggestion
-                          at the top, then every alternative it already
-                          computed for this opp's stage. */}
-                      {(() => {
-                        type Outcome = {
-                          label: string;
-                          actionType: typeof action.actionType;
-                          targetStage?: typeof action.targetStage;
-                          variant: 'default' | 'warn' | 'danger';
-                          isRecommended: boolean;
-                        };
-                        const outcomes: Outcome[] = [
-                          { label: action.label, actionType: action.actionType, targetStage: action.targetStage, variant: 'default', isRecommended: true },
-                          ...action.alternatives.map(alt => ({ label: alt.label, actionType: alt.actionType, targetStage: alt.targetStage, variant: alt.variant, isRecommended: false })),
-                        ];
-                        const isExecuting = executingAction === opp.id;
-                        const handlePick = async (o: Outcome) => {
-                          if (o.label === 'Interested') {
-                            await SalesPipelineService.update(opp.id, { warm_sub_state: 'interested' });
-                            setOpportunities(prev => prev.map(p => p.id === opp.id ? { ...p, warm_sub_state: 'interested' } : p));
-                            return;
-                          }
-                          if (o.isRecommended) {
-                            handleActionExecute(opp.id, action, opp);
-                            return;
-                          }
-                          if (o.actionType === 'stage_change' && o.targetStage) {
-                            handleStageChange(opp.id, o.targetStage, opp.stage);
-                          } else {
-                            openSlideOver(opp, ACTION_GUIDANCE[o.label]);
-                          }
-                        };
-                        return (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs gap-1.5"
-                                disabled={isExecuting}
-                              >
-                                {isExecuting && <Loader2 className="h-3 w-3 animate-spin" />}
-                                Set outcome
-                                <ChevronDown className="h-3 w-3 opacity-60" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-60 z-[80]">
-                              {outcomes.map((o, idx) => (
-                                <DropdownMenuItem
-                                  key={`${o.label}-${idx}`}
-                                  className={
-                                    o.variant === 'danger' ? 'text-rose-600' :
-                                    o.variant === 'warn' ? 'text-orange-600' :
-                                    o.isRecommended ? 'text-brand font-medium' : ''
-                                  }
-                                  onClick={() => handlePick(o)}
-                                >
-                                  {o.variant === 'danger' ? <X className="h-3.5 w-3.5 mr-2" /> :
-                                   o.variant === 'warn' ? <RotateCcw className="h-3.5 w-3.5 mr-2" /> :
-                                   o.isRecommended ? <Zap className="h-3.5 w-3.5 mr-2" /> :
-                                   <ArrowRight className="h-3.5 w-3.5 mr-2" />}
-                                  <span className="flex-1 truncate">{o.label}</span>
-                                  {o.isRecommended && (
-                                    <span className="ml-2 text-[10px] text-brand opacity-70">suggested</span>
-                                  )}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        );
-                      })()}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  };
 
   // ============================================
   // RENDER: Orbit Tab
   // ============================================
 
-  const renderOrbitTab = () => (
-    <div className="pb-8">
-      {/* Sticky bulk action toolbar — mirrors the Outreach toolbar so users
-          have the same multi-select UX in Orbit. Only renders when at least
-          one row is selected. */}
-      {selectedOrbit.length > 0 && (
-        <div className="sticky top-0 z-30 flex items-center gap-3 mb-3 px-4 py-2.5 bg-orange-50 border border-orange-200 rounded-lg shadow-sm">
-          <span className="text-sm font-medium text-orange-800">{selectedOrbit.length} selected</span>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectAllOrbitVisible}>
-            Select All Visible
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedOrbit([])}>
-            Deselect All
-          </Button>
-          <div className="flex-1" />
-          <Button
-            size="sm"
-            className="h-7 text-xs bg-sky-600 hover:bg-sky-700 text-white"
-            onClick={() => handleOrbitBulkMove('cold_dm')}
-            disabled={isOrbitBulkMoving}
-          >
-            {isOrbitBulkMoving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />}
-            Move to Cold DM
-          </Button>
-          <Button
-            size="sm"
-            className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white"
-            onClick={() => handleOrbitBulkMove('warm')}
-            disabled={isOrbitBulkMoving}
-          >
-            {isOrbitBulkMoving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
-            Move to Pipeline (Warm)
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
-            onClick={handleOrbitBulkDelete}
-          >
-            <Trash2 className="h-3 w-3 mr-1" /> Delete
-          </Button>
-        </div>
-      )}
-      {/* [Orbit split, May 2026] Two-section orbit view per user
-          feedback: cold-DM orbit (never got a response) and engaged
-          orbit (responded at some point, paused later) have totally
-          different follow-up profiles. Combining them was inflating
-          'engaged pipeline' counts with stale cold outreach. We
-          render Engaged first (higher value, deserves attention),
-          then Cold-DM below. Both share the bulk-action toolbar
-          (selectedOrbit) so the user can still multi-select across
-          sections.
-
-          NOTE: the row-rendering body is identical between sections —
-          we accept a `currentSorted` arg into the row map so the
-          project-name grouping (prev/next compare) stays correct
-          within each bucket independently. */}
-      {(() => {
-        const sections: Array<{
-          key: 'engaged' | 'cold_dm';
-          title: string;
-          subtitle: string;
-          opps: SalesPipelineOpportunity[];
-          totalValue: number;
-          headerBg: string;
-          headerBorder: string;
-          headerText: string;
-          iconColor: string;
-        }> = [
-          {
-            key: 'engaged',
-            title: 'Engaged orbit',
-            subtitle: 'Responded or qualified at some point — re-engage with context',
-            opps: sortedEngagedOrbit,
-            totalValue: engagedOrbitTotalValue,
-            headerBg: 'bg-emerald-50',
-            headerBorder: 'border-emerald-200',
-            headerText: 'text-emerald-800',
-            iconColor: 'text-emerald-700',
-          },
-          {
-            key: 'cold_dm',
-            title: 'Cold-DM orbit',
-            subtitle: 'Never responded — low-touch revisit pool',
-            opps: sortedColdDmOrbit,
-            totalValue: coldDmOrbitTotalValue,
-            headerBg: 'bg-sky-50',
-            headerBorder: 'border-sky-200',
-            headerText: 'text-sky-800',
-            iconColor: 'text-sky-700',
-          },
-        ];
-        // If we have neither bucket populated AND we're not still loading
-        // engaged-ids, show the standard empty state once.
-        if (sortedEngagedOrbit.length === 0 && sortedColdDmOrbit.length === 0) {
-          return (
-            <div className="mb-6 bg-white rounded-lg border border-gray-200 p-10 text-center text-sm text-gray-400">
-              No opportunities in orbit.
-            </div>
-          );
-        }
-        return sections.map(section => {
-          const currentSorted = section.opps;
-          const nameCounts = (() => {
-            const counts = new Map<string, number>();
-            currentSorted.forEach(o => counts.set(o.name || '', (counts.get(o.name || '') || 0) + 1));
-            return counts;
-          })();
-          return (
-          <div key={section.key} className="mb-6">
-            <div className={`flex items-center justify-between px-4 py-3 ${section.headerBg} rounded-t-lg border ${section.headerBorder} border-b-0`}>
-              <div className="flex items-center gap-2">
-                <RotateCcw className={`h-4 w-4 ${section.iconColor}`} />
-                <div>
-                  <h4 className={`font-semibold ${section.headerText} leading-tight`}>{section.title}</h4>
-                  <p className="text-[11px] text-gray-500 leading-tight mt-0.5">{section.subtitle}</p>
-                </div>
-                <Badge variant="secondary" className="text-xs font-medium ml-2">{currentSorted.length}</Badge>
-              </div>
-              {section.totalValue > 0 && (
-                <span className="text-sm font-medium text-gray-600">
-                  ${section.totalValue.toLocaleString()}
-                </span>
-              )}
-            </div>
-            <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
-              {currentSorted.length === 0 ? (
-                <div className="text-center text-sm text-gray-400 py-8">
-                  {section.key === 'engaged'
-                    ? 'No engaged opps in orbit — every paused deal hasn\'t responded yet.'
-                    : 'No cold-DM opps in orbit.'}
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50/50">
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="w-[180px]">POC</TableHead>
-                      <TableHead className="w-[70px]">Bucket</TableHead>
-                      <TableHead className="w-[110px]">Value</TableHead>
-                      <TableHead className="w-[100px]">Owner</TableHead>
-                      <TableHead className="w-[100px]">Source</TableHead>
-                      <TableHead className="w-[140px]">Reason</TableHead>
-                      <TableHead className="w-[120px]">Next check-in</TableHead>
-                      <TableHead className="w-[120px]">Time in Orbit</TableHead>
-                      <TableHead className="w-[120px]">Last Contacted</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentSorted.map((opp, index) => {
-                      const isChecked = selectedOrbit.includes(opp.id);
-                      const prevName = index > 0 ? currentSorted[index - 1].name : null;
-                      const nextName = index < currentSorted.length - 1 ? currentSorted[index + 1].name : null;
-                      const isFirstInGroup = opp.name !== prevName;
-                      const isLastInGroup = opp.name !== nextName;
-                      const groupCount = nameCounts.get(opp.name || '') || 1;
-                      // (per-section row rendering; structure unchanged
-                      //  from the previous single-table version)
-                      return (
-                      <TableRow
-                        key={opp.id}
-                        className={`group hover:bg-gray-50 cursor-pointer ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
-                        onClick={() => openSlideOver(opp)}
-                      >
-                        <TableCell className="w-10" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center justify-center">
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={() => toggleOrbitSelect(opp.id)}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
-                          {isFirstInGroup ? (
-                            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                              <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                              <span className="font-medium truncate">{opp.name}</span>
-                              {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
-                              {groupCount > 1 && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
-                              )}
-                              {/* Add-another-POC button on hover — same
-                                  affordance the Outreach table has. Pre-
-                                  fills the create form with the same
-                                  project context. */}
-                              <button
-                                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
-                                title="Add another POC for this project"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setForm({
-                                    name: opp.name,
-                                    stage: 'orbit' as OpportunityStage,
-                                    dm_account: opp.dm_account,
-                                    bucket: opp.bucket || undefined,
-                                    source: opp.source || undefined,
-                                    owner_id: opp.owner_id || undefined,
-                                    co_owner_ids: opp.co_owner_ids || undefined,
-                                    referrer: opp.referrer || undefined,
-                                    affiliate_id: opp.affiliate_id || undefined,
-                                    twitter_handle: opp.twitter_handle || undefined,
-                                  });
-                                  setIsCreateOpen(true);
-                                }}
-                              >
-                                <UserPlus className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="pl-8 text-gray-300 text-xs">└</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap max-w-[180px] overflow-hidden">
-                          {renderPocCell(opp, 'max-w-[120px]')}
-                        </TableCell>
-                        <TableCell>
-                          {opp.bucket && (
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${BUCKET_COLORS[opp.bucket].bg} ${BUCKET_COLORS[opp.bucket].text}`}>
-                              {opp.bucket}
-                            </span>
-                          )}
-                        </TableCell>
-                        {/* DM (dm_account) + Temp cells removed 2026-05-13
-                            to match the trimmed orbit header. */}
-                        <TableCell>
-                          {opp.deal_value ? (
-                            <span className="font-semibold text-emerald-600">${opp.deal_value.toLocaleString()}</span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{renderOwnerCell(opp)}</TableCell>
-                        <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
-                        {/* Reason tag — surfaces orbit_reason even for opps
-                            that didn't have it set (those used to vanish
-                            entirely from the per-reason layout). */}
-                        <TableCell>
-                          {opp.orbit_reason ? (
-                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
-                              {ORBIT_REASONS.find(r => r.value === opp.orbit_reason)?.label || opp.orbit_reason}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-xs">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            if (!opp.next_action_at) return <span className="text-gray-400 text-xs">—</span>;
-                            const checkin = new Date(opp.next_action_at + 'T00:00:00');
-                            const today = new Date(); today.setHours(0, 0, 0, 0);
-                            const overdue = checkin < today;
-                            const isToday = checkin.getTime() === today.getTime();
-                            return (
-                              <span className={`text-xs ${overdue ? 'text-rose-600 font-medium' : isToday ? 'text-amber-600 font-medium' : 'text-gray-700'}`}>
-                                {format(checkin, 'MMM d')}
-                                {overdue && ' · overdue'}
-                                {isToday && ' · today'}
-                              </span>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell className="text-gray-500">{opp.updated_at ? formatDistanceToNow(new Date(opp.updated_at)) : '—'}</TableCell>
-                        <TableCell className="text-gray-500">{opp.last_contacted_at ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true }) : '—'}</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 z-[80]">
-                              <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(opp); }}>
-                                <Edit className="h-4 w-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={e => { e.stopPropagation(); handleResurrect(opp); }} className="text-blue-600">
-                                <ArrowRight className="h-4 w-4 mr-2" /> Resurrect
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          </div>
-          );
-        });
-      })()}
-    </div>
-  );
 
   // ============================================
   // RENDER: Forecast Tab
   // ============================================
-  // Post-proposal visibility — every deal that's been proposed but not
-  // yet closed, grouped by expected close date with at-risk auto-flag.
-  // KPIs at the top give a quick "where's my pipeline at?" answer.
+  // Extracted to components/crm/sales-pipeline/panels/ForecastPanel.tsx
+  // on 2026-06-02 as Phase 1 of the structural split. Post-proposal
+  // visibility — every deal that's been proposed but not yet closed,
+  // grouped by expected close date with at-risk auto-flag. KPIs at the
+  // top give a quick "where's my pipeline at?" answer.
 
-  const renderForecastTab = () => {
-    const periods: Array<{ key: keyof typeof forecastByPeriod; label: string; tone: string; description: string }> = [
-      { key: 'thisWeek',  label: 'This Week',  tone: 'bg-emerald-50 border-emerald-200 text-emerald-700', description: 'Closing this week' },
-      { key: 'nextWeek',  label: 'Next Week',  tone: 'bg-emerald-50 border-emerald-200 text-emerald-700', description: 'Closing next week' },
-      { key: 'thisMonth', label: 'This Month', tone: 'bg-sky-50 border-sky-200 text-sky-700', description: 'Closing this month' },
-      { key: 'nextMonth', label: 'Next Month', tone: 'bg-sky-50 border-sky-200 text-sky-700', description: 'Closing next month' },
-      { key: 'later',     label: 'Later',      tone: 'bg-gray-50 border-gray-200 text-gray-700', description: '60+ days out' },
-      { key: 'noDate',    label: 'No Date Set', tone: 'bg-amber-50 border-amber-200 text-amber-700', description: 'Set an expected close date' },
-    ];
 
-    return (
-      <div className="pb-4 space-y-4">
-        {/* [Space optimization, May 2026] Tightened pb-8 → pb-4 and
-            space-y-6 → space-y-4 inside the Forecast tab. Was adding
-            ~80px of unused vertical padding. KPI strip cell padding
-            also trimmed p-4 → p-3 for the same reason. */}
-        {/* KPI strip — high-level pipeline health */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide">Pipeline value</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">${forecastKpis.totalValue.toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-1">{forecastOpps.length} active deal{forecastOpps.length === 1 ? '' : 's'}</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide">Weighted forecast</div>
-            <div className="text-2xl font-bold text-emerald-700 mt-1">${Math.round(forecastKpis.weighted).toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-1">Stage-weighted probability</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide">This month</div>
-            <div className="text-2xl font-bold text-sky-700 mt-1">${forecastKpis.thisMonthValue.toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-1">Expected to close</div>
-          </div>
-          <div className={`border rounded-lg p-3 ${forecastKpis.atRiskCount > 0 ? 'bg-rose-50 border-rose-200' : 'bg-white border-gray-200'}`}>
-            <div className={`text-xs uppercase tracking-wide ${forecastKpis.atRiskCount > 0 ? 'text-rose-700' : 'text-gray-500'}`}>At risk</div>
-            <div className={`text-2xl font-bold mt-1 ${forecastKpis.atRiskCount > 0 ? 'text-rose-700' : 'text-gray-400'}`}>
-              {forecastKpis.atRiskCount}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">${forecastKpis.atRiskValue.toLocaleString()} stalled</div>
-          </div>
-        </div>
-
-        {/* Empty state — [Design system, May 2026] using shared EmptyState */}
-        {forecastOpps.length === 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <EmptyState
-              icon={TrendingUp}
-              title="No proposals out yet"
-              description="Move a deal to Proposal Sent to see it here."
-              className="py-12"
-            />
-          </div>
-        )}
-
-        {/* Period buckets */}
-        {periods.map(period => {
-          const opps = forecastByPeriod[period.key];
-          if (opps.length === 0) return null;
-          const periodValue = opps.reduce((s, o) => s + (o.deal_value || 0), 0);
-          const periodAtRisk = opps.filter(isOppAtRisk).length;
-
-          return (
-            <div key={period.key} className="space-y-2">
-              <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg border ${period.tone}`}>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold">{period.label}</h4>
-                  <span className="text-xs opacity-70">· {period.description}</span>
-                  <Badge variant="secondary" className="text-xs">{opps.length}</Badge>
-                  {periodAtRisk > 0 && (
-                    <Badge variant="secondary" className="text-xs bg-rose-100 text-rose-700 hover:bg-rose-100">
-                      {periodAtRisk} at-risk
-                    </Badge>
-                  )}
-                </div>
-                {periodValue > 0 && (
-                  <span className="text-sm font-medium">${periodValue.toLocaleString()}</span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {opps.map(opp => {
-                  const atRisk = isOppAtRisk(opp);
-                  const proposalAge = opp.proposal_sent_at
-                    ? differenceInDays(new Date(), new Date(opp.proposal_sent_at))
-                    : null;
-                  const ageBadgeClass = proposalAge === null
-                    ? 'bg-gray-100 text-gray-500'
-                    : proposalAge < 7
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : proposalAge < 21
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-rose-50 text-rose-700 border border-rose-200';
-                  const stageColor = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
-                  const owner = users.find(u => u.id === opp.owner_id);
-                  const winProb = STAGE_WIN_PROB[opp.stage] || 0;
-
-                  return (
-                    <div
-                      key={opp.id}
-                      onClick={() => openSlideOver(opp)}
-                      className={`group bg-white border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow ${atRisk ? 'border-rose-300 bg-rose-50/30' : 'border-gray-200'}`}
-                    >
-                      {/* Header row: name + at-risk flag */}
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                          <span className="font-semibold truncate">{opp.name}</span>
-                          {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
-                        </div>
-                        {atRisk && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-700 shrink-0">
-                            <AlertTriangle className="h-3 w-3" /> At risk
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Stage + value + win-prob row */}
-                      <div className="flex items-center gap-2 mb-3 text-xs">
-                        <Badge className={`${stageColor.bg} ${stageColor.text} pointer-events-none`}>
-                          {STAGE_LABELS[opp.stage as SalesPipelineStage] || opp.stage}
-                        </Badge>
-                        {opp.deal_value ? (
-                          <span className="font-semibold text-emerald-700">${opp.deal_value.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-gray-400">No value set</span>
-                        )}
-                        {winProb > 0 && (
-                          <span className="text-gray-400">· {Math.round(winProb * 100)}% win</span>
-                        )}
-                      </div>
-
-                      {/* Days-since-proposal + last activity */}
-                      <div className="flex items-center gap-3 text-xs mb-2">
-                        <span className={`px-1.5 py-0.5 rounded font-medium ${ageBadgeClass}`}>
-                          {proposalAge === null ? 'Date unknown' : `${proposalAge}d since proposal`}
-                        </span>
-                        {opp.updated_at && (
-                          <span className="text-gray-500">
-                            Last touched {formatDistanceToNow(new Date(opp.updated_at), { addSuffix: true })}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Decision maker + next action */}
-                      <div className="space-y-1 text-xs">
-                        {opp.decision_maker_name && (
-                          <div className="text-gray-600">
-                            <span className="text-gray-400">DM:</span> <span className="font-medium">{opp.decision_maker_name}</span>
-                            {opp.decision_maker_role && <span className="text-gray-400"> · {opp.decision_maker_role}</span>}
-                          </div>
-                        )}
-                        {opp.next_action_at && (
-                          <div className="text-gray-600">
-                            <span className="text-gray-400">Next:</span>{' '}
-                            <span className="font-medium">{format(new Date(opp.next_action_at + 'T00:00:00'), 'MMM d')}</span>
-                            {opp.next_action_notes && <span className="text-gray-500"> — {opp.next_action_notes}</span>}
-                          </div>
-                        )}
-                        {!opp.decision_maker_name && !opp.next_action_at && (
-                          <div className="text-gray-400 italic">No DM or next action set</div>
-                        )}
-                      </div>
-
-                      {/* Footer: owner + actions */}
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
-                        <span className="text-xs text-gray-500">{owner?.name || 'Unassigned'}</span>
-                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                          {opp.proposal_doc_url && (
-                            <a
-                              href={opp.proposal_doc_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-brand hover:underline"
-                              title="Open proposal"
-                            >
-                              <FileText className="h-3.5 w-3.5 inline" />
-                            </a>
-                          )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 z-[80]">
-                              <DropdownMenuItem onClick={() => openEditDialog(opp)}>
-                                <Edit className="h-4 w-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleStageChange(opp.id, 'v2_closed_won', opp.stage)}
-                                className="text-emerald-700"
-                              >
-                                <Check className="h-4 w-4 mr-2" /> Mark Closed Won
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleStageChange(opp.id, 'v2_closed_lost', opp.stage)}
-                                className="text-rose-600"
-                              >
-                                <X className="h-4 w-4 mr-2" /> Mark Closed Lost
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStageChange(opp.id, 'nurture', opp.stage)}>
-                                <Clock className="h-4 w-4 mr-2" /> Move to Nurture
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  /**
-   * Compact metric card used by the Metrics tab + Outreach strip.
-   * `tone` lets us color-code green/red without changing layout.
-   */
-  const MetricCard = ({ label, value, hint, tone }: { label: string; value: number | string; hint?: string; tone?: 'good' | 'bad' | 'neutral' }) => {
-    const valueClass =
-      tone === 'good' ? 'text-emerald-700' :
-      tone === 'bad' ? 'text-rose-600' :
-      'text-gray-900';
-    return (
-      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-        <div className="text-[11px] text-gray-500 uppercase tracking-wide">{label}</div>
-        <div className={`text-2xl font-bold mt-0.5 tabular-nums ${valueClass}`}>{value}</div>
-        {hint && <div className="text-[11px] text-gray-500 mt-0.5">{hint}</div>}
-      </div>
-    );
-  };
-
-  // ============================================
-  // RENDER: Metrics Tab
-  // ============================================
-  // Per-user outreach scorecard + team comparison. Works for any user
-  // the manager picks, defaults to the logged-in user.
-
-  const renderMetricsTab = () => {
-    const selectedId = metricsUserId || user?.id || '';
-    const selectedUser = users.find(u => u.id === selectedId);
-    const m = computeOutreachMetrics(selectedId, metricsRangeDays);
-
-    // Team comparison — every user with at least one opp owned in window
-    const teamRows = users
-      .map(u => ({ user: u, metrics: computeOutreachMetrics(u.id, metricsRangeDays) }))
-      .filter(r => r.metrics.touch1s > 0 || r.metrics.callsBooked > 0)
-      .sort((a, b) => b.metrics.touch1s - a.metrics.touch1s);
-
-    return (
-      <div className="pb-4 space-y-4">
-        {/* [Space optimization, May 2026] Tightened pb-8 → pb-4 and
-            space-y-6 → space-y-4 inside the Metrics tab. Methodology
-            block (80px of text at the bottom) moved into a popover
-            on the Team comparison header to save space without
-            losing the explanatory text. */}
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={selectedId} onValueChange={setMetricsUserId}>
-            <SelectTrigger className="h-9 w-56 text-sm focus-brand">
-              <SelectValue placeholder="Select user" />
-            </SelectTrigger>
-            <SelectContent>
-              {activeUsers.map(u => (
-                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(metricsRangeDays)} onValueChange={v => setMetricsRangeDays(Number(v) as 7 | 30 | 90)}>
-            <SelectTrigger className="h-9 w-40 text-sm focus-brand">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
-          {metricsBookingsLoading && (
-            <span className="text-xs text-gray-500 flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" /> Loading bookings...
-            </span>
-          )}
-        </div>
-
-        {/* Per-user scorecard */}
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900">{selectedUser?.name || 'Select a user'}</h3>
-              <p className="text-[11px] text-gray-500">Last {metricsRangeDays} days</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard label="Touch 1s sent" value={m.touch1s} hint="First DM sent in window" />
-            <MetricCard label="Replies received" value={m.replies} hint="Moved past cold_dm" />
-            <MetricCard label="Reply rate" value={`${(m.replyRate * 100).toFixed(1)}%`} tone={m.replyRate >= 0.2 ? 'good' : 'neutral'} />
-            <MetricCard label="Qualified" value={m.qualified} hint={`${(m.qualificationRate * 100).toFixed(0)}% of replies · 5-for-5 ≥ 3/5`} />
-            <MetricCard label="Calls booked" value={m.callsBooked} />
-            <MetricCard label="Calls held" value={m.callsHeld} tone="good" />
-            <MetricCard label="No-shows" value={m.noShows} hint={`${(((m.noShows) / (m.callsBooked || 1)) * 100).toFixed(0)}% of bookings`} tone={m.noShows > 0 ? 'bad' : 'neutral'} />
-            <MetricCard label="Show rate" value={`${(m.showRate * 100).toFixed(0)}%`} hint={m.callsPending > 0 ? `${m.callsPending} pending` : undefined} tone={m.showRate >= 0.7 ? 'good' : 'neutral'} />
-          </div>
-        </div>
-
-        {/* Team comparison */}
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <h4 className="text-sm font-semibold text-gray-900">Team comparison</h4>
-              {/* [Space optimization] Methodology popover — the previous
-                  ~80px disclosure block at the bottom of the tab was
-                  always-visible explainer text. Same content, behind
-                  a help icon. */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                    title="How metrics are computed"
-                    aria-label="How metrics are computed"
-                  >
-                    <HelpCircle className="h-3.5 w-3.5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="w-[400px] text-xs text-gray-600 space-y-1.5 leading-relaxed">
-                  <p className="font-semibold text-gray-900 mb-1">How metrics are computed</p>
-                  <p>· <strong>Touch 1s sent</strong> — opportunities owned by the rep in <code className="bg-gray-100 px-1 rounded text-[10px]">cold_dm</code> with <code className="bg-gray-100 px-1 rounded text-[10px]">bump_number ≥ 1</code> created in the window.</p>
-                  <p>· <strong>Replies</strong> — proxy: opps that moved past <code className="bg-gray-100 px-1 rounded text-[10px]">cold_dm</code> (created or last-updated in window). Improve by logging inbound activities explicitly.</p>
-                  <p>· <strong>Qualified</strong> — opps with at least 3 of 5 BANT+ qualification checks marked, set on the opportunity slide-over.</p>
-                  <p>· <strong>Calls booked / held / no-shows</strong> — bookings where the booking page is owned by the rep. Mark held / no-show on /crm/meetings after each call.</p>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <span className="text-xs text-gray-500">{teamRows.length} active rep{teamRows.length === 1 ? '' : 's'}</span>
-          </div>
-          {teamRows.length === 0 ? (
-            <div className="text-center py-8 text-sm text-gray-400">
-              No outreach activity in the last {metricsRangeDays} days.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50/50">
-                  <TableHead>Rep</TableHead>
-                  <TableHead className="text-right">Touch 1s</TableHead>
-                  <TableHead className="text-right">Replies</TableHead>
-                  <TableHead className="text-right">Reply %</TableHead>
-                  <TableHead className="text-right">Qualified</TableHead>
-                  <TableHead className="text-right">Booked</TableHead>
-                  <TableHead className="text-right">Held</TableHead>
-                  <TableHead className="text-right">No-show</TableHead>
-                  <TableHead className="text-right">Show %</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teamRows.map(({ user: u, metrics }) => (
-                  <TableRow key={u.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">{u.name}</TableCell>
-                    <TableCell className="text-right tabular-nums">{metrics.touch1s}</TableCell>
-                    <TableCell className="text-right tabular-nums">{metrics.replies}</TableCell>
-                    <TableCell className="text-right tabular-nums">{(metrics.replyRate * 100).toFixed(1)}%</TableCell>
-                    <TableCell className="text-right tabular-nums">{metrics.qualified}</TableCell>
-                    <TableCell className="text-right tabular-nums">{metrics.callsBooked}</TableCell>
-                    <TableCell className="text-right tabular-nums text-emerald-700">{metrics.callsHeld}</TableCell>
-                    <TableCell className="text-right tabular-nums text-rose-600">{metrics.noShows}</TableCell>
-                    <TableCell className="text-right tabular-nums">{(metrics.showRate * 100).toFixed(0)}%</TableCell>
-                  </TableRow>
-                ))}
-                {/* Team totals */}
-                <TableRow className="bg-gray-50 font-semibold">
-                  <TableCell>TEAM TOTAL</TableCell>
-                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.touch1s, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.replies, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">—</TableCell>
-                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.qualified, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.callsBooked, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-emerald-700">{teamRows.reduce((s, r) => s + r.metrics.callsHeld, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-rose-600">{teamRows.reduce((s, r) => s + r.metrics.noShows, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">—</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          )}
-        </div>
-
-        {/* [Space optimization] Methodology block moved into a
-            popover on the Team comparison header above. Same content,
-            ~80px saved. */}
-      </div>
-    );
-  };
 
   // ============================================
   // RENDER: Activity Slide-Over
   // ============================================
 
-  const renderSlideOver = () => {
-    if (!slideOverOpp || typeof document === 'undefined') return null;
-    const opp = opportunities.find(o => o.id === slideOverOpp.id) || slideOverOpp;
-    const bamfam = isBAMFAM(opp);
-    const stageColors = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
-
-    return createPortal(
-      <>
-      {/* Backdrop */}
-      {!orbitPrompt && !closedLostPrompt && !activityLogPrompt && (
-        <div className="fixed inset-0 bg-black/20 z-[60]" onClick={() => {
-          if (slideOverMode === 'edit') {
-            if (!confirm('You have unsaved changes. Close anyway?')) return;
-            setSlideOverMode('view');
-            setEditingOpp(null);
-            setForm({ name: '' });
-          }
-          setSlideOverOpp(null);
-          setActionGuidance(null);
-        }} />
-      )}
-      <div className="fixed inset-y-0 right-0 w-[480px] max-w-[calc(100vw-2rem)] bg-white border-l shadow-xl z-[70] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-white">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                <h3 className="font-semibold text-lg text-gray-900 truncate">
-                  {slideOverMode === 'edit' ? 'Edit Opportunity' : opp.name}
-                </h3>
-              </div>
-              {slideOverMode === 'view' && (
-                <>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className={`text-xs ${stageColors.bg} ${stageColors.text} border ${stageColors.border}`}>
-                      {STAGE_LABELS[opp.stage as SalesPipelineStage] || opp.stage}
-                    </Badge>
-                    {opp.bucket && (
-                      <Badge className={`text-xs ${BUCKET_COLORS[opp.bucket].bg} ${BUCKET_COLORS[opp.bucket].text} border-0`}>
-                        Bucket {opp.bucket}
-                      </Badge>
-                    )}
-                    {opp.dm_account && (
-                      <Badge variant="outline" className={`text-xs ${opp.dm_account === 'closer' ? 'border-blue-300 text-blue-600' : 'border-emerald-300 text-emerald-600'}`}>
-                        {opp.dm_account === 'closer' ? 'Closer' : opp.dm_account === 'sdr' ? 'SDR' : 'Other'}
-                      </Badge>
-                    )}
-                  </div>
-                  {opp.deal_value && (
-                    <p className="text-xl font-bold text-emerald-600 mt-2">${opp.deal_value.toLocaleString()} <span className="text-sm font-normal text-gray-400">{opp.currency}</span></p>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {slideOverMode === 'view' ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={openStageHistory}
-                    title="Stage history"
-                  >
-                    <History className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditDialog(opp)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => { setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); }}>
-                  Cancel
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { setSlideOverOpp(null); setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); setActionGuidance(null); }}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Edit mode */}
-        {slideOverMode === 'edit' && (
-          <ScrollArea className="flex-1">
-            <form onSubmit={e => { e.preventDefault(); handleUpdate(); }} className="p-6">
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name <RequiredAsterisk /></Label>
-                  <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or contact name" className="focus-brand" />
-                </div>
-                {/* Path (dm_account) field removed 2026-05-13 — kept the
-                    DB column intact (existing rows still have a value),
-                    but it's no longer surfaced in the slide-over edit
-                    form. Bucket takes the left slot; new Twitter Handle
-                    input on the right. Temperature slider also removed —
-                    the score auto-updates from activity, so manual
-                    override was rarely used. */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bucket</Label>
-                    <Select value={form.bucket || ''} onValueChange={v => setForm(f => ({ ...f, bucket: v as Bucket }))}>
-                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A">A - High Priority</SelectItem>
-                        <SelectItem value="B">B - Medium</SelectItem>
-                        <SelectItem value="C">C - Low Priority</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Project Twitter</Label>
-                    <Input
-                      value={form.twitter_handle || ''}
-                      onChange={e => setForm(f => ({ ...f, twitter_handle: e.target.value }))}
-                      placeholder="@handle or https://x.com/handle"
-                      className="focus-brand"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">POC Platform</Label>
-                    <Select value={form.poc_platform || ''} onValueChange={v => setForm(f => ({ ...f, poc_platform: v as PocPlatform }))}>
-                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>
-                        {POC_PLATFORMS.map(p => (
-                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">POC Handle / ID</Label>
-                    <Input value={form.poc_handle || ''} onChange={e => setForm(f => ({ ...f, poc_handle: e.target.value }))} placeholder="@handle or ID" className="focus-brand" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</Label>
-                    <Select value={form.source || ''} onValueChange={v => setForm(f => ({ ...f, source: v }))}>
-                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="referral">Referral</SelectItem>
-                        <SelectItem value="inbound">Inbound</SelectItem>
-                        <SelectItem value="event">Event</SelectItem>
-                        <SelectItem value="cold_outreach">Cold Outreach</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">TG Handle</Label>
-                    <Input value={form.tg_handle || ''} onChange={e => setForm(f => ({ ...f, tg_handle: e.target.value }))} placeholder="@handle" className="focus-brand" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</Label>
-                    <Select value={form.owner_id || ''} onValueChange={v => setForm(f => ({ ...f, owner_id: v }))}>
-                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>
-                        {activeUsers.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Referrer</Label>
-                    <Input value={form.referrer || ''} onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))} placeholder="Who referred?" className="focus-brand" />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Co-Owners</Label>
-                  <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-white">
-                    {(form.co_owner_ids || []).map(id => {
-                      const u = users.find(u => u.id === id);
-                      return (
-                        <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
-                          {u?.name || u?.email || id}
-                          <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-rose-500 ml-0.5">&times;</button>
-                        </span>
-                      );
-                    })}
-                    <Select value="" onValueChange={v => { if (v && !(form.co_owner_ids || []).includes(v) && v !== form.owner_id) setForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] })); }}>
-                      <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
-                      <SelectContent>
-                        {activeUsers.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Affiliate</Label>
-                  <Select value={form.affiliate_id || ''} onValueChange={v => setForm(f => ({ ...f, affiliate_id: v }))}>
-                    <SelectTrigger className="focus-brand"><SelectValue placeholder="Select affiliate..." /></SelectTrigger>
-                    <SelectContent>
-                      {affiliates.map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* Deal Value / Currency / Meeting Date / Time / Type
-                    moved 2026-05-14 out of this Edit form and into the
-                    slide-over view's "Deal" card. Those fields shift
-                    often during a deal — inline-edit in the view is
-                    faster than opening this modal each time. The Edit
-                    form is now identity-focused (name, POC, source,
-                    owner, affiliate, etc.). */}
-                {editingOpp?.stage === 'orbit' && (
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Orbit Follow-up Days</Label>
-                    <Input type="number" min={1} value={form.orbit_followup_days || 90} onChange={e => setForm(f => ({ ...f, orbit_followup_days: Math.max(1, parseInt(e.target.value) || 90) }))} className="focus-brand" />
-                  </div>
-                )}
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</Label>
-                  <Textarea value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Additional notes..." className="focus-brand" rows={3} />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => { setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); }}>
-                  Cancel
-                </Button>
-                <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()}>
-                  {isSubmitting ? 'Saving...' : 'Update'}
-                </Button>
-              </div>
-            </form>
-          </ScrollArea>
-        )}
-
-        {/* View mode */}
-        {slideOverMode === 'view' && bamfam && (
-          <div className="px-6 py-2.5 bg-rose-50 border-b border-rose-200 flex items-center gap-2 text-rose-700 text-sm">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span className="font-medium">BAMFAM: No upcoming meeting scheduled</span>
-          </div>
-        )}
-
-        {slideOverMode === 'view' && actionGuidance && (
-          <div className="px-6 py-3 border-b border-sky-200" style={{ backgroundColor: '#f0f9fa' }}>
-            <div className="flex items-start gap-2">
-              <Zap className="h-4 w-4 flex-shrink-0 mt-0.5 text-brand"/>
-              <div>
-                <p className="text-sm font-semibold text-brand">{actionGuidance.label}</p>
-                <p className="text-xs text-gray-600 mt-0.5">{actionGuidance.hint}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 ml-auto flex-shrink-0 text-gray-400 hover:text-gray-600"
-                onClick={() => setActionGuidance(null)}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {slideOverMode === 'view' && (
-        <ScrollArea className="flex-1">
-          <div className="p-6 space-y-6">
-            {/* Details Card */}
-            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Details</h4>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm min-w-0">
-                <div className="min-w-0">
-                  <span className="text-xs text-gray-500">Temperature</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-rose-400'}`}
-                        style={{ width: `${opp.temperature_score}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium">{opp.temperature_score}%</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">Owner</span>
-                  <p className="font-medium mt-0.5">{getUserName(opp.owner_id)}</p>
-                  {opp.co_owner_ids && opp.co_owner_ids.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {opp.co_owner_ids.map(id => (
-                        <span key={id} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{getUserName(id)}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">POC</span>
-                  {opp.poc_handle ? (
-                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{opp.poc_platform || 'other'}</Badge>
-                      <span className="font-medium truncate">{cleanPocHandle(opp.poc_handle)}</span>
-                    </div>
-                  ) : (
-                    <p className="font-medium mt-0.5 text-gray-400">—</p>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <span className="text-xs text-gray-500">TG Handle</span>
-                  <p className="font-medium mt-0.5 truncate">{opp.tg_handle || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500">Source</span>
-                  <p className="font-medium mt-0.5 capitalize">{opp.source?.replace('_', ' ') || '—'}</p>
-                </div>
-                {opp.next_meeting_at && (
-                  <div>
-                    <span className="text-xs text-gray-500">Next Meeting</span>
-                    <p className="font-medium mt-0.5">{format(new Date(opp.next_meeting_at), 'MMM d, yyyy h:mm a')}</p>
-                  </div>
-                )}
-                {opp.referrer && (
-                  <div>
-                    <span className="text-xs text-gray-500">Referrer</span>
-                    <p className="font-medium mt-0.5">{opp.referrer}</p>
-                  </div>
-                )}
-                {opp.last_contacted_at && (
-                  <div>
-                    <span className="text-xs text-gray-500">Last Contacted</span>
-                    <p className="font-medium mt-0.5">{formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true })}</p>
-                  </div>
-                )}
-                <div>
-                  <span className="text-xs text-gray-500">Affiliate</span>
-                  {opp.affiliate ? (
-                    <div className="mt-0.5">
-                      <Badge className="text-xs bg-brand text-white">{opp.affiliate.name}</Badge>
-                    </div>
-                  ) : (
-                    <p className="font-medium mt-0.5 text-gray-400">—</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Notes */}
-            {opp.notes && (
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</h4>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words" style={{ overflowWrap: 'anywhere' }}>{opp.notes}</p>
-              </div>
-            )}
-
-            {/* Bump Counter (cold_dm only) */}
-            {opp.stage === 'cold_dm' && (
-              <div className="bg-sky-50 rounded-lg border border-sky-200 p-4">
-                <h4 className="text-xs font-semibold text-sky-700 uppercase tracking-wider mb-3">Bump Progress</h4>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4].map(i => (
-                        <div key={i} className={`w-3 h-3 rounded-full border-2 ${i <= opp.bump_number ? 'bg-sky-500 border-sky-500' : 'bg-white border-sky-300'}`} />
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium text-sky-800">{opp.bump_number} / 4 bumps</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 border-sky-300 text-sky-700 hover:bg-sky-100"
-                      onClick={() => handleReduceBump(opp.id)}
-                      disabled={opp.bump_number <= 0 || isBumping}
-                    >
-                      {isBumping ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Minus className="h-3.5 w-3.5" />}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-3 border-sky-300 text-sky-700 hover:bg-sky-100 text-xs font-medium"
-                      onClick={() => handleRecordBump(opp.id)}
-                      disabled={isBumping}
-                    >
-                      {isBumping ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />} Bump
-                    </Button>
-                  </div>
-                </div>
-                {opp.last_bump_date && (
-                  <p className="text-xs text-sky-600 mt-2">Last bump: {formatDistanceToNow(new Date(opp.last_bump_date), { addSuffix: true })}</p>
-                )}
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="flex gap-2 flex-wrap min-w-0">
-              <div className="flex items-center gap-1 flex-wrap">
-                <Select
-                  value={bookingUserId[`slide-${opp.id}`] || opp.owner_id || ''}
-                  onValueChange={v => setBookingUserId(prev => ({ ...prev, [`slide-${opp.id}`]: v }))}
-                >
-                  <SelectTrigger className="h-8 text-xs w-[120px] border-brand/30">
-                    <SelectValue placeholder="Team member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeUsers.map(u => (
-                      <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline" size="sm" className="text-xs text-brand border-brand/30 hover:bg-brand/5"
-                  onClick={() => copyBookingLink(bookingUserId[`slide-${opp.id}`] || opp.owner_id || '', opp.id)}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" /> Copy Booking Link
-                </Button>
-              </div>
-              <Button
-                variant="outline" size="sm" className="text-xs text-orange-600 border-orange-300 hover:bg-orange-50"
-                onClick={() => handleStageChange(opp.id, 'orbit', opp.stage)}
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Move to Orbit
-              </Button>
-              <Button
-                variant="outline" size="sm" className="text-xs text-rose-600 border-rose-300 hover:bg-rose-50"
-                onClick={() => handleDelete(opp.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-              </Button>
-            </div>
-
-            {/* Stage Move */}
-            <div className="grid gap-2">
-              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Move to Stage</Label>
-              <Select
-                value={opp.stage}
-                onValueChange={(v) => handleStageChange(opp.id, v as SalesPipelineStage, opp.stage)}
-              >
-                <SelectTrigger className="focus-brand">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_V2_STAGES.filter(s => s !== 'proposal_sent').map(s => (
-                    <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* 5-for-5 Qualification — BANT+ checkboxes. ≥3/5 counts as a
-                qualified conversation in the Outreach metrics dashboard. */}
-            {(() => {
-              const quals = [
-                { key: 'qual_budget',   label: 'Budget',         hint: 'Confirmed or directional' },
-                { key: 'qual_dm',       label: 'Decision Maker', hint: 'Identified + engaged' },
-                { key: 'qual_timeline', label: 'Timeline',       hint: 'Within ~90 days' },
-                { key: 'qual_scope',    label: 'Scope',          hint: 'Knows what they want' },
-                { key: 'qual_fit',      label: 'Fit',            hint: 'Right vertical/region/size' },
-              ] as const;
-              const checkedCount = quals.filter(q => (opp as any)[q.key]).length;
-              const isQualified = checkedCount >= 3;
-              return (
-                <div className="border-t pt-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      5-for-5 Qualification
-                    </h4>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isQualified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {checkedCount}/5 {isQualified ? '· Qualified' : ''}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {quals.map(q => {
-                      const checked = !!(opp as any)[q.key];
-                      return (
-                        <label
-                          key={q.key}
-                          className={`flex items-start gap-2 p-2.5 rounded-md border cursor-pointer transition-colors ${checked ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={async (next) => {
-                              const patch = { [q.key]: !!next };
-                              applyOppPatch(opp.id, patch as Partial<SalesPipelineOpportunity>);
-                              try {
-                                await SalesPipelineService.update(opp.id, patch as any);
-                              } catch (err) {
-                                console.error('Error updating qual flag:', err);
-                                applyOppPatch(opp.id, { [q.key]: checked } as Partial<SalesPipelineOpportunity>);
-                              }
-                            }}
-                            className="mt-0.5"
-                          />
-                          <div className="min-w-0">
-                            <div className={`text-sm font-medium ${checked ? 'text-emerald-800' : 'text-gray-700'}`}>{q.label}</div>
-                            <div className="text-[11px] text-gray-500">{q.hint}</div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Deal — high-traffic state fields (value, next meeting,
-                meeting type) that used to live in the Edit form. Moved
-                here 2026-05-14 so users can update them inline without
-                opening the modal — these fields shift often as a deal
-                moves, while the Edit form is for identity (name, POC,
-                source, owner). Mirrors the inline-edit pattern used by
-                Post-Proposal Tracking below. */}
-            <div className="border-t pt-6">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Deal</h4>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <div>
-                  <Label className="text-xs text-gray-500">Deal value</Label>
-                  {/* Uncontrolled input — `value={opp.deal_value}` with
-                      only an onBlur handler made the input unwritable:
-                      every parent re-render (and applyOppPatch triggers
-                      one) reset the DOM value back to the prop, so
-                      typing never stuck. `defaultValue` + `key={opp.id}`
-                      lets the user type freely, and the key remounts the
-                      input when switching to a different opp so it
-                      picks up the new starting value. Same fix applied
-                      to every inline-edit Input/Textarea in this panel. */}
-                  <Input
-                    key={`deal-value-${opp.id}`}
-                    type="number"
-                    defaultValue={opp.deal_value ?? ''}
-                    placeholder="0"
-                    onBlur={async (e) => {
-                      const raw = e.target.value.trim();
-                      const v = raw === '' ? null : parseFloat(raw);
-                      if (v === opp.deal_value) return;
-                      if (v !== null && Number.isNaN(v)) return;
-                      applyOppPatch(opp.id, { deal_value: v } as Partial<SalesPipelineOpportunity>);
-                      try { await SalesPipelineService.update(opp.id, { deal_value: v } as any); }
-                      catch (err) { console.error(err); }
-                    }}
-                    className="h-7 text-sm focus-brand"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Currency</Label>
-                  <Select
-                    value={opp.currency || 'USD'}
-                    onValueChange={async (v) => {
-                      if (v === (opp.currency || 'USD')) return;
-                      applyOppPatch(opp.id, { currency: v } as Partial<SalesPipelineOpportunity>);
-                      try { await SalesPipelineService.update(opp.id, { currency: v } as any); }
-                      catch (err) { console.error(err); }
-                    }}
-                  >
-                    <SelectTrigger className="h-7 text-sm focus-brand"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="USDT">USDT</SelectItem>
-                      <SelectItem value="USDC">USDC</SelectItem>
-                      <SelectItem value="ETH">ETH</SelectItem>
-                      <SelectItem value="BTC">BTC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Next meeting</Label>
-                  {/* Date + time scroll picker, copied from the (now-
-                      removed) Edit form variant. Keeps next_meeting_at
-                      as ISO string and persists onSelect. */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
-                        style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: opp.next_meeting_at ? '#111827' : '#9ca3af' }}
-                      >
-                        <Calendar className="mr-2 h-3.5 w-3.5" />
-                        {opp.next_meeting_at
-                          ? format(new Date(opp.next_meeting_at), 'MMM d, yyyy')
-                          : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={opp.next_meeting_at ? new Date(opp.next_meeting_at) : undefined}
-                        onSelect={async (date) => {
-                          let iso: string | null = null;
-                          if (date) {
-                            // Preserve existing time if a meeting was already set.
-                            const existing = opp.next_meeting_at ? new Date(opp.next_meeting_at) : new Date();
-                            date.setHours(existing.getHours(), existing.getMinutes(), 0, 0);
-                            iso = date.toISOString();
-                          }
-                          applyOppPatch(opp.id, { next_meeting_at: iso } as Partial<SalesPipelineOpportunity>);
-                          try { await SalesPipelineService.update(opp.id, { next_meeting_at: iso } as any); }
-                          catch (err) { console.error(err); }
-                        }}
-                        initialFocus
-                        classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                        modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Meeting time</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
-                        style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: opp.next_meeting_at ? '#111827' : '#9ca3af' }}
-                        disabled={!opp.next_meeting_at}
-                      >
-                        <Clock className="mr-2 h-3.5 w-3.5" />
-                        {opp.next_meeting_at ? format(new Date(opp.next_meeting_at), 'h:mm a') : '—'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                      <div className="flex gap-0 divide-x">
-                        {/* Hour column */}
-                        <ScrollArea className="h-[200px] w-[70px]">
-                          <div className="p-1">
-                            {Array.from({ length: 24 }, (_, h) => {
-                              const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'PM' : 'AM'}`;
-                              const isSelected = opp.next_meeting_at && new Date(opp.next_meeting_at).getHours() === h;
-                              return (
-                                <Button
-                                  key={h}
-                                  variant={isSelected ? 'brand' : 'ghost'}
-                                  className="w-full justify-center font-normal text-xs h-7 px-1"
-                                  onClick={async () => {
-                                    const d = opp.next_meeting_at ? new Date(opp.next_meeting_at) : new Date();
-                                    d.setHours(h, d.getMinutes(), 0, 0);
-                                    const iso = d.toISOString();
-                                    applyOppPatch(opp.id, { next_meeting_at: iso } as Partial<SalesPipelineOpportunity>);
-                                    try { await SalesPipelineService.update(opp.id, { next_meeting_at: iso } as any); }
-                                    catch (err) { console.error(err); }
-                                  }}
-                                >
-                                  {label}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        </ScrollArea>
-                        {/* Minute column */}
-                        <ScrollArea className="h-[200px] w-[50px]">
-                          <div className="p-1">
-                            {Array.from({ length: 60 }, (_, m) => {
-                              const isSelected = opp.next_meeting_at && new Date(opp.next_meeting_at).getMinutes() === m;
-                              return (
-                                <Button
-                                  key={m}
-                                  variant={isSelected ? 'brand' : 'ghost'}
-                                  className="w-full justify-center font-normal text-xs h-7 px-1"
-                                  onClick={async () => {
-                                    const d = opp.next_meeting_at ? new Date(opp.next_meeting_at) : new Date();
-                                    d.setMinutes(m, 0, 0);
-                                    const iso = d.toISOString();
-                                    applyOppPatch(opp.id, { next_meeting_at: iso } as Partial<SalesPipelineOpportunity>);
-                                    try { await SalesPipelineService.update(opp.id, { next_meeting_at: iso } as any); }
-                                    catch (err) { console.error(err); }
-                                  }}
-                                >
-                                  {String(m).padStart(2, '0')}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        </ScrollArea>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="col-span-2">
-                  <Label className="text-xs text-gray-500">Meeting type</Label>
-                  <Select
-                    value={(opp as any).next_meeting_type || ''}
-                    onValueChange={async (v) => {
-                      const nextVal = v || null;
-                      if (nextVal === ((opp as any).next_meeting_type || null)) return;
-                      applyOppPatch(opp.id, { next_meeting_type: nextVal } as Partial<SalesPipelineOpportunity>);
-                      try { await SalesPipelineService.update(opp.id, { next_meeting_type: nextVal } as any); }
-                      catch (err) { console.error(err); }
-                    }}
-                  >
-                    <SelectTrigger className="h-7 text-sm focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="discovery">Discovery Call</SelectItem>
-                      <SelectItem value="proposal">Proposal Call</SelectItem>
-                      <SelectItem value="follow_up">Follow Up</SelectItem>
-                      <SelectItem value="closing">Closing Call</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Orbit Tracking — shown when stage='orbit'. Mirrors the
-                Post-Proposal Tracking pattern but framed for keeping
-                tabs on a deal we're not actively pursuing. The
-                next-check-in fields reuse next_action_at +
-                next_action_notes (an opp can't be both orbit AND
-                post-proposal, so the columns can serve double duty
-                without conflict). */}
-            {opp.stage === 'orbit' && (() => {
-              const checkinDate = opp.next_action_at ? new Date(opp.next_action_at + 'T00:00:00') : null;
-              const today = new Date(); today.setHours(0, 0, 0, 0);
-              const isOverdue = !!checkinDate && checkinDate < today;
-              const isToday = !!checkinDate && checkinDate.getTime() === today.getTime();
-              return (
-                <div className="border-t pt-6">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <RotateCcw className="h-3.5 w-3.5 text-orange-600" />
-                    Orbit Tracking
-                  </h4>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    <div>
-                      <Label className="text-xs text-gray-500">Next check-in</Label>
-                      {/* Reuses next_action_at — same DATE column as Post-
-                          Proposal's "Next action date". Stage exclusivity
-                          means the two contexts never share a row. */}
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
-                            style={{
-                              borderColor: isOverdue ? '#fecaca' : '#e5e7eb',
-                              backgroundColor: isOverdue ? '#fef2f2' : 'white',
-                              color: opp.next_action_at ? (isOverdue ? '#b91c1c' : '#111827') : '#9ca3af',
-                            }}
-                          >
-                            <Calendar className="mr-2 h-3.5 w-3.5" />
-                            {opp.next_action_at
-                              ? `${format(checkinDate!, 'MMM d, yyyy')}${isOverdue ? ' · overdue' : isToday ? ' · today' : ''}`
-                              : 'Select date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                          <CalendarPicker
-                            mode="single"
-                            selected={checkinDate || undefined}
-                            onSelect={async (date) => {
-                              const v = date
-                                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                                : null;
-                              applyOppPatch(opp.id, { next_action_at: v } as Partial<SalesPipelineOpportunity>);
-                              try { await SalesPipelineService.update(opp.id, { next_action_at: v } as any); }
-                              catch (err) { console.error(err); }
-                            }}
-                            initialFocus
-                            classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">Reason</Label>
-                      <Select
-                        value={opp.orbit_reason || ''}
-                        onValueChange={async (v) => {
-                          const nextVal = v || null;
-                          if (nextVal === (opp.orbit_reason || null)) return;
-                          applyOppPatch(opp.id, { orbit_reason: nextVal } as Partial<SalesPipelineOpportunity>);
-                          try { await SalesPipelineService.update(opp.id, { orbit_reason: nextVal } as any); }
-                          catch (err) { console.error(err); }
-                        }}
-                      >
-                        <SelectTrigger className="h-7 text-sm focus-brand"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {ORBIT_REASONS.map(r => (
-                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">Time in orbit</Label>
-                      <p className="font-medium mt-1.5 text-sm">
-                        {opp.bucket_changed_at || opp.updated_at
-                          ? formatDistanceToNow(new Date(opp.bucket_changed_at || opp.updated_at))
-                          : <span className="text-gray-400">—</span>}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">Last contacted</Label>
-                      <p className="font-medium mt-1.5 text-sm">
-                        {opp.last_contacted_at
-                          ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true })
-                          : <span className="text-gray-400">—</span>}
-                      </p>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs text-gray-500">What to watch for</Label>
-                      {/* Reuses next_action_notes. Free-form so users can
-                          drop signals like "Korea announcement", "Series
-                          A", "exchange listing", or full context paragraphs. */}
-                      <Textarea
-                        key={`orbit-watch-${opp.id}`}
-                        defaultValue={opp.next_action_notes || ''}
-                        placeholder="e.g. Watching for Korea expansion announcement, Series A raise, or exchange listing — message them when any of these hit."
-                        onBlur={async (e) => {
-                          const v = e.target.value.trim() || null;
-                          if (v === opp.next_action_notes) return;
-                          applyOppPatch(opp.id, { next_action_notes: v } as Partial<SalesPipelineOpportunity>);
-                          try { await SalesPipelineService.update(opp.id, { next_action_notes: v } as any); }
-                          catch (err) { console.error(err); }
-                        }}
-                        rows={2}
-                        className="text-sm focus-brand"
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Post-Proposal Tracking — only shown when proposal_sent_at
-                is set OR the deal is in a post-proposal stage. Inline-
-                editable so users can update without going into edit mode. */}
-            {(opp.proposal_sent_at || ['proposal_sent', 'proposal_call', 'v2_contract'].includes(opp.stage)) && (
-              <div className="border-t pt-6">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Post-Proposal Tracking</h4>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <div>
-                    <Label className="text-xs text-gray-500">Proposal sent</Label>
-                    <p className="font-medium mt-0.5">
-                      {opp.proposal_sent_at ? (
-                        <>
-                          {format(new Date(opp.proposal_sent_at), 'MMM d, yyyy')}
-                          <span className="text-xs text-gray-400 ml-1">
-                            ({differenceInDays(new Date(), new Date(opp.proposal_sent_at))}d ago)
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">Expected close</Label>
-                    {/* Swapped from native <input type="date"> to the
-                        Popover + CalendarPicker pattern used by the rest
-                        of the slide-over (e.g. Meeting Date above) so the
-                        UI is consistent. Stored value remains YYYY-MM-DD
-                        because expected_close_date is a DATE column. */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
-                          style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: opp.expected_close_date ? '#111827' : '#9ca3af' }}
-                        >
-                          <Calendar className="mr-2 h-3.5 w-3.5" />
-                          {opp.expected_close_date
-                            ? format(new Date(opp.expected_close_date + 'T00:00:00'), 'MMM d, yyyy')
-                            : 'Select date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                        <CalendarPicker
-                          mode="single"
-                          selected={opp.expected_close_date ? new Date(opp.expected_close_date + 'T00:00:00') : undefined}
-                          onSelect={async (date) => {
-                            // Convert back to YYYY-MM-DD (DATE column, not timestamp).
-                            const v = date
-                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                              : null;
-                            applyOppPatch(opp.id, { expected_close_date: v } as Partial<SalesPipelineOpportunity>);
-                            try { await SalesPipelineService.update(opp.id, { expected_close_date: v } as any); }
-                            catch (err) { console.error(err); }
-                          }}
-                          initialFocus
-                          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">Decision maker</Label>
-                    <Input
-                      key={`dm-name-${opp.id}`}
-                      defaultValue={opp.decision_maker_name || ''}
-                      placeholder="Name"
-                      onBlur={async (e) => {
-                        const v = e.target.value.trim() || null;
-                        if (v === opp.decision_maker_name) return;
-                        applyOppPatch(opp.id, { decision_maker_name: v } as Partial<SalesPipelineOpportunity>);
-                        try { await SalesPipelineService.update(opp.id, { decision_maker_name: v } as any); }
-                        catch (err) { console.error(err); }
-                      }}
-                      className="h-7 text-sm focus-brand"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">DM role</Label>
-                    <Input
-                      key={`dm-role-${opp.id}`}
-                      defaultValue={opp.decision_maker_role || ''}
-                      placeholder="e.g. Head of Marketing"
-                      onBlur={async (e) => {
-                        const v = e.target.value.trim() || null;
-                        if (v === opp.decision_maker_role) return;
-                        applyOppPatch(opp.id, { decision_maker_role: v } as Partial<SalesPipelineOpportunity>);
-                        try { await SalesPipelineService.update(opp.id, { decision_maker_role: v } as any); }
-                        catch (err) { console.error(err); }
-                      }}
-                      className="h-7 text-sm focus-brand"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">Next action date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
-                          style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: opp.next_action_at ? '#111827' : '#9ca3af' }}
-                        >
-                          <Calendar className="mr-2 h-3.5 w-3.5" />
-                          {opp.next_action_at
-                            ? format(new Date(opp.next_action_at + 'T00:00:00'), 'MMM d, yyyy')
-                            : 'Select date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                        <CalendarPicker
-                          mode="single"
-                          selected={opp.next_action_at ? new Date(opp.next_action_at + 'T00:00:00') : undefined}
-                          onSelect={async (date) => {
-                            const v = date
-                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                              : null;
-                            applyOppPatch(opp.id, { next_action_at: v } as Partial<SalesPipelineOpportunity>);
-                            try { await SalesPipelineService.update(opp.id, { next_action_at: v } as any); }
-                            catch (err) { console.error(err); }
-                          }}
-                          initialFocus
-                          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500">Proposal doc URL</Label>
-                    <Input
-                      key={`proposal-url-${opp.id}`}
-                      defaultValue={opp.proposal_doc_url || ''}
-                      placeholder="https://..."
-                      onBlur={async (e) => {
-                        const v = e.target.value.trim() || null;
-                        if (v === opp.proposal_doc_url) return;
-                        applyOppPatch(opp.id, { proposal_doc_url: v } as Partial<SalesPipelineOpportunity>);
-                        try { await SalesPipelineService.update(opp.id, { proposal_doc_url: v } as any); }
-                        catch (err) { console.error(err); }
-                      }}
-                      className="h-7 text-sm focus-brand"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs text-gray-500">Next action / notes</Label>
-                    <Textarea
-                      key={`pp-notes-${opp.id}`}
-                      defaultValue={opp.next_action_notes || ''}
-                      placeholder="What are we waiting on? What's the next step?"
-                      onBlur={async (e) => {
-                        const v = e.target.value.trim() || null;
-                        if (v === opp.next_action_notes) return;
-                        applyOppPatch(opp.id, { next_action_notes: v } as Partial<SalesPipelineOpportunity>);
-                        try { await SalesPipelineService.update(opp.id, { next_action_notes: v } as any); }
-                        catch (err) { console.error(err); }
-                      }}
-                      rows={2}
-                      className="text-sm focus-brand"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Activity Timeline */}
-            <div className="border-t pt-6">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Activity Timeline</h4>
-
-              {/* Add activity form */}
-              <div className="space-y-3 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-1 mb-1">
-                  {([
-                    { key: 'note' as const, label: 'Note', icon: <StickyNote className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-700 border-gray-200' },
-                    { key: 'message' as const, label: 'Message', icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-sky-100 text-sky-700 border-sky-200' },
-                    { key: 'meeting' as const, label: 'Meeting', icon: <Calendar className="h-3.5 w-3.5" />, color: 'bg-purple-100 text-purple-700 border-purple-200' },
-                    { key: 'proposal' as const, label: 'Proposal', icon: <FileText className="h-3.5 w-3.5" />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
-                  ]).map(t => (
-                    <button
-                      key={t.key}
-                      type="button"
-                      onClick={() => setActivityForm(f => ({ ...f, type: t.key }))}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                        activityForm.type === t.key ? t.color : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      {t.icon}
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Direction toggle — only meaningful for messages.
-                    Defaults to outbound. Setting to inbound stamps
-                    last_reply_at on the opportunity (so the funnel
-                    can count replies). Hidden for note/meeting/proposal
-                    since those are always team-side actions. */}
-                {activityForm.type === 'message' && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-500">Direction:</span>
-                    {([
-                      { v: 'outbound' as const, label: 'Outbound (we sent)', cls: 'bg-sky-100 text-sky-700 border-sky-200' },
-                      { v: 'inbound' as const,  label: 'Inbound (reply)',    cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-                    ]).map(opt => {
-                      const current = activityForm.direction ?? 'outbound';
-                      const active = current === opt.v;
-                      return (
-                        <button
-                          key={opt.v}
-                          type="button"
-                          onClick={() => setActivityForm(f => ({ ...f, direction: opt.v }))}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium transition-colors ${
-                            active ? opt.cls : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Title..."
-                    value={activityForm.title}
-                    onChange={e => setActivityForm(f => ({ ...f, title: e.target.value }))}
-                    className="h-9 text-sm flex-1 focus-brand"
-                  />
-                </div>
-                <Textarea
-                  placeholder="Description (optional)"
-                  value={activityForm.description || ''}
-                  onChange={e => setActivityForm(f => ({ ...f, description: e.target.value }))}
-                  className="text-sm min-h-[60px] focus-brand"
-                  rows={2}
-                />
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Outcome"
-                    value={activityForm.outcome || ''}
-                    onChange={e => setActivityForm(f => ({ ...f, outcome: e.target.value }))}
-                    className="h-9 text-sm flex-1 focus-brand"
-                  />
-                  <Input
-                    placeholder="Next step"
-                    value={activityForm.next_step || ''}
-                    onChange={e => setActivityForm(f => ({ ...f, next_step: e.target.value }))}
-                    className="h-9 text-sm flex-1 focus-brand"
-                  />
-                </div>
-                {/* Meeting Date/Time (only for meeting type) */}
-                {activityForm.type === 'meeting' && (
-                  <div className="flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="h-9 text-sm flex-1 focus-brand justify-start font-normal"
-                          style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityMeetingDate ? '#111827' : '#9ca3af' }}
-                        >
-                          <Calendar className="mr-2 h-4 w-4" />
-                          {activityMeetingDate ? format(new Date(activityMeetingDate), 'MMM d, yyyy') : 'Meeting date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                        <CalendarPicker
-                          mode="single"
-                          selected={activityMeetingDate ? new Date(activityMeetingDate) : undefined}
-                          onSelect={date => setActivityMeetingDate(date ? date.toISOString() : undefined)}
-                          initialFocus
-                          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="h-9 text-sm flex-1 focus-brand justify-start font-normal"
-                          style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityMeetingTime ? '#111827' : '#9ca3af' }}
-                        >
-                          <Clock className="mr-2 h-4 w-4" />
-                          {activityMeetingTime
-                            ? (() => { const [h, m] = activityMeetingTime.split(':').map(Number); return `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; })()
-                            : 'Time'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                        <div className="flex gap-0 divide-x">
-                          <ScrollArea className="h-[200px] w-[70px]">
-                            <div className="p-1">
-                              {Array.from({ length: 24 }, (_, h) => {
-                                const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'PM' : 'AM'}`;
-                                const isSelected = activityMeetingTime && parseInt(activityMeetingTime.split(':')[0]) === h;
-                                return (
-                                  <Button
-                                    key={h}
-                                    variant={isSelected ? 'brand' : 'ghost'}
-                                    className="w-full justify-center font-normal text-xs h-7 px-1"
-                                    onClick={() => {
-                                      const currentMin = activityMeetingTime ? activityMeetingTime.split(':')[1] : '00';
-                                      setActivityMeetingTime(`${String(h).padStart(2, '0')}:${currentMin}`);
-                                    }}
-                                  >
-                                    {label}
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                          </ScrollArea>
-                          <ScrollArea className="h-[200px] w-[50px]">
-                            <div className="p-1">
-                              {Array.from({ length: 60 }, (_, m) => {
-                                const isSelected = activityMeetingTime && parseInt(activityMeetingTime.split(':')[1]) === m;
-                                return (
-                                  <Button
-                                    key={m}
-                                    variant={isSelected ? 'brand' : 'ghost'}
-                                    className="w-full justify-center font-normal text-xs h-7 px-1"
-                                    onClick={() => {
-                                      const currentHour = activityMeetingTime ? activityMeetingTime.split(':')[0] : '09';
-                                      setActivityMeetingTime(`${currentHour}:${String(m).padStart(2, '0')}`);
-                                    }}
-                                  >
-                                    {String(m).padStart(2, '0')}
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                          </ScrollArea>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
-                <div className="flex gap-2 items-center">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-9 text-sm flex-1 focus-brand justify-start font-normal"
-                        style={{
-                          borderColor: '#e5e7eb',
-                          backgroundColor: 'white',
-                          color: activityForm.next_step_date ? '#111827' : '#9ca3af'
-                        }}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {activityForm.next_step_date
-                          ? new Date(activityForm.next_step_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : 'Next step date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={activityForm.next_step_date ? new Date(activityForm.next_step_date) : undefined}
-                        onSelect={(date) => setActivityForm(f => ({ ...f, next_step_date: date ? date.toISOString() : undefined }))}
-                        initialFocus
-                        classNames={{
-                          day_selected: 'text-white hover:text-white focus:text-white',
-                        }}
-                        modifiersStyles={{
-                          selected: { backgroundColor: '#3e8692' }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Button variant="brand" size="sm" className="h-9 text-sm" onClick={handleAddActivity} disabled={isActivitySubmitting || !activityForm.title.trim()}>
-                    {isActivitySubmitting ? '...' : 'Add'}
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={activityFileRef}
-                    className="hidden"
-                    onChange={e => setActivityFile(e.target.files?.[0] || null)}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs text-gray-500"
-                    onClick={() => activityFileRef.current?.click()}
-                  >
-                    <Paperclip className="h-3.5 w-3.5 mr-1" />
-                    {activityFile ? 'Change file' : 'Attach file'}
-                  </Button>
-                  {activityFile && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-white border rounded-md px-2 py-1">
-                      <Paperclip className="h-3 w-3 text-gray-400" />
-                      <span className="truncate max-w-[180px]">{activityFile.name}</span>
-                      <button type="button" onClick={() => { setActivityFile(null); if (activityFileRef.current) activityFileRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Activity list — [Auto-stamp, May 2026] now renders the
-                  unified TimelineEntry feed (manual + stage + meetings
-                  + Telegram). Source-specific styling lives in the
-                  helpers below the map; per-entry render is mostly
-                  source-agnostic. */}
-              <div className="space-y-4">
-                {activities.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">No activity yet</p>
-                ) : activities.map(act => {
-                  // Per-source visual treatment so the user can scan
-                  // origin at a glance: manual = gray, stage_change =
-                  // brand-tinted, meeting = sky, telegram = subtle.
-                  const sourceStyle =
-                    act.source === 'stage_change' ? { wrapper: 'bg-brand/10 text-brand', badge: 'bg-brand/10 text-brand border-brand/30' } :
-                    act.source === 'meeting'      ? { wrapper: 'bg-purple-100 text-purple-700', badge: 'bg-purple-50 text-purple-700 border-purple-200' } :
-                    act.source === 'telegram'     ? { wrapper: 'bg-sky-50 text-sky-600',    badge: 'bg-sky-50 text-sky-700 border-sky-200' } :
-                    { wrapper: 'bg-gray-100 text-gray-500', badge: '' };
-                  const sourceLabel =
-                    act.source === 'stage_change' ? 'stage' :
-                    act.source === 'meeting'      ? 'meeting' :
-                    act.source === 'telegram'     ? 'telegram' :
-                    act.type;
-                  return (
-                  <div key={act.id} className="flex gap-3">
-                    <div className="mt-0.5 flex flex-col items-center">
-                      <div className={`p-2 rounded-full ${sourceStyle.wrapper}`}>
-                        {activityIcon(act.type)}
-                      </div>
-                      <div className="w-px flex-1 bg-gray-200 mt-2" />
-                    </div>
-                    <div className="flex-1 min-w-0 pb-4 overflow-hidden">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-gray-900 break-words">{linkifyText(act.title)}</span>
-                        <Badge variant="outline" className={`text-[10px] px-1.5 capitalize flex-shrink-0 ${sourceStyle.badge}`}>{sourceLabel}</Badge>
-                      </div>
-                      {act.description && <p className="text-sm text-gray-600 mt-1 break-words overflow-wrap-anywhere" style={{ overflowWrap: 'anywhere' }}>{linkifyText(act.description)}</p>}
-                      {act.outcome && (
-                        <p className="text-sm text-gray-500 mt-1 break-words" style={{ overflowWrap: 'anywhere' }}>
-                          <span className="font-medium text-gray-700">Outcome:</span> {linkifyText(act.outcome)}
-                        </p>
-                      )}
-                      {act.next_step && (
-                        <div className="flex items-start gap-1 mt-1 text-sm text-blue-600">
-                          <ArrowRight className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                          <span className="break-words" style={{ overflowWrap: 'anywhere' }}>{linkifyText(act.next_step)}</span>
-                          {act.next_step_date && (
-                            <span className="text-gray-400 ml-1">
-                              ({format(new Date(act.next_step_date), 'MMM d')})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {act.attachment_url && (
-                        <a
-                          href={act.attachment_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-1.5 text-xs text-brand hover:underline"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <Paperclip className="h-3 w-3" />
-                          {act.attachment_name || 'Attachment'}
-                        </a>
-                      )}
-                      <span className="text-xs text-gray-400 mt-1.5 block">
-                        {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </ScrollArea>
-        )}
-      </div>
-
-      {/* Stage History dialog — restored from the legacy /crm/pipeline.
-          Sourced from crm_stage_history; recordStageHistory() in
-          crmService writes to it on every updateOpportunity stage change.
-          Z-index above the slide-over (z-[80] > z-[70]) so it floats
-          on top when triggered. */}
-      <Dialog open={stageHistoryOpen} onOpenChange={setStageHistoryOpen}>
-        <DialogContent className="max-w-lg z-[80]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-4 w-4 text-brand" />
-              Stage History
-            </DialogTitle>
-            <DialogDescription>
-              Timeline for <span className="font-medium">{slideOverOpp?.name}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[420px]">
-            <div className="space-y-4 py-2">
-              {stageHistoryLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              ) : stageHistory.length === 0 ? (
-                <p className="text-center text-sm text-gray-500 py-6">No history recorded yet.</p>
-              ) : (
-                <div className="relative">
-                  <div className="absolute left-4 top-1 bottom-1 w-0.5 bg-gray-200" />
-                  {stageHistory.map(entry => (
-                    <div key={entry.id} className="relative pl-10 pb-4">
-                      <div className="absolute left-2.5 top-1.5 w-3 h-3 bg-white border-2 border-gray-400 rounded-full" />
-                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          {entry.from_stage ? (
-                            <>
-                              <Badge variant="outline" className="text-[10px]">
-                                {STAGE_LABELS[entry.from_stage as SalesPipelineStage] || entry.from_stage}
-                              </Badge>
-                              <ArrowRight className="h-3 w-3 text-gray-400" />
-                              <Badge className="text-[10px] bg-brand text-white">
-                                {STAGE_LABELS[entry.to_stage as SalesPipelineStage] || entry.to_stage}
-                              </Badge>
-                            </>
-                          ) : (
-                            <Badge className="text-[10px] bg-brand text-white">
-                              Created as {STAGE_LABELS[entry.to_stage as SalesPipelineStage] || entry.to_stage}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-gray-500 flex items-center gap-2">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(entry.changed_at), 'MMM d, yyyy h:mm a')}
-                          {entry.changed_by && (
-                            <>· <span className="text-gray-600">{getUserName(entry.changed_by)}</span></>
-                          )}
-                        </p>
-                        {entry.notes && (
-                          <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{entry.notes}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setStageHistoryOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      </>,
-      document.body
-    );
-  };
 
   // ============================================
   // RENDER: Create / Edit Dialog
   // ============================================
 
-  const renderFormDialog = () => {
-    const isEdit = !!editingOpp;
-    // Only open as dialog for create, or edit when NOT in slide-over edit mode
-    const isOpen = isCreateOpen || (!!editingOpp && slideOverMode !== 'edit');
-
-    return (
-      <Dialog open={isOpen} onOpenChange={open => {
-        if (!open) { setIsCreateOpen(false); setEditingOpp(null); setForm({ name: '' }); }
-      }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isEdit ? 'Edit Opportunity' : 'New Opportunity'}</DialogTitle>
-            <DialogDescription>
-              {isEdit ? 'Update opportunity details.' : 'Add a new opportunity to the sales pipeline.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={e => { e.preventDefault(); isEdit ? handleUpdate() : handleCreate(); }}>
-            <div className="grid gap-4 py-4">
-              {/* Basic Info */}
-              <div className="grid gap-2">
-                <Label>Name <RequiredAsterisk /></Label>
-                <Input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Company or contact name"
-                  className="focus-brand"
-                />
-              </div>
-
-              {!isEdit && (
-                <div className="grid gap-2">
-                  <Label>Stage</Label>
-                  <Select value={form.stage || 'cold_dm'} onValueChange={v => setForm(f => ({ ...f, stage: v as SalesPipelineStage }))}>
-                    <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ALL_V2_STAGES.filter(s => s !== 'proposal_sent').map(s => (
-                        <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>POC Platform</Label>
-                  <Select value={form.poc_platform || ''} onValueChange={v => setForm(f => ({ ...f, poc_platform: v as PocPlatform }))}>
-                    <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      {POC_PLATFORMS.map(p => (
-                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>POC Handle / ID</Label>
-                  <Input
-                    value={form.poc_handle || ''}
-                    onChange={e => setForm(f => ({ ...f, poc_handle: e.target.value }))}
-                    placeholder="@handle or ID"
-                    className="focus-brand"
-                  />
-                </div>
-              </div>
-
-              {/* Project Twitter — the project-level X/Twitter URL or
-                  handle. Populated here so the Twitter "+" affordance
-                  on the row hover (renderProjectNameSuffix) becomes a
-                  resolved link. */}
-              <div className="grid gap-2">
-                <Label>Project Twitter</Label>
-                <Input
-                  value={form.twitter_handle || ''}
-                  onChange={e => setForm(f => ({ ...f, twitter_handle: e.target.value }))}
-                  placeholder="@handle or https://x.com/handle"
-                  className="focus-brand"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Owner</Label>
-                <Select
-                  value={form.owner_id || ''}
-                  onValueChange={v => setForm(f => ({ ...f, owner_id: v }))}
-                >
-                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>
-                    {activeUsers.map(u => (
-                      <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Co-Owners</Label>
-                <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-white">
-                  {(form.co_owner_ids || []).map(id => {
-                    const u = users.find(u => u.id === id);
-                    return (
-                      <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
-                        {u?.name || u?.email || id}
-                        <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-rose-500 ml-0.5">&times;</button>
-                      </span>
-                    );
-                  })}
-                  <Select value="" onValueChange={v => { if (v && !(form.co_owner_ids || []).includes(v) && v !== form.owner_id) setForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] })); }}>
-                    <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
-                    <SelectContent>
-                      {activeUsers.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Source</Label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: 'cold_outreach', label: 'Cold Outreach' },
-                    { value: 'referral', label: 'Referral' },
-                    { value: 'inbound', label: 'Inbound' },
-                    { value: 'event', label: 'Event' },
-                    { value: 'twitter', label: 'Twitter' },
-                    { value: 'linkedin', label: 'LinkedIn' },
-                    { value: 'telegram', label: 'Telegram' },
-                    { value: 'website', label: 'Website' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, source: f.source === opt.value ? undefined : opt.value }))}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                        form.source === opt.value
-                          ? 'bg-brand text-white border-transparent'
-                          : 'text-gray-600 border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {form.source === 'referral' && (
-                <div className="grid gap-2">
-                  <Label>Referrer</Label>
-                  <Input
-                    value={form.referrer || ''}
-                    onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))}
-                    placeholder="Who referred?"
-                    className="focus-brand"
-                  />
-                </div>
-              )}
-
-              {form.source !== 'cold_outreach' && (
-                <div className="grid gap-2">
-                  <Label>Affiliate</Label>
-                  <Popover open={affiliatePopoverOpen} onOpenChange={setAffiliatePopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between font-normal focus-brand"
-                      >
-                        {form.affiliate_id
-                          ? affiliates.find(a => a.id === form.affiliate_id)?.name || 'Select affiliate...'
-                          : 'Select affiliate...'}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[350px] p-0">
-                      <Command>
-                        <CommandInput
-                          placeholder="Search or type new affiliate..."
-                          value={affiliateSearch}
-                          onValueChange={setAffiliateSearch}
-                        />
-                        <CommandList>
-                          <CommandEmpty>
-                            <button
-                              type="button"
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                              onClick={async () => {
-                                if (!affiliateSearch.trim()) return;
-                                try {
-                                  const created = await CRMService.createAffiliate({
-                                    name: affiliateSearch.trim(),
-                                    owner_id: user?.id,
-                                  });
-                                  setAffiliates(prev => [...prev, created]);
-                                  setForm(f => ({ ...f, affiliate_id: created.id }));
-                                  setAffiliateSearch('');
-                                  setAffiliatePopoverOpen(false);
-                                } catch (err) {
-                                  console.error('Error creating affiliate:', err);
-                                }
-                              }}
-                            >
-                              <Plus className="h-4 w-4 text-brand" />
-                              <span>Add "<strong>{affiliateSearch}</strong>" as new affiliate</span>
-                            </button>
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {affiliates.map(a => (
-                              <CommandItem
-                                key={a.id}
-                                value={a.name}
-                                onSelect={() => {
-                                  setForm(f => ({ ...f, affiliate_id: f.affiliate_id === a.id ? undefined : a.id }));
-                                  setAffiliateSearch('');
-                                  setAffiliatePopoverOpen(false);
-                                }}
-                              >
-                                <Check className={`mr-2 h-4 w-4 ${form.affiliate_id === a.id ? 'opacity-100' : 'opacity-0'}`} />
-                                {a.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
-
-              <div className="grid gap-2">
-                <Label>Notes</Label>
-                <Textarea
-                  value={form.notes || ''}
-                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Additional notes..."
-                  className="focus-brand"
-                  rows={3}
-                />
-              </div>
-
-              {/* Details Section — hidden for now */}
-              {isEdit && <details className="group hidden">
-                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 select-none">
-                  <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
-                  Details
-                </summary>
-                <div className="grid gap-4 mt-3 pl-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label>Path</Label>
-                      <Select
-                        value={form.dm_account || 'sdr'}
-                        onValueChange={v => setForm(f => ({ ...f, dm_account: v as DmAccount }))}
-                      >
-                        <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="closer">Closer (Path A)</SelectItem>
-                          <SelectItem value="sdr">SDR (Path B)</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Bucket</Label>
-                      <Select
-                        value={form.bucket || ''}
-                        onValueChange={v => setForm(f => ({ ...f, bucket: v as Bucket }))}
-                      >
-                        <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="A">A - High Priority</SelectItem>
-                          <SelectItem value="B">B - Medium</SelectItem>
-                          <SelectItem value="C">C - Low Priority</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>TG Handle</Label>
-                    <Input
-                      value={form.tg_handle || ''}
-                      onChange={e => setForm(f => ({ ...f, tg_handle: e.target.value }))}
-                      placeholder="@handle"
-                      className="focus-brand"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label>Deal Value</Label>
-                      <Input
-                        type="number"
-                        value={form.deal_value || ''}
-                        onChange={e => setForm(f => ({ ...f, deal_value: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                        placeholder="0"
-                        className="focus-brand"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Currency</Label>
-                      <Select
-                        value={form.currency || 'USD'}
-                        onValueChange={v => setForm(f => ({ ...f, currency: v }))}
-                      >
-                        <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="USDT">USDT</SelectItem>
-                          <SelectItem value="USDC">USDC</SelectItem>
-                          <SelectItem value="ETH">ETH</SelectItem>
-                          <SelectItem value="BTC">BTC</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {isEdit && (
-                    <div className="grid gap-2">
-                      <Label>Temperature Score: {form.temperature_score || 50} (Manual Override)</Label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={form.temperature_score || 50}
-                        onChange={e => setForm(f => ({ ...f, temperature_score: parseInt(e.target.value) }))}
-                        className="w-full accent-brand"
-                      />
-                    </div>
-                  )}
-                </div>
-              </details>}
-          </div>
-
-            {/* Copy Booking Link - only in edit mode */}
-            {isEdit && editingOpp && (
-              <div className="border-t pt-3 mb-1">
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={bookingUserId[`edit-${editingOpp.id}`] || editingOpp.owner_id || ''}
-                    onValueChange={v => setBookingUserId(prev => ({ ...prev, [`edit-${editingOpp.id}`]: v }))}
-                  >
-                    <SelectTrigger className="h-8 text-sm flex-1">
-                      <SelectValue placeholder="Team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeUsers.map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-sm whitespace-nowrap"
-                    onClick={() => copyBookingLink(bookingUserId[`edit-${editingOpp.id}`] || editingOpp.owner_id || '', editingOpp.id)}
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Copy Booking Link
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setEditingOpp(null); setForm({ name: '' }); }}>
-                Cancel
-              </Button>
-              <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()}>
-                {isSubmitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    );
-  };
 
   // ============================================
   // RENDER: Activity Log Prompt
   // ============================================
 
-  const renderActivityLogPrompt = () => {
-    const ACTIVITY_TYPE_LABELS: Record<ActivityType, { label: string; icon: React.ReactNode; color: string }> = {
-      call: { label: 'Call', icon: <Phone className="h-3.5 w-3.5" />, color: 'bg-blue-100 text-blue-700' },
-      message: { label: 'Message', icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-sky-100 text-sky-700' },
-      meeting: { label: 'Meeting', icon: <Calendar className="h-3.5 w-3.5" />, color: 'bg-purple-100 text-purple-700' },
-      proposal: { label: 'Proposal', icon: <FileText className="h-3.5 w-3.5" />, color: 'bg-amber-100 text-amber-700' },
-      note: { label: 'Note', icon: <StickyNote className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-700' },
-      bump: { label: 'Bump', icon: <Zap className="h-3.5 w-3.5" />, color: 'bg-orange-100 text-orange-700' },
-    };
-
-    const typeInfo = activityLogPrompt ? ACTIVITY_TYPE_LABELS[activityLogPrompt.type] : null;
-    const meetingDateObj = activityLogForm.meeting_date ? new Date(activityLogForm.meeting_date) : undefined;
-
-    // Apply meeting_time to meetingDateObj for display
-    const getMeetingDateTime = () => {
-      if (!meetingDateObj) return undefined;
-      const d = new Date(meetingDateObj);
-      if (activityLogForm.meeting_time) {
-        const [h, m] = activityLogForm.meeting_time.split(':').map(Number);
-        d.setHours(h, m, 0, 0);
-      }
-      return d;
-    };
-
-    return (
-      <Dialog open={!!activityLogPrompt} onOpenChange={open => { if (!open) { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined }); } }}>
-        <DialogContent className="sm:max-w-md z-[80] max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Log Activity — {activityLogPrompt?.oppName}</DialogTitle>
-            <DialogDescription>Add context to this activity before saving.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 overflow-y-auto flex-1 px-1 -mx-1">
-            {/* Type selector */}
-            <div className="flex flex-wrap items-center gap-1">
-              {([
-                { key: 'note' as ActivityType, label: 'Note', icon: <StickyNote className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-700 border-gray-300' },
-                { key: 'message' as ActivityType, label: 'Message', icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-sky-100 text-sky-700 border-sky-300' },
-                { key: 'meeting' as ActivityType, label: 'Meeting', icon: <Calendar className="h-3.5 w-3.5" />, color: 'bg-purple-100 text-purple-700 border-purple-300' },
-                { key: 'proposal' as ActivityType, label: 'Proposal', icon: <FileText className="h-3.5 w-3.5" />, color: 'bg-amber-100 text-amber-700 border-amber-300' },
-                { key: 'bump' as ActivityType, label: 'Bump', icon: <Zap className="h-3.5 w-3.5" />, color: 'bg-orange-100 text-orange-700 border-orange-300' },
-              ]).map(t => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setActivityLogPrompt(prev => prev ? { ...prev, type: t.key } : prev)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                    activityLogPrompt?.type === t.key ? t.color : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Template picker for message/bump type */}
-            {(activityLogPrompt?.type === 'message' || activityLogPrompt?.type === 'bump') && (() => {
-              const opp = opportunities.find(o => o.id === activityLogPrompt.oppId);
-              const oppStage = opp?.stage || '';
-              const stageTemplates = templates.filter(t => t.is_active && (t.stage === oppStage || (activityLogPrompt.type === 'bump' && t.stage === 'bump')));
-              const otherTemplates = templates.filter(t => t.is_active && t.stage !== oppStage && !(activityLogPrompt.type === 'bump' && t.stage === 'bump'));
-              return (
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DM Template <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                  <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="focus-brand justify-between font-normal text-sm h-10">
-                        Pick a template...
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[90]" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search templates..." />
-                        <CommandList>
-                          <CommandEmpty>No templates found.</CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem onSelect={() => { setActivityLogForm(f => ({ ...f, description: '' })); setTemplatePopoverOpen(false); }}>
-                              No template
-                            </CommandItem>
-                          </CommandGroup>
-                          {stageTemplates.length > 0 && (
-                            <CommandGroup heading={`Current Stage — ${oppStage.replace(/_/g, ' ')}`}>
-                              {stageTemplates.map(t => (
-                                <CommandItem key={t.id} onSelect={() => { setActivityLogForm(f => ({ ...f, description: t.content })); setTemplatePopoverOpen(false); }}>
-                                  <div className="flex items-center gap-2 w-full">
-                                    <span>{t.name}</span>
-                                    {(t.tags || []).length > 0 && (
-                                      <span className="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{(t.tags || []).join(', ')}</span>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          )}
-                          {otherTemplates.length > 0 && (
-                            <CommandGroup heading="Other Stages">
-                              {otherTemplates.map(t => (
-                                <CommandItem key={t.id} onSelect={() => { setActivityLogForm(f => ({ ...f, description: t.content })); setTemplatePopoverOpen(false); }}>
-                                  <div className="flex items-center gap-2 w-full">
-                                    <span>{t.name}</span>
-                                    <span className="text-gray-400 text-xs">({t.stage.replace(/_/g, ' ')})</span>
-                                    {(t.tags || []).length > 0 && (
-                                      <span className="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{(t.tags || []).join(', ')}</span>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              );
-            })()}
-
-            {/* Title (editable) */}
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</Label>
-              <Input
-                value={activityLogForm.title}
-                onChange={e => setActivityLogForm(f => ({ ...f, title: e.target.value }))}
-                className="focus-brand"
-                placeholder="Activity title..."
-              />
-            </div>
-
-            {/* Copy Booking Link — send to prospect so they self-book */}
-            {activityLogPrompt?.showMeetingPicker && (
-              <div className="p-3 bg-brand/5 border border-brand/20 rounded-lg">
-                <p className="text-xs text-gray-600 mb-2">Send a booking link so they can pick a time themselves:</p>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={bookingUserId[`activity-${activityLogPrompt.oppId}`] || activityLogPrompt.ownerId || ''}
-                    onValueChange={v => setBookingUserId(prev => ({ ...prev, [`activity-${activityLogPrompt.oppId}`]: v }))}
-                  >
-                    <SelectTrigger className="h-8 text-sm flex-1 border-brand/30">
-                      <SelectValue placeholder="Team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeUsers.map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-sm whitespace-nowrap border-brand/30 text-brand hover:bg-brand/10"
-                    onClick={() => copyBookingLink(bookingUserId[`activity-${activityLogPrompt.oppId}`] || activityLogPrompt.ownerId || '', activityLogPrompt.oppId)}
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Booking Link
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Meeting Date/Time pickers */}
-            {activityLogPrompt?.showMeetingPicker && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Date <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="focus-brand justify-start text-left font-normal w-full"
-                        style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityLogForm.meeting_date ? '#111827' : '#9ca3af' }}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {meetingDateObj ? format(meetingDateObj, 'MMM d, yyyy') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[90]" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={meetingDateObj}
-                        onSelect={date => {
-                          setActivityLogForm(f => ({ ...f, meeting_date: date ? date.toISOString() : undefined }));
-                        }}
-                        initialFocus
-                        classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                        modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Time <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="focus-brand justify-start text-left font-normal w-full"
-                        style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityLogForm.meeting_time ? '#111827' : '#9ca3af' }}
-                      >
-                        <Clock className="mr-2 h-4 w-4" />
-                        {activityLogForm.meeting_time
-                          ? (() => { const [h, m] = activityLogForm.meeting_time!.split(':').map(Number); return `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; })()
-                          : 'Select time'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[90]" align="start">
-                      <div className="flex gap-0 divide-x">
-                        <ScrollArea className="h-[200px] w-[70px]">
-                          <div className="p-1">
-                            {Array.from({ length: 24 }, (_, h) => {
-                              const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'PM' : 'AM'}`;
-                              const isSelected = activityLogForm.meeting_time && parseInt(activityLogForm.meeting_time.split(':')[0]) === h;
-                              return (
-                                <Button
-                                  key={h}
-                                  variant={isSelected ? 'brand' : 'ghost'}
-                                  className="w-full justify-center font-normal text-xs h-7 px-1"
-                                  onClick={() => {
-                                    const currentMin = activityLogForm.meeting_time ? activityLogForm.meeting_time.split(':')[1] : '00';
-                                    setActivityLogForm(f => ({ ...f, meeting_time: `${String(h).padStart(2, '0')}:${currentMin}` }));
-                                  }}
-                                >
-                                  {label}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        </ScrollArea>
-                        <ScrollArea className="h-[200px] w-[50px]">
-                          <div className="p-1">
-                            {Array.from({ length: 60 }, (_, m) => {
-                              const isSelected = activityLogForm.meeting_time && parseInt(activityLogForm.meeting_time.split(':')[1]) === m;
-                              return (
-                                <Button
-                                  key={m}
-                                  variant={isSelected ? 'brand' : 'ghost'}
-                                  className="w-full justify-center font-normal text-xs h-7 px-1"
-                                  onClick={() => {
-                                    const currentHour = activityLogForm.meeting_time ? activityLogForm.meeting_time.split(':')[0] : '09';
-                                    setActivityLogForm(f => ({ ...f, meeting_time: `${currentHour}:${String(m).padStart(2, '0')}` }));
-                                  }}
-                                >
-                                  {String(m).padStart(2, '0')}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        </ScrollArea>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            )}
-
-            {/* Co-Owners — shown when booking a meeting */}
-            {activityLogPrompt?.showMeetingPicker && (
-              <div className="grid gap-1.5">
-                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Co-Owners for this Meeting</Label>
-                <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-white">
-                  {(activityLogForm.co_owner_ids || []).map(id => {
-                    const u = users.find(u => u.id === id);
-                    return (
-                      <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
-                        {u?.name || u?.email || id}
-                        <button type="button" onClick={() => setActivityLogForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-rose-500 ml-0.5">&times;</button>
-                      </span>
-                    );
-                  })}
-                  <Select value="" onValueChange={v => {
-                    if (v && !(activityLogForm.co_owner_ids || []).includes(v)) {
-                      setActivityLogForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] }));
-                    }
-                  }}>
-                    <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
-                    <SelectContent>
-                      {activeUsers.filter(u => !(activityLogForm.co_owner_ids || []).includes(u.id)).map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Description */}
-            <div className="grid gap-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{activityLogPrompt?.type === 'message' ? 'Message' : 'Description'} <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                {activityLogPrompt?.type === 'message' && activityLogForm.description && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs text-gray-500 hover:text-brand"
-                    onClick={() => {
-                      navigator.clipboard.writeText(activityLogForm.description);
-                      toast({ title: 'Copied to clipboard' });
-                    }}
-                  >
-                    <Copy className="h-3 w-3 mr-1" />
-                    Copy
-                  </Button>
-                )}
-              </div>
-              <Textarea
-                value={activityLogForm.description}
-                onChange={e => setActivityLogForm(f => ({ ...f, description: e.target.value }))}
-                className="focus-brand min-h-[60px]"
-                placeholder={activityLogPrompt?.type === 'message' ? 'DM content...' : 'Add context...'}
-                rows={activityLogPrompt?.type === 'message' ? 4 : 2}
-              />
-            </div>
-
-            {/* Outcome + Next Step */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5">
-                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Outcome <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                <Input
-                  value={activityLogForm.outcome}
-                  onChange={e => setActivityLogForm(f => ({ ...f, outcome: e.target.value }))}
-                  className="focus-brand"
-                  placeholder="Result..."
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Next Step <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                <Input
-                  value={activityLogForm.next_step}
-                  onChange={e => setActivityLogForm(f => ({ ...f, next_step: e.target.value }))}
-                  className="focus-brand"
-                  placeholder="What's next..."
-                />
-              </div>
-            </div>
-
-            {/* Next Step Date */}
-            <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Next Step Date <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="focus-brand justify-start text-left font-normal w-full"
-                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityLogForm.next_step_date ? '#111827' : '#9ca3af' }}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {activityLogForm.next_step_date
-                      ? new Date(activityLogForm.next_step_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : 'Select date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[90]" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={activityLogForm.next_step_date ? new Date(activityLogForm.next_step_date) : undefined}
-                    onSelect={date => setActivityLogForm(f => ({ ...f, next_step_date: date ? date.toISOString() : undefined }))}
-                    initialFocus
-                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined }); }}>Cancel</Button>
-            <Button variant="brand" onClick={confirmActivityLog} disabled={isActivityLogSubmitting}>
-              {isActivityLogSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Log Activity
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
 
   // ============================================
   // RENDER: Orbit Reason Prompt
   // ============================================
 
-  const renderOrbitPrompt = () => (
-    <Dialog open={!!orbitPrompt} onOpenChange={open => { if (!open) setOrbitPrompt(null); }}>
-      <DialogContent className="sm:max-w-sm z-[80]">
-        <DialogHeader>
-          <DialogTitle>Move to Orbit</DialogTitle>
-          <DialogDescription>Select the reason for moving this opportunity to orbit.</DialogDescription>
-        </DialogHeader>
-        <Select value={orbitReasonValue} onValueChange={v => setOrbitReasonValue(v as OrbitReason)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {ORBIT_REASONS.map(r => (
-              <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div>
-          <label className="text-sm font-medium mb-1 block">Follow up in X days</label>
-          <Input
-            type="number"
-            min={1}
-            value={orbitFollowupDays}
-            onChange={e => setOrbitFollowupDays(Math.max(1, parseInt(e.target.value) || 90))}
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setOrbitPrompt(null); setOrbitFollowupDays(90); }}>Cancel</Button>
-          <Button variant="brand" onClick={confirmOrbit}>Confirm</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  // renderOrbitPrompt + renderClosedLostPrompt extracted to
+  // components/crm/sales-pipeline/dialogs/{OrbitDialog,ClosedLostDialog}.tsx
+  // on 2026-06-02 as part of Phase 3.
 
-  const renderClosedLostPrompt = () => (
-    <Dialog open={!!closedLostPrompt} onOpenChange={open => { if (!open) setClosedLostPrompt(null); }}>
-      <DialogContent className="sm:max-w-sm z-[80]">
-        <DialogHeader>
-          <DialogTitle>Close as Lost</DialogTitle>
-          <DialogDescription>Optionally add a reason for closing this opportunity.</DialogDescription>
-        </DialogHeader>
-        <Input
-          value={closedLostReasonValue}
-          onChange={e => setClosedLostReasonValue(e.target.value)}
-          placeholder="Reason (optional)"
-        />
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setClosedLostPrompt(null)}>Cancel</Button>
-          <Button onClick={confirmClosedLost} variant="destructive">Close Lost</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 
-  const renderClosedWonPrompt = () => {
-    const filteredClients = closedWonClients.filter(c =>
-      c.name.toLowerCase().includes(closedWonClientSearch.toLowerCase()) ||
-      c.email.toLowerCase().includes(closedWonClientSearch.toLowerCase())
-    );
-    const selectedClient = closedWonClients.find(c => c.id === closedWonClientId);
-    const canConfirm = closedWonMode === 'new' ? closedWonName.trim() !== '' : closedWonClientId !== '';
+  // renderTgHandlePrompt extracted to
+  // components/crm/sales-pipeline/dialogs/TgHandleDialog.tsx
+  // on 2026-06-02 as the first dialog in Phase 3 of the structural
+  // split. Consumes tgHandle* + confirmTgHandle from
+  // SalesPipelineContext — see the provider value below.
 
-    return (
-      <Dialog open={!!closedWonPrompt} onOpenChange={open => { if (!open) setClosedWonPrompt(null); }}>
-        <DialogContent className="sm:max-w-sm z-[80]">
-          <DialogHeader>
-            <DialogTitle>Deal Won!</DialogTitle>
-            <DialogDescription>Link {closedWonPrompt?.oppName} to a client, or skip.</DialogDescription>
-          </DialogHeader>
-          <Select value={closedWonMode} onValueChange={v => setClosedWonMode(v as 'new' | 'existing')}>
-            <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new">Create New Client</SelectItem>
-              <SelectItem value="existing">Link Existing Client</SelectItem>
-            </SelectContent>
-          </Select>
-          {closedWonMode === 'new' ? (
-            <div className="space-y-2">
-              <div>
-                <Label className="text-sm font-medium">Client Name</Label>
-                <Input
-                  value={closedWonName}
-                  onChange={e => setClosedWonName(e.target.value)}
-                  placeholder="Company or contact name"
-                  autoFocus
-                  className="focus-brand"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Email</Label>
-                <Input
-                  value={closedWonEmail}
-                  onChange={e => setClosedWonEmail(e.target.value)}
-                  placeholder="client@example.com (optional)"
-                  type="email"
-                  className="focus-brand"
-                />
-              </div>
-            </div>
-          ) : (
-            <Popover open={closedWonClientPopoverOpen} onOpenChange={setClosedWonClientPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between focus-brand">
-                  {selectedClient ? selectedClient.name : 'Select a client...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0 z-[90]" align="start">
-                <Command>
-                  <CommandInput
-                    placeholder="Search clients..."
-                    value={closedWonClientSearch}
-                    onValueChange={setClosedWonClientSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>No clients found.</CommandEmpty>
-                    <CommandGroup>
-                      {filteredClients.map(client => (
-                        <CommandItem
-                          key={client.id}
-                          value={client.name}
-                          onSelect={() => {
-                            setClosedWonClientId(client.id);
-                            setClosedWonClientPopoverOpen(false);
-                          }}
-                        >
-                          <Check className={`mr-2 h-4 w-4 ${closedWonClientId === client.id ? 'opacity-100' : 'opacity-0'}`} />
-                          <div>
-                            <div className="font-medium">{client.name}</div>
-                            {client.email && <div className="text-xs text-gray-500">{client.email}</div>}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={skipClosedWon}>Skip</Button>
-            <Button variant="brand" onClick={confirmClosedWon} disabled={!canConfirm}>Confirm</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
-  const renderTgHandlePrompt = () => (
-    <Dialog open={!!tgHandlePrompt} onOpenChange={open => { if (!open) setTgHandlePrompt(null); }}>
-      <DialogContent className="sm:max-w-sm z-[80]">
-        <DialogHeader>
-          <DialogTitle>Enter TG Handle</DialogTitle>
-          <DialogDescription>Enter the Telegram handle for {tgHandlePrompt?.oppName}.</DialogDescription>
-        </DialogHeader>
-        <Input
-          value={tgHandleValue}
-          onChange={e => setTgHandleValue(e.target.value)}
-          placeholder="@handle"
-          autoFocus
-          className="focus-brand"
-        />
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setTgHandlePrompt(null)}>Cancel</Button>
-          <Button variant="brand" onClick={confirmTgHandle} disabled={!tgHandleValue.trim()} className="text-white">Confirm</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-
-  const renderBucketPrompt = () => (
-    <Dialog open={!!bucketPrompt} onOpenChange={open => { if (!open) setBucketPrompt(null); }}>
-      <DialogContent className="sm:max-w-sm z-[80]">
-        <DialogHeader>
-          <DialogTitle>Assign Bucket</DialogTitle>
-          <DialogDescription>How qualified is {bucketPrompt?.oppName} after the discovery call?</DialogDescription>
-        </DialogHeader>
-        <div className="flex gap-3">
-          {(['A', 'B', 'C'] as Bucket[]).map(b => (
-            <button
-              key={b}
-              onClick={() => setBucketValue(b)}
-              className={`flex-1 py-3 rounded-lg text-center font-semibold text-lg border-2 transition-all ${
-                bucketValue === b
-                  ? b === 'A' ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                    : b === 'B' ? 'border-amber-500 bg-amber-50 text-amber-700'
-                    : 'border-gray-400 bg-gray-50 text-gray-600'
-                  : 'border-gray-200 text-gray-400 hover:border-gray-300'
-              }`}
-            >
-              {b}
-              <div className="text-[10px] font-normal mt-0.5">
-                {b === 'A' ? 'Hot' : b === 'B' ? 'Warm' : 'Low'}
-              </div>
-            </button>
-          ))}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setBucketPrompt(null)}>Cancel</Button>
-          <Button variant="brand" onClick={confirmBucket} className="text-white">Confirm</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  // renderBucketPrompt extracted to
+  // components/crm/sales-pipeline/dialogs/BucketDialog.tsx
+  // on 2026-06-02 as part of Phase 3.
 
   // ============================================
   // RENDER: Loading
   // ============================================
 
+  // Side-effect the AlertCardsStrip fires when a card is *activated*
+  // (not toggled off): jump to the Actions tab with filters cleared
+  // so the filtered subset is visible immediately. Kept in the page
+  // so the strip stays unaware of activeTab/actionFilter — those are
+  // CRM-page concerns, not alert-strip concerns.
+  //
+  // **MUST sit above the `if (loading) return ...` early-return below**
+  // — hooks have to run in the same order every render. Placing this
+  // useCallback after the loading branch caused
+  // "Rendered more hooks than during the previous render" the first
+  // time `loading` flipped to `false`.
+  const handleAlertCardActivate = useCallback((_filter: AlertCardFilter) => {
+    setActiveTab('actions');
+    setActionFilter('all');
+    setActionPhaseFilter('all');
+  }, []);
+
   if (loading) {
+    // **Structural skeleton, not "Loading…".** Mirrors the loaded
+    // shape (PageHeader → unified search → F&M collapsed bar → tab
+    // strip → Actions tab body) so the page doesn't lurch when data
+    // arrives. Updated 2026-06-03 to match the post-merge layout:
+    // Today's Attention card is now inside the Actions tab body (not
+    // at page level), and Actions is the default tab.
     return (
-      <div className="flex flex-col h-full gap-6">
+      <div className="space-y-6">
         <PageHeader
           icon={Target}
           title="Sales"
           subtitle="Track and manage your active sales opportunities"
+          kicker="CRM · Sales"
+          kickerDot="brand"
           actions={(
             <>
-              <Skeleton className="h-10 w-64 rounded-md" />
-              <Skeleton className="h-10 w-36 rounded-md" />
+              <Skeleton className="h-9 w-28 rounded-md hidden md:block" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-9 w-40 rounded-md" />
             </>
           )}
         />
 
-        {/* Stats Cards — [Responsive cleanup, May 2026] add fallbacks */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-lg" />
-          ))}
+        {/* Unified search bar */}
+        <Skeleton className="h-9 w-full max-w-md rounded-md" />
+
+        {/* Forecast & Metrics — collapsed by default, 1-line header */}
+        <div className="bg-white rounded-xl border border-cream-200">
+          <div className="flex items-center justify-between gap-3 px-5 py-3">
+            <div className="flex items-center gap-2 flex-1">
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-3 w-44" />
+            </div>
+            <Skeleton className="h-4 w-4 rounded" />
+          </div>
         </div>
 
-        {/* Tabs and Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4">
-            <Skeleton className="h-10 w-56 rounded-md" />
-            <Skeleton className="h-10 w-40 rounded-md" />
+        {/* Main tab strip — 6 tabs (Overall merged into Actions on
+            2026-06-03), default Actions active. Widths approximate
+            the loaded tabs (Actions/Outreach/Pipeline/Orbit/Discovery/
+            Templates) so the first paint doesn't shift when text
+            renders. */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="inline-flex bg-cream-100 p-1 rounded-md border border-cream-200 gap-1">
+            {['w-24', 'w-24', 'w-24', 'w-20', 'w-24', 'w-24'].map((w, i) => (
+              <Skeleton key={i} className={`h-7 ${w} rounded`} />
+            ))}
           </div>
-          <div className="space-y-6 overflow-auto flex-1">
-            {[...Array(3)].map((_, i) => (
-              <div key={i}>
-                <Skeleton className="h-12 w-full rounded-t-lg" />
-                <div className="bg-white rounded-b-lg border border-gray-200 border-t-0 p-4 space-y-3">
-                  <Skeleton className="h-10 w-full" />
-                  {[...Array(2)].map((_, j) => (
-                    <Skeleton key={j} className="h-14 w-full" />
-                  ))}
-                </div>
+          <div className="h-7" />
+        </div>
+
+        {/* Actions tab body — Today's Attention card on top, then
+            Owner/Phase filter row, then the action queue table. */}
+        <div className="space-y-4">
+          {/* Today's Attention card */}
+          <div className="bg-white rounded-xl border border-cream-200 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-cream-100">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+              <Skeleton className="h-8 w-44 rounded-md" />
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 rounded-lg" />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Owner + Phase filter row */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <Skeleton className="h-8 w-72 rounded-md" />
+            <Skeleton className="h-8 w-96 rounded-md" />
+          </div>
+
+          {/* Action queue table */}
+          <div className="bg-white border border-cream-200 rounded-lg overflow-hidden">
+            <div className="bg-cream-50/80 border-b border-cream-200 px-4 py-2.5 flex items-center gap-3">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <Skeleton key={i} className="h-3 w-16" />
+              ))}
+            </div>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-4 py-3 border-b border-cream-100 last:border-0"
+              >
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 flex-1 max-w-[200px]" />
+                <Skeleton className="h-5 w-24 rounded-md" />
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-3 w-8" />
+                <Skeleton className="h-7 w-28 rounded-md" />
               </div>
             ))}
           </div>
@@ -7419,254 +2676,286 @@ export default function SalesPipelinePage() {
     );
   }
 
+
   // ============================================
   // MAIN RENDER
   // ============================================
 
+  // SalesPipelineProvider value — read-only data + setters that the
+  // extracted child components consume via useSalesPipeline(). Grows
+  // field-by-field as more components are extracted. The page itself
+  // remains the source of truth via the useState calls above.
+  const salesPipelineCtx = {
+    opportunities,
+    // Forecast view — wired for ForecastPanel.
+    forecastOpps,
+    forecastByPeriod,
+    forecastKpis,
+    users,
+    openSlideOver,
+    openEditDialog,
+    handleStageChange,
+    // Metrics view — wired for MetricsPanel.
+    activeUsers,
+    metricsUserId,
+    setMetricsUserId,
+    metricsRangeDays,
+    setMetricsRangeDays,
+    metricsBookingsLoading,
+    computeOutreachMetrics,
+    // TG handle prompt — wired for TgHandleDialog.
+    tgHandlePrompt,
+    setTgHandlePrompt,
+    tgHandleValue,
+    setTgHandleValue,
+    confirmTgHandle,
+    // Orbit reason prompt — wired for OrbitDialog.
+    orbitPrompt,
+    setOrbitPrompt,
+    orbitReasonValue,
+    setOrbitReasonValue,
+    orbitFollowupDays,
+    setOrbitFollowupDays,
+    confirmOrbit,
+    // Closed-lost reason prompt — wired for ClosedLostDialog.
+    closedLostPrompt,
+    setClosedLostPrompt,
+    closedLostReasonValue,
+    setClosedLostReasonValue,
+    confirmClosedLost,
+    // Closed-won client-link prompt — wired for ClosedWonDialog.
+    closedWonPrompt,
+    setClosedWonPrompt,
+    closedWonMode,
+    setClosedWonMode,
+    closedWonEmail,
+    setClosedWonEmail,
+    closedWonName,
+    setClosedWonName,
+    closedWonClientId,
+    setClosedWonClientId,
+    closedWonClients,
+    closedWonClientSearch,
+    setClosedWonClientSearch,
+    closedWonClientPopoverOpen,
+    setClosedWonClientPopoverOpen,
+    confirmClosedWon,
+    skipClosedWon,
+    // Bucket assignment prompt — wired for BucketDialog.
+    bucketPrompt,
+    setBucketPrompt,
+    bucketValue,
+    setBucketValue,
+    confirmBucket,
+    // Stage History dialog — wired for StageHistoryDialog.
+    stageHistoryOpen,
+    setStageHistoryOpen,
+    stageHistory,
+    stageHistoryLoading,
+    slideOverOpp,
+    getUserName,
+    // Slide-over — wired for OpportunitySlideOver.
+    setSlideOverOpp,
+    setSlideOverMode,
+    actionGuidance,
+    setActionGuidance,
+    isBAMFAM,
+    applyOppPatch,
+    openStageHistory,
+    handleDelete,
+    activities,
+    setActivities,
+    activityForm,
+    setActivityForm,
+    activityMeetingDate,
+    setActivityMeetingDate,
+    activityMeetingTime,
+    setActivityMeetingTime,
+    isActivitySubmitting,
+    activityFile,
+    setActivityFile,
+    activityFileRef,
+    handleAddActivity,
+    handleRecordBump,
+    handleReduceBump,
+    isBumping,
+    // Activity Log dialog — wired for ActivityLogDialog.
+    activityLogPrompt,
+    setActivityLogPrompt,
+    activityLogForm,
+    setActivityLogForm,
+    isActivityLogSubmitting,
+    templatePopoverOpen,
+    setTemplatePopoverOpen,
+    templates,
+    bookingUserId,
+    setBookingUserId,
+    confirmActivityLog,
+    copyBookingLink,
+    // Cross-tab navigation — wired for OverviewTab's JumpCards
+    // + Pulse chips that route the user to dedicated tabs.
+    setActiveTab,
+    // Overview tab — wired for OverviewTab.
+    overallSearch,
+    setOverallSearch,
+    engagedOrbitOpps,
+    coldDmOrbitOpps,
+    allNurtureOpps,
+    // Kanban + Table views — wired for PipelineKanban + PipelineTable.
+    sensors,
+    handleDragStart,
+    handleDragEnd,
+    activeOpportunity,
+    visiblePipelineStages,
+    getStageOpps,
+    collapsedKanbanStages,
+    toggleKanbanCollapse,
+    collapsedStages,
+    setCollapsedStages,
+    allOrbitOpps,
+    filteredOpportunities,
+    editingCell,
+    setEditingCell,
+    editingValue,
+    setEditingValue,
+    handleInlineEdit,
+    // Outreach tab — wired for OutreachTab.
+    openMetricsView,
+    outreachFilters,
+    setOutreachFilters,
+    outreachPage,
+    setOutreachPage,
+    outreachTotal,
+    outreachTotalPages,
+    outreachAllTotal,
+    outreachLoading,
+    outreachOpps,
+    sortedOutreach,
+    outreachNameCounts,
+    outreachStart,
+    outreachEnd,
+    selectedOutreach,
+    setSelectedOutreach,
+    toggleOutreachSelect,
+    selectAllOnPage,
+    handleBulkBump,
+    handleBulkMoveToWarm,
+    handleBulkDelete,
+    handleBulkReassignOwner,
+    isBulkBumping,
+    isBulkMoving,
+    isBulkReassigning,
+    bulkOwnerOpen,
+    setBulkOwnerOpen,
+    getNextAction,
+    // Actions tab — wired for ActionsTab.
+    actionFilter,
+    setActionFilter,
+    actionPhaseFilter,
+    setActionPhaseFilter,
+    actionSort,
+    setActionSort,
+    actionsSearch,
+    setActionsSearch,
+    allActionItems,
+    allOutreachCount,
+    allClosingCount,
+    allOrbitCount,
+    allNonUrgentCount,
+    displayedActions,
+    actionsNameCounts,
+    alertCardOppIds,
+    executingAction,
+    handleActionExecute,
+    setOpportunities,
+    // Orbit tab — wired for OrbitTab.
+    selectedOrbit,
+    setSelectedOrbit,
+    selectAllOrbitVisible,
+    toggleOrbitSelect,
+    isOrbitBulkMoving,
+    handleOrbitBulkMove,
+    handleOrbitBulkDelete,
+    sortedEngagedOrbit,
+    engagedOrbitTotalValue,
+    sortedColdDmOrbit,
+    coldDmOrbitTotalValue,
+    handleResurrect,
+    // Templates tab — wired for TemplatesTab.
+    setTemplates,
+    templateStageFilter,
+    setTemplateStageFilter,
+    templateTagFilter,
+    setTemplateTagFilter,
+    isTemplateDialogOpen,
+    setIsTemplateDialogOpen,
+    editingTemplate,
+    setEditingTemplate,
+    templateForm,
+    setTemplateForm,
+    isTemplateSubmitting,
+    setIsTemplateSubmitting,
+    previewTemplate,
+    setPreviewTemplate,
+    // Create / Edit Opportunity dialog — wired for CreateEditOpportunityDialog.
+    isCreateOpen,
+    setIsCreateOpen,
+    editingOpp,
+    setEditingOpp,
+    slideOverMode,
+    form,
+    setForm,
+    handleCreate,
+    handleUpdate,
+    isSubmitting,
+    affiliates,
+    setAffiliates,
+    affiliatePopoverOpen,
+    setAffiliatePopoverOpen,
+    affiliateSearch,
+    setAffiliateSearch,
+    // Alert cards strip.
+    alertMetrics,
+    alertCardFilter,
+    setAlertCardFilter,
+    onAlertCardActivate: handleAlertCardActivate,
+    toast,
+  };
+
   return (
+    <SalesPipelineProvider value={salesPipelineCtx}>
     <div className="space-y-6">
-      {/* Activity Slide-Over (rendered via portal to document.body) */}
-      {renderSlideOver()}
+      {/* Activity Slide-Over — rendered via portal to document.body
+          from inside the component. Visibility is driven by
+          slideOverOpp !== null in context. */}
+      <OpportunitySlideOver />
 
       <PageHeader
         icon={Target}
         title="Sales"
         subtitle="Track and manage your active sales opportunities"
+        kicker="CRM · Sales"
+        kickerDot="brand"
         actions={(
-          <>
-          <Button
-            variant="outline"
-            size="sm"
-            title="Export current filtered view as CSV"
-            onClick={() => downloadCsv(filteredOpportunities, [
-              { header: 'Name', accessor: r => r.name },
-              { header: 'Stage', accessor: r => r.stage || '' },
-              { header: 'Bucket', accessor: r => (r as any).bucket || '' },
-              { header: 'Source', accessor: r => (r as any).source || '' },
-              { header: 'Owner', accessor: r => (r as any).owner?.name || (r as any).owner_id || '' },
-              { header: 'POC Handle', accessor: r => (r as any).poc_handle || '' },
-              { header: 'POC Platform', accessor: r => (r as any).poc_platform || '' },
-              { header: 'Deal Value', accessor: r => (r as any).deal_value ?? '' },
-              { header: 'Currency', accessor: r => (r as any).currency || '' },
-              { header: 'Last Contacted', accessor: r => (r as any).last_contacted_at ? new Date((r as any).last_contacted_at).toISOString().slice(0, 10) : '' },
-              { header: 'Next Action', accessor: r => (r as any).next_action_at ? new Date((r as any).next_action_at).toISOString().slice(0, 10) : '' },
-              { header: 'Created', accessor: r => new Date(r.created_at).toISOString().slice(0, 10) },
-            ], `sales-pipeline-${todayStamp()}`)}
-            disabled={filteredOpportunities.length === 0}
-          >
-            <Download className="h-4 w-4 mr-1" /> Export CSV
-          </Button>
-          <Button variant="brand" onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Opportunity
-          </Button>
-          </>
+          <SalesPipelineHeaderActions
+            onOpenPalette={() => setPaletteOpen(true)}
+            onExportCsv={() => downloadCsv(filteredOpportunities, SP_CSV_COLUMNS, `sales-pipeline-${todayStamp()}`)}
+            exportCount={filteredOpportunities.length}
+            onNewOpportunity={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}
+          />
         )}
       />
 
-      {/* [Sales-pipeline space optimization, May 2026] Combined
-          "Pipeline Activity" container — was previously two separate
-          cards (Weekly Funnel + Attention Cards grid) with a 24px gap.
-          Merging them into one card saves ~100px of vertical real
-          estate, removes a redundant border, and visually groups two
-          things that belong together (volume signal + urgency signal).
+      {/* Unified search moved below Forecast & Metrics on 2026-06-03
+          so it sits adjacent to the main tab strip it scopes (rather
+          than above the analytics card, which is a different concern).
+          Was previously at the top of the page, between PageHeader and
+          F&M. See the input + Clear button further down in the JSX. */}
 
-          Weekly Activity Funnel — canonical 5-stage outbound funnel.
-          Outreach → Replies → Calls Booked → Calls Taken → Proposals.
-          Counts DISTINCT opportunities per stage (one prospect DM'd 5x
-          = 1 outreach). Backed by:
-            - migration 044 (direction column on crm_activities)
-            - auto-stamped milestones (proposal_sent_at) from createActivity
-            - meeting next_step_date split for booked vs taken
-          Each step shows the conversion % vs Outreach so the funnel
-          shape is visually obvious. */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-brand" />
-            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
-              Weekly Activity Funnel
-            </h3>
-            <Badge variant="secondary" className="text-[10px]">
-              last {salesFunnelWindow}d
-            </Badge>
-          </div>
-          <Select
-            value={String(salesFunnelWindow)}
-            onValueChange={(v) => setSalesFunnelWindow(Number(v) as 7 | 14 | 30)}
-          >
-            <SelectTrigger className="h-8 w-28 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="14">Last 14 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {!salesFunnel ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 rounded-lg" />
-            ))}
-          </div>
-        ) : (
-          (() => {
-            // Use Outreach as the funnel-top denominator. ÷0 guard via ||1.
-            const top = salesFunnel.outreach || 1;
-            type Step = {
-              label: string;
-              count: number;
-              colorClass: string;
-              hint: string;
-            };
-            const steps: Step[] = [
-              { label: 'Outreach',     count: salesFunnel.outreach,       colorClass: 'bg-sky-50 text-sky-700 border-sky-200',           hint: 'New prospects we first messaged in this window. Bumps to existing prospects don\'t count — Reply Rate stays stable as you bump.' },
-              { label: 'Replies',      count: salesFunnel.replies,        colorClass: 'bg-purple-50 text-purple-700 border-purple-200',  hint: 'Distinct opps that wrote back (inbound message)' },
-              { label: 'Calls Booked', count: salesFunnel.calls_booked,   colorClass: 'bg-amber-50 text-amber-700 border-amber-200',     hint: 'Meetings logged with a future date' },
-              { label: 'Calls Taken',  count: salesFunnel.calls_taken,    colorClass: 'bg-orange-50 text-orange-700 border-orange-200',  hint: 'Meetings logged without a future date (= happened)' },
-              { label: 'Proposals',    count: salesFunnel.proposals_sent, colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', hint: 'Opportunities with proposal_sent_at in window' },
-            ];
-            return (
-              <div className="flex items-stretch gap-2">
-                {steps.map((step, i) => {
-                  const pct = i === 0 ? 100 : Math.round((step.count / top) * 100);
-                  return (
-                    <div key={step.label} className="flex items-center gap-2 flex-1 min-w-0">
-                      <div
-                        className={`flex-1 rounded-lg border px-3 py-2.5 text-center min-w-0 ${step.colorClass}`}
-                        title={step.hint}
-                      >
-                        <div className="text-[10px] uppercase tracking-wider opacity-80 truncate">
-                          {step.label}
-                        </div>
-                        <div className="text-2xl font-bold tabular-nums mt-0.5 leading-none">
-                          {step.count}
-                        </div>
-                        {i === 0 ? (
-                          <div className="text-[10px] opacity-70 mt-1">distinct opps</div>
-                        ) : salesFunnel.outreach > 0 ? (
-                          <div className="text-[10px] opacity-70 mt-1">{pct}% of outreach</div>
-                        ) : null}
-                      </div>
-                      {i < steps.length - 1 && (
-                        <ArrowRight className="h-4 w-4 text-gray-300 shrink-0" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()
-        )}
-
-        {/* [Space optimization] Attention Cards moved inside this
-            container — same five urgency tiles, but the shared border
-            + tighter divider (vs the previous standalone grid with a
-            24px gap above it) saves about 100px while making the
-            relationship between activity volume (funnel) and urgency
-            (alerts) more obvious. */}
-        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-          {/* Booking Needed */}
-          <Card
-            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
-            onClick={() => {
-              if (alertCardFilter === 'booking_needed') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('booking_needed'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
-            }}
-          >
-            <CardContent className="pt-2.5 pb-2.5 px-3">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Calendar className={`h-3.5 w-3.5 ${alertMetrics.bamfamViolations > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.bamfamViolations > 0 ? 'text-rose-500' : 'text-gray-400'}`}>Booking Needed</p>
-              </div>
-              <p className={`text-xl font-bold leading-none ${alertMetrics.bamfamViolations > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{alertMetrics.bamfamViolations}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">No future meeting</p>
-            </CardContent>
-          </Card>
-
-          {/* Overdue */}
-          <Card
-            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'overdue' ? 'ring-2 ring-orange-400 shadow-md' : ''} ${alertMetrics.overdueFollowups > 0 ? 'border-l-orange-500 bg-orange-50' : 'border-l-gray-200 bg-white'}`}
-            onClick={() => {
-              if (alertCardFilter === 'overdue') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('overdue'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
-            }}
-          >
-            <CardContent className="pt-2.5 pb-2.5 px-3">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Clock className={`h-3.5 w-3.5 ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`} />
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`}>Overdue</p>
-              </div>
-              <p className={`text-xl font-bold leading-none ${alertMetrics.overdueFollowups > 0 ? 'text-orange-700' : 'text-gray-900'}`}>{alertMetrics.overdueFollowups}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Past meeting date</p>
-            </CardContent>
-          </Card>
-
-          {/* Stale */}
-          <Card
-            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'stale' ? 'ring-2 ring-amber-400 shadow-md' : ''} ${alertMetrics.staleDeals > 0 ? 'border-l-amber-500 bg-amber-50' : 'border-l-gray-200 bg-white'}`}
-            onClick={() => {
-              if (alertCardFilter === 'stale') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('stale'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
-            }}
-          >
-            <CardContent className="pt-2.5 pb-2.5 px-3">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <RotateCcw className={`h-3.5 w-3.5 ${alertMetrics.staleDeals > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.staleDeals > 0 ? 'text-amber-600' : 'text-gray-400'}`}>Stale (7d+)</p>
-              </div>
-              <p className={`text-xl font-bold leading-none ${alertMetrics.staleDeals > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{alertMetrics.staleDeals}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">No contact 7+ days</p>
-            </CardContent>
-          </Card>
-
-          {/* At Risk */}
-          <Card
-            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'at_risk' ? 'ring-2 ring-rose-400 shadow-md' : ''} ${alertMetrics.dealsAtRisk > 0 ? 'border-l-rose-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
-            onClick={() => {
-              if (alertCardFilter === 'at_risk') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('at_risk'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
-            }}
-          >
-            <CardContent className="pt-2.5 pb-2.5 px-3">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <TrendingUp className={`h-3.5 w-3.5 ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`}>At Risk</p>
-              </div>
-              <p className={`text-xl font-bold leading-none ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{alertMetrics.dealsAtRisk}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Closing, temp &lt; 40</p>
-            </CardContent>
-          </Card>
-
-          {/* Meetings */}
-          <Card
-            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'meetings' ? 'ring-2 ring-blue-400 shadow-md' : ''} ${alertMetrics.meetingsToday > 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-200 bg-white'}`}
-            onClick={() => {
-              if (alertCardFilter === 'meetings') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('meetings'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
-            }}
-          >
-            <CardContent className="pt-2.5 pb-2.5 px-3">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Calendar className={`h-3.5 w-3.5 ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`}>Meetings</p>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <p className={`text-xl font-bold leading-none ${alertMetrics.meetingsToday > 0 ? 'text-blue-700' : 'text-gray-900'}`}>
-                  {alertMetrics.meetingsToday > 0 ? alertMetrics.meetingsToday : alertMetrics.meetingsThisWeek}
-                </p>
-                {alertMetrics.meetingsToday > 0 && alertMetrics.meetingsThisWeek > alertMetrics.meetingsToday && (
-                  <p className="text-[10px] text-blue-400">+{alertMetrics.meetingsThisWeek - alertMetrics.meetingsToday} wk</p>
-                )}
-              </div>
-              <p className="text-[10px] text-gray-400 mt-0.5">{alertMetrics.meetingsToday > 0 ? 'Today' : 'This week'}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      {/* Today's Attention card moved into the Actions tab on
+          2026-06-03 — it's a cohort filter for the action queue, so
+          it lives spatially next to the queue rather than floating
+          above the tab strip. See ActionsTab.tsx for the JSX. */}
 
       {/* [Sales-pipeline space optimization, May 2026] Forecast +
           Metrics is now collapsible — the full Tabs view is 400-1200px
@@ -7677,1290 +2966,157 @@ export default function SalesPipelinePage() {
           managers still see headline data without expanding. State
           persists in localStorage so sales-focused users can pin it
           open once. */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="bg-white rounded-xl border border-cream-200">
         <button
           type="button"
           onClick={toggleAnalytics}
-          className="w-full flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left"
+          className="w-full flex items-center justify-between gap-3 px-5 py-3 hover:bg-cream-50 transition-colors text-left"
           aria-expanded={showAnalytics}
           aria-controls="sp-analytics-panel"
         >
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             <BarChart3 className="h-4 w-4 text-brand flex-shrink-0" />
-            <span className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex-shrink-0">
+            <span className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider flex-shrink-0">
               Forecast & Metrics
             </span>
-            {/* Always-visible summary strip — replaces the need to
-                expand for the four most-referenced numbers. Hidden when
-                expanded so the full Tabs view (with its own KPI strip)
-                doesn't visually duplicate. */}
-            {!showAnalytics && (
-              <span className="hidden sm:flex items-center gap-3 ml-2 text-xs text-gray-600 flex-wrap min-w-0">
-                <span className="tabular-nums">
-                  <span className="text-gray-400">Pipeline</span>{' '}
-                  <span className="font-semibold text-gray-900">${forecastKpis.totalValue.toLocaleString()}</span>
-                </span>
-                <span className="tabular-nums">
-                  <span className="text-gray-400">Weighted</span>{' '}
-                  <span className="font-semibold text-emerald-700">${Math.round(forecastKpis.weighted).toLocaleString()}</span>
-                </span>
-                <span className="tabular-nums">
-                  <span className="text-gray-400">This month</span>{' '}
-                  <span className="font-semibold text-sky-700">${forecastKpis.thisMonthValue.toLocaleString()}</span>
-                </span>
-                {forecastKpis.atRiskCount > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-semibold">
-                    {forecastKpis.atRiskCount} at risk
-                  </span>
-                )}
-              </span>
-            )}
+            {/* Inline summary strip removed 2026-06-03 — it duplicated
+                the OverviewTab's stats strip (same 4 numbers: Pipeline /
+                Weighted / This month / At risk). Users land on Overall
+                by default and see those numbers there; this header now
+                stays a clean title + chevron. */}
           </div>
           <ChevronDown
-            className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${showAnalytics ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 text-ink-warm-400 flex-shrink-0 transition-transform ${showAnalytics ? 'rotate-180' : ''}`}
           />
         </button>
         {showAnalytics && (
-          <div id="sp-analytics-panel" className="border-t border-gray-100">
-            <Tabs value={topSectionTab} onValueChange={v => setTopSectionTab(v as 'forecast' | 'metrics')}>
-              <div className="flex items-center justify-between px-5 pt-4 border-b border-gray-100">
-                <TabsList className="bg-transparent p-0 h-auto gap-1">
+          <div id="sp-analytics-panel" className="border-t border-cream-100">
+            <Tabs value={topSectionTab} onValueChange={v => setTopSectionTab(v as 'forecast' | 'metrics' | 'dashboard')}>
+              {/* Sub-tab strip — same shape as the main tab strip
+                  below (cream-100 container, white active tile,
+                  per-tab semantic color). Was `bg-brand-light` chrome
+                  on every active state — visually different rhythm
+                  than the main tabs. Unified 2026-06-03. */}
+              <div className="px-5 pt-3 pb-3 border-b border-cream-100">
+                <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
                   <TabsTrigger
                     value="forecast"
-                    className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-emerald-700"
                   >
                     <TrendingUp className="h-4 w-4" />
                     Forecast
-                    {forecastOpps.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 text-[10px]">{forecastOpps.length}</Badge>
-                    )}
-                    {forecastKpis.atRiskCount > 0 && (
-                      <Badge variant="secondary" className="ml-1 bg-rose-100 text-rose-700 hover:bg-rose-100 text-[10px]" title={`${forecastKpis.atRiskCount} at-risk`}>
+                    {/* Show only the actionable signal — the at-risk
+                        count — when present. The total forecast-opp
+                        count was the volume signal but stacking both
+                        next to "Forecast" was too noisy. The total
+                        still shows in the panel's own KPI header. */}
+                    {forecastKpis.atRiskCount > 0 ? (
+                      <span
+                        className="ml-1 inline-flex items-center px-1.5 py-0 rounded text-[10px] bg-rose-100 text-rose-700 tabular-nums"
+                        title={`${forecastKpis.atRiskCount} at-risk · ${forecastOpps.length} total in forecast`}
+                      >
                         {forecastKpis.atRiskCount} at-risk
-                      </Badge>
-                    )}
+                      </span>
+                    ) : forecastOpps.length > 0 ? (
+                      <span className="ml-1 text-[11px] text-ink-warm-400 tabular-nums">
+                        {forecastOpps.length}
+                      </span>
+                    ) : null}
                   </TabsTrigger>
                   <TabsTrigger
                     value="metrics"
-                    className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-sky-700"
                   >
                     <BarChart3 className="h-4 w-4" />
                     Metrics
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="dashboard"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    Dashboard
+                  </TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="forecast" className="mt-0 p-5 pt-4">
-                {renderForecastTab()}
+                <ForecastPanel />
               </TabsContent>
               <TabsContent value="metrics" className="mt-0 p-5 pt-4">
-                {renderMetricsTab()}
+                <MetricsPanel />
+              </TabsContent>
+              <TabsContent value="dashboard" className="mt-0 p-5 pt-4">
+                <SalesDashboard
+                  onRecalculate={handleRecalculateAll}
+                  isRecalculating={isRecalculating}
+                  metrics={metrics}
+                />
               </TabsContent>
             </Tabs>
           </div>
         )}
       </div>
 
-      {/* Sales Dashboard */}
-      <Card className="border-gray-200">
-        <div
-          className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-          onClick={() => setShowDashboard(!showDashboard)}
-        >
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-brand" />
-            <span className="text-sm font-semibold text-gray-900">Sales Dashboard</span>
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-[11px] text-gray-500 hover:text-brand gap-1"
-                    disabled={isRecalculating}
-                    onClick={(e) => { e.stopPropagation(); handleRecalculateAll(); }}
-                  >
-                    <RotateCcw className={`h-3 w-3 ${isRecalculating ? 'animate-spin' : ''}`} />
-                    {isRecalculating ? 'Recalculating...' : 'Recalc Scores'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="max-w-xs text-xs space-y-1 p-3">
-                  <p className="font-semibold">Auto-calculates temperature (0–100)</p>
-                  <p>• Base: Bucket A=40, B=25, C=10, none=20</p>
-                  <p>• Recency: +30 minus days since last contact</p>
-                  <p>• Engagement: +4 per activity (max +20)</p>
-                  <p>• Meeting booked: +15</p>
-                  <p>• Stage: warm +5, booked/tg_intro +10, discovery+ +15</p>
-                  <p>• Warm interested: +10</p>
-                  <p>• Stale cold DM (&gt;30d): −15</p>
-                  <p>• Bump exhaustion (3+): −10</p>
-                  <p>• Warm silent: −5</p>
-                  <p>• Orbit → 5, Closed Lost → 0</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          {showDashboard ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-        </div>
-        {/* Time Period Filter */}
-        {showDashboard && <div className="flex items-center gap-2 flex-wrap px-5 pb-2" onClick={e => e.stopPropagation()}>
-          <span className="text-xs font-medium text-gray-500 mr-1">Period:</span>
-          {([
-            { key: 'all', label: 'All Time' },
-            { key: 'today', label: 'Today' },
-            { key: '7d', label: '7 Days' },
-            { key: '30d', label: '30 Days' },
-            { key: 'custom', label: 'Custom' },
-          ] as const).map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => setDashboardPeriod(opt.key)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                dashboardPeriod === opt.key
-                  ? 'bg-brand text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-          {dashboardPeriod === 'custom' && (
-            <div className="flex items-center gap-1.5 ml-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-7 px-2.5 text-xs justify-start font-normal gap-1.5"
-                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: dashboardCustomFrom ? '#111827' : '#9ca3af' }}
-                  >
-                    <Calendar className="h-3 w-3" />
-                    {dashboardCustomFrom ? format(new Date(dashboardCustomFrom + 'T00:00:00'), 'MMM d, yyyy') : 'From'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={dashboardCustomFrom ? new Date(dashboardCustomFrom + 'T00:00:00') : undefined}
-                    onSelect={date => setDashboardCustomFrom(date ? format(date, 'yyyy-MM-dd') : '')}
-                    initialFocus
-                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                  />
-                </PopoverContent>
-              </Popover>
-              <span className="text-xs text-gray-400">to</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-7 px-2.5 text-xs justify-start font-normal gap-1.5"
-                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: dashboardCustomTo ? '#111827' : '#9ca3af' }}
-                  >
-                    <Calendar className="h-3 w-3" />
-                    {dashboardCustomTo ? format(new Date(dashboardCustomTo + 'T00:00:00'), 'MMM d, yyyy') : 'To'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={dashboardCustomTo ? new Date(dashboardCustomTo + 'T00:00:00') : undefined}
-                    onSelect={date => setDashboardCustomTo(date ? format(date, 'yyyy-MM-dd') : '')}
-                    initialFocus
-                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-        </div>}
-        {showDashboard && (
-          <CardContent className="pt-0 pb-6 px-5 space-y-6">
-
-            {/* Row 1: Pipeline Health — headline numbers
-                [Responsive cleanup, May 2026] Drops to 2/3 cols on
-                narrow screens. */}
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Pipeline Health</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {[
-                  { label: 'Pipeline Value', value: `$${dashboardMetrics.pipelineValue >= 1000 ? `${(dashboardMetrics.pipelineValue / 1000).toFixed(1)}K` : dashboardMetrics.pipelineValue.toLocaleString()}`, accent: 'border-l-emerald-400', color: 'text-emerald-700' },
-                  { label: 'Weighted', value: `$${dashboardMetrics.weightedPipeline >= 1000 ? `${(dashboardMetrics.weightedPipeline / 1000).toFixed(1)}K` : dashboardMetrics.weightedPipeline.toFixed(0)}`, accent: 'border-l-teal-400', color: 'text-teal-700' },
-                  { label: 'Active Deals', value: `${dashboardMetrics.activeDeals}`, accent: 'border-l-blue-400', color: 'text-blue-700' },
-                  { label: 'Revenue (Won)', value: `$${dashboardMetrics.totalRevenue >= 1000 ? `${(dashboardMetrics.totalRevenue / 1000).toFixed(1)}K` : dashboardMetrics.totalRevenue.toLocaleString()}`, accent: 'border-l-purple-400', color: 'text-purple-700' },
-                  { label: 'Deals Won', value: `${dashboardMetrics.closedWon}`, accent: 'border-l-gray-300', color: 'text-gray-700' },
-                  { label: 'In Orbit', value: `${dashboardMetrics.inOrbit}`, accent: 'border-l-gray-300', color: 'text-gray-700' },
-                ].map(item => (
-                  <div key={item.label} className={`border-l-[3px] ${item.accent} bg-white rounded-r-lg px-3 py-2.5`}>
-                    <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
-                    <p className="text-[11px] text-gray-500">{item.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-100" />
-
-            {/* Row 2: Conversion Funnel + Key Rates side by side */}
-            <div className="grid grid-cols-2 gap-6">
-              {/* Funnel */}
-              <div>
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Conversion Funnel</p>
-                <div className="flex items-end gap-1.5">
-                  {[
-                    { label: 'DMs', value: dashboardMetrics.totalDmsSent, color: 'bg-sky-400' },
-                    { label: 'Replied', value: dashboardMetrics.totalDmsSent - dashboardMetrics.coldDmCount, color: 'bg-sky-500' },
-                    { label: 'Meetings', value: dashboardMetrics.meetingsBooked, color: 'bg-blue-500' },
-                    { label: 'Discovery', value: dashboardMetrics.discoveryCalls, color: 'bg-indigo-500' },
-                    { label: 'Proposals', value: dashboardMetrics.proposalsSent, color: 'bg-violet-500' },
-                    { label: 'Won', value: dashboardMetrics.closedWon, color: 'bg-emerald-500' },
-                    { label: 'Lost', value: dashboardMetrics.closedLost, color: 'bg-gray-300' },
-                  ].map((step, i) => {
-                    const pct = dashboardMetrics.totalDmsSent > 0 ? (step.value / dashboardMetrics.totalDmsSent) * 100 : 0;
-                    return (
-                      <div key={step.label} className="flex-1 text-center">
-                        <p className="text-sm font-bold text-gray-800 mb-1">{step.value}</p>
-                        <div className="h-20 rounded-md flex items-end justify-center overflow-hidden bg-gray-50">
-                          <div className={`w-full rounded-t-sm ${step.color}`} style={{ height: `${Math.max(pct, 5)}%` }} />
-                        </div>
-                        <p className="text-[10px] text-gray-500 mt-1.5 leading-tight">{step.label}</p>
-                        {i > 0 && i < 6 && pct > 0 && (
-                          <p className="text-[9px] text-gray-400">{pct.toFixed(0)}%</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Key Rates */}
-              <div>
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Key Rates</p>
-                <div className="grid grid-cols-3 gap-x-4 gap-y-3">
-                  {[
-                    { label: 'Response Rate', value: `${dashboardMetrics.responseRate.toFixed(1)}%` },
-                    { label: 'Close Rate', value: `${dashboardMetrics.closeRate.toFixed(0)}%` },
-                    { label: 'Avg Deal Size', value: `$${dashboardMetrics.avgDealSize > 0 ? (dashboardMetrics.avgDealSize >= 1000 ? `${(dashboardMetrics.avgDealSize / 1000).toFixed(1)}K` : dashboardMetrics.avgDealSize.toFixed(0)) : '0'}` },
-                    { label: 'Avg Close Time', value: dashboardMetrics.avgCloseTime > 0 ? `${dashboardMetrics.avgCloseTime.toFixed(0)}d` : '—' },
-                    { label: 'Qualified (A+B)', value: `${dashboardMetrics.qualifiedPct.toFixed(0)}%` },
-                    { label: 'Bucket A %', value: `${dashboardMetrics.bucketAPct.toFixed(0)}%` },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-baseline justify-between py-1.5 border-b border-gray-100 last:border-b-0">
-                      <p className="text-[11px] text-gray-500">{item.label}</p>
-                      <p className="text-sm font-bold text-gray-800">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-100" />
-
-            {/* Row 3: Bottleneck Analysis */}
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Bottleneck Analysis</p>
-
-              {/* Summary callouts */}
-              {(dashboardMetrics.worstConversion || dashboardMetrics.slowestStage) && (
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {dashboardMetrics.worstConversion && (
-                    <div className="border-l-[3px] border-l-red-400 bg-rose-50/60 rounded-r-lg px-3 py-2.5">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-                        <p className="text-[11px] font-semibold text-rose-600">Biggest Drop-off</p>
-                      </div>
-                      <p className="text-sm font-bold text-gray-800">
-                        {STAGE_LABELS[dashboardMetrics.worstConversion.stage as SalesPipelineStage]} → {STAGE_LABELS[dashboardMetrics.worstConversion.nextStage as SalesPipelineStage]}
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {dashboardMetrics.worstConversion.rate.toFixed(0)}% convert — {dashboardMetrics.worstConversion.dropoff} lost
-                      </p>
-                    </div>
-                  )}
-                  {dashboardMetrics.slowestStage && (
-                    <div className="border-l-[3px] border-l-amber-400 bg-amber-50/60 rounded-r-lg px-3 py-2.5">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <Clock className="h-3.5 w-3.5 text-amber-400" />
-                        <p className="text-[11px] font-semibold text-amber-600">Slowest Stage</p>
-                      </div>
-                      <p className="text-sm font-bold text-gray-800">
-                        {STAGE_LABELS[dashboardMetrics.slowestStage.stage as SalesPipelineStage]}
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Avg {dashboardMetrics.slowestStage.avgDays}d — {dashboardMetrics.slowestStage.count} deals sitting here
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Stage conversion table */}
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50/80">
-                      <th className="text-left py-2 px-3 font-medium text-gray-400 uppercase tracking-wider text-[10px]">Stage</th>
-                      <th className="text-center py-2 px-3 font-medium text-gray-400 uppercase tracking-wider text-[10px]">In</th>
-                      <th className="text-center py-2 px-3 font-medium text-gray-400 uppercase tracking-wider text-[10px]">Out</th>
-                      <th className="text-center py-2 px-3 font-medium text-gray-400 uppercase tracking-wider text-[10px]">Conv.</th>
-                      <th className="text-center py-2 px-3 font-medium text-gray-400 uppercase tracking-wider text-[10px]">Drop</th>
-                      <th className="text-center py-2 px-3 font-medium text-gray-400 uppercase tracking-wider text-[10px]">Avg Days</th>
-                      <th className="py-2 px-3 w-[100px]"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dashboardMetrics.stageConversions.map((conv, i) => {
-                      const timeData = dashboardMetrics.avgDaysInStage[i];
-                      const isWorst = dashboardMetrics.worstConversion?.stage === conv.stage;
-                      const isSlowest = dashboardMetrics.slowestStage?.stage === conv.stage;
-                      const barWidth = Math.max(conv.rate, 3);
-                      const barColor = conv.rate >= 60 ? 'bg-emerald-400' : conv.rate >= 30 ? 'bg-amber-400' : 'bg-rose-400';
-                      return (
-                        <tr key={conv.stage} className={`border-t border-gray-100 ${isWorst ? 'bg-rose-50/40' : isSlowest ? 'bg-amber-50/30' : ''}`}>
-                          <td className="py-1.5 px-3 font-medium text-gray-700">
-                            <div className="flex items-center gap-1.5">
-                              {STAGE_LABELS[conv.stage as SalesPipelineStage]}
-                              {isWorst && <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400" />}
-                              {isSlowest && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                            </div>
-                          </td>
-                          <td className="py-1.5 px-3 text-center text-gray-500">{conv.from}</td>
-                          <td className="py-1.5 px-3 text-center text-gray-500">{conv.to}</td>
-                          <td className="py-1.5 px-3 text-center">
-                            <span className={`font-semibold ${conv.rate >= 60 ? 'text-emerald-600' : conv.rate >= 30 ? 'text-amber-600' : 'text-rose-500'}`}>
-                              {conv.from > 0 ? `${conv.rate.toFixed(0)}%` : '—'}
-                            </span>
-                          </td>
-                          <td className="py-1.5 px-3 text-center">
-                            {conv.dropoff > 0 ? (
-                              <span className="text-rose-400 font-medium">-{conv.dropoff}</span>
-                            ) : (
-                              <span className="text-gray-300">0</span>
-                            )}
-                          </td>
-                          <td className="py-1.5 px-3 text-center">
-                            {timeData.count > 0 ? (
-                              <span className={`font-medium ${timeData.avgDays >= 14 ? 'text-rose-500' : timeData.avgDays >= 7 ? 'text-amber-500' : 'text-gray-500'}`}>
-                                {timeData.avgDays}d
-                              </span>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="py-1.5 px-3">
-                            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-100" />
-
-            {/* Row 4: Bucket Breakdown */}
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Bucket Breakdown</p>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Bucket A', sub: 'High-value, high-intent', value: metrics.bucketA, accent: 'border-l-emerald-400', color: 'text-emerald-700' },
-                  { label: 'Bucket B', sub: 'Standard follow-up', value: metrics.bucketB, accent: 'border-l-amber-400', color: 'text-amber-700' },
-                  { label: 'Bucket C', sub: 'Lower priority', value: metrics.bucketC, accent: 'border-l-gray-300', color: 'text-gray-600' },
-                ].map(item => (
-                  <div key={item.label} className={`border-l-[3px] ${item.accent} bg-white rounded-r-lg px-3 py-2.5 flex items-center justify-between`}>
-                    <div>
-                      <p className="text-xs font-medium text-gray-700">{item.label}</p>
-                      <p className="text-[10px] text-gray-400">{item.sub}</p>
-                    </div>
-                    <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
+      {/* Unified search — sits BELOW the Forecast & Metrics card so
+          it's adjacent to the main tab strip it scopes (was above
+          F&M before 2026-06-03; moved by request because the
+          analytics card is a different concern than tab-level
+          filtering). Single input drives every tab (Outreach /
+          Pipeline / Orbit / Actions simultaneously). The ⌘K palette
+          is the cross-tab quick-jump alternative. */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400 pointer-events-none" />
+        <Input
+          value={overallSearch}
+          onChange={(e) => setOverallSearch(e.target.value)}
+          placeholder="Search across all tabs..."
+          className="pl-9 focus-brand"
+        />
+        {overallSearch && (
+          <button
+            type="button"
+            onClick={() => setOverallSearch('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded text-ink-warm-400 hover:bg-cream-100"
+            title="Clear search"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         )}
-      </Card>
+      </div>
 
-      {/* Tabs + Controls */}
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery')}>
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
-          <TabsList>
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Overall
-              <Badge variant="secondary" className="ml-1">
-                {opportunities.filter(o => !['v2_closed_won', 'v2_closed_lost'].includes(o.stage)).length}
-              </Badge>
-            </TabsTrigger>
-            {/* [Actions consolidation, May 2026] Standalone Actions tab
-                removed. Its content (the priority-sorted action queue)
-                now lives as a collapsible section inside the Overall
-                tab below, alongside Outreach / Pipeline / Orbit. The
-                tab strip stays cleaner and managers see actions in
-                context with everything else. */}
-            {/* [Tab merge May 2026] Standalone Outreach tab removed.
-                Per user feedback: "didnt want actions to replace
-                outreach/overall... wanted to combine them into 1".
-                The full outreach surface (My-outreach-30d strip,
-                owner sub-tabs, Cold-DM table) now lives inside the
-                Overall tab as a default-open collapsible section.
-                Outreach-count badge moved onto the Overall tab itself
-                so the headline number stays visible in the strip. */}
-            <TabsTrigger value="pipeline" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Pipeline
-              {(() => {
-                const pipelineCount = opportunities.filter(o =>
-                  PIPELINE_STAGES.includes(o.stage as SalesPipelineStage) && o.stage !== 'cold_dm'
-                ).length;
-                return pipelineCount > 0 ? <Badge variant="secondary" className="ml-1">{pipelineCount}</Badge> : null;
-              })()}
-            </TabsTrigger>
-            <TabsTrigger value="orbit" className="flex items-center gap-2">
-              <RotateCcw className="h-4 w-4" />
-              Orbit
-              {/* [Orbit split, May 2026] Two-count badge so the
-                  inflation problem the team had with the old single
-                  N is visible at a glance: green = engaged (warm
-                  follow-ups), muted gray = cold-DM revisit pool. */}
-              {orbitOpps.length > 0 && (
-                <span className="ml-1 inline-flex items-center gap-0.5" title={`${engagedOrbitOpps.length} engaged · ${coldDmOrbitOpps.length} cold-DM`}>
-                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{engagedOrbitOpps.length}</Badge>
-                  {coldDmOrbitOpps.length > 0 && (
-                    <span className="text-[10px] text-gray-400 font-medium">+{coldDmOrbitOpps.length}</span>
-                  )}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="discovery" className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              Discovery
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Templates
-            </TabsTrigger>
-          </TabsList>
+      {/* Sales Dashboard merged into Forecast & Metrics above as a
+          third sub-tab on 2026-06-03 — was a standalone collapsible
+          here, which produced three analytics sections showing
+          overlapping numbers. */}
 
-          <div className="flex items-center gap-3">
-            {/* Path filter */}
-            {activeTab === 'pipeline' && (
-              <Select value={pathFilter} onValueChange={v => setPathFilter(v as 'all' | 'closer' | 'sdr')}>
-                <SelectTrigger className="h-9 w-40 text-sm focus-brand">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Paths</SelectItem>
-                  <SelectItem value="closer">Path A (Closer)</SelectItem>
-                  <SelectItem value="sdr">Path B (SDR)</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* View toggle */}
-            {activeTab === 'pipeline' && (
-              <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-                <div
-                  onClick={() => setViewMode('table')}
-                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer ${viewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
-                >
-                  <TableIcon className="h-4 w-4 mr-2" />
-                  Table
-                </div>
-                <div
-                  onClick={() => setViewMode('kanban')}
-                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer ${viewMode === 'kanban' ? 'bg-background text-foreground shadow-sm' : ''}`}
-                >
-                  <LayoutGrid className="h-4 w-4 mr-2" />
-                  Kanban
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* [Actions consolidation, May 2026] TabsContent for 'actions'
-            removed. Same call lives inside the Overall tab below as
-            the topmost collapsible section. */}
-
-        {/* [Tab merge May 2026] Standalone Outreach TabsContent
-            removed. renderOutreachTab(true) is rendered inside the
-            Overall tab's Outreach section below. The `true` arg
-            suppresses the section-local search since the Overall
-            tab's unified search drives all subsection filters. */}
-
-        <TabsContent value="pipeline" className="mt-0">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search pipeline..."
-              defaultValue={pipelineSearch}
-              onChange={e => {
-                const v = e.target.value;
-                if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-                searchDebounceRef.current = setTimeout(() => setPipelineSearch(v), 300);
-              }}
-              className="pl-9 h-9 text-sm focus-brand max-w-xs"
-            />
-          </div>
-          {viewMode === 'kanban' ? renderKanban() : renderTable()}
-        </TabsContent>
-
-        <TabsContent value="orbit" className="mt-0">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search orbit..."
-              defaultValue={orbitSearch}
-              onChange={e => {
-                const v = e.target.value;
-                if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-                searchDebounceRef.current = setTimeout(() => setOrbitSearch(v), 300);
-              }}
-              className="pl-9 h-9 text-sm focus-brand max-w-xs"
-            />
-          </div>
-          {renderOrbitTab()}
-        </TabsContent>
-
-        <TabsContent value="overview" className="mt-0">
-          <div className="space-y-4 pb-8">
-            {/* Unified search — broadcasts into Outreach/Pipeline/Orbit
-                via the overallSearch useEffect (defined near the top of
-                this file). Restored 2026-05-14 alongside hiding the
-                Outreach sub-section's own search bar — together those
-                two changes mean the user types once at the top and all
-                three sections filter as one. */}
-            <div className="flex items-center gap-2 sticky top-0 z-20 bg-white py-2 -mt-2 -mx-1 px-1">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                <Input
-                  value={overallSearch}
-                  onChange={(e) => setOverallSearch(e.target.value)}
-                  placeholder="Search across Outreach, Pipeline, and Orbit..."
-                  className="pl-9 focus-brand"
-                />
-                {overallSearch && (
-                  <button
-                    onClick={() => setOverallSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                    title="Clear search"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {overallSearch && (
-                <span className="text-xs text-gray-500">
-                  Filtering all sections by &ldquo;{overallSearch}&rdquo;
-                </span>
-              )}
-            </div>
-
-            {/* Actions Section — [Actions consolidation, May 2026]
-                The former standalone 'Actions' tab is now the topmost
-                collapsible section of Overall. Default-open since
-                action items are time-sensitive. Phase + sort + search
-                filter controls live inside renderActionsTab. */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setOverviewSections(prev => ({ ...prev, actions: !prev.actions }))}
-                className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-amber-700" />
-                  <h4 className="font-semibold text-amber-700">Actions</h4>
-                  {allActionItems.length > 0 && (
-                    <Badge variant="secondary" className="text-xs font-medium">{allActionItems.length}</Badge>
-                  )}
-                </div>
-                {overviewSections.actions ? <ChevronUp className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
-              </button>
-              {overviewSections.actions && (
-                <div className="border-t border-gray-200">
-                  {renderActionsTab()}
-                </div>
-              )}
-            </div>
-
-            {/* Outreach Section — [Tab merge May 2026] Now the only
-                home for the outreach surface (Cold DM table, per-
-                owner sub-tabs, "My outreach · last 30 days" strip).
-                Default-open since users coming to /crm/sales-pipeline
-                expect their outreach pipeline first thing. Cold DM
-                stays as its own clearly-labeled section header
-                INSIDE renderOutreachTab — per user feedback
-                "i like how cold dm is its own section, thats
-                important". */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setOverviewSections(prev => ({ ...prev, outreach: !prev.outreach }))}
-                className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-blue-700" />
-                  <h4 className="font-semibold text-blue-700">Outreach</h4>
-                  <Badge variant="secondary" className="text-xs font-medium">{outreachAllTotal}</Badge>
-                  <span className="text-[11px] text-gray-500 font-normal">Cold DM pipeline</span>
-                </div>
-                {overviewSections.outreach ? <ChevronUp className="h-4 w-4 text-blue-500" /> : <ChevronDown className="h-4 w-4 text-blue-500" />}
-              </button>
-              {overviewSections.outreach && (
-                <div className="border-t border-gray-200">
-                  {/* Pass hideSearch — the unified search at the top of the
-                      Overall tab already drives this section's filter. */}
-                  {renderOutreachTab(true)}
-                </div>
-              )}
-            </div>
-
-            {/* Pipeline Section */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setOverviewSections(prev => ({ ...prev, pipeline: !prev.pipeline }))}
-                className="w-full flex items-center justify-between px-4 py-3 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-emerald-700" />
-                  <h4 className="font-semibold text-emerald-700">Pipeline</h4>
-                  <Badge variant="secondary" className="text-xs font-medium">
-                    {opportunities.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage) && o.stage !== 'cold_dm').length}
-                  </Badge>
-                </div>
-                {overviewSections.pipeline ? <ChevronUp className="h-4 w-4 text-emerald-500" /> : <ChevronDown className="h-4 w-4 text-emerald-500" />}
-              </button>
-              {overviewSections.pipeline && (
-                <div className="border-t border-gray-200">
-                  {renderTable()}
-                </div>
-              )}
-            </div>
-
-            {/* Orbit Section */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setOverviewSections(prev => ({ ...prev, orbit: !prev.orbit }))}
-                className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <RotateCcw className="h-4 w-4 text-amber-700" />
-                  <h4 className="font-semibold text-amber-700">Orbit</h4>
-                  {/* [Orbit split, May 2026] Same engaged/cold split
-                      as the tab badge so the totals match. */}
-                  <Badge variant="secondary" className="text-xs font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{engagedOrbitOpps.length}</Badge>
-                  {coldDmOrbitOpps.length > 0 && (
-                    <span className="text-[11px] text-gray-500 font-medium">+ {coldDmOrbitOpps.length} cold-DM</span>
-                  )}
-                </div>
-                {overviewSections.orbit ? <ChevronUp className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
-              </button>
-              {overviewSections.orbit && (
-                <div className="border-t border-gray-200">
-                  {renderOrbitTab()}
-                </div>
-              )}
-            </div>
-
-            {/* Nurture Section — without this, nurture-stage opportunities
-                are invisible everywhere except 2 of the Actions sub-tabs.
-                This gives them a dedicated spot on Overview alongside Orbit
-                so a deal set to nurture doesn't silently drop out of view. */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setOverviewSections(prev => ({ ...prev, nurture: !prev.nurture }))}
-                className="w-full flex items-center justify-between px-4 py-3 bg-lime-50 hover:bg-lime-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-lime-700" />
-                  <h4 className="font-semibold text-lime-700">Nurture</h4>
-                  <Badge variant="secondary" className="text-xs font-medium">{allNurtureOpps.length}</Badge>
-                  <span className="text-[11px] text-lime-600 ml-1">Long-cycle deals — periodic check-ins</span>
-                </div>
-                {overviewSections.nurture ? <ChevronUp className="h-4 w-4 text-lime-500" /> : <ChevronDown className="h-4 w-4 text-lime-500" />}
-              </button>
-              {overviewSections.nurture && (
-                <div className="border-t border-gray-200">
-                  {allNurtureOpps.length === 0 ? (
-                    <div className="text-center text-sm text-gray-400 py-8">
-                      No opportunities in nurture stage.
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50/50">
-                          <TableHead>Name</TableHead>
-                          <TableHead className="w-[180px]">POC</TableHead>
-                          <TableHead className="w-[140px]">Last Contact</TableHead>
-                          <TableHead className="w-[100px]">Owner</TableHead>
-                          <TableHead className="w-[120px]">Created</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {allNurtureOpps
-                          .slice()
-                          .sort((a, b) => {
-                            // Most-stale first — same logic as crm_followups_due
-                            // (oldest last_contacted_at OR null bubbles to top)
-                            const aT = a.last_contacted_at ? new Date(a.last_contacted_at).getTime() : 0;
-                            const bT = b.last_contacted_at ? new Date(b.last_contacted_at).getTime() : 0;
-                            return aT - bT;
-                          })
-                          .map((opp) => (
-                            <TableRow
-                              key={opp.id}
-                              className="group hover:bg-gray-50 cursor-pointer"
-                              onClick={() => openSlideOver(opp)}
-                            >
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Building2 className="h-4 w-4 text-gray-400" />
-                                  <span className="font-medium">{opp.name}</span>
-                                  {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {renderPocCell(opp, 'max-w-[120px]')}
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-xs text-gray-600">
-                                  {opp.last_contacted_at
-                                    ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true })
-                                    : <span className="text-gray-300">never</span>}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-xs text-gray-600">
-                                  {users.find(u => u.id === opp.owner_id)?.name || '—'}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-xs text-gray-500">
-                                  {opp.created_at
-                                    ? formatDistanceToNow(new Date(opp.created_at), { addSuffix: true })
-                                    : '—'}
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="discovery" className="mt-0">
-          {/* onPromoted: a Discovery prospect was just turned into a CRM
-              opportunity server-side. We need fresh opps + metrics; the
-              other 4 resources (affiliates/users/templates/outreachCount)
-              don't change so we skip them. */}
-          <DiscoveryTab onPromoted={() => { void fetchOpportunities(); void fetchMetrics(); }} />
-        </TabsContent>
-
-        <TabsContent value="templates" className="mt-0">
-          {(() => {
-            const TEMPLATE_STAGES = [
-              { value: 'all', label: 'All' },
-              { value: 'cold_dm', label: 'Cold DM' },
-              { value: 'warm', label: 'Warm' },
-              { value: 'tg_intro', label: 'TG Intro' },
-              { value: 'booked', label: 'Booked' },
-              { value: 'discovery_done', label: 'Discovery Done' },
-              { value: 'proposal_call', label: 'Proposal Call' },
-              { value: 'v2_contract', label: 'Contract' },
-              { value: 'bump', label: 'Bumps' },
-            ];
-
-            const allTags = Array.from(new Set(templates.flatMap(t => t.tags || [])));
-
-            const filteredTemplates = templates.filter(t => {
-              if (templateStageFilter !== 'all' && t.stage !== templateStageFilter) return false;
-              if (templateTagFilter !== 'all' && !(t.tags || []).includes(templateTagFilter)) return false;
-              return true;
-            });
-
-            const getSubTypeLabel = (subType: string) => {
-              const labels: Record<string, string> = {
-                general: 'General',
-                initial: 'Initial',
-                bump_1: 'Bump 1',
-                bump_2: 'Bump 2',
-                bump_3: 'Bump 3',
-                follow_up: 'Follow-up',
-              };
-              return labels[subType] || subType;
-            };
-
-            const getStageLabelForTemplate = (stage: string) => {
-              if (stage === 'bump') return 'Bump';
-              return (STAGE_LABELS as Record<string, string>)[stage] || stage;
-            };
-
-            const getStageColorForTemplate = (stage: string) => {
-              if (stage === 'bump') return { bg: 'bg-pink-50', text: 'text-pink-700' };
-              const colors = (STAGE_COLORS as Record<string, { bg: string; text: string }>)[stage];
-              return colors || { bg: 'bg-gray-50', text: 'text-gray-700' };
-            };
-
-            const handleCopy = async (content: string) => {
-              await navigator.clipboard.writeText(content);
-            };
-
-            const handleCreateTemplate = async () => {
-              setIsTemplateSubmitting(true);
-              try {
-                const created = await SalesPipelineService.createTemplate(templateForm);
-                setTemplates(prev => [...prev, created]);
-                setIsTemplateDialogOpen(false);
-                setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] });
-              } catch (err) {
-                console.error('Error creating template:', err);
-              } finally {
-                setIsTemplateSubmitting(false);
-              }
-            };
-
-            const handleUpdateTemplate = async () => {
-              if (!editingTemplate) return;
-              setIsTemplateSubmitting(true);
-              try {
-                const updated = await SalesPipelineService.updateTemplate(editingTemplate.id, templateForm);
-                setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
-                setEditingTemplate(null);
-                setIsTemplateDialogOpen(false);
-                setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] });
-              } catch (err) {
-                console.error('Error updating template:', err);
-              } finally {
-                setIsTemplateSubmitting(false);
-              }
-            };
-
-            const handleDeleteTemplate = async (id: string) => {
-              try {
-                await SalesPipelineService.deleteTemplate(id);
-                setTemplates(prev => prev.filter(t => t.id !== id));
-              } catch (err) {
-                console.error('Error deleting template:', err);
-              }
-            };
-
-            const openEditDialog = (t: SalesDmTemplate) => {
-              setEditingTemplate(t);
-              setTemplateForm({ name: t.name, stage: t.stage, sub_type: t.sub_type, content: t.content, variables: t.variables, tags: t.tags || [], attachments: t.attachments || [] });
-              setIsTemplateDialogOpen(true);
-            };
-
-            const openCreateDialog = () => {
-              setEditingTemplate(null);
-              setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] });
-              setIsTemplateDialogOpen(true);
-            };
-
-            const getSubTypeOptions = (stage: string) => {
-              if (stage === 'bump') return ['bump_1', 'bump_2', 'bump_3'];
-              return ['general', 'initial', 'follow_up'];
-            };
-
-            return (
-              <div className="space-y-4">
-                {/* Stage filter pills + New button */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {TEMPLATE_STAGES.map(s => (
-                      <button
-                        key={s.value}
-                        onClick={() => setTemplateStageFilter(s.value)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          templateStageFilter === s.value
-                            ? 'bg-brand text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                  <Button variant="brand" size="sm" onClick={openCreateDialog} className="text-white">
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Template
-                  </Button>
-                </div>
-
-                {/* Tag filter pills */}
-                {allTags.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-gray-500 font-medium">Tags:</span>
-                    <button
-                      onClick={() => setTemplateTagFilter('all')}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                        templateTagFilter === 'all'
-                          ? 'bg-brand text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      All
-                    </button>
-                    {allTags.map(tag => (
-                      <button
-                        key={tag}
-                        onClick={() => setTemplateTagFilter(tag)}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                          templateTagFilter === tag
-                            ? 'bg-brand text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Template cards grid */}
-                {filteredTemplates.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No templates found{templateStageFilter !== 'all' ? ' for this stage' : ''}.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredTemplates.map(t => {
-                      const stageColor = getStageColorForTemplate(t.stage);
-                      return (
-                        <Card key={t.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => setPreviewTemplate(t)}>
-                          <CardContent className="p-4 space-y-3">
-                            <div className="flex items-start justify-between">
-                              <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{t.name}</h4>
-                              <div className="flex items-center gap-1 ml-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => setPreviewTemplate(t)}
-                                  title="Preview"
-                                >
-                                  <Eye className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => handleCopy(t.content)}
-                                  title="Copy to clipboard"
-                                >
-                                  <Copy className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => openEditDialog(t)}
-                                  title="Edit"
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-rose-500 hover:text-rose-700"
-                                  onClick={() => handleDeleteTemplate(t.id)}
-                                  title="Delete"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className={`${stageColor.bg} ${stageColor.text} text-xs border-0`}>
-                                {getStageLabelForTemplate(t.stage)}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {getSubTypeLabel(t.sub_type)}
-                              </Badge>
-                              {(t.tags || []).map(tag => (
-                                <Badge key={tag} className="text-[10px] bg-teal-50 text-teal-700 border-0">
-                                  {tag}
-                                </Badge>
-                              ))}
-                              {(t.attachments || []).length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-500">
-                                  <Image className="h-3 w-3" />
-                                  {t.attachments.length}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600 line-clamp-4 whitespace-pre-wrap">{t.content}</p>
-                            {t.variables && t.variables.length > 0 && (
-                              <div className="flex items-center gap-1 flex-wrap">
-                                {t.variables.map(v => (
-                                  <span key={v} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">
-                                    [{v}]
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Create/Edit Template Dialog */}
-                <Dialog open={isTemplateDialogOpen} onOpenChange={(open) => {
-                  setIsTemplateDialogOpen(open);
-                  if (!open) { setEditingTemplate(null); setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] }); }
-                }}>
-                  <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle>{editingTemplate ? 'Edit Template' : 'New Template'}</DialogTitle>
-                      <DialogDescription>
-                        {editingTemplate ? 'Update this sales DM template.' : 'Create a new stage-specific DM template.'}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Name</Label>
-                        <Input
-                          value={templateForm.name}
-                          onChange={e => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="e.g., Cold DM — Initial Outreach"
-                          className="focus-brand"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Stage</Label>
-                          <Select
-                            value={templateForm.stage}
-                            onValueChange={v => setTemplateForm(prev => ({
-                              ...prev,
-                              stage: v,
-                              sub_type: v === 'bump' ? 'bump_1' : 'general',
-                            }))}
-                          >
-                            <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cold_dm">Cold DM</SelectItem>
-                              <SelectItem value="warm">Warm</SelectItem>
-                              <SelectItem value="tg_intro">TG Intro</SelectItem>
-                              <SelectItem value="booked">Booked</SelectItem>
-                              <SelectItem value="discovery_done">Discovery Done</SelectItem>
-                              <SelectItem value="proposal_call">Proposal Call</SelectItem>
-                              <SelectItem value="v2_contract">Contract</SelectItem>
-                              <SelectItem value="bump">Bump</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Sub-type</Label>
-                          <Select
-                            value={templateForm.sub_type || 'general'}
-                            onValueChange={v => setTemplateForm(prev => ({ ...prev, sub_type: v }))}
-                          >
-                            <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {getSubTypeOptions(templateForm.stage).map(opt => (
-                                <SelectItem key={opt} value={opt}>{getSubTypeLabel(opt)}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div>
-                        <Label>Tags</Label>
-                        <div className="space-y-2">
-                          {(templateForm.tags || []).length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {(templateForm.tags || []).map(tag => (
-                                <Badge key={tag} className="text-xs bg-teal-50 text-teal-700 border-0 gap-1">
-                                  {tag}
-                                  <button
-                                    type="button"
-                                    onClick={() => setTemplateForm(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }))}
-                                    className="hover:text-rose-500"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          <Input
-                            placeholder="Type a tag and press Enter (e.g., Token Launch, DeFi)"
-                            className="focus-brand"
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const val = (e.target as HTMLInputElement).value.trim();
-                                if (val && !(templateForm.tags || []).includes(val)) {
-                                  setTemplateForm(prev => ({ ...prev, tags: [...(prev.tags || []), val] }));
-                                  (e.target as HTMLInputElement).value = '';
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label>Content</Label>
-                        <Textarea
-                          value={templateForm.content}
-                          onChange={e => setTemplateForm(prev => ({ ...prev, content: e.target.value }))}
-                          placeholder="Write your template here... Use [KOL_NAME], [PROJECT_NAME], etc. as placeholders."
-                          rows={6}
-                          className="focus-brand"
-                        />
-                      </div>
-                      <div>
-                        <Label>Attachments</Label>
-                        <div className="space-y-2">
-                          {(templateForm.attachments || []).length > 0 && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {(templateForm.attachments || []).map((att, idx) => (
-                                <div key={idx} className="relative group">
-                                  <img src={att.url} alt={att.name} className="h-16 w-16 object-cover rounded border" />
-                                  <button
-                                    type="button"
-                                    onClick={() => setTemplateForm(prev => ({ ...prev, attachments: (prev.attachments || []).filter((_, i) => i !== idx) }))}
-                                    className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                  <p className="text-[9px] text-gray-500 truncate w-16 text-center mt-0.5">{att.name}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            className="focus-brand"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              try {
-                                const fileExt = file.name.split('.').pop();
-                                const filePath = `templates/${Date.now()}.${fileExt}`;
-                                const { error: uploadError } = await supabase.storage
-                                  .from('crm-attachments')
-                                  .upload(filePath, file, { cacheControl: '3600', upsert: false });
-                                if (uploadError) throw uploadError;
-                                const { data: { publicUrl } } = supabase.storage.from('crm-attachments').getPublicUrl(filePath);
-                                setTemplateForm(prev => ({
-                                  ...prev,
-                                  attachments: [...(prev.attachments || []), { url: publicUrl, name: file.name }],
-                                }));
-                              } catch (err) {
-                                console.error('Error uploading attachment:', err);
-                              }
-                              e.target.value = '';
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>Cancel</Button>
-                      <Button variant="brand" onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate} disabled={isTemplateSubmitting || !templateForm.name || !templateForm.content} className="text-white">
-                        {isTemplateSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        {editingTemplate ? 'Save Changes' : 'Create Template'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Preview Template Dialog */}
-                <Dialog open={!!previewTemplate} onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}>
-                  <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
-                    <DialogHeader>
-                      <DialogTitle>{previewTemplate?.name}</DialogTitle>
-                      <DialogDescription>Template preview</DialogDescription>
-                    </DialogHeader>
-                    {previewTemplate && (
-                      <div className="space-y-4 overflow-y-auto flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className={`${getStageColorForTemplate(previewTemplate.stage).bg} ${getStageColorForTemplate(previewTemplate.stage).text} text-xs border-0`}>
-                            {getStageLabelForTemplate(previewTemplate.stage)}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {getSubTypeLabel(previewTemplate.sub_type)}
-                          </Badge>
-                          {(previewTemplate.tags || []).map(tag => (
-                            <Badge key={tag} className="text-[10px] bg-teal-50 text-teal-700 border-0">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-800 whitespace-pre-wrap">
-                          {previewTemplate.content}
-                        </div>
-                        {previewTemplate.variables && previewTemplate.variables.length > 0 && (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs text-gray-500 font-medium">Variables:</span>
-                            {previewTemplate.variables.map(v => (
-                              <span key={v} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">
-                                [{v}]
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {(previewTemplate.attachments || []).length > 0 && (
-                          <div className="space-y-2">
-                            <span className="text-xs text-gray-500 font-medium">Attachments:</span>
-                            <div className="grid grid-cols-2 gap-2">
-                              {previewTemplate.attachments.map((att, idx) => (
-                                <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
-                                  <img src={att.url} alt={att.name} className="w-full rounded border transition-opacity" />
-                                  <p className="text-[10px] text-gray-500 mt-1 truncate">{att.name}</p>
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (previewTemplate) {
-                            navigator.clipboard.writeText(previewTemplate.content);
-                            toast({ title: 'Copied to clipboard' });
-                          }
-                        }}
-                      >
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copy
-                      </Button>
-                      <Button variant="outline" onClick={() => setPreviewTemplate(null)}>Close</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            );
-          })()}
-        </TabsContent>
-
-      </Tabs>
-
+      {/* Main tabs + per-tab controls extracted to SalesPipelineTabs
+          on 2026-06-03 — was ~210 LOC of TabsList + 7 TabsContent
+          inline. Page keeps `activeTab` / `viewMode` / `pathFilter` so
+          its fetch effects + recalc handler still key off them. */}
+      <SalesPipelineTabs
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        pathFilter={pathFilter}
+        onPathFilterChange={setPathFilter}
+        onDiscoveryPromoted={() => { void fetchOpportunities(); void fetchMetrics(); }}
+      />
       {/* Dialogs */}
-      {renderFormDialog()}
-      {renderOrbitPrompt()}
-      {renderClosedLostPrompt()}
-      {renderClosedWonPrompt()}
-      {renderTgHandlePrompt()}
-      {renderBucketPrompt()}
-      {renderActivityLogPrompt()}
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onNewOpportunity={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}
+        onExportCsv={() => downloadCsv(filteredOpportunities, SP_CSV_COLUMNS, `sales-pipeline-${todayStamp()}`)}
+      />
+      <CreateEditOpportunityDialog />
+      <OrbitDialog />
+      <ClosedLostDialog />
+      <ClosedWonDialog />
+      <TgHandleDialog />
+      <BucketDialog />
+      <StageHistoryDialog />
+      <ActivityLogDialog />
 
       {/* Shared destructive-confirm dialog. Replaces the half-dozen
           window.confirm() calls that used to live in delete handlers.
@@ -9000,5 +3156,6 @@ export default function SalesPipelinePage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </SalesPipelineProvider>
   );
 }

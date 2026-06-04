@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Bell, Plus, Pencil, Trash2, Clock, MessageSquare, Play, Loader2, CheckCircle, XCircle, AlertTriangle, Send, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -150,7 +153,7 @@ export default function RemindersPage() {
       const data = await res.json();
       if (data.rules) setRules(data.rules);
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to load reminders', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to load reminders', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -181,7 +184,7 @@ export default function RemindersPage() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.telegram_chat_id) {
-      toast({ title: 'Error', description: 'Name and Telegram Chat ID are required', variant: 'destructive' });
+      toast({ title: 'Missing fields', description: 'Name and Telegram Chat ID are required.', variant: 'destructive' });
       return;
     }
 
@@ -206,7 +209,7 @@ export default function RemindersPage() {
       setEditDialog(false);
       fetchRules();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Save failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -223,7 +226,7 @@ export default function RemindersPage() {
       if (data.error) throw new Error(data.error);
       setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, is_active: !r.is_active } : r)));
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Update failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     }
   };
 
@@ -240,7 +243,7 @@ export default function RemindersPage() {
       toast({ title: 'Reminder deleted' });
       setRules((prev) => prev.filter((r) => r.id !== deletingRule.id));
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Delete failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setDeleteDialogOpen(false);
       setDeletingRule(null);
@@ -266,7 +269,7 @@ export default function RemindersPage() {
         toast({ title: 'Test failed', description: data.error, variant: 'destructive' });
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Test failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setTesting(null);
     }
@@ -290,7 +293,7 @@ export default function RemindersPage() {
               value={params.threshold_days ?? 90}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 90)}
             />
-            <p className="text-xs text-gray-500 mt-1">Alert if KOL stats not updated within this many days</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Alert if KOL stats not updated within this many days</p>
           </div>
         );
       case 'client_checkin':
@@ -303,7 +306,7 @@ export default function RemindersPage() {
               value={params.advance_days ?? 1}
               onChange={(e) => setParam('advance_days', parseInt(e.target.value) || 1)}
             />
-            <p className="text-xs text-gray-500 mt-1">Remind this many days before the meeting</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Remind this many days before the meeting</p>
           </div>
         );
       case 'cdl_needs_update':
@@ -316,7 +319,7 @@ export default function RemindersPage() {
               value={params.threshold_days ?? 14}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 14)}
             />
-            <p className="text-xs text-gray-500 mt-1">Flag clients with no CDL entry within this many days</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Flag clients with no CDL entry within this many days</p>
           </div>
         );
       case 'weekly_cdl_review':
@@ -346,7 +349,7 @@ export default function RemindersPage() {
               value={params.threshold_days ?? 7}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 7)}
             />
-            <p className="text-xs text-gray-500 mt-1">Content published more than this many days ago with no metrics</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Content published more than this many days ago with no metrics</p>
           </div>
         );
       case 'crm_followup':
@@ -359,7 +362,7 @@ export default function RemindersPage() {
               value={params.threshold_days ?? 7}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 7)}
             />
-            <p className="text-xs text-gray-500 mt-1">Remind if no contact within this many days</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Remind if no contact within this many days</p>
           </div>
         );
       case 'payment_reminder':
@@ -371,7 +374,7 @@ export default function RemindersPage() {
               value={(params.exclude_campaign_patterns || []).join(', ')}
               onChange={(e) => setParam('exclude_campaign_patterns', e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean))}
             />
-            <p className="text-xs text-gray-500 mt-1">Comma-separated campaign name patterns to exclude (e.g. KOL Round)</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Comma-separated campaign name patterns to exclude (e.g. KOL Round)</p>
           </div>
         );
       case 'new_kol_no_gc':
@@ -385,17 +388,17 @@ export default function RemindersPage() {
               value={params.lookback_days ?? 7}
               onChange={(e) => setParam('lookback_days', parseInt(e.target.value) || 7)}
             />
-            <p className="text-xs text-gray-500 mt-1">Check items created within this many days</p>
+            <p className="text-xs text-ink-warm-500 mt-1">Check items created within this many days</p>
           </div>
         );
       case 'form_submission':
         return (
-          <p className="text-sm text-gray-500">This rule is event-driven. It routes form submission notifications to the configured chatroom.</p>
+          <p className="text-sm text-ink-warm-500">This rule is event-driven. It routes form submission notifications to the configured chatroom.</p>
         );
       case 'task_assigned':
         return (
           <div className="space-y-2">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-warm-500">
               This rule is event-driven. It fires inline whenever a task is assigned (or reassigned),
               DM&apos;ing the new assignee on their personal Telegram.
             </p>
@@ -424,7 +427,7 @@ export default function RemindersPage() {
                 value={params.proposal_age_days ?? 14}
                 onChange={(e) => setParam('proposal_age_days', parseInt(e.target.value) || 14)}
               />
-              <p className="text-xs text-gray-500 mt-1">Flag proposals sent at least this many days ago.</p>
+              <p className="text-xs text-ink-warm-500 mt-1">Flag proposals sent at least this many days ago.</p>
             </div>
             <div>
               <Label>Inactivity threshold (days)</Label>
@@ -434,7 +437,7 @@ export default function RemindersPage() {
                 value={params.inactivity_days ?? 7}
                 onChange={(e) => setParam('inactivity_days', parseInt(e.target.value) || 7)}
               />
-              <p className="text-xs text-gray-500 mt-1">AND no activity (updated_at) within this many days.</p>
+              <p className="text-xs text-ink-warm-500 mt-1">AND no activity (updated_at) within this many days.</p>
             </div>
           </div>
         );
@@ -474,10 +477,10 @@ export default function RemindersPage() {
                   setParam('advance_minutes', unique);
                 }}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-warm-500 mt-1">
                 Comma-separated list. Each entry sends one DM that many minutes before each Meet. Example: <code className="bg-gray-100 px-1 rounded">30, 10, 5</code> sends three DMs (30, 10, 5 min before).
                 {adv.length > 0 && (
-                  <> Currently configured: <span className="font-medium text-gray-700">{adv.map((n) => `${n} min`).join(', ')}</span>.</>
+                  <> Currently configured: <span className="font-medium text-ink-warm-700">{adv.map((n) => `${n} min`).join(', ')}</span>.</>
                 )}
               </p>
             </div>
@@ -488,7 +491,7 @@ export default function RemindersPage() {
               />
               <div>
                 <Label className="text-sm">Also DM at meeting start</Label>
-                <p className="text-xs text-gray-500">Send an additional DM the moment the meeting begins.</p>
+                <p className="text-xs text-ink-warm-500">Send an additional DM the moment the meeting begins.</p>
               </div>
             </div>
             <div>
@@ -499,7 +502,7 @@ export default function RemindersPage() {
                 value={lookahead}
                 onChange={(e) => setParam('lookahead_minutes', parseInt(e.target.value) || 60)}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-warm-500 mt-1">
                 How far ahead the cron looks at each user&apos;s calendar. Should be at least <strong>(largest advance + 5)</strong>.
                 {lookaheadTooSmall && (
                   <span className="text-amber-700 font-medium"> Currently too small for your largest advance ({maxAdv} min) — bump to at least {maxAdv + 10}.</span>
@@ -536,6 +539,8 @@ export default function RemindersPage() {
           icon={Bell}
           title="Reminders"
           subtitle="Automated Telegram reminders for your team"
+          kicker="Workspace · Reminders"
+          kickerDot="brand"
           actions={(
             <Button variant="brand" disabled>
               <Plus className="h-4 w-4 mr-2" />
@@ -543,18 +548,32 @@ export default function RemindersPage() {
             </Button>
           )}
         />
+
+        {/* SectionHeader skeleton — keeps the chapter divider in place
+            so the layout doesn't shift when data lands. */}
+        <div className="section-head first flex items-center gap-3">
+          <span className="dot bg-brand/30" aria-hidden />
+          <Skeleton className="h-3 w-16" />
+          <span className="flex-1 h-px bg-cream-200" aria-hidden />
+          <Skeleton className="h-3 w-32" />
+        </div>
+
+        {/* Rule-card skeletons — same shape as the loaded cards
+            (icon tile + name + status + sub-badges + body + status
+            row), no hover effect since loaded cards are display-only
+            with their own action buttons inside. */}
         <div className="grid gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="hover:shadow-md transition-shadow">
+            <Card key={i} className="border-cream-200">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-7 w-7 rounded-lg" />
                   <Skeleton className="h-5 w-48" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-md" />
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <Skeleton className="h-5 w-24 rounded-full" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-24 rounded-md" />
+                  <Skeleton className="h-5 w-16 rounded-md" />
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
@@ -568,12 +587,19 @@ export default function RemindersPage() {
     );
   }
 
+  // Counts used by both the SectionHeader counter and the
+  // unconfigured banner. Hoisted so we compute once.
+  const unconfiguredCount = rules.filter(r => r.telegram_chat_id === 'PLACEHOLDER_CHAT_ID').length;
+  const activeCount = rules.filter(r => r.is_active).length;
+
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Bell}
         title="Reminders"
         subtitle="Automated Telegram reminders for your team"
+        kicker="Workspace · Reminders"
+        kickerDot="brand"
         actions={(
           <Button variant="brand" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
@@ -582,36 +608,48 @@ export default function RemindersPage() {
         )}
       />
 
+      {/* v11 chapter divider — counter shows live composition
+          (active / total + the unconfigured-filter state) so the
+          rules list reads with the same rhythm as other admin
+          surfaces. */}
+      <SectionHeader
+        label="Rules"
+        dot="brand"
+        counter={`${rules.length} rule${rules.length === 1 ? '' : 's'} · ${activeCount} active${
+          unconfiguredCount > 0
+            ? ` · ${unconfiguredCount} unconfigured${showUnconfiguredOnly ? ' · filtered' : ''}`
+            : ''
+        }`}
+        first
+      />
+
       {/* Unconfigured-rules banner — rules with PLACEHOLDER_CHAT_ID are
           silently skipped by the cron engine (lib/reminderService.ts:231),
           which used to be invisible to anyone managing the list. Now we
           surface the count up front and let them filter to just those
-          rows. */}
-      {(() => {
-        const unconfiguredCount = rules.filter(r => r.telegram_chat_id === 'PLACEHOLDER_CHAT_ID').length;
-        if (unconfiguredCount === 0) return null;
-        return (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-900">
-                {unconfiguredCount} of {rules.length} rule{rules.length === 1 ? '' : 's'} {unconfiguredCount === 1 ? 'is' : 'are'} unconfigured
-              </p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                These rules won&apos;t fire until you set a Telegram chat ID. Open the rule, paste the chat ID, and save.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
-              onClick={() => setShowUnconfiguredOnly(v => !v)}
-            >
-              {showUnconfiguredOnly ? 'Show all rules' : 'Show only these'}
-            </Button>
+          rows. Amber semantic palette kept — these are a real
+          "needs your attention" signal. */}
+      {unconfiguredCount > 0 && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-900">
+              {unconfiguredCount} of {rules.length} rule{rules.length === 1 ? '' : 's'} {unconfiguredCount === 1 ? 'is' : 'are'} unconfigured
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              These rules won&apos;t fire until you set a Telegram chat ID. Open the rule, paste the chat ID, and save.
+            </p>
           </div>
-        );
-      })()}
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
+            onClick={() => setShowUnconfiguredOnly(v => !v)}
+          >
+            {showUnconfiguredOnly ? 'Show all rules' : 'Show only these'}
+          </Button>
+        </div>
+      )}
 
       {/* Rules List */}
       <div className="grid gap-4">
@@ -620,18 +658,30 @@ export default function RemindersPage() {
             ? rules.filter(r => r.telegram_chat_id === 'PLACEHOLDER_CHAT_ID')
             : rules;
           if (rules.length === 0) {
+            // v11 EmptyState primitive wrapped in a Card to match the
+            // empty-state treatment everywhere else in the app
+            // (/tasks, /sops, /templates, /deliverables, etc.).
             return (
-              <div className="text-center py-12">
-                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">No reminders configured. Create your first reminder to get started.</p>
-                <Button variant="brand" onClick={openCreate}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Reminder
-                </Button>
-              </div>
+              <Card className="border-cream-200 overflow-hidden">
+                <EmptyState
+                  icon={Bell}
+                  title="No reminders configured."
+                  description="Create your first reminder to start sending automated Telegram nudges for stale KOL stats, client check-ins, CDL reviews, and more."
+                  className="py-16"
+                >
+                  <Button variant="brand" onClick={openCreate}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Reminder
+                  </Button>
+                </EmptyState>
+              </Card>
             );
           }
           if (visibleRules.length === 0) {
+            // "All rules configured" success state. Kept semantic
+            // emerald-50 since it's a positive confirmation, not
+            // chrome — same logic as the unconfigured banner staying
+            // amber-50.
             return (
               <div className="text-center py-10 bg-emerald-50 border border-emerald-100 rounded-lg">
                 <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
@@ -648,19 +698,27 @@ export default function RemindersPage() {
             );
           }
           return visibleRules.map((rule) => (
-            <Card key={rule.id} className={`hover:shadow-md transition-shadow ${!rule.is_active ? 'opacity-60' : ''}`}>
+            // Card chrome: border-cream-200 + display-only (no
+            // hover:shadow-md — the card has explicit Test/Edit/
+            // Delete buttons inside, so falsely implying full-card
+            // clickability with a hover-shadow is wrong, same fix
+            // as /sops cards).
+            <Card key={rule.id} className={`border-cream-200 ${!rule.is_active ? 'opacity-60' : ''}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="bg-gray-100 p-1.5 rounded-lg flex-shrink-0">
-                      <Bell className="h-4 w-4 text-gray-600" />
+                    <div className="bg-brand-soft border border-brand-light p-1.5 rounded-lg flex-shrink-0">
+                      <Bell className="h-4 w-4 text-brand-deep" />
                     </div>
-                    <h3 className="font-semibold text-gray-900 truncate">{rule.name}</h3>
+                    <h3 className="font-semibold text-ink-warm-900 truncate">{rule.name}</h3>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge className={`pointer-events-none ${rule.is_active ? 'bg-brand-light text-brand' : 'bg-gray-100 text-gray-800'}`}>
+                    {/* v11 StatusBadge: brand tone for Active,
+                        neutral for Disabled. Was a bespoke Badge
+                        with brand-light/gray-100 className. */}
+                    <StatusBadge tone={rule.is_active ? 'brand' : 'neutral'} size="sm">
                       {rule.is_active ? 'Active' : 'Disabled'}
-                    </Badge>
+                    </StatusBadge>
                     <Switch
                       checked={rule.is_active}
                       onCheckedChange={() => handleToggle(rule)}
@@ -682,10 +740,10 @@ export default function RemindersPage() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-sm text-gray-600">{rule.description || RULE_TYPES[rule.rule_type]?.description || ''}</p>
+                <p className="text-sm text-ink-warm-700">{rule.description || RULE_TYPES[rule.rule_type]?.description || ''}</p>
 
                 {/* Status row */}
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
+                <div className="flex items-center gap-4 mt-2 text-xs text-ink-warm-500 flex-wrap">
                   <span className="flex items-center gap-1">
                     <MessageSquare className="h-3 w-3" />
                     {rule.telegram_chat_id === 'PLACEHOLDER_CHAT_ID' ? (
@@ -724,15 +782,15 @@ export default function RemindersPage() {
 
                 {/* Recent logs */}
                 {rule.recent_logs.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-gray-100 space-y-0.5">
+                  <div className="mt-3 pt-2 border-t border-cream-100 space-y-0.5">
                     {rule.recent_logs.slice(0, 3).map((log) => (
-                      <div key={log.id} className="text-xs text-gray-500 flex items-center gap-2">
+                      <div key={log.id} className="text-xs text-ink-warm-500 flex items-center gap-2">
                         {log.error ? (
                           <AlertTriangle className="h-3 w-3 text-rose-500 shrink-0" />
                         ) : log.message_sent ? (
                           <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" />
                         ) : (
-                          <span className="h-3 w-3 rounded-full bg-gray-300 inline-block shrink-0" />
+                          <span className="h-3 w-3 rounded-full bg-cream-300 inline-block shrink-0" />
                         )}
                         <span>{new Date(log.run_at).toLocaleString()}</span>
                         <span>{log.items_found} items</span>
@@ -766,15 +824,18 @@ export default function RemindersPage() {
 
       {/* Edit/Create Dialog */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editingRule ? 'Edit Reminder' : 'New Reminder'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-brand" />
+              {editingRule ? 'Edit Reminder' : 'New Reminder'}
+            </DialogTitle>
             <DialogDescription>
               {editingRule ? 'Update reminder settings and Telegram routing.' : 'Create a new automated reminder rule.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
             <div>
               <Label>Name</Label>
               <Input
@@ -827,10 +888,10 @@ export default function RemindersPage() {
                       {tgChats.map((chat) => (
                         <SelectItem key={chat.id} value={chat.chat_id}>
                           <span className="flex items-center gap-1.5">
-                            <Send className="h-3 w-3 text-gray-400" />
+                            <Send className="h-3 w-3 text-ink-warm-400" />
                             {chat.title || chat.chat_id}
                             {chat.chat_type && (
-                              <span className="text-gray-400 text-xs">({chat.chat_type})</span>
+                              <span className="text-ink-warm-400 text-xs">({chat.chat_type})</span>
                             )}
                           </span>
                         </SelectItem>
@@ -884,19 +945,19 @@ export default function RemindersPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-gray-500"
+                  className="h-7 text-xs text-ink-warm-500"
                   onClick={() => setShowPreview(!showPreview)}
                 >
                   <Eye className="h-3 w-3 mr-1" />
                   {showPreview ? 'Hide Preview' : 'Show Preview'}
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mb-3">
+              <p className="text-xs text-ink-warm-500 mb-3">
                 Customize the Telegram message. Variables: <code className="bg-gray-100 px-1 rounded">{'{{name}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{emoji}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{count}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{label}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{detail}}'}</code>
               </p>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs text-gray-500">Header</Label>
+                  <Label className="text-xs text-ink-warm-500">Header</Label>
                   <Textarea
                     value={formData.params.message_template?.header ?? (DEFAULT_TEMPLATES[formData.rule_type]?.header || '')}
                     onChange={(e) => setFormData((prev) => ({
@@ -915,7 +976,7 @@ export default function RemindersPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">Item format (repeated per item)</Label>
+                  <Label className="text-xs text-ink-warm-500">Item format (repeated per item)</Label>
                   <Input
                     value={formData.params.message_template?.item ?? (DEFAULT_TEMPLATES[formData.rule_type]?.item || '')}
                     onChange={(e) => setFormData((prev) => ({
@@ -933,7 +994,7 @@ export default function RemindersPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">Footer (optional)</Label>
+                  <Label className="text-xs text-ink-warm-500">Footer (optional)</Label>
                   <Input
                     value={formData.params.message_template?.footer ?? (DEFAULT_TEMPLATES[formData.rule_type]?.footer || '')}
                     onChange={(e) => setFormData((prev) => ({
@@ -986,10 +1047,10 @@ export default function RemindersPage() {
                   .replace('{{count}}', '3');
 
                 return (
-                  <div className="mt-3 bg-gray-50 border rounded-lg p-3">
-                    <Label className="text-xs text-gray-500 mb-1 block">Preview</Label>
+                  <div className="mt-3 bg-cream-50 border rounded-lg p-3">
+                    <Label className="text-xs text-ink-warm-500 mb-1 block">Preview</Label>
                     <div
-                      className="text-sm text-gray-900 whitespace-pre-wrap font-mono"
+                      className="text-sm text-ink-warm-900 whitespace-pre-wrap font-mono"
                       dangerouslySetInnerHTML={{
                         __html: headerText + '\n' + itemText + '\n' + itemText + '\n' + itemText + (footerText ? '\n\n' + footerText : ''),
                       }}
@@ -1000,7 +1061,7 @@ export default function RemindersPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setEditDialog(false)}>Cancel</Button>
             <Button variant="brand" onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -1012,14 +1073,17 @@ export default function RemindersPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Reminder</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Reminder
+            </DialogTitle>
             <DialogDescription>
               Are you sure you want to delete &quot;{deletingRule?.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Cancel
             </Button>

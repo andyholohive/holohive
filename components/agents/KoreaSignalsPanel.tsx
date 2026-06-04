@@ -43,7 +43,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -432,17 +432,17 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
         if (data.trending && data.trending.length > 0) {
           setTimeout(() => {
             toast({
-              title: '🔥 Trending Prospects',
-              description: `${data.trending.slice(0, 5).join(', ')} — 3+ signals in the last 7 days`,
+              title: 'Trending Prospects',
+              description: `${data.trending.slice(0, 5).join(', ')} — 3+ signals in the last 7 days.`,
             });
           }, (data.alerts?.length || 0) * 800 + 800);
         }
         fetchDashboard();
       } else {
-        toast({ title: 'Scan Failed', description: data.error, variant: 'destructive' });
+        toast({ title: 'Scan failed', description: data.error ?? 'Unknown error', variant: 'destructive' });
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message || 'Network error', variant: 'destructive' });
+      toast({ title: 'Scan failed', description: err?.message ?? 'Network error', variant: 'destructive' });
     } finally {
       setScanning(false);
     }
@@ -459,15 +459,15 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
       const data = await res.json();
       if (res.ok) {
         toast({
-          title: 'Added to Pipeline',
-          description: `${prospectName} has been promoted to your sales pipeline.`,
+          title: 'Added to pipeline',
+          description: `${prospectName} promoted to your sales pipeline.`,
         });
         fetchDashboard();
       } else {
-        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
+        toast({ title: 'Promote failed', description: data.error ?? 'Unknown error', variant: 'destructive' });
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Promote failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     } finally {
       setPromoting(null);
     }
@@ -517,13 +517,13 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
 
   const handleManualSignalSubmit = async () => {
     if (!manualSignalData.prospect_name || !manualSignalData.headline) {
-      toast({ title: 'Prospect and headline are required', variant: 'destructive' });
+      toast({ title: 'Missing fields', description: 'Prospect and headline are required.', variant: 'destructive' });
       return;
     }
     // Find prospect by name
     const match = topProspects.find(p => p.name.toLowerCase() === manualSignalData.prospect_name.toLowerCase());
     if (!match) {
-      toast({ title: 'Prospect not found — enter exact name from the list', variant: 'destructive' });
+      toast({ title: 'Prospect not found', description: 'Enter the exact name from the list.', variant: 'destructive' });
       return;
     }
     setManualSignalSubmitting(true);
@@ -546,10 +546,10 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
         setManualSignalData({ prospect_name: '', signal_type: 'news_mention', headline: '', source_url: '', confidence: 'likely' });
         fetchDashboard();
       } else {
-        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        toast({ title: 'Add signal failed', description: data.error ?? 'Unknown error', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Failed to add signal', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Add signal failed', description: err instanceof Error ? err.message : 'Failed to add signal', variant: 'destructive' });
     } finally {
       setManualSignalSubmitting(false);
     }
@@ -922,7 +922,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`h-8 px-1.5 rounded-l-none border-l-0 ${scanMenuOpen ? 'bg-brand text-white border-brand hover:bg-brand/90' : ''}`}
+                  className={`h-8 px-1.5 rounded-l-none border-l-0 ${scanMenuOpen ? 'border-brand' : ''}`}
                   onClick={() => setScanMenuOpen(!scanMenuOpen)}
                   disabled={scanning}
                 >
@@ -1369,7 +1369,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <AlertDialogFooter>
             <AlertDialogCancel disabled={!!promoting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-brand text-white hover:bg-brand/90"
+              className={buttonVariants({ variant: 'brand' })}
               disabled={!!promoting}
               onClick={async () => {
                 if (!confirmPromote) return;

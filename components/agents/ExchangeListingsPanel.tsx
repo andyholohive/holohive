@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { KpiCard } from '@/components/ui/kpi-card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -72,9 +75,13 @@ interface Stats {
   total_scanner_signals: number;
 }
 
-const EXCHANGE_BADGE: Record<string, string> = {
-  upbit: 'bg-blue-100 text-blue-700',
-  bithumb: 'bg-orange-100 text-orange-700',
+// v11: exchange tones mapped to StatusBadge palette. Sky/info reads as
+// the "neutral information" exchange; warning/amber reads as the
+// "watch-out" exchange. (These are just visual labels — there's no
+// real safety meaning, just two distinguishable tones.)
+const EXCHANGE_TONE: Record<string, BadgeTone> = {
+  upbit: 'info',
+  bithumb: 'warning',
 };
 
 function formatDate(iso: string): string {
@@ -124,7 +131,7 @@ export default function ExchangeListingsPanel() {
       setDelisted(data.delisted_markets || []);
       setRuns(data.recent_runs || []);
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to load', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err?.message ?? 'Failed to load', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -149,7 +156,7 @@ export default function ExchangeListingsPanel() {
       }
       fetchData();
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Run failed', variant: 'destructive' });
+      toast({ title: 'Run failed', description: err?.message ?? 'Run failed', variant: 'destructive' });
     } finally {
       setRunning(false);
     }
@@ -186,7 +193,7 @@ export default function ExchangeListingsPanel() {
       }
       fetchData();
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Simulation failed', variant: 'destructive' });
+      toast({ title: 'Simulation failed', description: err?.message ?? 'Simulation failed', variant: 'destructive' });
     } finally {
       setSimulating(false);
     }
@@ -200,9 +207,9 @@ export default function ExchangeListingsPanel() {
     <div className="pb-8 space-y-4">
       {/* Description + actions */}
       <div className="flex items-start justify-between gap-4">
-        <p className="text-sm text-gray-600 max-w-2xl">
+        <p className="text-sm text-ink-warm-700 max-w-2xl">
           Tracks every listed market on Upbit and Bithumb hourly. New listings fire
-          Tier 1 <code className="bg-gray-100 px-1 rounded text-xs">korea_exchange_listing</code> signals;
+          Tier 1 <code className="bg-cream-100 px-1 rounded text-xs">korea_exchange_listing</code> signals;
           delistings fire disqualifier signals. Signals appear in the Korea Signals tab.
         </p>
         <div className="flex items-center gap-2 shrink-0">
@@ -216,22 +223,25 @@ export default function ExchangeListingsPanel() {
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          {/* Simulate — colored outline dropped 2026-06-03 (was
+              `text-violet-700 border-violet-200`); icon tint carries
+              the "test mode" semantic. */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => setSimulateOpen(true)}
             disabled={simulating || running}
-            className="h-9 text-violet-700 border-violet-200 hover:bg-violet-50"
+            className="h-9"
             title="Safely simulate a new listing — removes a market from the DB, runs the scanner, verifies the signal fired, and restores everything"
           >
-            <TestTube2 className="w-4 h-4 mr-1.5" />
+            <TestTube2 className="w-4 h-4 mr-1.5 text-violet-500" />
             Simulate
           </Button>
           <Button
+            variant="brand"
             size="sm"
             onClick={runNow}
             disabled={running || simulating}
-            style={{ backgroundColor: 'var(--brand)', color: 'white' }}
             className="h-9"
           >
             {running ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Play className="w-4 h-4 mr-1.5" />}
@@ -240,79 +250,55 @@ export default function ExchangeListingsPanel() {
         </div>
       </div>
 
-      {/* Stat cards */}
+      {/* Stat cards — KpiCard (project convention). Was rolling its
+          own Card + CardContent variant with `hover:shadow-md` that
+          falsely implied clickability.
+
+          On initial mount (loading + no stats fetched yet) we render
+          KPI skeletons instead of em-dash tiles — matches the
+          DiscoveryPanel pattern so the two tabs feel like the same
+          surface. On refresh, prior values stay visible (no flicker).
+          2026-06-03. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Building2 className="h-3.5 w-3.5 text-gray-400" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Markets Tracked</span>
-            </div>
-            {loading ? <Skeleton className="h-7 w-20" /> : (
-              <>
-                <div className="text-2xl font-bold text-gray-900">{stats?.total_markets ?? 0}</div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {stats?.upbit ?? 0} Upbit · {stats?.bithumb ?? 0} Bithumb
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">New Listings (7d)</span>
-            </div>
-            {loading ? <Skeleton className="h-7 w-20" /> : (
-              <>
-                <div className="text-2xl font-bold text-emerald-700">{stats?.new_last_7d ?? 0}</div>
-                <div className="text-xs text-gray-500 mt-0.5">with signals fired</div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <XCircle className="h-3.5 w-3.5 text-rose-500" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Delistings (30d)</span>
-            </div>
-            {loading ? <Skeleton className="h-7 w-20" /> : (
-              <>
-                <div className="text-2xl font-bold text-rose-700">{stats?.delisted_last_30d ?? 0}</div>
-                <div className="text-xs text-gray-500 mt-0.5">disqualifier signals</div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-3.5 w-3.5 text-brand" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Scan</span>
-            </div>
-            {loading ? <Skeleton className="h-7 w-20" /> : runs[0] ? (
-              <>
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatDate(runs[0].started_at)}
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                  {runs[0].status === 'completed' ? (
-                    <CheckCircle className="h-3 w-3 text-emerald-600" />
-                  ) : runs[0].status === 'running' ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-brand" />
-                  ) : (
-                    <XCircle className="h-3 w-3 text-rose-600" />
-                  )}
-                  {runs[0].duration_ms ? `${Math.round(runs[0].duration_ms / 1000)}s` : runs[0].status}
-                </div>
-              </>
-            ) : (
-              <div className="text-sm text-gray-400">No runs yet</div>
-            )}
-          </CardContent>
-        </Card>
+        {loading && !stats ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))
+        ) : (
+          <>
+            <KpiCard
+              icon={Building2}
+              label="Markets Tracked"
+              value={stats?.total_markets ?? 0}
+              sub={`${stats?.upbit ?? 0} Upbit · ${stats?.bithumb ?? 0} Bithumb`}
+              accent="gray"
+            />
+            <KpiCard
+              icon={Sparkles}
+              label="New Listings (7d)"
+              value={stats?.new_last_7d ?? 0}
+              sub="with signals fired"
+              accent="emerald"
+            />
+            <KpiCard
+              icon={XCircle}
+              label="Delistings (30d)"
+              value={stats?.delisted_last_30d ?? 0}
+              sub="disqualifier signals"
+              accent="rose"
+            />
+            <KpiCard
+              icon={Clock}
+              label="Last Scan"
+              value={runs[0] ? formatDate(runs[0].started_at) : 'Never'}
+              sub={runs[0]
+                ? `${runs[0].duration_ms ? `${Math.round(runs[0].duration_ms / 1000)}s` : runs[0].status}`
+                : 'no runs yet'
+              }
+              accent="brand"
+            />
+          </>
+        )}
       </div>
 
       {/* Detected by scanner — the actual "what's new from scans" view */}
@@ -320,11 +306,11 @@ export default function ExchangeListingsPanel() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">
+              <h3 className="font-semibold text-sm text-ink-warm-900 flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-emerald-600" />
                 Detected by scanner
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-ink-warm-500 mt-0.5">
                 Listings (and delistings) the scanner actually fired signals on — not baseline inventory.
               </p>
             </div>
@@ -334,89 +320,86 @@ export default function ExchangeListingsPanel() {
           </div>
 
           {loading ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            // Structural skeleton — matches the v11 table-row shape
+            // (`py-3.5 px-5`) so the layout doesn't jump when the
+            // signals land. 5 rows matches the Discovery + main
+            // markets table skeleton density for cross-tab parity.
+            <div className="space-y-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 py-3 px-5 border-b border-cream-100 last:border-0">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-4 flex-1" />
+                  <Skeleton className="h-4 w-10" />
+                  <Skeleton className="h-4 w-14" />
+                </div>
+              ))}
             </div>
           ) : detected.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-              <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-700 font-medium">No new listings detected yet</p>
-              <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                The scanner runs hourly. When Upbit or Bithumb lists a token not already in our tracker,
-                a signal will appear here. Use <span className="font-semibold">Simulate</span> above to
-                test the pipeline without waiting for a real listing.
-              </p>
-            </div>
+            <EmptyState
+              icon={Clock}
+              title="No new listings detected yet"
+              description="The scanner runs hourly. When Upbit or Bithumb lists a token not already in our tracker, a signal will appear here. Use Simulate above to test the pipeline without waiting for a real listing."
+            />
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead>Project</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Headline</TableHead>
-                  <TableHead>Weight</TableHead>
-                  <TableHead>Detected</TableHead>
-                  <TableHead>Matched</TableHead>
-                  <TableHead className="text-right">Open</TableHead>
+                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                  {['Project', 'Event', 'Headline', 'Weight', 'Detected', 'Matched'].map(h => (
+                    <TableHead key={h} className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">{h}</TableHead>
+                  ))}
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Open</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {detected.map(d => {
                   const isListing = d.signal_type === 'korea_exchange_listing';
                   return (
-                    <TableRow key={d.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{d.project_name}</TableCell>
+                    <TableRow key={d.id} className="border-cream-100 row-accent">
+                      <TableCell className="py-3.5 px-5 font-medium">{d.project_name}</TableCell>
                       <TableCell>
-                        {isListing ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 pointer-events-none text-[10px] uppercase">
-                            Listed
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-rose-100 text-rose-700 pointer-events-none text-[10px] uppercase">
-                            Delisted
-                          </Badge>
-                        )}
+                        <StatusBadge tone={isListing ? 'success' : 'danger'} size="sm" className="uppercase">
+                          {isListing ? 'Listed' : 'Delisted'}
+                        </StatusBadge>
                         {d.exchange && (
-                          <Badge className={`ml-1 ${EXCHANGE_BADGE[d.exchange]} pointer-events-none text-[10px] uppercase`}>
+                          <StatusBadge tone={EXCHANGE_TONE[d.exchange] || 'neutral'} size="sm" className="ml-1 uppercase">
                             {d.exchange}
-                          </Badge>
+                          </StatusBadge>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-700 max-w-[300px] truncate" title={d.headline}>
+                      <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700 max-w-[300px] truncate" title={d.headline}>
                         {d.headline}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3.5 px-5 tabular-nums">
                         <span className={`text-xs font-semibold ${
                           isListing ? 'text-emerald-700' : 'text-rose-700'
                         }`}>
                           {isListing ? '+' : ''}{d.relevancy_weight}
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs text-gray-500">
+                      <TableCell className="py-3.5 px-5 text-xs text-ink-warm-500">
                         {formatDate(d.detected_at)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3.5 px-5">
                         {d.matched_prospect_id ? (
-                          <Badge className="bg-brand-light text-brand pointer-events-none text-[10px]">
-                            ✓ prospect
-                          </Badge>
+                          <StatusBadge tone="brand" size="sm">✓ prospect</StatusBadge>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-ink-warm-400">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="py-3.5 px-5 text-right">
                         {d.source_url ? (
                           <a
                             href={d.source_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-gray-400 hover:text-gray-900 inline-flex"
+                            className="text-ink-warm-400 hover:text-ink-warm-900 inline-flex"
                             title="Open on exchange"
                           >
                             <ExternalLink className="h-4 w-4" />
                           </a>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-ink-warm-400">—</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -431,23 +414,24 @@ export default function ExchangeListingsPanel() {
       {/* Inventory: all tracked markets (filterable) */}
       <div>
         <div className="flex items-center justify-between mb-2 mt-2">
-          <h3 className="font-semibold text-sm text-gray-900">All tracked markets</h3>
-          <span className="text-xs text-gray-500">Showing newest 50 · baseline + detected</span>
+          <h3 className="font-semibold text-sm text-ink-warm-900">All tracked markets</h3>
+          <span className="text-xs text-ink-warm-500">Showing newest 50 · baseline + detected</span>
         </div>
       </div>
 
-      {/* Markets filter */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Markets filter — v11 segmented control (cream-100 base + active
+          white tile with shadow-card + brand text). */}
+      <div className="inline-flex bg-cream-100 p-1 rounded-md border border-cream-200 w-fit">
         {(['all', 'upbit', 'bithumb'] as const).map(f => (
           <button
             key={f}
+            type="button"
             onClick={() => setExchangeFilter(f)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
               exchangeFilter === f
-                ? 'text-white'
-                : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+                ? 'bg-white shadow-card text-brand'
+                : 'text-ink-warm-500 hover:bg-cream-200 hover:text-ink-warm-700'
             }`}
-            style={exchangeFilter === f ? { backgroundColor: 'var(--brand)' } : {}}
           >
             {f === 'all' ? 'All Exchanges' : f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
@@ -456,60 +440,72 @@ export default function ExchangeListingsPanel() {
 
       {/* Recent markets table */}
       {loading ? (
-        <Card><CardContent className="p-4 space-y-2">
-          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-        </CardContent></Card>
+        // Structural skeleton — 5 rows in v11 table-row dimensions.
+        <Card className="overflow-hidden">
+          <div className="border-b border-cream-200 bg-cream-50/80 py-2.5 px-5 flex items-center gap-3">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className={`h-3 ${i === 0 ? 'w-16' : i === 3 ? 'flex-1' : 'w-20'}`} />
+            ))}
+          </div>
+          <div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-3.5 px-5 border-b border-cream-100 last:border-0">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            ))}
+          </div>
+        </Card>
       ) : filteredMarkets.length === 0 ? (
-        <Card><CardContent className="text-center py-12 text-gray-500">
-          No markets in this view.
-        </CardContent></Card>
+        <EmptyState
+          icon={Building2}
+          title="No markets in this view"
+          description="Try a different exchange filter, or wait for the hourly scanner to populate the inventory."
+        />
       ) : (
         <Card>
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead>Symbol</TableHead>
-                <TableHead>Exchange</TableHead>
-                <TableHead>Pair</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>First Seen</TableHead>
-                <TableHead>Signal Fired</TableHead>
-                <TableHead className="text-right">Open</TableHead>
+              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                {['Symbol', 'Exchange', 'Pair', 'Name', 'First Seen', 'Signal Fired'].map(h => (
+                  <TableHead key={h} className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">{h}</TableHead>
+                ))}
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Open</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredMarkets.map((m, i) => (
-                <TableRow key={`${m.exchange}-${m.market_pair}-${i}`} className="hover:bg-gray-50">
-                  <TableCell>
+                <TableRow key={`${m.exchange}-${m.market_pair}-${i}`} className="border-cream-100 row-accent">
+                  <TableCell className="py-3.5 px-5">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{m.symbol}</span>
-                      {m.is_new && (
-                        <Badge className="bg-emerald-100 text-emerald-700 pointer-events-none text-[10px]">NEW</Badge>
-                      )}
-                      {m.warning_flag && (
-                        <Badge className="bg-amber-100 text-amber-700 pointer-events-none text-[10px]">⚠ Caution</Badge>
-                      )}
+                      <span className="font-semibold text-ink-warm-900">{m.symbol}</span>
+                      {m.is_new && <StatusBadge tone="success" size="sm">NEW</StatusBadge>}
+                      {m.warning_flag && <StatusBadge tone="warning" size="sm">⚠ Caution</StatusBadge>}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge className={`${EXCHANGE_BADGE[m.exchange]} pointer-events-none text-[10px] uppercase`}>
+                  <TableCell className="py-3.5 px-5">
+                    <StatusBadge tone={EXCHANGE_TONE[m.exchange] || 'neutral'} size="sm" className="uppercase">
                       {m.exchange}
-                    </Badge>
+                    </StatusBadge>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-600 font-mono">{m.market_pair}</TableCell>
-                  <TableCell className="text-sm text-gray-600">
-                    {m.korean_name || m.english_name || <span className="text-gray-400">—</span>}
+                  <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700 font-mono">{m.market_pair}</TableCell>
+                  <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">
+                    {m.korean_name || m.english_name || <span className="text-ink-warm-400">—</span>}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-500">{formatDate(m.first_seen_at)}</TableCell>
-                  <TableCell className="text-xs text-gray-500">
-                    {m.listing_signal_fired_at ? formatDate(m.listing_signal_fired_at) : <span className="text-gray-400">—</span>}
+                  <TableCell className="py-3.5 px-5 text-xs text-ink-warm-500">{formatDate(m.first_seen_at)}</TableCell>
+                  <TableCell className="py-3.5 px-5 text-xs text-ink-warm-500">
+                    {m.listing_signal_fired_at ? formatDate(m.listing_signal_fired_at) : <span className="text-ink-warm-400">—</span>}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="py-3.5 px-5 text-right">
                     <a
                       href={exchangeMarketUrl(m.exchange, m.market_pair, m.symbol, m.quote_currency)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gray-400 hover:text-gray-900 inline-flex"
+                      className="text-ink-warm-400 hover:text-ink-warm-900 inline-flex"
                       title={`View ${m.symbol} on ${m.exchange}`}
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -527,32 +523,31 @@ export default function ExchangeListingsPanel() {
         <div>
           <button
             onClick={() => setShowDelisted(v => !v)}
-            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5"
+            className="text-sm text-ink-warm-700 hover:text-ink-warm-900 flex items-center gap-1.5"
           >
             {showDelisted ? '▼' : '▶'} Recent delistings ({delisted.length})
           </button>
           {showDelisted && (
-            <Card className="mt-2">
+            <Card className="mt-2 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-rose-50">
-                    <TableHead>Symbol</TableHead>
-                    <TableHead>Exchange</TableHead>
-                    <TableHead>Pair</TableHead>
-                    <TableHead>Delisted</TableHead>
+                  <TableRow className="bg-rose-50/80 hover:bg-rose-50/80 border-b border-rose-200">
+                    {['Symbol', 'Exchange', 'Pair', 'Delisted'].map(h => (
+                      <TableHead key={h} className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">{h}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {delisted.map(d => (
-                    <TableRow key={`${d.exchange}-${d.market_pair}`}>
-                      <TableCell className="font-semibold">{d.symbol}</TableCell>
-                      <TableCell>
-                        <Badge className={`${EXCHANGE_BADGE[d.exchange]} pointer-events-none text-[10px] uppercase`}>
+                    <TableRow key={`${d.exchange}-${d.market_pair}`} className="border-cream-100">
+                      <TableCell className="py-3.5 px-5 font-semibold">{d.symbol}</TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        <StatusBadge tone={EXCHANGE_TONE[d.exchange] || 'neutral'} size="sm" className="uppercase">
                           {d.exchange}
-                        </Badge>
+                        </StatusBadge>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{d.market_pair}</TableCell>
-                      <TableCell className="text-xs text-gray-500">{formatDate(d.delisted_at)}</TableCell>
+                      <TableCell className="py-3.5 px-5 font-mono text-sm">{d.market_pair}</TableCell>
+                      <TableCell className="py-3.5 px-5 text-xs text-ink-warm-500">{formatDate(d.delisted_at)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -566,12 +561,12 @@ export default function ExchangeListingsPanel() {
       {runs.length > 0 && (
         <Card>
           <CardContent className="p-4">
-            <h3 className="font-semibold text-sm text-gray-700 mb-2">Recent runs</h3>
+            <h3 className="font-semibold text-sm text-ink-warm-700 mb-2">Recent runs</h3>
             <div className="space-y-1.5">
               {runs.slice(0, 5).map(r => {
                 const s = r.output_summary || {};
                 return (
-                  <div key={r.id} className="flex items-center gap-3 text-xs py-1 border-b border-gray-100 last:border-0">
+                  <div key={r.id} className="flex items-center gap-3 text-xs py-1 border-b border-cream-100 last:border-0">
                     {r.status === 'completed' ? (
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     ) : r.status === 'running' ? (
@@ -579,14 +574,14 @@ export default function ExchangeListingsPanel() {
                     ) : (
                       <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
                     )}
-                    <span className="text-gray-500 shrink-0">{formatDate(r.started_at)}</span>
+                    <span className="text-ink-warm-500 shrink-0">{formatDate(r.started_at)}</span>
                     {r.duration_ms != null && (
-                      <span className="text-gray-400 shrink-0">{Math.round(r.duration_ms / 1000)}s</span>
+                      <span className="text-ink-warm-400 shrink-0">{Math.round(r.duration_ms / 1000)}s</span>
                     )}
                     {s.baseline_run && (
                       <Badge variant="outline" className="text-[10px] pointer-events-none">baseline</Badge>
                     )}
-                    <span className="text-gray-600 truncate">
+                    <span className="text-ink-warm-700 truncate">
                       {s.live_markets_total ?? '—'} markets · {s.listing_signals_fired ?? 0} new · {s.delisting_signals_fired ?? 0} delisted
                       {s.prospect_matches ? ` · ${s.prospect_matches} matched` : ''}
                     </span>
@@ -603,9 +598,11 @@ export default function ExchangeListingsPanel() {
         </Card>
       )}
 
-      {/* Simulate dialog */}
+      {/* Simulate dialog — v11 pattern: max-h-[85vh] + flex-col, inner
+          scroll surface with flex-1 + overflow-y-auto, footer pinned
+          with border-t. */}
       <Dialog open={simulateOpen} onOpenChange={setSimulateOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Simulate a new listing</DialogTitle>
             <DialogDescription>
@@ -615,7 +612,7 @@ export default function ExchangeListingsPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2 py-2">
+          <div className="flex-1 overflow-y-auto px-1 space-y-2 py-2">
             <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800 space-y-1">
               <p className="font-semibold flex items-center gap-1"><TestTube2 className="h-3.5 w-3.5" /> What this does</p>
               <ol className="list-decimal ml-4 space-y-0.5">
@@ -629,8 +626,8 @@ export default function ExchangeListingsPanel() {
             </div>
 
             {lastSimulation && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
-                <div className="font-semibold text-gray-700">Last simulation</div>
+              <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-xs space-y-1">
+                <div className="font-semibold text-ink-warm-700">Last simulation</div>
                 {lastSimulation.run_error ? (
                   <div className="text-rose-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" /> {lastSimulation.run_error}
@@ -641,10 +638,10 @@ export default function ExchangeListingsPanel() {
                     {lastSimulation.signal_captured ? (
                       <>
                         <div className="text-emerald-700 font-medium flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Signal fired correctly</div>
-                        <div className="text-gray-600">Headline: "{lastSimulation.signal_captured.headline}"</div>
-                        <div className="text-gray-600">Weight: {lastSimulation.signal_captured.relevancy_weight}</div>
+                        <div className="text-ink-warm-700">Headline: "{lastSimulation.signal_captured.headline}"</div>
+                        <div className="text-ink-warm-700">Weight: {lastSimulation.signal_captured.relevancy_weight}</div>
                         {lastSimulation.signal_captured.matched_prospect_id && (
-                          <div className="text-gray-600">✓ Matched a prospect</div>
+                          <div className="text-ink-warm-700">✓ Matched a prospect</div>
                         )}
                       </>
                     ) : (
@@ -652,22 +649,21 @@ export default function ExchangeListingsPanel() {
                         <AlertTriangle className="h-3 w-3" /> No signal captured — pipeline may have issues
                       </div>
                     )}
-                    <div className="text-gray-500 pt-0.5">Cleanup: market restored · {lastSimulation.cleanup?.synthetic_signals_deleted ?? 0} synthetic signals deleted</div>
+                    <div className="text-ink-warm-500 pt-0.5">Cleanup: market restored · {lastSimulation.cleanup?.synthetic_signals_deleted ?? 0} synthetic signals deleted</div>
                   </>
                 )}
               </div>
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setSimulateOpen(false)} disabled={simulating}>
               Close
             </Button>
             <Button
+              variant="brand"
               onClick={runSimulation}
               disabled={simulating}
-              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-             
             >
               {simulating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {simulating ? 'Simulating...' : 'Run Simulation'}

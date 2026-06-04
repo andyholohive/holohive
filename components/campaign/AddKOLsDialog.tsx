@@ -115,8 +115,8 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
       // for a potential future "initial payment" flow but are
       // intentionally not consumed here today.
       toast({
-        title: 'Success',
-        description: `${addedKOLs.length} KOL(s) added successfully.`,
+        title: 'KOLs added',
+        description: `${addedKOLs.length} KOL(s) added.`,
       });
 
       setNewKOLData(DEFAULT_FORM);

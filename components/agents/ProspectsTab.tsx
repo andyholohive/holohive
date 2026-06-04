@@ -368,13 +368,13 @@ export default function ProspectsTab() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: 'Promoted', description: 'Prospect added to pipeline as Cold DM' });
+        toast({ title: 'Prospect promoted', description: 'Added to pipeline as Cold DM.' });
         fetchProspects();
       } else {
-        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        toast({ title: 'Promote failed', description: data.error ?? 'Unknown error', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to promote', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Promote failed', description: err instanceof Error ? err.message : 'Failed to promote', variant: 'destructive' });
     } finally {
       setPromoting(null);
     }
@@ -388,8 +388,8 @@ export default function ProspectsTab() {
         body: JSON.stringify({ id, status: 'dismissed' }),
       });
       fetchProspects();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to dismiss', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Dismiss failed', description: err instanceof Error ? err.message : 'Failed to dismiss', variant: 'destructive' });
     }
   };
 
@@ -433,8 +433,8 @@ export default function ProspectsTab() {
         body: JSON.stringify({ id }),
       });
       fetchProspects();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed to delete', variant: 'destructive' });
     }
   };
 
@@ -633,7 +633,7 @@ export default function ProspectsTab() {
           <Settings className="w-4 h-4 mr-1.5" />
           ICP Settings
         </Button>
-        <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="h-9 bg-brand text-white">
+        <Button variant="brand" size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="h-9">
           <Download className="w-4 h-4 mr-1.5" />
           Import Prospects
         </Button>
@@ -733,7 +733,7 @@ export default function ProspectsTab() {
                     <Globe className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                     <p className="text-sm font-medium text-gray-700 mb-1">No prospects yet</p>
                     <p className="text-xs text-gray-400 mb-4">Import projects from DropsTab to start discovering new prospects.</p>
-                    <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="bg-brand text-white">
+                    <Button variant="brand" size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }}>
                       <Download className="w-4 h-4 mr-1.5" />
                       Import Prospects
                     </Button>
@@ -1058,7 +1058,7 @@ export default function ProspectsTab() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setScraperOpen(false)}>
               {scraperResult ? 'Done' : 'Cancel'}
             </Button>

@@ -140,7 +140,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
               
               {insight.actionable && onApplyInsight && (
                 <div className="flex gap-2 pt-2">
-                  <Button size="sm" onClick={() => onApplyInsight(insight)} className="flex items-center gap-2 bg-brand text-white">
+                  <Button variant="brand" size="sm" onClick={() => onApplyInsight(insight)} className="flex items-center gap-2">
                     <Target className="w-3 h-3" />
                     Apply Insight
                   </Button>

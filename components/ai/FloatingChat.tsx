@@ -212,8 +212,8 @@ export default function FloatingChat() {
     } catch (error) {
       console.error('Error initializing chat:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to initialize chat.',
+        title: 'Chat init failed',
+        description: error instanceof Error ? error.message : 'Failed to initialize chat',
         variant: 'destructive',
       });
     } finally {
@@ -234,8 +234,8 @@ export default function FloatingChat() {
     } catch (error) {
       console.error('Error creating new session:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create new chat session.',
+        title: 'Create session failed',
+        description: error instanceof Error ? error.message : 'Failed to create new chat session',
         variant: 'destructive',
       });
     }
@@ -254,9 +254,9 @@ export default function FloatingChat() {
     } catch (error) {
       console.error("Error switching session:", error);
       toast({
-        title: "Error",
-        description: "Failed to switch chat session.",
-        variant: "destructive",
+        title: 'Switch session failed',
+        description: error instanceof Error ? error.message : 'Failed to switch chat session',
+        variant: 'destructive',
       });
     }
   };
@@ -282,16 +282,13 @@ export default function FloatingChat() {
         setCurrentSession(null);
       }
       
-      toast({
-        title: "Success",
-        description: "Chat session deleted successfully.",
-      });
+      toast({ title: 'Chat session deleted' });
     } catch (error) {
       console.error('Error deleting session:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete chat session.",
-        variant: "destructive",
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete chat session',
+        variant: 'destructive',
       });
     } finally {
       setDeleteDialogOpen(false);
@@ -412,8 +409,8 @@ export default function FloatingChat() {
       console.error('Error sending message:', error);
       setAgentStatus('error');
       toast({
-        title: 'Error',
-        description: 'Failed to send message.',
+        title: 'Send failed',
+        description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       });
       setTimeout(() => setAgentStatus(null), 3000);
@@ -437,10 +434,7 @@ export default function FloatingChat() {
       const data = await response.json();
 
       if (data.success) {
-        toast({
-          title: 'Success',
-          description: 'Action undone successfully',
-        });
+        toast({ title: 'Action undone' });
 
         // Refresh reversible actions
         if (currentSession) {
@@ -463,8 +457,8 @@ export default function FloatingChat() {
     } catch (error) {
       console.error('Error undoing action:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to undo action',
+        title: 'Undo failed',
+        description: error instanceof Error ? error.message : 'Failed to undo action',
         variant: 'destructive',
       });
     }
@@ -502,8 +496,8 @@ export default function FloatingChat() {
   const handleApplySuggestion = (suggestion: CampaignSuggestion | ListSuggestion) => {
     // TODO: Navigate to campaign/list creation with pre-filled data
     toast({
-      title: 'Suggestion Applied',
-      description: 'Redirecting to creation form...',
+      title: 'Suggestion applied',
+      description: 'Redirecting to creation form…',
     });
     setAiSuggestion(null);
   };
@@ -515,8 +509,7 @@ export default function FloatingChat() {
   const handleCreateListFromKOLs = async () => {
     if (!newListName.trim() || pendingListKOLs.length === 0) {
       toast({
-        title: 'Error',
-        description: 'Please enter a list name',
+        title: 'List name required',
         variant: 'destructive',
       });
       return;
@@ -567,8 +560,8 @@ export default function FloatingChat() {
       console.log('[CreateList] Successfully added KOLs to list');
 
       toast({
-        title: 'List Created',
-        description: `Successfully created "${newListName}" with ${pendingListKOLs.length} KOLs`,
+        title: 'List created',
+        description: `Created "${newListName}" with ${pendingListKOLs.length} KOLs.`,
       });
 
       // Close dialog and reset
@@ -578,7 +571,7 @@ export default function FloatingChat() {
     } catch (error) {
       console.error('[CreateList] Error:', error);
       toast({
-        title: 'Error',
+        title: 'Create failed',
         description: error instanceof Error ? error.message : 'Failed to create list',
         variant: 'destructive',
       });
@@ -659,7 +652,7 @@ export default function FloatingChat() {
   if (!isOpen) {
     return (
       <div className="fixed bottom-6 right-6 z-50">
-        <Button variant="brand" onClick={toggleChat} size="lg" className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 p-3">
+        <Button variant="brand" onClick={toggleChat} size="lg" className="w-14 h-14 rounded-full shadow-lg p-3">
           <MessageSquare className="w-6 h-6 text-white" />
         </Button>
       </div>
@@ -937,7 +930,9 @@ export default function FloatingChat() {
                                     <div className="mt-3 p-3 bg-white border border-gray-300 rounded-lg relative">
                                       <div className="flex items-center justify-between mb-2">
                                         <span className="text-xs font-semibold text-brand">📋 Client Message (Telegram)</span>
-                                        <button
+                                        <Button
+                                          variant="brand"
+                                          size="sm"
                                           onClick={() => {
                                             navigator.clipboard.writeText(generatedMessageContent);
                                             // Show a toast or temporary indicator
@@ -948,14 +943,14 @@ export default function FloatingChat() {
                                               btn.innerText = originalText;
                                             }, 2000);
                                           }}
-                                          className="text-xs px-2 py-1 bg-brand text-white rounded hover:bg-[#2d5a63] transition-colors flex items-center gap-1"
+                                          className="text-xs px-2 py-1 flex items-center gap-1"
                                         >
                                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                                             <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
                                           </svg>
                                           Copy
-                                        </button>
+                                        </Button>
                                       </div>
                                       <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans overflow-x-auto mb-3">
                                         {generatedMessageContent}
@@ -1021,18 +1016,20 @@ export default function FloatingChat() {
                                 {/* Create List button for KOL search results */}
                                 {isKOLSearchResult && searchResultKOLIds.length > 0 && (
                                   <div className="mt-3">
-                                    <button
+                                    <Button
+                                      variant="brand"
+                                      size="sm"
                                       onClick={() => {
                                         setPendingListKOLs(searchResultKOLIds);
                                         setCreateListDialogOpen(true);
                                       }}
-                                      className="w-full text-xs px-3 py-2 bg-brand text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center justify-center gap-2"
+                                      className="w-full text-xs px-3 py-2 rounded-lg flex items-center justify-center gap-2"
                                     >
                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
                                       </svg>
                                       Create List from {searchResultKOLIds.length} KOLs
-                                    </button>
+                                    </Button>
                                   </div>
                                 )}
 
@@ -1168,7 +1165,7 @@ export default function FloatingChat() {
               Are you sure you want to delete this chat session? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
@@ -1177,7 +1174,7 @@ export default function FloatingChat() {
             </Button>
             <Button
               onClick={handleDeleteSession}
-             
+
               style={{ backgroundColor: "#dc2626", color: "white" }}
             >
               Delete
@@ -1209,7 +1206,7 @@ export default function FloatingChat() {
               autoFocus
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => {

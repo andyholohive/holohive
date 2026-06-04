@@ -131,7 +131,7 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
   // Load the team list once; reused across all rows + the add-row picker.
   // Filter out clients — they shouldn't be assignable to internal subtasks.
   useEffect(() => {
-    UserService.getAllUsers()
+    UserService.getActiveUsers()
       .then((users) => {
         setTeamMembers(
           users
@@ -188,8 +188,8 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
       setNewAssignee(null);
       setAdding(false);
       await loadSubtasks();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to add subtask.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Add failed', description: err instanceof Error ? err.message : 'Failed to add subtask', variant: 'destructive' });
     }
   };
 
@@ -344,7 +344,7 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
+          className="h-6 px-2 text-xs text-gray-500"
           onClick={() => setAdding(true)}
         >
           <Plus className="h-3 w-3 mr-1" /> Add

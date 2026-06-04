@@ -395,11 +395,21 @@ export default function KOLsPage() {
   // (we don't want stale projects from campaigns the team has buried).
   // Dedup per KOL — same campaign can only appear once even if there
   // are multiple campaign_kols rows (e.g. KOL re-added after dropout).
+  //
+  // [2026-06-05] Also skips rows where `campaign_kols.hidden = true`.
+  // The Hidden flag is set per-KOL-per-campaign when the team has
+  // pulled a KOL out of a project (NDA conflict, swap-out, etc.); in
+  // that case the KOL shouldn't appear to have "worked on" that
+  // project on their /kols row. If a KOL has multiple campaign_kols
+  // rows for the same campaign and ONLY some are hidden, the dedup
+  // below keeps the most-recent visible one (because the query is
+  // ordered created_at desc, and the hidden row is skipped before
+  // it can claim the campaign_id slot in `seen`).
   const fetchProjectsPerKol = async () => {
     try {
       const { data, error } = await (supabase as any)
         .from('campaign_kols')
-        .select('master_kol_id, campaign:campaigns!inner(id, name, slug, archived_at, created_at)')
+        .select('master_kol_id, hidden, campaign:campaigns!inner(id, name, slug, archived_at, created_at)')
         .order('created_at', { ascending: false });
       if (error || !data) return;
 
@@ -411,6 +421,7 @@ export default function KOLsPage() {
         const campaign = row.campaign;
         if (!kolId || !campaign) continue;
         if (campaign.archived_at) continue; // skip archived campaigns
+        if (row.hidden === true) continue;  // skip hidden links
 
         const existing = seen.get(kolId) || new Set<string>();
         if (existing.has(campaign.id)) continue;
@@ -534,14 +545,14 @@ export default function KOLsPage() {
       }
       
       toast({
-        title: 'Success',
-        description: `Added new option: ${optionValue}`,
+        title: 'Option added',
+        description: `Added "${optionValue}".`,
       });
     } catch (error) {
       console.error('Error adding new option:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to add new option',
+        title: 'Add failed',
+        description: error instanceof Error ? error.message : 'Failed to add new option',
         variant: 'destructive',
       });
     }
@@ -791,8 +802,8 @@ export default function KOLsPage() {
 
         if (duplicateKOL) {
           toast({
-            title: 'Duplicate Link',
-            description: `This link is already used by "${duplicateKOL.name || 'another KOL'}"`,
+            title: 'Duplicate link',
+            description: `Link already used by "${duplicateKOL.name || 'another KOL'}".`,
             variant: 'destructive',
             duration: 5000,
           });
@@ -2923,7 +2934,7 @@ export default function KOLsPage() {
               {visibleColumns.description && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Notes</TableHead>}
               {visibleColumns.wallet && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Wallet</TableHead>}
               {visibleColumns.telegram && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Telegram</TableHead>}
-              <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Actions</TableHead>
+              <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap text-right w-16">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="bg-white">
@@ -3176,8 +3187,8 @@ export default function KOLsPage() {
                       )}
                   </TableCell>
                   )}
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
-                    <div className="flex space-x-1">
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-right w-16`}>
+                    <div className="flex space-x-1 justify-end">
                       <Button size="sm" variant="outline" onClick={() => handleDelete(kol.id)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -3285,12 +3296,12 @@ export default function KOLsPage() {
 
       {/* 4. Add Dialog for single delete at the bottom of the component */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Archive KOL</DialogTitle>
           </DialogHeader>
           <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to archive this KOL? You can restore it later from the Archive page.</div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowDeleteDialog(false);
@@ -3302,7 +3313,7 @@ export default function KOLsPage() {
                 await KOLService.archiveKOL(kolToDelete);
                 toast({
                   title: 'KOL archived',
-                  description: 'KOL archived successfully. You can restore it from the Archive page.',
+                  description: 'You can restore it from the Archive page.',
                   duration: 3000,
                 });
               } catch (error) {
@@ -3316,12 +3327,12 @@ export default function KOLsPage() {
       </Dialog>
       {/* 5. Add Dialog for bulk delete at the bottom of the component */}
       <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Archive KOLs</DialogTitle>
           </DialogHeader>
           <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to archive {selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''}? You can restore them from the Archive page.</div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowBulkDeleteDialog(false);
@@ -3330,7 +3341,7 @@ export default function KOLsPage() {
               await Promise.all(toArchive.map(kolId => KOLService.archiveKOL(kolId)));
               toast({
                 title: 'KOLs archived',
-                description: `${toArchive.length} KOL${toArchive.length !== 1 ? 's' : ''} archived successfully.`,
+                description: `${toArchive.length} KOL${toArchive.length !== 1 ? 's' : ''} archived.`,
                 duration: 3000,
               });
               setSelectedKOLs([]);
@@ -3439,7 +3450,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.description && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Notes</TableHead>}
             {visibleColumns.wallet && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Wallet</TableHead>}
             {visibleColumns.telegram && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Telegram</TableHead>}
-            <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Actions</TableHead>
+            <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap text-right w-16">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody className="bg-white">
@@ -3464,7 +3475,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
               {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
+              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden w-16 text-right`}><div className="flex space-x-1 w-full justify-end"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
             </TableRow>
           ))}
         </TableBody>

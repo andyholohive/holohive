@@ -3,7 +3,9 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sliders, Bot, Archive } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Sliders, Bot, Archive, Settings } from 'lucide-react';
 
 import FieldOptionsPage from '@/app/admin/field-options/page';
 import McpPage from '@/app/mcp/page';
@@ -45,18 +47,38 @@ function AdminPageInner() {
   }, [tab]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <PageHeader
+        icon={Settings}
+        title="Admin Tools"
+        subtitle="Field Options, Claude MCP, and Archive — combined into one tabbed page."
+        kicker="Admin · Tools"
+        kickerDot="brand"
+      />
+
+      {/* v11 tab chrome (cream-100 outer + cream-200 border + white
+          active tile with shadow-card + brand text). Was unstyled
+          shadcn default. */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as AdminTab)}>
-        <TabsList>
-          <TabsTrigger value="field-options" className="flex items-center gap-2">
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+          <TabsTrigger
+            value="field-options"
+            className="flex items-center gap-2 px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+          >
             <Sliders className="h-4 w-4" />
             Field Options
           </TabsTrigger>
-          <TabsTrigger value="mcp" className="flex items-center gap-2">
+          <TabsTrigger
+            value="mcp"
+            className="flex items-center gap-2 px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+          >
             <Bot className="h-4 w-4" />
             Claude MCP
           </TabsTrigger>
-          <TabsTrigger value="archive" className="flex items-center gap-2">
+          <TabsTrigger
+            value="archive"
+            className="flex items-center gap-2 px-3 py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+          >
             <Archive className="h-4 w-4" />
             Archive
           </TabsTrigger>
@@ -82,10 +104,29 @@ function AdminPageInner() {
   );
 }
 
+// Structural skeleton for the Suspense fallback. Mirrors the loaded
+// layout (PageHeader + tab strip + content card) so the kicker/title
+// doesn't shift when `useSearchParams` resolves and the inner renders.
+function AdminPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={Settings}
+        title="Admin Tools"
+        subtitle="Field Options, Claude MCP, and Archive — combined into one tabbed page."
+        kicker="Admin · Tools"
+        kickerDot="brand"
+      />
+      <Skeleton className="h-10 w-[320px] rounded-md" />
+      <Skeleton className="h-64 rounded-lg" />
+    </div>
+  );
+}
+
 export default function AdminPage() {
   // useSearchParams requires a Suspense boundary in app router.
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading...</div>}>
+    <Suspense fallback={<AdminPageSkeleton />}>
       <AdminPageInner />
     </Suspense>
   );

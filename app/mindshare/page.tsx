@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,7 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
-  BarChart3, Plus, Trash2, Radio, AlertTriangle, Search, TrendingUp, TrendingDown,
+  BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown,
   Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
   XCircle, HelpCircle, ShieldAlert,
 } from 'lucide-react';
@@ -88,11 +91,48 @@ interface MonitoredChannel {
 
 type SortKey = 'mindshare_pct' | 'mention_count' | 'name' | 'delta_pct' | 'channel_reach' | 'score';
 
+// ─── v11 status-pill tone maps ──────────────────────────────────────
+// Centralized tone lookups so every channel status pill on this page
+// renders through <StatusBadge> instead of inline color classes. Each
+// map covers a distinct concept (bot membership / channel activity /
+// telegram chat type) and is consumed below in the channel list.
+
+// Bot membership: 'in' (member/admin/owner) → success, 'not in' (left/kicked)
+// → danger, 'error' → warning, anything else → neutral.
+const BOT_STATUS_TONES: Record<string, BadgeTone> = {
+  member: 'success',
+  administrator: 'success',
+  creator: 'success',
+  left: 'danger',
+  kicked: 'danger',
+  error: 'warning',
+  unknown: 'neutral',
+};
+
+// 7-day activity volume: 0 hits → neutral (likely dead), 1-4 → warning
+// (low signal), 5+ → success (healthy). Keyed by a coarse bucket label
+// so the lookup site doesn't repeat the threshold logic.
+const ACTIVITY_TONES: Record<'dead' | 'low' | 'healthy', BadgeTone> = {
+  dead: 'neutral',
+  low: 'warning',
+  healthy: 'success',
+};
+
+// Telegram chat_type — channels need admin rights to add the bot,
+// groups can add as regular member. Tone difference signals which is
+// which at a glance.
+const CHAT_TYPE_TONES: Record<string, BadgeTone> = {
+  channel: 'purple',
+  group: 'info',
+  supergroup: 'info',
+  private: 'info',
+};
+
 // ─── Sparkline ──────────────────────────────────────────────────────
 // Tiny inline SVG so we don't pull a chart lib for one feature. 14
 // daily values, scaled to fit a 80×24 viewport.
 function Sparkline({ values }: { values: number[] }) {
-  if (!values || values.length === 0) return <span className="text-gray-300 text-xs">—</span>;
+  if (!values || values.length === 0) return <span className="text-ink-warm-300 text-xs">—</span>;
   const max = Math.max(...values, 1);
   const W = 80, H = 24;
   const stepX = W / Math.max(values.length - 1, 1);
@@ -357,33 +397,33 @@ function GainerLoserPanel({
 }) {
   const isGain = variant === 'gain';
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className={`px-3 py-2 border-b border-gray-100 flex items-center justify-between ${isGain ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+    <Card className="border-cream-200 overflow-hidden">
+      <div className={`px-3 py-2 border-b border-cream-100 flex items-center justify-between ${isGain ? 'bg-emerald-50' : 'bg-rose-50'}`}>
         <h4 className={`text-xs font-semibold uppercase tracking-wider ${isGain ? 'text-emerald-700' : 'text-rose-700'}`}>{title}</h4>
         {isGain ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> : <TrendingDown className="h-3.5 w-3.5 text-rose-600" />}
       </div>
       {items.length === 0 ? (
-        <div className="px-3 py-6 text-center text-xs text-gray-400">No data</div>
+        <div className="px-3 py-6 text-center text-xs text-ink-warm-400">No data</div>
       ) : (
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-cream-100">
           {items.map((item) => (
             <button
               key={item.project_id}
               onClick={() => onSelect(item.project_id)}
-              className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-cream-50 transition-colors"
             >
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-gray-900 truncate">{item.name}</div>
-                <div className="text-[10px] text-gray-500">{item.mindshare_pct.toFixed(2)}% mindshare</div>
+                <div className="text-xs font-medium text-ink-warm-900 truncate">{item.name}</div>
+                <div className="text-[10px] text-ink-warm-500">{item.mindshare_pct.toFixed(2)}% mindshare</div>
               </div>
-              <div className={`text-xs font-semibold tabular-nums ${item.delta_pct > 0 ? 'text-emerald-600' : item.delta_pct < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+              <div className={`text-xs font-semibold tabular-nums ${item.delta_pct > 0 ? 'text-emerald-600' : item.delta_pct < 0 ? 'text-rose-600' : 'text-ink-warm-400'}`}>
                 {item.delta_pct > 0 ? '+' : ''}{item.delta_pct.toFixed(2)}%
               </div>
             </button>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -576,7 +616,7 @@ export default function MindsharePage() {
   };
 
   const sortIndicator = (k: SortKey) =>
-    sortKey === k ? <span className="ml-0.5 text-[10px] text-gray-500">{sortDir === 'asc' ? '▲' : '▼'}</span> : null;
+    sortKey === k ? <span className="ml-0.5 text-[10px] text-ink-warm-500">{sortDir === 'asc' ? '▲' : '▼'}</span> : null;
 
   // ─── Projects tab state ─────────────────────────────────────────
   const [projects, setProjects] = useState<MindshareProject[]>([]);
@@ -828,21 +868,53 @@ export default function MindsharePage() {
   // userProfile is null on first render, which would otherwise paint the
   // "Admin access required" placeholder for one frame before the real
   // role arrives.
+  // v10 admin-locked shells replaced 2026-06-03 — use the standard
+  // PageHeader + EmptyState pattern so the gated states match the
+  // rest of the app instead of a v10 gray-bg + centered spinner.
   if (authLoading || !userProfile) {
+    // [v11] Structural skeleton — mirror loaded shell so layout
+    // doesn't jump when auth resolves: PageHeader + section header
+    // strip + a table-shaped placeholder where the leaderboard lands.
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" />
+      <div className="space-y-6">
+        <PageHeader
+          icon={BarChart3}
+          title="Korean Mindshare"
+          subtitle="Where projects stand in Korean crypto Telegram channels."
+          kicker="Documents · Mindshare"
+          kickerDot="brand"
+        />
+        <Skeleton className="h-9 w-72 rounded-md" />
+        <SectionHeader label="Leaderboard" dot="brand" first />
+        <Card className="border-cream-200 overflow-hidden">
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-md" />
+            ))}
+          </div>
+        </Card>
       </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-amber-400 mx-auto mb-3" />
-          <p className="text-gray-600">Admin access required.</p>
-        </div>
+      <div className="space-y-6">
+        <PageHeader
+          icon={BarChart3}
+          title="Korean Mindshare"
+          subtitle="Where projects stand in Korean crypto Telegram channels."
+          kicker="Documents · Mindshare"
+          kickerDot="brand"
+        />
+        <Card className="border-cream-200 overflow-hidden">
+          <EmptyState
+            icon={AlertTriangle}
+            title="Admin access required."
+            description="Mindshare is an admin-only surface. Reach out if you think you should have access."
+            className="py-16"
+          />
+        </Card>
       </div>
     );
   }
@@ -884,50 +956,105 @@ export default function MindsharePage() {
 
   return (
     <div className="space-y-6">
-      {/* [Design system, May 2026] Header migrated to <PageHeader> */}
+      {/* [Design system, May 2026] Header migrated to <PageHeader>.
+          2026-06-03: kicker + brand dot added to match other v11 pages. */}
       <PageHeader
         icon={BarChart3}
         title="Korean Mindshare"
         subtitle="Where projects stand in Korean crypto Telegram channels."
+        kicker="Documents · Mindshare"
+        kickerDot="brand"
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-        <TabsList>
-          <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+        {/* [v11] Tab chrome — cream-100 outer w/ hairline, white active
+            tile with shadow-card + brand text. Same treatment as /sops
+            and other v11 pages. */}
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+          <TabsTrigger
+            value="leaderboard"
+            className="flex items-center gap-2 text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+          >
             <TrendingUp className="h-4 w-4" /> Leaderboard
           </TabsTrigger>
-          <TabsTrigger value="projects" className="flex items-center gap-2">
+          <TabsTrigger
+            value="projects"
+            className="flex items-center gap-2 text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+          >
             <BarChart3 className="h-4 w-4" /> Projects
             {/* Render the count badge only after the underlying fetch
                 has resolved at least once — otherwise it flashes "0"
                 on first paint before settling. Pattern matches the
                 Channels tab below. */}
             {projectsLoading && projects.length === 0 ? (
-              <span className="ml-1 inline-block h-4 w-6 rounded bg-gray-100 animate-pulse" />
+              <span className="ml-2 inline-block h-4 w-6 rounded-full bg-cream-100 animate-pulse" />
             ) : (
-              <Badge variant="secondary" className="ml-1 text-xs">{projects.length}</Badge>
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{projects.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="channels" className="flex items-center gap-2">
+          <TabsTrigger
+            value="channels"
+            className="flex items-center gap-2 text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+          >
             <Radio className="h-4 w-4" /> Channels
             {channelsLoading && channels.length === 0 ? (
-              <span className="ml-1 inline-block h-4 w-6 rounded bg-gray-100 animate-pulse" />
+              <span className="ml-2 inline-block h-4 w-6 rounded-full bg-cream-100 animate-pulse" />
             ) : (
-              <Badge variant="secondary" className="ml-1 text-xs">{channels.filter(c => c.is_active).length}</Badge>
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{channels.filter(c => c.is_active).length}</span>
             )}
           </TabsTrigger>
         </TabsList>
 
         {/* ─── Leaderboard ─────────────────────────────────────── */}
         <TabsContent value="leaderboard" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
+          {/* [v11] Filter toolbar — single-row pattern: search (flex-1
+              middle), category/language/pre-tge filters, range buttons +
+              export/refresh pushed to the right via ml-auto. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+              <Input
+                placeholder="Search projects..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 h-9 text-sm focus-brand"
+              />
+            </div>
+            {categories.length > 1 && (
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="h-9 w-40 text-sm focus-brand">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => (
+                    <SelectItem key={c} value={c}>{c === 'all' ? 'All categories' : c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={language} onValueChange={(v) => setLanguage(v as any)}>
+              <SelectTrigger className="h-9 w-32 text-sm focus-brand">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All languages</SelectItem>
+                <SelectItem value="ko">한국어 (Korean)</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="ja">日本語</SelectItem>
+                <SelectItem value="zh">中文</SelectItem>
+                <SelectItem value="vi">Tiếng Việt</SelectItem>
+              </SelectContent>
+            </Select>
+            <label className="flex items-center gap-1.5 text-xs text-ink-warm-700 px-2 py-1 border border-cream-200 rounded-md cursor-pointer">
+              <Switch checked={preTgeOnly} onCheckedChange={setPreTgeOnly} />
+              Pre-TGE only
+            </label>
+            <div className="ml-auto flex items-center gap-2 flex-wrap">
               {(['24h', '7d', '14d', '30d', '90d'] as const).map(r => (
                 <Button
                   key={r}
-                  variant={range === r ? 'default' : 'outline'}
+                  variant={range === r ? 'brand' : 'outline'}
                   size="sm"
-                  className={range === r ? 'bg-brand text-white hover:bg-brand/90' : ''}
                   onClick={() => setRange(r)}
                 >
                   {r === '24h' ? 'Last 24h'
@@ -937,47 +1064,7 @@ export default function MindsharePage() {
                     : 'Last 90 days'}
                 </Button>
               ))}
-              <span className="ml-2 text-xs text-gray-500">{totalMentions.toLocaleString()} total mentions</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                <Input
-                  placeholder="Search projects..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 h-9 w-56 focus-brand"
-                />
-              </div>
-              {categories.length > 1 && (
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="h-9 w-40 text-sm focus-brand">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(c => (
-                      <SelectItem key={c} value={c}>{c === 'all' ? 'All categories' : c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={language} onValueChange={(v) => setLanguage(v as any)}>
-                <SelectTrigger className="h-9 w-32 text-sm focus-brand">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All languages</SelectItem>
-                  <SelectItem value="ko">한국어 (Korean)</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="ja">日本語</SelectItem>
-                  <SelectItem value="zh">中文</SelectItem>
-                  <SelectItem value="vi">Tiếng Việt</SelectItem>
-                </SelectContent>
-              </Select>
-              <label className="flex items-center gap-1.5 text-xs text-gray-600 px-2 py-1 border border-gray-200 rounded-md cursor-pointer">
-                <Switch checked={preTgeOnly} onCheckedChange={setPreTgeOnly} />
-                Pre-TGE only
-              </label>
+              <span className="text-xs text-ink-warm-500">{totalMentions.toLocaleString()} total mentions</span>
               <Button
                 variant="outline"
                 size="sm"
@@ -1084,69 +1171,97 @@ export default function MindsharePage() {
             </div>
           )}
 
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {/* [v11] Section header above leaderboard table */}
+          <SectionHeader
+            label="Leaderboard"
+            dot="brand"
+            counter={`${filteredSorted.length} of ${leaderboard.length} project${leaderboard.length === 1 ? '' : 's'}`}
+            first
+          />
+          <Card className="border-cream-200 overflow-hidden">
             {leaderboardLoading ? (
-              <div className="p-4 space-y-2">
-                {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-12">#</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Project</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Mentions</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Mindshare</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Score</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Δ</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[100px]">Trend (14d)</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[100px]">Channels</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[80px]">Tags</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i} className="border-cream-100">
+                      <TableCell colSpan={9} className="py-3.5 px-5"><Skeleton className="h-6 w-full rounded-md" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : filteredSorted.length === 0 ? (
-              <div className="py-16 text-center">
-                <BarChart3 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">
-                  {leaderboard.length === 0
-                    ? 'No mentions yet. Configure projects + channels, then trigger a scan.'
-                    : 'No projects match the current filters.'}
-                </p>
+              <EmptyState
+                icon={BarChart3}
+                title={leaderboard.length === 0 ? 'No mentions yet' : 'No projects match the current filters'}
+                description={
+                  leaderboard.length === 0
+                    ? 'Configure projects + channels, then trigger a scan.'
+                    : 'Try clearing the search or category filter.'
+                }
+              >
                 {leaderboard.length === 0 && (
-                  <Button variant="outline" size="sm" className="mt-3" onClick={() => triggerScan(true)}>
+                  <Button variant="outline" size="sm" onClick={() => triggerScan(true)}>
                     <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Run backfill scan
                   </Button>
                 )}
-              </div>
+              </EmptyState>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/50">
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>
-                      <button onClick={() => toggleSort('name')} className="hover:underline inline-flex items-center font-medium">
+                  <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-12">#</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                      <button onClick={() => toggleSort('name')} className="hover:underline inline-flex items-center font-semibold uppercase tracking-[0.18em]">
                         Project{sortIndicator('name')}
                       </button>
                     </TableHead>
-                    <TableHead className="text-right">
-                      <button onClick={() => toggleSort('mention_count')} className="hover:underline inline-flex items-center font-medium">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">
+                      <button onClick={() => toggleSort('mention_count')} className="hover:underline inline-flex items-center font-semibold uppercase tracking-[0.18em]">
                         Mentions{sortIndicator('mention_count')}
                       </button>
                     </TableHead>
-                    <TableHead className="text-right">
-                      <button onClick={() => toggleSort('mindshare_pct')} className="hover:underline inline-flex items-center font-medium">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">
+                      <button onClick={() => toggleSort('mindshare_pct')} className="hover:underline inline-flex items-center font-semibold uppercase tracking-[0.18em]">
                         Mindshare{sortIndicator('mindshare_pct')}
                       </button>
                     </TableHead>
                     {/* [Weighted score v1] Composite recency × reach × uniqueness,
                         normalized 0-100 against the top project. Hover for the
                         breakdown. */}
-                    <TableHead className="text-right">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">
                       <button
                         onClick={() => toggleSort('score')}
-                        className="hover:underline inline-flex items-center font-medium"
+                        className="hover:underline inline-flex items-center font-semibold uppercase tracking-[0.18em]"
                         title="Composite score: recency × reach × uniqueness, normalized to 100"
                       >
                         Score{sortIndicator('score')}
                       </button>
                     </TableHead>
-                    <TableHead className="text-right">
-                      <button onClick={() => toggleSort('delta_pct')} className="hover:underline inline-flex items-center font-medium">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">
+                      <button onClick={() => toggleSort('delta_pct')} className="hover:underline inline-flex items-center font-semibold uppercase tracking-[0.18em]">
                         Δ{sortIndicator('delta_pct')}
                       </button>
                     </TableHead>
-                    <TableHead className="w-[100px]">Trend (14d)</TableHead>
-                    <TableHead className="w-[100px]">
-                      <button onClick={() => toggleSort('channel_reach')} className="hover:underline inline-flex items-center font-medium">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[100px]">Trend (14d)</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[100px]">
+                      <button onClick={() => toggleSort('channel_reach')} className="hover:underline inline-flex items-center font-semibold uppercase tracking-[0.18em]">
                         Channels{sortIndicator('channel_reach')}
                       </button>
                     </TableHead>
-                    <TableHead className="w-[80px]">Tags</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[80px]">Tags</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1155,49 +1270,49 @@ export default function MindsharePage() {
                       ? <TrendingUp className="h-3 w-3 text-emerald-600" />
                       : item.delta_pct < -0.5
                         ? <TrendingDown className="h-3 w-3 text-rose-600" />
-                        : <Minus className="h-3 w-3 text-gray-400" />;
-                    const deltaColor = item.delta_pct > 0.5 ? 'text-emerald-600' : item.delta_pct < -0.5 ? 'text-rose-600' : 'text-gray-500';
+                        : <Minus className="h-3 w-3 text-ink-warm-400" />;
+                    const deltaColor = item.delta_pct > 0.5 ? 'text-emerald-600' : item.delta_pct < -0.5 ? 'text-rose-600' : 'text-ink-warm-500';
                     return (
-                      <TableRow key={item.project_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(item.project_id)}>
-                        <TableCell className="text-gray-400 font-medium">{idx + 1}</TableCell>
-                        <TableCell>
+                      <TableRow key={item.project_id} className="border-cream-100 hover:bg-cream-50 cursor-pointer" onClick={() => openDetail(item.project_id)}>
+                        <TableCell className="py-3.5 px-5 text-ink-warm-400 font-medium">{idx + 1}</TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">{item.name}</span>
+                            <span className="font-medium text-ink-warm-900">{item.name}</span>
                             {item.twitter_handle && (
                               <a
                                 href={`https://x.com/${item.twitter_handle.replace(/^@/, '')}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-500"
+                                className="text-ink-warm-400 hover:text-brand"
                                 title="Open on X"
                               >
                                 <ExternalLink className="h-3 w-3" />
                               </a>
                             )}
-                            {item.client_id && <Badge variant="outline" className="text-[10px] bg-brand-light text-brand border-brand/30">Client</Badge>}
+                            {item.client_id && <StatusBadge tone="brand" size="sm">Client</StatusBadge>}
                           </div>
-                          {item.category && <div className="text-xs text-gray-400 mt-0.5">{item.category}</div>}
+                          {item.category && <div className="text-xs text-ink-warm-400 mt-0.5">{item.category}</div>}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{item.mention_count.toLocaleString()}</TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">{item.mindshare_pct.toFixed(2)}%</TableCell>
+                        <TableCell className="py-3.5 px-5 text-right tabular-nums">{item.mention_count.toLocaleString()}</TableCell>
+                        <TableCell className="py-3.5 px-5 text-right tabular-nums font-medium">{item.mindshare_pct.toFixed(2)}%</TableCell>
                         {/* [Weighted score v1] Top project renders as 100.0 by
                             definition; lighter gray below to signal it's
                             relative-to-leader, not absolute. */}
-                        <TableCell className="text-right tabular-nums">
-                          <span className={item.score >= 50 ? 'font-semibold text-gray-900' : 'text-gray-600'}>
+                        <TableCell className="py-3.5 px-5 text-right tabular-nums">
+                          <span className={item.score >= 50 ? 'font-semibold text-ink-warm-900' : 'text-ink-warm-700'}>
                             {item.score.toFixed(1)}
                           </span>
                         </TableCell>
-                        <TableCell className={`text-right tabular-nums ${deltaColor}`}>
+                        <TableCell className={`py-3.5 px-5 text-right tabular-nums ${deltaColor}`}>
                           <span className="inline-flex items-center gap-1 justify-end">
                             {trendIcon}
                             {item.delta_pct > 0 ? '+' : ''}{item.delta_pct.toFixed(2)}%
                           </span>
                         </TableCell>
-                        <TableCell><Sparkline values={item.spark} /></TableCell>
-                        <TableCell className="text-right tabular-nums text-gray-600">{item.channel_reach}</TableCell>
-                        <TableCell>
-                          {item.is_pre_tge && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">Pre-TGE</Badge>}
+                        <TableCell className="py-3.5 px-5"><Sparkline values={item.spark} /></TableCell>
+                        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{item.channel_reach}</TableCell>
+                        <TableCell className="py-3.5 px-5">
+                          {item.is_pre_tge && <StatusBadge tone="warning" size="sm">Pre-TGE</StatusBadge>}
                         </TableCell>
                       </TableRow>
                     );
@@ -1205,13 +1320,14 @@ export default function MindsharePage() {
                 </TableBody>
               </Table>
             )}
-          </div>
+          </Card>
 
           {/* Drill-down dialog — opened from row click or treemap cell.
               Shows project metadata, daily mention chart, top channels,
               and a sample of recent matching messages. */}
           <Dialog open={!!detailProjectId} onOpenChange={(open) => { if (!open) { setDetailProjectId(null); setDetailData(null); } }}>
-            <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+              <div className="flex-1 overflow-y-auto px-1 py-2">
               {detailLoading ? (
                 <div className="space-y-3 py-4">
                   <Skeleton className="h-6 w-48" />
@@ -1219,26 +1335,28 @@ export default function MindsharePage() {
                   <Skeleton className="h-24 w-full" />
                 </div>
               ) : !detailData ? (
-                <div className="py-8 text-center text-sm text-gray-500">Couldn&apos;t load detail.</div>
+                <EmptyState
+                  icon={AlertCircle}
+                  title="Couldn't load detail"
+                  description="The detail request failed. Try closing the dialog and reopening it."
+                />
               ) : (
                 <>
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       {detailData.project.name}
                       {detailData.project.client && (
-                        <Badge variant="outline" className="text-[10px] bg-brand-light text-brand border-brand/30">
-                          Client: {detailData.project.client.name}
-                        </Badge>
+                        <StatusBadge tone="brand" size="sm">Client: {detailData.project.client.name}</StatusBadge>
                       )}
                       {detailData.project.is_pre_tge && (
-                        <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">Pre-TGE</Badge>
+                        <StatusBadge tone="warning" size="sm">Pre-TGE</StatusBadge>
                       )}
                       {detailData.project.twitter_handle && (
                         <a
                           href={`https://x.com/${detailData.project.twitter_handle.replace(/^@/, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-gray-400 hover:text-blue-500"
+                          className="text-ink-warm-400 hover:text-brand"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
@@ -1267,11 +1385,11 @@ export default function MindsharePage() {
                       enough scale context without a full axis. */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-medium text-gray-700">Daily mentions</div>
+                      <div className="text-xs font-medium text-ink-warm-700">Daily mentions</div>
                       {(() => {
                         const peak = Math.max(...detailData.series.map((d: any) => d.mentions), 0);
                         return peak > 0 ? (
-                          <div className="text-[10px] text-gray-400">peak: {peak.toLocaleString()}/day</div>
+                          <div className="text-[10px] text-ink-warm-400">peak: {peak.toLocaleString()}/day</div>
                         ) : null;
                       })()}
                     </div>
@@ -1279,19 +1397,19 @@ export default function MindsharePage() {
                       const max = Math.max(...detailData.series.map((d: any) => d.mentions), 1);
                       return (
                         <>
-                          <div className="flex items-end gap-0.5 h-24 bg-gray-50 rounded p-2 relative">
+                          <div className="flex items-end gap-0.5 h-24 bg-cream-50 rounded p-2 relative">
                             {/* y-axis tick at top */}
-                            <span className="absolute top-1 left-1 text-[9px] text-gray-300 leading-none">{max}</span>
+                            <span className="absolute top-1 left-1 text-[9px] text-ink-warm-300 leading-none">{max}</span>
                             {detailData.series.map((d: any) => (
                               <div key={d.day} className="flex-1 flex flex-col items-center justify-end group" title={`${d.day}: ${d.mentions} mentions`}>
                                 <div
-                                  className={`w-full rounded-t transition-opacity ${d.mentions > 0 ? 'bg-brand' : 'bg-gray-200'} group-hover:opacity-80`}
+                                  className={`w-full rounded-t transition-opacity ${d.mentions > 0 ? 'bg-brand' : 'bg-cream-200'} group-hover:opacity-80`}
                                   style={{ height: `${(d.mentions / max) * 100}%`, minHeight: d.mentions > 0 ? 2 : 1 }}
                                 />
                               </div>
                             ))}
                           </div>
-                          <div className="flex justify-between text-[10px] text-gray-400 px-1">
+                          <div className="flex justify-between text-[10px] text-ink-warm-400 px-1">
                             <span>{detailData.series[0]?.day}</span>
                             <span>{detailData.series[detailData.series.length - 1]?.day}</span>
                           </div>
@@ -1303,21 +1421,21 @@ export default function MindsharePage() {
                   {/* Top channels */}
                   {detailData.top_channels.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-xs font-medium text-gray-700">Top channels</div>
+                      <div className="text-xs font-medium text-ink-warm-700">Top channels</div>
                       <div className="space-y-1">
                         {detailData.top_channels.map((c: any, i: number) => {
                           const totalChannelHits = detailData.top_channels.reduce((s: number, x: any) => s + x.count, 0) || 1;
                           const sharePct = (c.count / totalChannelHits) * 100;
                           return (
-                            <div key={i} className="flex items-center justify-between text-xs px-2 py-1.5 bg-gray-50 rounded">
+                            <div key={i} className="flex items-center justify-between text-xs px-2 py-1.5 bg-cream-50 rounded">
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-medium text-gray-700 truncate">{c.name}</span>
+                                <span className="font-medium text-ink-warm-700 truncate">{c.name}</span>
                                 {c.username && (
                                   <a
                                     href={`https://t.me/${String(c.username).replace(/^@/, '')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-gray-300 hover:text-blue-500 shrink-0"
+                                    className="text-ink-warm-300 hover:text-brand shrink-0"
                                     title="Open on Telegram"
                                   >
                                     <ExternalLink className="h-3 w-3" />
@@ -1325,7 +1443,7 @@ export default function MindsharePage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-[10px] text-gray-400 tabular-nums">{sharePct.toFixed(0)}%</span>
+                                <span className="text-[10px] text-ink-warm-400 tabular-nums">{sharePct.toFixed(0)}%</span>
                                 <span className="tabular-nums font-semibold w-8 text-right">{c.count}</span>
                               </div>
                             </div>
@@ -1337,15 +1455,15 @@ export default function MindsharePage() {
 
                   {/* Sample mentions */}
                   <div className="space-y-1.5">
-                    <div className="text-xs font-medium text-gray-700">Recent mentions ({detailData.sample_mentions.length})</div>
+                    <div className="text-xs font-medium text-ink-warm-700">Recent mentions ({detailData.sample_mentions.length})</div>
                     {detailData.sample_mentions.length === 0 ? (
-                      <div className="text-xs text-gray-400 italic px-2 py-3">No matching messages in this window.</div>
+                      <div className="text-xs text-ink-warm-400 italic px-2 py-3">No matching messages in this window.</div>
                     ) : (
                       <div className="space-y-1.5 max-h-72 overflow-y-auto">
                         {detailData.sample_mentions.map((m: any) => (
-                          <div key={m.id} className="text-xs p-2.5 border border-gray-200 rounded">
+                          <div key={m.id} className="text-xs p-2.5 border border-cream-200 rounded">
                             <div className="flex items-center justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 min-w-0">
+                              <div className="flex items-center gap-1.5 text-[10px] text-ink-warm-500 min-w-0">
                                 <span className="shrink-0">{new Date(m.message_date).toLocaleString()}</span>
                                 {m.channel?.channel_name && (
                                   <span className="truncate">
@@ -1355,7 +1473,7 @@ export default function MindsharePage() {
                                         href={`https://t.me/${String(m.channel.channel_username).replace(/^@/, '')}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-gray-500 hover:text-blue-500 underline-offset-2 hover:underline"
+                                        className="text-ink-warm-500 hover:text-brand underline-offset-2 hover:underline"
                                       >
                                         {m.channel.channel_name}
                                       </a>
@@ -1367,7 +1485,7 @@ export default function MindsharePage() {
                                 <Badge variant="outline" className="text-[9px] shrink-0">{m.matched_keyword}</Badge>
                               </div>
                             </div>
-                            <p className="text-gray-700 line-clamp-3 whitespace-pre-wrap">{m.message_text}</p>
+                            <p className="text-ink-warm-700 line-clamp-3 whitespace-pre-wrap">{m.message_text}</p>
                           </div>
                         ))}
                       </div>
@@ -1375,6 +1493,7 @@ export default function MindsharePage() {
                   </div>
                 </>
               )}
+              </div>
             </DialogContent>
           </Dialog>
         </TabsContent>
@@ -1382,7 +1501,7 @@ export default function MindsharePage() {
         {/* ─── Projects ────────────────────────────────────────── */}
         <TabsContent value="projects" className="space-y-4 mt-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink-warm-700">
               The universe ranked on the leaderboard. Includes your clients (auto-seeded) plus competitor benchmarks you add manually.
             </p>
             <Button variant="brand" onClick={openCreateProject}>
@@ -1390,11 +1509,33 @@ export default function MindsharePage() {
             </Button>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {/* [v11] Section header above projects table */}
+          <SectionHeader
+            label="Projects"
+            dot="brand"
+            counter={`${projects.length} project${projects.length === 1 ? '' : 's'}`}
+          />
+          <Card className="border-cream-200 overflow-hidden">
             {projectsLoading ? (
-              <div className="p-4 space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Project</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Keywords</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[120px]">Category</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[100px]">Tags</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[80px]">Active</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[120px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i} className="border-cream-100">
+                      <TableCell colSpan={6} className="py-3.5 px-5"><Skeleton className="h-8 w-full rounded-md" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : projects.length === 0 ? (
               <EmptyState
                 icon={BarChart3}
@@ -1404,42 +1545,42 @@ export default function MindsharePage() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Keywords</TableHead>
-                    <TableHead className="w-[120px]">Category</TableHead>
-                    <TableHead className="w-[100px]">Tags</TableHead>
-                    <TableHead className="w-[80px]">Active</TableHead>
-                    <TableHead className="w-[120px] text-right">Actions</TableHead>
+                  <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Project</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Keywords</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[120px]">Category</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[100px]">Tags</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[80px]">Active</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[120px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {projects.map(p => (
-                    <TableRow key={p.id}>
-                      <TableCell>
+                    <TableRow key={p.id} className="border-cream-100">
+                      <TableCell className="py-3.5 px-5">
                         <div className="font-medium">{p.name}</div>
                         {p.client && <div className="text-xs text-brand">→ Client: {p.client.name}</div>}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3.5 px-5">
                         <div className="flex flex-wrap gap-1 max-w-[400px]">
-                          {p.tracked_keywords.length === 0 && <span className="text-xs text-gray-400 italic">No keywords</span>}
+                          {p.tracked_keywords.length === 0 && <span className="text-xs text-ink-warm-400 italic">No keywords</span>}
                           {p.tracked_keywords.slice(0, 8).map(k => (
-                            <span key={k} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">{k}</span>
+                            <span key={k} className="text-xs px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700">{k}</span>
                           ))}
                           {p.tracked_keywords.length > 8 && (
-                            <span className="text-xs text-gray-400">+{p.tracked_keywords.length - 8}</span>
+                            <span className="text-xs text-ink-warm-400">+{p.tracked_keywords.length - 8}</span>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell><span className="text-xs text-gray-600">{p.category || '—'}</span></TableCell>
-                      <TableCell>
-                        {p.is_pre_tge && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">Pre-TGE</Badge>}
+                      <TableCell className="py-3.5 px-5"><span className="text-xs text-ink-warm-700">{p.category || '—'}</span></TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        {p.is_pre_tge && <StatusBadge tone="warning" size="sm">Pre-TGE</StatusBadge>}
                       </TableCell>
-                      <TableCell><Switch checked={p.is_active} onCheckedChange={async (v) => {
+                      <TableCell className="py-3.5 px-5"><Switch checked={p.is_active} onCheckedChange={async (v) => {
                         await fetch('/api/mindshare/projects', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, is_active: v }) });
                         await loadProjects();
                       }} /></TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="py-3.5 px-5 text-right">
                         <Button variant="ghost" size="sm" onClick={() => openEditProject(p)} className="h-7 w-7 p-0"><Edit className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => deleteProject(p)} className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </TableCell>
@@ -1448,7 +1589,7 @@ export default function MindsharePage() {
                 </TableBody>
               </Table>
             )}
-          </div>
+          </Card>
 
           {/* Project edit dialog */}
           <Dialog open={!!editingProject} onOpenChange={(open) => { if (!open) setEditingProject(null); }}>
@@ -1480,7 +1621,7 @@ export default function MindsharePage() {
                       placeholder="solana, SOL, 솔라나"
                       className="focus-brand"
                     />
-                    <p className="text-[11px] text-gray-500">Add Korean spellings + English + ticker. Each is matched as a substring (case-insensitive) in monitored channel messages.</p>
+                    <p className="text-[11px] text-ink-warm-500">Add Korean spellings + English + ticker. Each is matched as a substring (case-insensitive) in monitored channel messages.</p>
                   </div>
                   <div className="col-span-2 flex items-center gap-3">
                     <Switch checked={!!projectForm.is_pre_tge} onCheckedChange={(v) => setProjectForm(f => ({ ...f, is_pre_tge: v }))} />
@@ -1488,7 +1629,7 @@ export default function MindsharePage() {
                   </div>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                 <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
                 <Button variant="brand" onClick={saveProject} disabled={savingProject}>
                   {savingProject ? 'Saving...' : 'Save'}
@@ -1502,13 +1643,13 @@ export default function MindsharePage() {
         <TabsContent value="channels" className="space-y-4 mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Bulk import */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <Card className="border-cream-200 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Upload className="h-4 w-4 text-brand" />
                 <h3 className="font-semibold text-sm">Bulk import Korean channels</h3>
               </div>
-              <p className="text-xs text-gray-500 mb-2">
-                Paste one channel per line. Accepts <code className="bg-gray-100 px-1 rounded">@username</code>, <code className="bg-gray-100 px-1 rounded">t.me/username</code>, or <code className="bg-gray-100 px-1 rounded">"Display Name @username"</code>.
+              <p className="text-xs text-ink-warm-500 mb-2">
+                Paste one channel per line. Accepts <code className="bg-cream-100 px-1 rounded">@username</code>, <code className="bg-cream-100 px-1 rounded">t.me/username</code>, or <code className="bg-cream-100 px-1 rounded">"Display Name @username"</code>.
               </p>
               <Textarea
                 rows={8}
@@ -1518,20 +1659,20 @@ export default function MindsharePage() {
                 className="focus-brand font-mono text-xs"
               />
               <div className="flex items-center justify-between mt-3">
-                <p className="text-xs text-gray-500">All imports default to <strong>language=ko</strong> + active.</p>
+                <p className="text-xs text-ink-warm-500">All imports default to <strong>language=ko</strong> + active.</p>
                 <Button variant="brand" onClick={handleBulkImport} disabled={!importText.trim() || importing}>
                   <Upload className="h-3.5 w-3.5 mr-1.5" /> {importing ? 'Importing...' : 'Import'}
                 </Button>
               </div>
-            </div>
+            </Card>
 
             {/* Manual scan trigger */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <Card className="border-cream-200 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <RefreshCw className="h-4 w-4 text-brand" />
                 <h3 className="font-semibold text-sm">Scan controls</h3>
               </div>
-              <p className="text-xs text-gray-500 mb-3">
+              <p className="text-xs text-ink-warm-500 mb-3">
                 The scanner runs every 30 minutes via Vercel cron. Trigger manually if you just added channels or projects.
               </p>
               <div className="flex flex-col gap-2">
@@ -1546,7 +1687,7 @@ export default function MindsharePage() {
                   ) : 'Backfill (rescan all messages)'}
                 </Button>
               </div>
-            </div>
+            </Card>
           </div>
 
           {/* [Bot membership tracking] Summary banner — answers
@@ -1572,7 +1713,7 @@ export default function MindsharePage() {
               c.is_active && !c.channel_tg_id && c.channel_username
             ).length;
             return (
-              <div className={`border rounded-lg p-4 ${allGood ? 'bg-emerald-50 border-emerald-200' : left > 0 || unknown > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+              <div className={`border rounded-lg p-4 ${allGood ? 'bg-emerald-50 border-emerald-200' : left > 0 || unknown > 0 ? 'bg-amber-50 border-amber-200' : 'bg-cream-50 border-cream-200'}`}>
                 <div className="flex items-start gap-3">
                   <Bot className={`h-5 w-5 mt-0.5 flex-shrink-0 ${allGood ? 'text-emerald-600' : 'text-amber-600'}`} />
                   <div className="flex-1 min-w-0">
@@ -1585,14 +1726,14 @@ export default function MindsharePage() {
                           href={`https://t.me/${botInfo.username}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs text-gray-600 hover:text-brand underline decoration-dotted"
+                          className="text-xs text-ink-warm-700 hover:text-brand underline decoration-dotted"
                           title="Open bot on Telegram"
                         >
                           @{botInfo.username}
                         </a>
                       )}
                     </div>
-                    <p className="text-xs text-gray-600 mt-1">
+                    <p className="text-xs text-ink-warm-700 mt-1">
                       {allGood
                         ? 'All active channels have the bot as a member. Mindshare will receive messages from every channel.'
                         : 'The Telegram scanner only sees messages from chats the bot is a member of. Channels marked "left" or "unknown" need a bot invite.'}
@@ -1601,7 +1742,7 @@ export default function MindsharePage() {
                       <div className="flex items-center gap-3 mt-2 text-[11px] tabular-nums">
                         {member > 0 && <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3 w-3" /> {member} member</span>}
                         {left > 0 && <span className="inline-flex items-center gap-1 text-rose-700"><XCircle className="h-3 w-3" /> {left} not-joined</span>}
-                        {unknown > 0 && <span className="inline-flex items-center gap-1 text-gray-600"><HelpCircle className="h-3 w-3" /> {unknown} unchecked</span>}
+                        {unknown > 0 && <span className="inline-flex items-center gap-1 text-ink-warm-700"><HelpCircle className="h-3 w-3" /> {unknown} unchecked</span>}
                         {errored > 0 && <span className="inline-flex items-center gap-1 text-amber-700"><ShieldAlert className="h-3 w-3" /> {errored} errored</span>}
                       </div>
                     )}
@@ -1646,12 +1787,18 @@ export default function MindsharePage() {
             );
           })()}
 
+          {/* [v11] Section header above channels card */}
+          <SectionHeader
+            label="Channels"
+            dot="brand"
+            counter={`${channels.length} channel${channels.length === 1 ? '' : 's'}`}
+          />
           {/* Channel list */}
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+          <Card className="border-cream-200">
+            <div className="px-4 py-3 border-b border-cream-100 flex items-center gap-3">
               <h3 className="font-semibold text-sm flex-1">
                 Monitored channels{' '}
-                <Badge variant="secondary" className="ml-1 text-xs">{filteredChannels.length}{filteredChannels.length !== channels.length && ` of ${channels.length}`}</Badge>
+                <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{filteredChannels.length}{filteredChannels.length !== channels.length && ` of ${channels.length}`}</span>
               </h3>
               {/* [Channel metadata] Sort selector — defaults to alpha,
                   but "by members" is the right pick once we've run
@@ -1680,36 +1827,40 @@ export default function MindsharePage() {
                 </Select>
               )}
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-warm-400" />
                 <Input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder="Search..." className="pl-8 h-8 w-56 focus-brand" />
               </div>
             </div>
             {channelsLoading ? (
-              <div className="p-4 space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+              <div className="p-4 space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-md" />)}</div>
             ) : (
-              <div className="divide-y divide-gray-50 max-h-[500px] overflow-auto">
+              <div className="divide-y divide-cream-100 max-h-[500px] overflow-auto">
                 {filteredChannels.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-gray-500">No channels yet. Use the bulk importer above.</div>
+                  <EmptyState
+                    icon={Radio}
+                    title="No channels yet"
+                    description="Use the bulk importer above to add Korean Telegram channels."
+                  />
                 ) : filteredChannels.map(c => {
                   const hits7d = channelMentionCounts[c.id] || 0;
                   // Visual signal: dead channels (no hits in 7d) get a
-                  // muted dot so admins can scan and prune.
-                  const activityClass =
-                    hits7d === 0 ? 'bg-gray-200 text-gray-500'
-                    : hits7d < 5 ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                  // muted tone so admins can scan and prune.
+                  const activityTone: BadgeTone =
+                    hits7d === 0 ? ACTIVITY_TONES.dead
+                    : hits7d < 5 ? ACTIVITY_TONES.low
+                    : ACTIVITY_TONES.healthy;
                   return (
                     <div key={c.id} className={`px-4 py-2.5 flex items-center gap-3 ${!c.is_active ? 'opacity-60' : ''}`}>
                       <Switch checked={c.is_active} onCheckedChange={() => toggleChannel(c)} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">{c.channel_name}</p>
+                          <p className="text-sm font-medium text-ink-warm-900 truncate">{c.channel_name}</p>
                           {c.channel_username && (
                             <a
                               href={`https://t.me/${c.channel_username.replace(/^@/, '')}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-gray-300 hover:text-blue-500"
+                              className="text-ink-warm-300 hover:text-brand"
                               title="Open on Telegram"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -1718,24 +1869,25 @@ export default function MindsharePage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <p className="text-xs text-gray-500">{c.channel_username ? `@${c.channel_username}` : '—'}</p>
+                          <p className="text-xs text-ink-warm-500">{c.channel_username ? `@${c.channel_username}` : '—'}</p>
                           {/* [Channel metadata] Chat type hint — channels
                               need admin rights to add a bot. Tooltip
                               spells out the invitation requirement. */}
                           {c.chat_type && (
                             <span
-                              className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
-                                c.chat_type === 'channel'
-                                  ? 'bg-purple-50 text-purple-700 border border-purple-100'
-                                  : 'bg-blue-50 text-blue-700 border border-blue-100'
-                              }`}
                               title={
                                 c.chat_type === 'channel'
                                   ? 'Broadcast channel — bot must be added as admin (not regular member)'
                                   : `${c.chat_type} — bot can be added as a regular member`
                               }
                             >
-                              {c.chat_type}
+                              <StatusBadge
+                                tone={CHAT_TYPE_TONES[c.chat_type] ?? 'neutral'}
+                                size="sm"
+                                className="uppercase tracking-wide"
+                              >
+                                {c.chat_type}
+                              </StatusBadge>
                             </span>
                           )}
                         </div>
@@ -1745,33 +1897,27 @@ export default function MindsharePage() {
                           on the biggest channels first. */}
                       {typeof c.member_count === 'number' && (
                         <span
-                          className="text-[10px] px-2 py-0.5 rounded-full tabular-nums bg-gray-100 text-gray-700 border border-gray-200"
+                          className="text-[10px] px-2 py-0.5 rounded-full tabular-nums bg-cream-100 text-ink-warm-700 border border-cream-200"
                           title={`~${c.member_count.toLocaleString()} members (Telegram approximate)`}
                         >
                           {c.member_count >= 1000 ? `${(c.member_count / 1000).toFixed(1)}K` : c.member_count}
                         </span>
                       )}
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full tabular-nums ${activityClass}`}
-                        title={`${hits7d} mentions in last 7 days`}
-                      >
-                        {hits7d} / 7d
+                      <span title={`${hits7d} mentions in last 7 days`}>
+                        <StatusBadge tone={activityTone} size="sm" className="tabular-nums">
+                          {hits7d} / 7d
+                        </StatusBadge>
                       </span>
                       {/* [Bot membership tracking] Per-row status pill +
                           single-channel recheck. Click the pill to
                           recheck just this channel (useful right after
-                          you invite the bot). */}
+                          you invite the bot). Pill is a real <button>
+                          (clickable) with a StatusBadge styling. */}
                       {(() => {
                         const status = c.bot_status || 'unknown';
                         const isMember = status === 'member' || status === 'administrator' || status === 'creator';
                         const isLeft = status === 'left' || status === 'kicked';
-                        const pillClass = isMember
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                          : isLeft
-                            ? 'bg-rose-50 text-rose-700 border border-rose-100'
-                            : status === 'error'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                              : 'bg-gray-100 text-gray-500';
+                        const tone: BadgeTone = BOT_STATUS_TONES[status] ?? 'neutral';
                         const label = isMember
                           ? (status === 'administrator' ? 'admin' : status === 'creator' ? 'owner' : 'in')
                           : isLeft ? 'not in'
@@ -1782,18 +1928,20 @@ export default function MindsharePage() {
                             type="button"
                             disabled={checkingBotStatus === c.id || checkingBotStatus === 'all'}
                             onClick={() => checkBotStatus(c.id)}
-                            className={`text-[10px] px-2 py-0.5 rounded-full ${pillClass} hover:opacity-80 transition-opacity disabled:opacity-50 inline-flex items-center gap-1`}
+                            className="disabled:opacity-50"
                             title={
                               checkingBotStatus === c.id ? 'Checking…' :
                               `Bot status: ${status}${c.bot_status_checked_at ? ` (checked ${new Date(c.bot_status_checked_at).toLocaleString()})` : ''}. Click to recheck.`
                             }
                           >
-                            {checkingBotStatus === c.id ? (
-                              <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                            ) : (
-                              <Bot className="h-2.5 w-2.5" />
-                            )}
-                            {label}
+                            <StatusBadge tone={tone} size="sm" className="hover:opacity-80 transition-opacity">
+                              {checkingBotStatus === c.id ? (
+                                <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                              ) : (
+                                <Bot className="h-2.5 w-2.5" />
+                              )}
+                              {label}
+                            </StatusBadge>
                           </button>
                         );
                       })()}
@@ -1807,7 +1955,7 @@ export default function MindsharePage() {
                           <SelectItem value="vi">Vietnamese</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400 hover:text-rose-500" onClick={() => deleteChannel(c)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-warm-400 hover:text-rose-500" onClick={() => deleteChannel(c)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -1815,7 +1963,7 @@ export default function MindsharePage() {
                 })}
               </div>
             )}
-          </div>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

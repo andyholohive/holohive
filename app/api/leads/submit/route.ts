@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     // Send Telegram notification
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://portal.holohive.agency';
-    const pipelineUrl = `${baseUrl}/crm/pipeline`;
+    const pipelineUrl = `${baseUrl}/crm/sales-pipeline`;
     const message = `<b>New Lead Submitted</b>\n\n` +
       `<b>Name:</b> ${name.trim()}\n` +
       `<b>Type:</b> ${account_type || 'N/A'}\n` +

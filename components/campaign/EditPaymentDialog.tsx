@@ -148,10 +148,10 @@ export function EditPaymentDialog({ open, onOpenChange, payment }: EditPaymentDi
       ));
 
       onOpenChange(false);
-      toast({ title: 'Success', description: 'Payment updated successfully.' });
+      toast({ title: 'Payment updated' });
     } catch (err) {
       console.error('Error updating payment:', err);
-      toast({ title: 'Error', description: 'Failed to update payment.', variant: 'destructive' });
+      toast({ title: 'Update failed', description: err instanceof Error ? err.message : 'Failed to update payment', variant: 'destructive' });
     }
   };
 

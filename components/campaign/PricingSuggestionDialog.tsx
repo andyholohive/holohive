@@ -82,14 +82,14 @@ export function PricingSuggestionDialog({
         }
         fetchPayments();
         toast({
-          title: 'Success',
-          description: `Updated ${paymentIds.length} payment(s) to $${latestCost.toLocaleString()}`,
+          title: 'Payments updated',
+          description: `Updated ${paymentIds.length} payment(s) to $${latestCost.toLocaleString()}.`,
         });
       } catch (error) {
         console.error('Error updating payments:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to update payment amounts',
+          title: 'Update failed',
+          description: error instanceof Error ? error.message : 'Failed to update payment amounts',
           variant: 'destructive',
         });
       }

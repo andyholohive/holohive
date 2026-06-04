@@ -5,9 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { KpiCard } from '@/components/ui/kpi-card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -28,7 +31,7 @@ import {
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
   ArrowUp, ArrowDown, ArrowUpDown, Radar, Search, Info, Trash2,
-  MessageSquare, Copy as CopyIcon,
+  MessageSquare, Copy as CopyIcon, ChevronLeft,
 } from 'lucide-react';
 
 interface Trigger {
@@ -140,16 +143,20 @@ const STATUS_TABS = [
 const CONTACT_CONFIDENCE_STYLE: Record<string, string> = {
   high: 'bg-emerald-100 text-emerald-700',
   medium: 'bg-amber-100 text-amber-700',
-  low: 'bg-gray-100 text-gray-600',
+  low: 'bg-cream-100 text-ink-warm-700',
 };
 
-const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = {
-  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-rose-100 text-rose-700 border-rose-200' },
-  PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
-  RESEARCH:            { label: 'RESEARCH FIRST',     className: 'bg-blue-100 text-blue-700 border-blue-200' },
-  WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  NURTURE:             { label: 'NURTURE',            className: 'bg-gray-100 text-gray-700 border-gray-200' },
-  SKIP:                { label: 'SKIP',               className: 'bg-gray-50 text-gray-400 border-gray-200 line-through decoration-gray-300' },
+// v11: action_tier rendered via StatusBadge to match RecentSignalsPanel.
+// Tone hierarchy: REACH_OUT_NOW=danger (rose), PRE_TOKEN_PRIORITY=warning
+// (amber), RESEARCH=info (sky), WATCH=brand (teal), NURTURE=neutral,
+// SKIP=slate (de-emphasized + strikethrough).
+const ACTION_TIER_STYLE: Record<string, { label: string; tone: BadgeTone; strike?: boolean }> = {
+  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      tone: 'danger' },
+  PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', tone: 'warning' },
+  RESEARCH:            { label: 'RESEARCH FIRST',     tone: 'info' },
+  WATCH:               { label: 'WATCH',              tone: 'brand' },
+  NURTURE:             { label: 'NURTURE',            tone: 'neutral' },
+  SKIP:                { label: 'SKIP',               tone: 'slate', strike: true },
 };
 
 const VERDICT_STYLE: Record<string, string> = {
@@ -523,46 +530,54 @@ export default function DiscoveryPanel() {
   });
   const rowDeepDiveTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchProspects = useCallback(async () => {
-    setLoading(true);
+  /**
+   * Fetch prospects. The `silent` flag controls whether we flip the
+   * loading skeleton — initial mount + status-tab switch should show
+   * the skeleton; background refreshes (focus / visibility) should
+   * not. Was previously always loud → every focus or tab switch
+   * flicker the whole table back to skeleton, making the page feel
+   * like it was reloading. 2026-06-03 fix.
+   */
+  const fetchProspectsRef = React.useRef<boolean>(false);
+  const fetchProspects = useCallback(async (silent: boolean = false) => {
+    // Guard against re-entrant fetches — if a fetch is already in
+    // flight, skip this trigger. Otherwise rapid focus events stack
+    // overlapping fetches.
+    if (fetchProspectsRef.current) return;
+    fetchProspectsRef.current = true;
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/prospects/discovery?status=${statusFilter}`);
       const data = await res.json();
       if (data.prospects) setProspects(data.prospects);
-      // schedule may be null if the row is missing (treat as
-      // healthy — we don't have a signal either way). When present
-      // we always overwrite so a re-enable / new run timestamp shows
-      // up immediately on the next refresh.
       if (data.schedule !== undefined) setSchedule(data.schedule);
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to load discovered prospects', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to load discovered prospects', variant: 'destructive' });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      fetchProspectsRef.current = false;
     }
   }, [statusFilter, toast]);
 
+  // Loud fetch on mount + on status-tab switch (the only deps of
+  // fetchProspects). Shows skeleton while loading.
   useEffect(() => {
-    fetchProspects();
+    fetchProspects(false);
   }, [fetchProspects]);
 
-  // [Audit fix May 2026] Auto-refresh the prospects list when the
-  // tab regains focus or the document becomes visible. Previously
-  // the stat cards + table only refreshed on manual "Refresh"
-  // button click, so a background scan completing OR another user
-  // dismissing prospects left the local copy stale until a manual
-  // click. Common scenario: user switches tabs to run a scan, comes
-  // back, sees old counts, makes decisions on stale numbers.
+  // Silent background refresh when the tab regains focus / becomes
+  // visible. Keeps the existing rows on screen during the refetch so
+  // the page doesn't flicker back to skeleton on every tab switch.
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const silentRefresh = () => fetchProspects(true);
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchProspects();
-      }
+      if (document.visibilityState === 'visible') silentRefresh();
     };
-    window.addEventListener('focus', fetchProspects);
+    window.addEventListener('focus', silentRefresh);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      window.removeEventListener('focus', fetchProspects);
+      window.removeEventListener('focus', silentRefresh);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [fetchProspects]);
@@ -702,10 +717,10 @@ export default function DiscoveryPanel() {
             description: baseDesc,
           });
         }
-        fetchProspects();
+        fetchProspects(true);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Scan failed', variant: 'destructive' });
+      toast({ title: 'Scan failed', description: err?.message ?? 'Scan failed', variant: 'destructive' });
     } finally {
       stopProgressPolling();
       setScanning(false);
@@ -773,10 +788,10 @@ export default function DiscoveryPanel() {
           title: action === 'delete' ? 'POC removed' : 'POC confirmed',
           description: `${pocName} — remaining POCs: ${data.remaining_contacts}`,
         });
-        fetchProspects();
+        fetchProspects(true);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Action failed', variant: 'destructive' });
+      toast({ title: 'Action failed', description: err?.message ?? 'Action failed', variant: 'destructive' });
     } finally {
       setPocActionInFlight(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
@@ -805,9 +820,9 @@ export default function DiscoveryPanel() {
         return;
       }
       toast({ title: 'Signal deleted', description: 'Marked inactive. Refresh to remove from view.' });
-      fetchProspects();
+      fetchProspects(true);
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Delete failed', variant: 'destructive' });
+      toast({ title: 'Delete failed', description: err?.message ?? 'Delete failed', variant: 'destructive' });
     } finally {
       setDeletingSignalIds(prev => {
         const next = new Set(prev);
@@ -839,27 +854,25 @@ export default function DiscoveryPanel() {
       const data = await res.json();
       if (!res.ok || data.error) {
         toast({
-          title: `Find POCs failed — ${projectName}`,
-          description: data.error || (data.errors?.[0] ?? 'Unknown error'),
+          title: 'Find POCs failed',
+          description: `${projectName}: ${data.error || (data.errors?.[0] ?? 'Unknown error')}`,
           variant: 'destructive',
         });
       } else {
         const didEnrich = (data.enriched ?? 0) > 0;
         toast({
-          title: didEnrich
-            ? `POCs found — ${projectName}`
-            : `No POCs found — ${projectName}`,
+          title: didEnrich ? 'POCs found' : 'No POCs found',
           description: didEnrich
-            ? `${data.enriched} prospect updated · $${data.cost_usd?.toFixed(2) ?? '—'}`
-            : `Grok couldn't find credible decision-makers. Try manually. $${data.cost_usd?.toFixed(2) ?? '—'}`,
+            ? `${projectName} · ${data.enriched} prospect updated · $${data.cost_usd?.toFixed(2) ?? '—'}`
+            : `${projectName} · Grok couldn't find credible decision-makers. Try manually. $${data.cost_usd?.toFixed(2) ?? '—'}`,
           variant: didEnrich ? 'default' : 'destructive',
         });
-        fetchProspects();
+        fetchProspects(true);
       }
     } catch (err: any) {
       toast({
-        title: `Error — ${projectName}`,
-        description: err?.message ?? 'Find POCs failed',
+        title: 'Find POCs failed',
+        description: `${projectName}: ${err?.message ?? 'Unknown error'}`,
         variant: 'destructive',
       });
     } finally {
@@ -980,16 +993,16 @@ export default function DiscoveryPanel() {
 
       if (!res.ok || data.error) {
         toast({
-          title: `Deep Dive failed — ${projectName}`,
-          description: data.error || (data.errors?.[0] ?? 'Unknown error'),
+          title: 'Deep Dive failed',
+          description: `${projectName}: ${data.error || (data.errors?.[0] ?? 'Unknown error')}`,
           variant: 'destructive',
         });
       } else {
         toast({
-          title: `Deep Dive complete — ${projectName}`,
-          description: `${data.pocs_scanned ?? 0} POCs scanned · ${data.signals_added ?? 0} signals added · $${data.cost_usd?.toFixed(2) ?? '—'}`,
+          title: 'Deep Dive complete',
+          description: `${projectName} · ${data.pocs_scanned ?? 0} POCs scanned · ${data.signals_added ?? 0} signals added · $${data.cost_usd?.toFixed(2) ?? '—'}`,
         });
-        fetchProspects();
+        fetchProspects(true);
       }
     } catch (err: any) {
       if (rowDeepDiveTimerRef.current) {
@@ -998,8 +1011,8 @@ export default function DiscoveryPanel() {
       }
       setRowDeepDive(prev => ({ ...prev, running: false, result: { error: err?.message ?? 'Deep Dive failed' } }));
       toast({
-        title: `Error — ${projectName}`,
-        description: err?.message ?? 'Deep Dive failed',
+        title: 'Deep Dive failed',
+        description: `${projectName}: ${err?.message ?? 'Unknown error'}`,
         variant: 'destructive',
       });
     } finally {
@@ -1053,9 +1066,9 @@ export default function DiscoveryPanel() {
       } else {
         toast({ title: 'Updated', description: `Moved to ${status.replace('_', ' ')}` });
       }
-      fetchProspects();
+      fetchProspects(true);
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Update failed', variant: 'destructive' });
+      toast({ title: 'Update failed', description: err?.message ?? 'Update failed', variant: 'destructive' });
     }
   };
 
@@ -1137,7 +1150,7 @@ export default function DiscoveryPanel() {
         description: parts.join(' · '),
         variant: hasAnyFailure ? 'destructive' : 'default',
       });
-      fetchProspects();
+      fetchProspects(true);
     }
   };
 
@@ -1183,10 +1196,10 @@ export default function DiscoveryPanel() {
           title: 'Bulk Deep Dive complete',
           description: `${data.pocs_scanned} POCs · ${data.signals_added} signals · $${data.cost_usd?.toFixed(2)}`,
         });
-        fetchProspects();
+        fetchProspects(true);
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Bulk Deep Dive failed', variant: 'destructive' });
+      toast({ title: 'Bulk Deep Dive failed', description: err?.message ?? 'Bulk Deep Dive failed', variant: 'destructive' });
     } finally {
       setBulkBusy(false);
       clearSelection();
@@ -1247,6 +1260,26 @@ export default function DiscoveryPanel() {
   const hiddenSkipCount = hideSkip
     ? prospects.filter(p => p.discovery_action_tier === 'SKIP').length
     : 0;
+
+  // Pagination — 50 rows per page. Was unbounded; with hundreds of
+  // discovered prospects the page rendered all rows at once which
+  // bloated DOM and made scrolling sluggish. 2026-06-03.
+  const PROSPECT_PAGE_SIZE = 50;
+  const [prospectsPage, setProspectsPage] = useState(1);
+  const totalProspectPages = Math.max(1, Math.ceil(filteredProspects.length / PROSPECT_PAGE_SIZE));
+  // Reset to page 1 when the filter or search changes — otherwise
+  // users can land on page 3 of pre-filter results and see an empty
+  // table after narrowing down to 12 matches.
+  useEffect(() => {
+    setProspectsPage(1);
+  }, [statusFilter, searchQuery, hideSkip, sort.field, sort.direction]);
+  // Clamp page if filtered count shrinks below current page.
+  useEffect(() => {
+    if (prospectsPage > totalProspectPages) setProspectsPage(totalProspectPages);
+  }, [prospectsPage, totalProspectPages]);
+  const prospectsPageStart = (prospectsPage - 1) * PROSPECT_PAGE_SIZE;
+  const prospectsPageEnd = Math.min(prospectsPageStart + PROSPECT_PAGE_SIZE, filteredProspects.length);
+  const paginatedProspects = filteredProspects.slice(prospectsPageStart, prospectsPageEnd);
 
   // Summary stats for the cards at top (always derived from the full prospects
   // list, ignoring the hide-disqualified toggle — we want stable counts that
@@ -1316,7 +1349,7 @@ export default function DiscoveryPanel() {
 
       {/* Description + primary actions */}
       <div className="flex items-start justify-between gap-4">
-        <p className="text-sm text-gray-600 max-w-2xl">
+        <p className="text-sm text-ink-warm-700 max-w-2xl">
           AI-driven lead finder. Claude scans configurable funding sources
           (DropsTab, RootData, CryptoRank, ETHGlobal), scores each candidate
           against our ICP, and finds Telegram/X decision-maker handles.
@@ -1327,7 +1360,7 @@ export default function DiscoveryPanel() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchProspects}
+            onClick={() => fetchProspects(false)}
             disabled={loading}
             className="h-9"
           >
@@ -1335,9 +1368,9 @@ export default function DiscoveryPanel() {
             Refresh
           </Button>
           <Button
+            variant="brand"
             size="sm"
             onClick={() => setScanOpen(true)}
-            style={{ backgroundColor: 'var(--brand)', color: 'white' }}
             className="h-9"
           >
             <Sparkles className="w-4 h-4 mr-1.5" />
@@ -1346,71 +1379,85 @@ export default function DiscoveryPanel() {
         </div>
       </div>
 
-      {/* Summary stat cards */}
+      {/* Summary stat cards — KpiCard (project convention from
+          CLAUDE.md). Previously rolled their own Card+CardContent
+          variant with a `hover:shadow-md transition-shadow` that
+          falsely implied clickability — KpiCard is explicitly
+          display-only with no hover. 2026-06-03.
+
+          On initial mount (loading + empty prospects list) we
+          render KPI skeletons instead of "0" tiles — showing 0
+          while data is fetching is misleading. On refresh the
+          prior values stay visible so the page doesn't flicker. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Globe className="h-3.5 w-3.5 text-gray-400" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
-            <div className="text-xs text-gray-500 mt-0.5">discovered projects</div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Eye className="h-3.5 w-3.5 text-blue-500" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Needs Review</span>
-            </div>
-            <div className="text-2xl font-bold text-blue-700">{needsReviewCount}</div>
-            <div className="text-xs text-gray-500 mt-0.5">awaiting your decision</div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Zap className="h-3.5 w-3.5 text-rose-500" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hot Leads</span>
-            </div>
-            <div className="text-2xl font-bold text-rose-700">{hotLeadCount}</div>
-            <div className="text-xs text-gray-500 mt-0.5">Reach Out Now / Pre-Token</div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Send className="h-3.5 w-3.5 text-[#229ED9]" />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">With Telegram</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">{withTelegramCount}</div>
-            <div className="text-xs text-gray-500 mt-0.5">DM-ready POCs found</div>
-          </CardContent>
-        </Card>
+        {loading && prospects.length === 0 ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))
+        ) : (
+          <>
+            <KpiCard
+              icon={Globe}
+              label="Total"
+              value={totalCount}
+              sub="discovered projects"
+              accent="gray"
+            />
+            <KpiCard
+              icon={Eye}
+              label="Needs Review"
+              value={needsReviewCount}
+              sub="awaiting your decision"
+              accent="sky"
+            />
+            <KpiCard
+              icon={Zap}
+              label="Hot Leads"
+              value={hotLeadCount}
+              sub="Reach Out Now / Pre-Token"
+              accent="rose"
+            />
+            <KpiCard
+              icon={Send}
+              label="With Telegram"
+              value={withTelegramCount}
+              sub="DM-ready POCs found"
+              accent="sky"
+            />
+          </>
+        )}
       </div>
 
-      {/* Status filter tabs + search + hide-disqualified toggle */}
+      {/* Status filter tabs + search + hide-disqualified toggle —
+          v11 segmented control. 2026-06-03: dropped the
+          `hover:text-ink-warm-700` on inactive tabs (hover shouldn't
+          change text color — the bg shift is enough) and modernized
+          the Search icon's `transform -translate-y-1/2` to the
+          current standalone utility. */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="inline-flex bg-cream-100 p-1 rounded-md border border-cream-200 w-fit flex-wrap">
           {STATUS_TABS.map(tab => (
             <button
               key={tab.value}
+              type="button"
               onClick={() => setStatusFilter(tab.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                 statusFilter === tab.value
-                  ? 'text-white'
-                  : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+                  ? 'bg-white shadow-card text-brand'
+                  : 'text-ink-warm-500 hover:bg-cream-200'
               }`}
-              style={statusFilter === tab.value ? { backgroundColor: 'var(--brand)' } : {}}
+              aria-pressed={statusFilter === tab.value}
             >
               {tab.label}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          {/* Widened from `max-w-sm` (384px, clipped "...or POC...")
+              to `min-w-[360px]` so the full placeholder fits. Still
+              flex-shrinks below that on narrow viewports. */}
+          <div className="relative w-full sm:w-[360px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400 pointer-events-none" />
             <Input
               placeholder="Search projects by name, symbol, or POC..."
               className="pl-10 focus-brand"
@@ -1424,55 +1471,60 @@ export default function DiscoveryPanel() {
               checked={hideSkip}
               onCheckedChange={setHideSkip}
             />
-            <Label htmlFor="hide-disqualified" className="text-xs text-gray-600 cursor-pointer select-none">
+            <Label htmlFor="hide-disqualified" className="text-xs text-ink-warm-700 cursor-pointer select-none">
               Hide disqualified
               {hideSkip && hiddenSkipCount > 0 && (
-                <span className="text-[10px] text-gray-400 ml-1">({hiddenSkipCount})</span>
+                <span className="text-[10px] text-ink-warm-400 ml-1">({hiddenSkipCount})</span>
               )}
             </Label>
           </div>
         </div>
       </div>
 
-      {/* Bulk actions toolbar — appears only when rows are selected */}
+      {/* Bulk actions toolbar — appears only when rows are selected.
+          2026-06-03: dropped the per-button colored outlines
+          (emerald/violet) — neutral outline buttons now, with the
+          icon tints carrying the semantic. Toolbar bg softened from
+          `bg-brand-light border-brand/40` to a calm cream surface so
+          it doesn't compete with the table below. */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 bg-brand-light border border-brand/40 rounded-lg px-3 py-2">
-          <div className="text-sm font-semibold text-gray-800">
+        <div className="flex items-center gap-3 bg-cream-50 border border-cream-200 rounded-lg px-3 py-2">
+          <div className="text-sm font-semibold text-ink-warm-700">
             {selectedIds.size} selected
           </div>
-          <div className="h-4 w-px bg-brand/30" />
+          <div className="h-4 w-px bg-cream-300" />
           <div className="flex items-center gap-1.5 flex-wrap">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              className="h-7 text-xs"
               onClick={() => bulkUpdateStatus('promoted')}
               disabled={bulkBusy}
             >
-              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1 text-emerald-500" />}
               Promote all
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 text-xs text-gray-700"
+              className="h-7 text-xs"
               onClick={() => bulkUpdateStatus('dismissed')}
               disabled={bulkBusy}
             >
-              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <XCircle className="h-3 w-3 mr-1" />}
+              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <XCircle className="h-3 w-3 mr-1 text-ink-warm-400" />}
               Dismiss all
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50"
+              className="h-7 text-xs"
               onClick={bulkDeepDive}
               disabled={bulkBusy}
             >
-              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Radar className="h-3 w-3 mr-1" />}
+              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Radar className="h-3 w-3 mr-1 text-brand" />}
               Deep Dive all
             </Button>
           </div>
@@ -1491,47 +1543,61 @@ export default function DiscoveryPanel() {
 
       {/* Table */}
       {loading ? (
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-          </CardContent>
+        // Structural skeleton — mirrors the v11 prospect-table row
+        // shape (8 cells, with the leftmost being the expand chevron).
+        <Card className="overflow-hidden">
+          <div className="border-b border-cream-200 bg-cream-50/80 py-2.5 px-5 flex items-center gap-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className={`h-3 ${i === 1 ? 'flex-1' : 'w-16'}`} />
+            ))}
+          </div>
+          <div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-3.5 px-5 border-b border-cream-100 last:border-0">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 flex-1 max-w-[260px]" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-8" />
+              </div>
+            ))}
+          </div>
         </Card>
       ) : filteredProspects.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-4">
-              <Sparkles className="h-6 w-6 text-gray-500" />
-            </div>
-            <p className="text-gray-900 font-medium text-base">
-              {statusFilter === 'needs_review'
-                ? 'No prospects awaiting review'
-                : `No ${statusFilter.replace('_', ' ')} prospects yet`}
-            </p>
-            <p className="text-gray-500 text-sm mt-1 mb-5 max-w-md mx-auto">
-              {statusFilter === 'needs_review'
-                ? 'Run a Discovery scan to surface crypto projects with live outreach triggers from DropsTab.'
-                : 'Run a scan to surface new candidates matching the SCOUT ICP framework.'}
-            </p>
-            <Button
-              onClick={() => setScanOpen(true)}
-              size="sm"
-              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-             
-            >
-              <Sparkles className="w-4 h-4 mr-1.5" />
-              Run Discovery
-            </Button>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Sparkles}
+          title={
+            statusFilter === 'needs_review'
+              ? 'No prospects awaiting review'
+              : `No ${statusFilter.replace('_', ' ')} prospects yet`
+          }
+          description={
+            statusFilter === 'needs_review'
+              ? 'Run a Discovery scan to surface crypto projects with live outreach triggers from DropsTab.'
+              : 'Run a scan to surface new candidates matching the SCOUT ICP framework.'
+          }
+        >
+          <Button variant="brand" onClick={() => setScanOpen(true)} size="sm">
+            <Sparkles className="w-4 h-4 mr-1.5" />
+            Run Discovery
+          </Button>
+        </EmptyState>
       ) : (
         <Card>
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
+              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200 [&_th]:py-2.5 [&_th]:px-5 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.18em] [&_th]:text-ink-warm-500">
                 <TableHead className="w-8 px-2">
                   {(() => {
-                    // Indeterminate state: some but not all visible rows selected.
-                    const visible = filteredProspects.map(p => p.id);
+                    // "Select all visible" applies only to the rows
+                    // rendered on this page — was filteredProspects
+                    // before pagination, which selected rows the user
+                    // couldn't see. Indeterminate state when some but
+                    // not all visible rows are selected.
+                    const visible = paginatedProspects.map(p => p.id);
                     const selectedVisible = visible.filter(id => selectedIds.has(id));
                     const allChecked = visible.length > 0 && selectedVisible.length === visible.length;
                     return (
@@ -1541,7 +1607,7 @@ export default function DiscoveryPanel() {
                           if (v) setSelectedIds(new Set(visible));
                           else clearSelection();
                         }}
-                        aria-label="Select all visible"
+                        aria-label="Select all visible on this page"
                       />
                     );
                   })()}
@@ -1553,7 +1619,7 @@ export default function DiscoveryPanel() {
                   <button
                     type="button"
                     onClick={() => toggleSort('funding')}
-                    className="flex items-center gap-1 group hover:text-gray-900"
+                    className="flex items-center gap-1 group hover:text-ink-warm-900"
                     title="Sort by funding amount"
                   >
                     <span>Funding</span>
@@ -1571,7 +1637,7 @@ export default function DiscoveryPanel() {
                   <button
                     type="button"
                     onClick={() => toggleSort('tier')}
-                    className="flex items-center gap-1 group hover:text-gray-900"
+                    className="flex items-center gap-1 group hover:text-ink-warm-900"
                     title="Sort by action tier (hot leads first)"
                   >
                     <span>Tier</span>
@@ -1590,7 +1656,7 @@ export default function DiscoveryPanel() {
                       <button
                         type="button"
                         onClick={() => toggleSort('score')}
-                        className="flex items-center gap-1 group hover:text-gray-900"
+                        className="flex items-center gap-1 group hover:text-ink-warm-900"
                         title="Sort by prospect score"
                       >
                         <span>Score</span>
@@ -1606,28 +1672,28 @@ export default function DiscoveryPanel() {
                           thresholds self-documenting instead of folklore. */}
                       <HoverCard openDelay={100} closeDelay={50}>
                         <HoverCardTrigger asChild>
-                          <Info className="h-3 w-3 text-gray-400 hover:text-gray-700 cursor-help" />
+                          <Info className="h-3 w-3 text-ink-warm-400 hover:text-ink-warm-700 cursor-help" />
                         </HoverCardTrigger>
                         <HoverCardContent side="bottom" align="start" className="w-72 text-xs">
-                          <div className="font-semibold text-gray-800 mb-1.5">
+                          <div className="font-semibold text-ink-warm-700 mb-1.5">
                             Prospect score (0–100)
                           </div>
-                          <div className="text-gray-600 mb-2">
+                          <div className="text-ink-warm-700 mb-2">
                             Sum of three components, each 0–33:
                             ICP fit · Signal strength · Timing.
                           </div>
                           <div className="space-y-1">
                             <div className="flex items-baseline gap-2">
                               <span className="inline-block w-10 text-right text-emerald-700 font-semibold tabular-nums">≥60</span>
-                              <span className="text-gray-700">Strong — prioritize outreach now.</span>
+                              <span className="text-ink-warm-700">Strong — prioritize outreach now.</span>
                             </div>
                             <div className="flex items-baseline gap-2">
                               <span className="inline-block w-10 text-right text-amber-700 font-semibold tabular-nums">30–59</span>
-                              <span className="text-gray-700">Borderline — review reasoning before reaching out.</span>
+                              <span className="text-ink-warm-700">Borderline — review reasoning before reaching out.</span>
                             </div>
                             <div className="flex items-baseline gap-2">
-                              <span className="inline-block w-10 text-right text-gray-500 font-semibold tabular-nums">&lt;30</span>
-                              <span className="text-gray-700">Weak — probably nurture or skip.</span>
+                              <span className="inline-block w-10 text-right text-ink-warm-500 font-semibold tabular-nums">&lt;30</span>
+                              <span className="text-ink-warm-700">Weak — probably nurture or skip.</span>
                             </div>
                           </div>
                         </HoverCardContent>
@@ -1640,11 +1706,11 @@ export default function DiscoveryPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProspects.map(p => {
+              {paginatedProspects.map(p => {
                 const isExpanded = expanded.has(p.id);
                 return (
                   <React.Fragment key={p.id}>
-                    <TableRow className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpand(p.id)}>
+                    <TableRow className="hover:bg-cream-50 cursor-pointer" onClick={() => toggleExpand(p.id)}>
                       <TableCell className="px-2" onClick={e => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(p.id)}
@@ -1654,27 +1720,27 @@ export default function DiscoveryPanel() {
                       </TableCell>
                       <TableCell className="px-2">
                         {isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-gray-400" />
-                          : <ChevronRightIcon className="h-4 w-4 text-gray-400" />}
+                          ? <ChevronDown className="h-4 w-4 text-ink-warm-400" />
+                          : <ChevronRightIcon className="h-4 w-4 text-ink-warm-400" />}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <a
                             href={`/intelligence/discovery/${p.id}`}
                             onClick={e => e.stopPropagation()}
-                            className="font-medium text-gray-900 hover:underline hover:text-brand"
+                            className="font-medium text-ink-warm-900 hover:underline hover:text-brand"
                             title="Open prospect detail page"
                           >
                             {p.name}
                           </a>
-                          {p.symbol && <span className="text-xs text-gray-500">{p.symbol}</span>}
+                          {p.symbol && <span className="text-xs text-ink-warm-500">{p.symbol}</span>}
                           {p.source_url && (
                             <a
                               href={p.source_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
-                              className="text-gray-400 hover:text-gray-700"
+                              className="text-ink-warm-400 hover:text-ink-warm-700"
                               title="View on DropsTab"
                             >
                               <ExternalLink className="h-3 w-3" />
@@ -1682,7 +1748,7 @@ export default function DiscoveryPanel() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-gray-600">
+                      <TableCell className="text-sm text-ink-warm-700">
                         {p.category || '—'}
                       </TableCell>
                       <TableCell className="text-sm">
@@ -1690,16 +1756,16 @@ export default function DiscoveryPanel() {
                           <div>
                             <div className="font-medium">{formatMoney(p.funding.amount_usd)}</div>
                             {p.funding.round && (
-                              <div className="text-xs text-gray-500">{p.funding.round}</div>
+                              <div className="text-xs text-ink-warm-500">{p.funding.round}</div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-ink-warm-400">—</span>
                         )}
                       </TableCell>
                       <TableCell>
                         {p.triggers.length === 0 ? (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-ink-warm-400">—</span>
                         ) : (
                           <HoverCard openDelay={150} closeDelay={50}>
                             <HoverCardTrigger asChild>
@@ -1714,7 +1780,7 @@ export default function DiscoveryPanel() {
                                   </Badge>
                                 ))}
                                 {p.triggers.length > 2 && (
-                                  <span className="text-[10px] text-gray-500">
+                                  <span className="text-[10px] text-ink-warm-500">
                                     +{p.triggers.length - 2} more
                                   </span>
                                 )}
@@ -1726,12 +1792,12 @@ export default function DiscoveryPanel() {
                               className="w-96 p-3"
                               onClick={e => e.stopPropagation()}
                             >
-                              <div className="text-[11px] font-semibold text-gray-700 mb-2">
+                              <div className="text-[11px] font-semibold text-ink-warm-700 mb-2">
                                 Triggers ({p.triggers.length})
                               </div>
                               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                                 {p.triggers.map(t => (
-                                  <div key={t.id} className="text-[11px] border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                                  <div key={t.id} className="text-[11px] border-b border-cream-100 last:border-0 pb-2 last:pb-0">
                                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                                       <Badge variant="outline" className="text-[9px] pointer-events-none">
                                         {formatSignalType(t.signal_type)}
@@ -1742,23 +1808,23 @@ export default function DiscoveryPanel() {
                                         </span>
                                       )}
                                       {t.weight && (
-                                        <span className="text-[9px] text-gray-500">w:{t.weight}</span>
+                                        <span className="text-[9px] text-ink-warm-500">w:{t.weight}</span>
                                       )}
                                       {t.source_url && (
                                         <a
                                           href={t.source_url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-gray-400 hover:text-gray-700 ml-auto"
+                                          className="text-ink-warm-400 hover:text-ink-warm-700 ml-auto"
                                           title="View source"
                                         >
                                           <ExternalLink className="h-3 w-3" />
                                         </a>
                                       )}
                                     </div>
-                                    <div className="font-medium text-gray-900">{t.headline}</div>
+                                    <div className="font-medium text-ink-warm-900">{t.headline}</div>
                                     {t.detail && (
-                                      <p className="text-gray-600 mt-0.5 line-clamp-3">{t.detail}</p>
+                                      <p className="text-ink-warm-700 mt-0.5 line-clamp-3">{t.detail}</p>
                                     )}
                                   </div>
                                 ))}
@@ -1769,14 +1835,17 @@ export default function DiscoveryPanel() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1 items-start">
-                          {p.discovery_action_tier ? (
-                            <span
-                              className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
-                              title={p.disqualification_reason || p.consideration_reason || ''}
-                            >
-                              {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
+                          {p.discovery_action_tier && ACTION_TIER_STYLE[p.discovery_action_tier] ? (
+                            <span title={p.disqualification_reason || p.consideration_reason || ''}>
+                              <StatusBadge
+                                tone={ACTION_TIER_STYLE[p.discovery_action_tier].tone}
+                                size="sm"
+                                className={ACTION_TIER_STYLE[p.discovery_action_tier].strike ? 'line-through' : ''}
+                              >
+                                {ACTION_TIER_STYLE[p.discovery_action_tier].label}
+                              </StatusBadge>
                             </span>
-                          ) : <span className="text-xs text-gray-400">—</span>}
+                          ) : <span className="text-xs text-ink-warm-400">—</span>}
                           {/* Grok-hot flag: fires when Grok's korea_interest_score
                               hits 70+. Orthogonal to tier — a REACH_OUT_NOW
                               prospect might have no Grok coverage yet, and a
@@ -1796,14 +1865,13 @@ export default function DiscoveryPanel() {
                               BD needs to change angle or dismiss. Red because
                               it's a hard ICP-violation signal. */}
                           {p.post_korea_listing_at && (
-                            <span
-                              className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 pointer-events-none"
-                              title={`Listed on ${p.post_korea_listing_exchange} (${p.post_korea_listing_market_pair}) on ${new Date(p.post_korea_listing_at).toLocaleString()}`}
-                            >
-                              📍 LISTED ON {String(p.post_korea_listing_exchange || '').toUpperCase()}
-                              <span className="font-normal text-rose-600 ml-0.5">
-                                {timeAgo(p.post_korea_listing_at)}
-                              </span>
+                            <span title={`Listed on ${p.post_korea_listing_exchange} (${p.post_korea_listing_market_pair}) on ${new Date(p.post_korea_listing_at).toLocaleString()}`}>
+                              <StatusBadge tone="danger" size="sm" className="font-bold">
+                                📍 LISTED ON {String(p.post_korea_listing_exchange || '').toUpperCase()}
+                                <span className="font-normal ml-0.5">
+                                  {timeAgo(p.post_korea_listing_at)}
+                                </span>
+                              </StatusBadge>
                             </span>
                           )}
                         </div>
@@ -1814,19 +1882,19 @@ export default function DiscoveryPanel() {
                             <span className={`text-sm font-semibold ${
                               p.prospect_score.total >= 60 ? 'text-emerald-700' :
                               p.prospect_score.total >= 30 ? 'text-amber-700' :
-                              'text-gray-500'
+                              'text-ink-warm-500'
                             }`}>
-                              {p.prospect_score.total}<span className="text-xs text-gray-400">/100</span>
+                              {p.prospect_score.total}<span className="text-xs text-ink-warm-400">/100</span>
                             </span>
-                          ) : <span className="text-xs text-gray-400">—</span>}
+                          ) : <span className="text-xs text-ink-warm-400">—</span>}
                         </TableCell>
                       )}
                       <TableCell>
                         {p.outreach_contacts && p.outreach_contacts.length > 0 ? (
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-gray-700">
+                            <span className="text-xs font-medium text-ink-warm-700">
                               {p.outreach_contacts[0].name}
-                              <span className="text-gray-400 ml-1">· {p.outreach_contacts[0].role}</span>
+                              <span className="text-ink-warm-400 ml-1">· {p.outreach_contacts[0].role}</span>
                               {!p.outreach_contacts[0].telegram_handle && (
                                 <span className="ml-1 text-[9px] text-amber-600 font-semibold">(No TG)</span>
                               )}
@@ -1850,7 +1918,7 @@ export default function DiscoveryPanel() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={e => e.stopPropagation()}
-                                  className="text-gray-500 hover:text-[#1DA1F2]"
+                                  className="text-ink-warm-500 hover:text-[#1DA1F2]"
                                   title={`X: ${p.outreach_contacts[0].twitter_handle}`}
                                 >
                                   <Twitter className="h-3.5 w-3.5" />
@@ -1863,12 +1931,12 @@ export default function DiscoveryPanel() {
                                 {p.outreach_contacts[0].confidence[0].toUpperCase()}
                               </span>
                               {p.outreach_contacts.length > 1 && (
-                                <span className="text-[10px] text-gray-500">+{p.outreach_contacts.length - 1}</span>
+                                <span className="text-[10px] text-ink-warm-500">+{p.outreach_contacts.length - 1}</span>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400 italic">No POC found</span>
+                          <span className="text-xs text-ink-warm-400 italic">No POC found</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -1893,7 +1961,7 @@ export default function DiscoveryPanel() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 disabled:text-gray-300 disabled:border-gray-200"
+                                className="h-7 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 disabled:text-ink-warm-300 disabled:border-cream-200"
                                 onClick={() => runFindPocsForProspect(p.id, p.name)}
                                 disabled={disabled}
                                 title={title}
@@ -1944,7 +2012,7 @@ export default function DiscoveryPanel() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50 disabled:text-gray-300 disabled:border-gray-200"
+                                  className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50 disabled:text-ink-warm-300 disabled:border-cream-200"
                                   onClick={handleClick}
                                   disabled={disabled}
                                   title={title}
@@ -1955,7 +2023,7 @@ export default function DiscoveryPanel() {
                                   Deep Dive
                                 </Button>
                                 {lastDiveAgo && !isDiving && (
-                                  <span className={`text-[9px] tabular-nums ${isRecent ? 'text-amber-600' : 'text-gray-400'}`}>
+                                  <span className={`text-[9px] tabular-nums ${isRecent ? 'text-amber-600' : 'text-ink-warm-400'}`}>
                                     {isRecent ? '⚠ ' : ''}scanned {lastDiveAgo}
                                   </span>
                                 )}
@@ -1978,7 +2046,7 @@ export default function DiscoveryPanel() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 text-xs text-gray-600"
+                              className="h-7 text-xs text-ink-warm-700"
                               onClick={() => updateStatus(p.id, 'dismissed')}
                               title="Dismiss"
                             >
@@ -1992,7 +2060,7 @@ export default function DiscoveryPanel() {
 
                     {/* Expanded detail row */}
                     {isExpanded && (
-                      <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableRow className="bg-cream-50 hover:bg-cream-50">
                         <TableCell colSpan={10} className="py-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                             {/* Verdict summary + reasons */}
@@ -2004,7 +2072,7 @@ export default function DiscoveryPanel() {
                                   </span>
                                 )}
                                 {SHOW_SCORE_COLUMN && p.prospect_score && (
-                                  <span className="text-[10px] text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 pointer-events-none">
+                                  <span className="text-[10px] text-ink-warm-700 px-1.5 py-0.5 rounded border border-cream-200 pointer-events-none">
                                     Score: {p.prospect_score.icp_fit}+{p.prospect_score.signal_strength}+{p.prospect_score.timing} = {p.prospect_score.total}/100
                                   </span>
                                 )}
@@ -2023,8 +2091,8 @@ export default function DiscoveryPanel() {
                               )}
                               {p.fit_reasoning && (
                                 <div>
-                                  <h4 className="font-semibold text-gray-700 mb-1">Why they're a fit</h4>
-                                  <p className="text-gray-600">{p.fit_reasoning}</p>
+                                  <h4 className="font-semibold text-ink-warm-700 mb-1">Why they're a fit</h4>
+                                  <p className="text-ink-warm-700">{p.fit_reasoning}</p>
                                 </div>
                               )}
                             </div>
@@ -2032,7 +2100,7 @@ export default function DiscoveryPanel() {
                             {/* ICP checklist */}
                             {p.icp_checks && (
                               <div className="md:col-span-2">
-                                <h4 className="font-semibold text-gray-700 mb-2">ICP Checklist</h4>
+                                <h4 className="font-semibold text-ink-warm-700 mb-2">ICP Checklist</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                                   {Object.entries(ICP_CRITERIA_LABELS).map(([key, label]) => {
                                     const check = (p.icp_checks as any)[key] as IcpCheck | undefined;
@@ -2045,8 +2113,8 @@ export default function DiscoveryPanel() {
                                           <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
                                         )}
                                         <div className="flex-1 min-w-0">
-                                          <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-rose-700'}`}>{label}</div>
-                                          <div className="text-gray-600 text-[11px]">{check.evidence}</div>
+                                          <div className={`font-medium ${check.pass ? 'text-ink-warm-900' : 'text-rose-700'}`}>{label}</div>
+                                          <div className="text-ink-warm-700 text-[11px]">{check.evidence}</div>
                                         </div>
                                       </div>
                                     );
@@ -2058,17 +2126,17 @@ export default function DiscoveryPanel() {
                             {/* Funding detail */}
                             {p.funding && (p.funding.amount_usd || p.funding.investors?.length) && (
                               <div>
-                                <h4 className="font-semibold text-gray-700 mb-1">Funding</h4>
+                                <h4 className="font-semibold text-ink-warm-700 mb-1">Funding</h4>
                                 {p.funding.amount_usd && (
-                                  <div className="text-gray-600">
+                                  <div className="text-ink-warm-700">
                                     <span className="font-medium">{formatMoney(p.funding.amount_usd)}</span>
                                     {p.funding.round && ` · ${p.funding.round}`}
                                     {p.funding.date && ` · ${p.funding.date}`}
                                   </div>
                                 )}
                                 {p.funding.investors && p.funding.investors.length > 0 && (
-                                  <div className="text-gray-600 mt-1">
-                                    <span className="text-xs text-gray-500">Investors: </span>
+                                  <div className="text-ink-warm-700 mt-1">
+                                    <span className="text-xs text-ink-warm-500">Investors: </span>
                                     {p.funding.investors.join(', ')}
                                   </div>
                                 )}
@@ -2077,12 +2145,12 @@ export default function DiscoveryPanel() {
 
                             {/* Outreach contacts — the humans to DM */}
                             <div className="md:col-span-2">
-                              <h4 className="font-semibold text-gray-700 mb-2">
+                              <h4 className="font-semibold text-ink-warm-700 mb-2">
                                 Outreach POCs ({p.outreach_contacts?.length || 0})
-                                <span className="font-normal text-xs text-gray-500 ml-2">— individual handles for cold BD, not the project community channel</span>
+                                <span className="font-normal text-xs text-ink-warm-500 ml-2">— individual handles for cold BD, not the project community channel</span>
                               </h4>
                               {!p.outreach_contacts || p.outreach_contacts.length === 0 ? (
-                                <p className="text-xs text-gray-500 italic">No decision-maker handles found. Worth a manual search on X.</p>
+                                <p className="text-xs text-ink-warm-500 italic">No decision-maker handles found. Worth a manual search on X.</p>
                               ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   {p.outreach_contacts.map((c, i) => {
@@ -2101,23 +2169,22 @@ export default function DiscoveryPanel() {
                                       <div className="flex items-start justify-between gap-2">
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold text-gray-900">{c.name}</span>
+                                            <span className="font-semibold text-ink-warm-900">{c.name}</span>
                                             <span className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${CONTACT_CONFIDENCE_STYLE[c.confidence]}`}>
                                               {c.confidence}
                                             </span>
                                             {needsReview && (
-                                              <span
-                                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 pointer-events-none"
-                                                title="Found by Grok — human hasn't verified this name/handle matches"
-                                              >
-                                                <AlertTriangle className="h-2.5 w-2.5" />
-                                                UNVERIFIED
+                                              <span title="Found by Grok — human hasn't verified this name/handle matches">
+                                                <StatusBadge tone="warning" size="sm" className="font-bold">
+                                                  <AlertTriangle className="h-2.5 w-2.5" />
+                                                  UNVERIFIED
+                                                </StatusBadge>
                                               </span>
                                             )}
                                           </div>
-                                          <div className="text-gray-500 text-[11px]">{c.role}</div>
+                                          <div className="text-ink-warm-500 text-[11px]">{c.role}</div>
                                           {c.notes && (
-                                            <p className="text-gray-600 text-[11px] mt-1">{c.notes}</p>
+                                            <p className="text-ink-warm-700 text-[11px] mt-1">{c.notes}</p>
                                           )}
                                           {needsReview && (
                                             <div className="flex items-center gap-1.5 mt-2">
@@ -2153,7 +2220,7 @@ export default function DiscoveryPanel() {
                                                 href={twitterUrl(c.twitter_handle)!}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-[11px] text-gray-600 hover:text-[#1DA1F2] flex items-center gap-1"
+                                                className="text-[11px] text-ink-warm-700 hover:text-[#1DA1F2] flex items-center gap-1"
                                               >
                                                 <Twitter className="h-3 w-3" />
                                                 {c.twitter_handle?.replace(/^https?:\/\/[^/]+\//, '@').replace(/^@@/, '@')}
@@ -2164,7 +2231,7 @@ export default function DiscoveryPanel() {
                                                 href={telegramUrl(c.telegram_handle)!}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-[11px] text-gray-600 hover:text-[#229ED9] flex items-center gap-1"
+                                                className="text-[11px] text-ink-warm-700 hover:text-[#229ED9] flex items-center gap-1"
                                               >
                                                 <Send className="h-3 w-3" />
                                                 {c.telegram_handle?.replace(/^https?:\/\/[^/]+\//, '@').replace(/^@@/, '@')}
@@ -2185,14 +2252,14 @@ export default function DiscoveryPanel() {
                                                   type="button"
                                                   variant="outline"
                                                   size="sm"
-                                                  className="h-6 text-[10px] text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed"
+                                                  className="h-6 text-[10px] text-ink-warm-400 border-cream-200 bg-cream-50 cursor-not-allowed"
                                                   disabled
                                                   title="Draft DM is coming soon — not yet ready to ship."
                                                   aria-disabled="true"
                                                 >
                                                   <MessageSquare className="h-2.5 w-2.5 mr-1" />
                                                   Draft DM
-                                                  <span className="ml-1 text-[8px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-500">
+                                                  <span className="ml-1 text-[8px] font-bold px-1 py-0.5 rounded bg-cream-200 text-ink-warm-500">
                                                     SOON
                                                   </span>
                                                 </Button>
@@ -2218,7 +2285,7 @@ export default function DiscoveryPanel() {
                                             href={c.source_url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-gray-400 hover:text-gray-700 shrink-0"
+                                            className="text-ink-warm-400 hover:text-ink-warm-700 shrink-0"
                                             title="Where we found this contact"
                                           >
                                             <ExternalLink className="h-3 w-3" />
@@ -2235,20 +2302,20 @@ export default function DiscoveryPanel() {
                             {/* Project community channels (for monitoring, not outreach) */}
                             {(p.twitter_url || p.telegram_url || p.website_url) && (
                               <div className="md:col-span-2">
-                                <h4 className="font-semibold text-gray-700 mb-1 text-xs">Community channels <span className="font-normal text-gray-500">(not for outreach)</span></h4>
+                                <h4 className="font-semibold text-ink-warm-700 mb-1 text-xs">Community channels <span className="font-normal text-ink-warm-500">(not for outreach)</span></h4>
                                 <div className="flex items-center gap-3 text-xs">
                                   {p.website_url && (
-                                    <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                                    <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-ink-warm-900 flex items-center gap-1">
                                       <Globe className="h-3 w-3" /> Website
                                     </a>
                                   )}
                                   {p.twitter_url && (
-                                    <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#1DA1F2] flex items-center gap-1">
+                                    <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-[#1DA1F2] flex items-center gap-1">
                                       <Twitter className="h-3 w-3" /> Project X
                                     </a>
                                   )}
                                   {p.telegram_url && (
-                                    <a href={p.telegram_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#229ED9] flex items-center gap-1">
+                                    <a href={p.telegram_url} target="_blank" rel="noopener noreferrer" className="text-ink-warm-700 hover:text-[#229ED9] flex items-center gap-1">
                                       <Send className="h-3 w-3" /> Community TG
                                     </a>
                                   )}
@@ -2261,21 +2328,21 @@ export default function DiscoveryPanel() {
                                 Grok korea score, and links to the raw run. */}
                             {p.last_deep_dive_at && (
                               <div className="md:col-span-2">
-                                <h4 className="font-semibold text-gray-700 mb-1 text-xs flex items-center gap-1.5">
+                                <h4 className="font-semibold text-ink-warm-700 mb-1 text-xs flex items-center gap-1.5">
                                   <Radar className="h-3 w-3 text-violet-600" />
                                   Last Deep Dive
                                 </h4>
                                 <div className="bg-violet-50 border border-violet-200 rounded-lg p-2.5 text-xs">
-                                  <div className="flex items-center gap-2 flex-wrap text-gray-700">
+                                  <div className="flex items-center gap-2 flex-wrap text-ink-warm-700">
                                     <span>Scanned <span className="font-semibold">{timeAgo(p.last_deep_dive_at)}</span></span>
-                                    <span className="text-gray-400">·</span>
+                                    <span className="text-ink-warm-400">·</span>
                                     <span>
                                       {p.triggers.filter(t => t.source_name === 'grok_x_deep_scan').length} Grok signal
                                       {p.triggers.filter(t => t.source_name === 'grok_x_deep_scan').length !== 1 ? 's' : ''}
                                     </span>
                                     {p.last_deep_dive_cost_usd != null && (
                                       <>
-                                        <span className="text-gray-400">·</span>
+                                        <span className="text-ink-warm-400">·</span>
                                         <span className="tabular-nums">
                                           Cost: <span className="font-semibold">${p.last_deep_dive_cost_usd.toFixed(2)}</span>
                                         </span>
@@ -2283,13 +2350,13 @@ export default function DiscoveryPanel() {
                                     )}
                                     {p.grok_korea_score != null && (
                                       <>
-                                        <span className="text-gray-400">·</span>
+                                        <span className="text-ink-warm-400">·</span>
                                         <span>
                                           Korea interest:{' '}
                                           <span className={`font-semibold ${
                                             p.grok_korea_score >= 70 ? 'text-emerald-700' :
                                             p.grok_korea_score >= 40 ? 'text-amber-700' :
-                                            'text-gray-600'
+                                            'text-ink-warm-700'
                                           }`}>
                                             {p.grok_korea_score}/100
                                           </span>
@@ -2303,7 +2370,7 @@ export default function DiscoveryPanel() {
 
                             {/* All triggers */}
                             <div className="md:col-span-2">
-                              <h4 className="font-semibold text-gray-700 mb-2">Triggers ({p.triggers.length})</h4>
+                              <h4 className="font-semibold text-ink-warm-700 mb-2">Triggers ({p.triggers.length})</h4>
                               <div className="space-y-2">
                                 {p.triggers.map(t => {
                                   const isDeleting = deletingSignalIds.has(t.id);
@@ -2341,15 +2408,15 @@ export default function DiscoveryPanel() {
                                               </Badge>
                                             )}
                                             {t.weight && (
-                                              <span className="text-[10px] text-gray-500">weight: {t.weight}</span>
+                                              <span className="text-[10px] text-ink-warm-500">weight: {t.weight}</span>
                                             )}
                                             {t.detected_at && (
-                                              <span className="text-[10px] text-gray-400">· {timeAgo(t.detected_at)}</span>
+                                              <span className="text-[10px] text-ink-warm-400">· {timeAgo(t.detected_at)}</span>
                                             )}
                                           </div>
-                                          <div className="font-medium text-gray-900 mt-1">{t.headline}</div>
+                                          <div className="font-medium text-ink-warm-900 mt-1">{t.headline}</div>
                                           {t.detail && (
-                                            <p className="text-gray-600 mt-0.5">{t.detail}</p>
+                                            <p className="text-ink-warm-700 mt-0.5">{t.detail}</p>
                                           )}
                                         </div>
                                         <div className="flex items-start gap-1 shrink-0">
@@ -2358,7 +2425,7 @@ export default function DiscoveryPanel() {
                                               href={t.source_url}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="text-gray-400 hover:text-gray-700 p-0.5"
+                                              className="text-ink-warm-400 hover:text-ink-warm-700 p-0.5"
                                               title="View source"
                                             >
                                               <ExternalLink className="h-3.5 w-3.5" />
@@ -2368,7 +2435,7 @@ export default function DiscoveryPanel() {
                                             type="button"
                                             onClick={() => deleteSignal(t.id, t.headline)}
                                             disabled={isDeleting}
-                                            className="text-gray-400 hover:text-rose-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="text-ink-warm-400 hover:text-rose-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Delete this signal (soft delete — DB row stays)"
                                             aria-label="Delete signal"
                                           >
@@ -2392,12 +2459,47 @@ export default function DiscoveryPanel() {
               })}
             </TableBody>
           </Table>
+          {/* Pagination footer — only shown when there's more than one
+              page. Mirrors the sales-pipeline ActionsTab pattern: count
+              on the left, Prev / page indicator / Next on the right. */}
+          {totalProspectPages > 1 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-cream-200 bg-cream-50/40">
+              <div className="text-xs text-ink-warm-500 tabular-nums">
+                Showing {prospectsPageStart + 1}–{prospectsPageEnd} of {filteredProspects.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  disabled={prospectsPage <= 1}
+                  onClick={() => setProspectsPage(p => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                  Prev
+                </Button>
+                <span className="text-xs text-ink-warm-600 tabular-nums px-1">
+                  Page {prospectsPage} of {totalProspectPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  disabled={prospectsPage >= totalProspectPages}
+                  onClick={() => setProspectsPage(p => Math.min(totalProspectPages, p + 1))}
+                >
+                  Next
+                  <ChevronRightIcon className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
-      {/* Scan config dialog */}
+      {/* Scan config dialog — v11 scroll/footer pattern. */}
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Run Discovery Scan</DialogTitle>
             <DialogDescription>
@@ -2407,7 +2509,7 @@ export default function DiscoveryPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="recency">Recency (days)</Label>
@@ -2439,7 +2541,7 @@ export default function DiscoveryPanel() {
                 onChange={e => setScanParams(p => ({ ...p, max_projects: e.target.value }))}
                 className="focus-brand mt-1"
               />
-              <p className="text-xs text-gray-500 mt-1">Higher = more coverage, more cost. 20 is a good default.</p>
+              <p className="text-xs text-ink-warm-500 mt-1">Higher = more coverage, more cost. 20 is a good default.</p>
             </div>
             <div>
               <Label htmlFor="cats">Categories (optional)</Label>
@@ -2450,13 +2552,13 @@ export default function DiscoveryPanel() {
                 className="focus-brand mt-1"
                 placeholder="DeFi, Gaming, AI"
               />
-              <p className="text-xs text-gray-500 mt-1">Comma-separated. Leave blank to scan all.</p>
+              <p className="text-xs text-ink-warm-500 mt-1">Comma-separated. Leave blank to scan all.</p>
             </div>
 
             <div>
               <Label className="mb-1.5 block">
                 Sources
-                <span className="font-normal text-[10px] text-gray-500 ml-1">
+                <span className="font-normal text-[10px] text-ink-warm-500 ml-1">
                   — click to toggle; at least one must stay selected
                 </span>
               </Label>
@@ -2471,20 +2573,20 @@ export default function DiscoveryPanel() {
                       className={`text-left rounded-lg border p-2.5 transition-colors ${
                         selected
                           ? 'border-brand bg-brand-light ring-1 ring-brand'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-cream-200 hover:border-cream-300'
                       }`}
                     >
-                      <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                      <div className="text-xs font-semibold text-ink-warm-900 flex items-center gap-1">
                         {card.title}
                         {selected && <CheckCircle className="h-3 w-3 text-brand" />}
                       </div>
-                      <div className="text-[10px] text-gray-600 mt-0.5">{card.oneLiner}</div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">{card.footnote}</div>
+                      <div className="text-[10px] text-ink-warm-700 mt-0.5">{card.oneLiner}</div>
+                      <div className="text-[10px] text-ink-warm-500 mt-0.5">{card.footnote}</div>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">
+              <p className="text-xs text-ink-warm-500 mt-1.5">
                 Each source is a public HTML page Claude reads via web_search. Sources fire
                 in PARALLEL — each gets its own 12-search budget so they don&apos;t compete
                 for context. Adding sources adds linear cost (~$0.05-0.20 per source) but
@@ -2503,12 +2605,12 @@ export default function DiscoveryPanel() {
                   className={`text-left rounded-lg border p-2.5 transition-colors ${
                     scanParams.model === 'opus'
                       ? 'border-brand bg-brand-light ring-1 ring-brand'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-cream-200 hover:border-cream-300'
                   }`}
                 >
-                  <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Thorough · Better judgment</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">~$2-$6 per scan</div>
+                  <div className="text-xs font-semibold text-ink-warm-900">Opus 4.7</div>
+                  <div className="text-[10px] text-ink-warm-700 mt-0.5">Thorough · Better judgment</div>
+                  <div className="text-[10px] text-ink-warm-500 mt-0.5">~$2-$6 per scan</div>
                 </button>
                 <button
                   type="button"
@@ -2516,15 +2618,15 @@ export default function DiscoveryPanel() {
                   className={`text-left rounded-lg border p-2.5 transition-colors ${
                     scanParams.model === 'sonnet'
                       ? 'border-brand bg-brand-light ring-1 ring-brand'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-cream-200 hover:border-cream-300'
                   }`}
                 >
-                  <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Fast · Cheaper</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">~$0.40-$1.50 per scan</div>
+                  <div className="text-xs font-semibold text-ink-warm-900">Sonnet 4.5</div>
+                  <div className="text-[10px] text-ink-warm-700 mt-0.5">Fast · Cheaper</div>
+                  <div className="text-[10px] text-ink-warm-500 mt-0.5">~$0.40-$1.50 per scan</div>
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">
+              <p className="text-xs text-ink-warm-500 mt-1.5">
                 Opus is better at POC accuracy and edge-case ICP judgment. Sonnet is fine for bulk/experimental scans. Scans now run in parallel batches with prompt caching, so costs are 2-3x lower than before.
               </p>
             </div>
@@ -2546,21 +2648,20 @@ export default function DiscoveryPanel() {
                     ) : (
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     )}
-                    <span className="font-semibold text-gray-800">
+                    <span className="font-semibold text-ink-warm-700">
                       {scanProgress.message || 'Scanning...'}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-gray-600 tabular-nums">
+                  <span className="text-[10px] font-mono text-ink-warm-700 tabular-nums">
                     {typeof scanProgress.percent === 'number' ? `${scanProgress.percent}%` : ''}
                   </span>
                 </div>
                 {/* Progress bar */}
                 <div className="h-1.5 w-full rounded-full bg-white/60 overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-[width] duration-500 ease-out"
+                    className="h-full rounded-full bg-brand transition-[width] duration-500 ease-out"
                     style={{
                       width: `${Math.max(2, Math.min(100, scanProgress.percent ?? 0))}%`,
-                      backgroundColor: 'var(--brand)',
                     }}
                   />
                 </div>
@@ -2568,15 +2669,15 @@ export default function DiscoveryPanel() {
                 {/* Top-line stats — always visible. Shows running totals
                     so the user has a number to track without expanding. */}
                 {(scanProgress.candidates_found != null || scanProgress.batches_total != null) && (
-                  <div className="text-[10px] text-gray-600 flex items-center gap-3 flex-wrap">
+                  <div className="text-[10px] text-ink-warm-700 flex items-center gap-3 flex-wrap">
                     {scanProgress.candidates_found != null && (
-                      <span><span className="text-gray-400">Candidates:</span> <span className="font-semibold text-gray-800">{scanProgress.candidates_found}</span></span>
+                      <span><span className="text-ink-warm-400">Candidates:</span> <span className="font-semibold text-ink-warm-700">{scanProgress.candidates_found}</span></span>
                     )}
                     {scanProgress.batches_total != null && (
-                      <span><span className="text-gray-400">Batches:</span> <span className="font-semibold text-gray-800">{scanProgress.batches_complete ?? 0} / {scanProgress.batches_total}</span></span>
+                      <span><span className="text-ink-warm-400">Batches:</span> <span className="font-semibold text-ink-warm-700">{scanProgress.batches_complete ?? 0} / {scanProgress.batches_total}</span></span>
                     )}
                     {scanProgress.detail?.enriched && scanProgress.detail.enriched.length > 0 && (
-                      <span><span className="text-gray-400">Enriched:</span> <span className="font-semibold text-gray-800">{scanProgress.detail.enriched.length}</span></span>
+                      <span><span className="text-ink-warm-400">Enriched:</span> <span className="font-semibold text-ink-warm-700">{scanProgress.detail.enriched.length}</span></span>
                     )}
                   </div>
                 )}
@@ -2591,12 +2692,12 @@ export default function DiscoveryPanel() {
                         key={src}
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
                           n === 0
-                            ? 'bg-gray-100 text-gray-500'
-                            : 'bg-white/70 text-gray-700 border border-gray-200'
+                            ? 'bg-cream-100 text-ink-warm-500'
+                            : 'bg-white/70 text-ink-warm-700 border border-cream-200'
                         }`}
                         title={n === 0 ? `${src} returned no candidates this scan` : undefined}
                       >
-                        {src} <span className={`font-mono font-semibold ${n === 0 ? 'text-gray-400' : 'text-brand'}`}>{n}</span>
+                        {src} <span className={`font-mono font-semibold ${n === 0 ? 'text-ink-warm-400' : 'text-brand'}`}>{n}</span>
                       </span>
                     ))}
                   </div>
@@ -2621,8 +2722,8 @@ export default function DiscoveryPanel() {
                         {/* Filtered out — what got dropped pre-Stage-2 and why */}
                         {scanProgress.detail.filtered && (
                           <div>
-                            <div className="text-[10px] font-semibold text-gray-700 mb-0.5">Filtered out</div>
-                            <div className="text-[10px] text-gray-600 flex items-center gap-3 flex-wrap">
+                            <div className="text-[10px] font-semibold text-ink-warm-700 mb-0.5">Filtered out</div>
+                            <div className="text-[10px] text-ink-warm-700 flex items-center gap-3 flex-wrap">
                               {scanProgress.detail.filtered.recent_skipped != null && (
                                 <span>Recently scanned: <span className="font-semibold">{scanProgress.detail.filtered.recent_skipped}</span></span>
                               )}
@@ -2634,7 +2735,7 @@ export default function DiscoveryPanel() {
                               )}
                             </div>
                             {scanProgress.detail.filtered.crm_filtered_names && scanProgress.detail.filtered.crm_filtered_names.items.length > 0 && (
-                              <div className="mt-1 text-[10px] text-gray-500 italic">
+                              <div className="mt-1 text-[10px] text-ink-warm-500 italic">
                                 {scanProgress.detail.filtered.crm_filtered_names.items.join(', ')}
                                 {scanProgress.detail.filtered.crm_filtered_names.truncated > 0 && ` +${scanProgress.detail.filtered.crm_filtered_names.truncated} more`}
                               </div>
@@ -2647,12 +2748,12 @@ export default function DiscoveryPanel() {
                             per row + score + POC count. */}
                         {scanProgress.detail.enriched && scanProgress.detail.enriched.length > 0 && (
                           <div>
-                            <div className="text-[10px] font-semibold text-gray-700 mb-0.5">Enriched ({scanProgress.detail.enriched.length})</div>
+                            <div className="text-[10px] font-semibold text-ink-warm-700 mb-0.5">Enriched ({scanProgress.detail.enriched.length})</div>
                             <div className="space-y-0.5 max-h-40 overflow-y-auto">
                               {scanProgress.detail.enriched.slice().reverse().map((e, idx) => (
                                 <div key={`${e.name}-${idx}`} className="flex items-center justify-between gap-2 py-0.5">
                                   <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-[10px] text-gray-800 truncate">{e.name}</span>
+                                    <span className="text-[10px] text-ink-warm-700 truncate">{e.name}</span>
                                     {e.tier && (
                                       <span
                                         className={`text-[9px] px-1 rounded font-semibold whitespace-nowrap ${
@@ -2660,16 +2761,16 @@ export default function DiscoveryPanel() {
                                           e.tier === 'PRE_TOKEN_PRIORITY' ? 'bg-blue-100 text-blue-700' :
                                           e.tier === 'RESEARCH' ? 'bg-amber-100 text-amber-700' :
                                           e.tier === 'WATCH' ? 'bg-purple-100 text-purple-700' :
-                                          e.tier === 'NURTURE' ? 'bg-gray-100 text-gray-600' :
+                                          e.tier === 'NURTURE' ? 'bg-cream-100 text-ink-warm-700' :
                                           e.tier === 'SKIP' ? 'bg-rose-50 text-rose-500' :
-                                          'bg-gray-100 text-gray-500'
+                                          'bg-cream-100 text-ink-warm-500'
                                         }`}
                                       >
                                         {e.tier.replace(/_/g, ' ')}
                                       </span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-2 text-[10px] text-gray-500 shrink-0">
+                                  <div className="flex items-center gap-2 text-[10px] text-ink-warm-500 shrink-0">
                                     {e.score != null && <span className="tabular-nums">{e.score}</span>}
                                     {e.poc_count > 0 && <span>{e.poc_count} POC</span>}
                                   </div>
@@ -2683,13 +2784,13 @@ export default function DiscoveryPanel() {
                             tier_breakdown is populated. Compact summary. */}
                         {scanProgress.detail.tier_breakdown && Object.keys(scanProgress.detail.tier_breakdown).length > 0 && (
                           <div>
-                            <div className="text-[10px] font-semibold text-gray-700 mb-0.5">By tier</div>
+                            <div className="text-[10px] font-semibold text-ink-warm-700 mb-0.5">By tier</div>
                             <div className="flex items-center gap-1 flex-wrap">
                               {Object.entries(scanProgress.detail.tier_breakdown).map(([tier, n]) => (
-                                <span key={tier} className="text-[10px] text-gray-600">
-                                  {tier.replace(/_/g, ' ')} <span className="font-semibold text-gray-800">{n}</span>
+                                <span key={tier} className="text-[10px] text-ink-warm-700">
+                                  {tier.replace(/_/g, ' ')} <span className="font-semibold text-ink-warm-700">{n}</span>
                                 </span>
-                              )).reduce((acc: any[], el, i) => i === 0 ? [el] : [...acc, <span key={`sep-${i}`} className="text-gray-300">·</span>, el], [])}
+                              )).reduce((acc: any[], el, i) => i === 0 ? [el] : [...acc, <span key={`sep-${i}`} className="text-ink-warm-300">·</span>, el], [])}
                             </div>
                           </div>
                         )}
@@ -2719,8 +2820,8 @@ export default function DiscoveryPanel() {
             )}
 
             {lastScanResult && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
-                <div className="font-semibold text-gray-700">Last scan</div>
+              <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-xs space-y-1">
+                <div className="font-semibold text-ink-warm-700">Last scan</div>
                 {lastScanResult.error ? (
                   <div className="text-rose-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
@@ -2736,15 +2837,14 @@ export default function DiscoveryPanel() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setScanOpen(false)} disabled={scanning}>
               Close
             </Button>
             <Button
+              variant="brand"
               onClick={runScan}
               disabled={scanning}
-              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-             
             >
               {scanning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {scanning ? 'Scanning...' : 'Start Scan'}
@@ -2767,12 +2867,12 @@ export default function DiscoveryPanel() {
         open={rowDeepDive.open}
         onOpenChange={o => { if (!o && !rowDeepDive.running) closeRowDeepDive(); }}
       >
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Deep Dive</DialogTitle>
             <DialogDescription>
               Grok reads each POC's X timeline for Korea / Asia relevance signals.
-              Target: <span className="font-semibold text-gray-900">{rowDeepDive.projectName}</span>
+              Target: <span className="font-semibold text-ink-warm-900">{rowDeepDive.projectName}</span>
               {' · '}
               {rowDeepDive.pocHandle ? (
                 <>
@@ -2785,7 +2885,7 @@ export default function DiscoveryPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
             {/* Lookback window */}
             <div>
               <Label htmlFor="row-lookback">Lookback window</Label>
@@ -2794,7 +2894,7 @@ export default function DiscoveryPanel() {
                 onValueChange={v => setRowDeepDive(prev => ({ ...prev, lookbackDays: Number(v) as 30 | 90 | 180 | 365 }))}
                 disabled={rowDeepDive.running}
               >
-                <SelectTrigger id="row-lookback" className="mt-1">
+                <SelectTrigger id="row-lookback" className="mt-1 focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2804,7 +2904,7 @@ export default function DiscoveryPanel() {
                   <SelectItem value="365">Last 12 months — historical</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-warm-500 mt-1">
                 How far back Grok looks when reading the POC's tweets.
               </p>
             </div>
@@ -2817,7 +2917,7 @@ export default function DiscoveryPanel() {
                 onValueChange={v => setRowDeepDive(prev => ({ ...prev, shelfLifeDays: Number(v) as 7 | 14 | 30 | 60 | 90 }))}
                 disabled={rowDeepDive.running}
               >
-                <SelectTrigger id="row-shelf" className="mt-1">
+                <SelectTrigger id="row-shelf" className="mt-1 focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2828,7 +2928,7 @@ export default function DiscoveryPanel() {
                   <SelectItem value="90">90 days — long-lived (use sparingly)</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-warm-500 mt-1">
                 How long resulting signals stay "fresh" on the prospect before expiring.
               </p>
             </div>
@@ -2863,26 +2963,23 @@ export default function DiscoveryPanel() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-3.5 w-3.5 text-brand animate-spin shrink-0" />
-                      <span className="font-semibold text-gray-800">
+                      <span className="font-semibold text-ink-warm-700">
                         {rowDeepDive.xPocCount > 1
                           ? `Reading X timeline ${pocIndex} of ${rowDeepDive.xPocCount}…`
                           : 'Reading X timeline with Grok…'}
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono text-gray-600 tabular-nums">
+                    <span className="text-[10px] font-mono text-ink-warm-700 tabular-nums">
                       {mmss(rowDeepDive.elapsedSec)} / ~{mmss(expectedSec)} · {pct}%
                     </span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-white/60 overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-[width] duration-500 ease-out"
-                      style={{
-                        width: `${Math.max(2, pct)}%`,
-                        backgroundColor: 'var(--brand)',
-                      }}
+                      className="h-full rounded-full bg-brand transition-[width] duration-500 ease-out"
+                      style={{ width: `${Math.max(2, pct)}%` }}
                     />
                   </div>
-                  <div className="text-[10px] text-gray-600">
+                  <div className="text-[10px] text-ink-warm-700">
                     Grok pulls recent tweets, filters by your {rowDeepDive.lookbackDays}-day window,
                     and extracts Korea / Asia signals.
                   </div>
@@ -2892,8 +2989,8 @@ export default function DiscoveryPanel() {
 
             {/* Result card — matches the "Last run" summary style from the other dialogs */}
             {rowDeepDive.result && !rowDeepDive.running && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
-                <div className="font-semibold text-gray-700">Result</div>
+              <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-xs space-y-1">
+                <div className="font-semibold text-ink-warm-700">Result</div>
                 {rowDeepDive.result.error ? (
                   <div className="text-rose-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
@@ -2908,22 +3005,22 @@ export default function DiscoveryPanel() {
                       Cost: ${rowDeepDive.result.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((rowDeepDive.result.duration_ms || 0) / 1000)}s
                     </div>
                     {Array.isArray(rowDeepDive.result.per_poc) && rowDeepDive.result.per_poc.length > 0 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-gray-200 space-y-1.5">
+                      <div className="mt-1.5 pt-1.5 border-t border-cream-200 space-y-1.5">
                         {rowDeepDive.result.per_poc.map((r: any) => (
                           <div key={r.handle} className="text-[11px]">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-medium">@{r.handle}</span>
-                              <span className="text-gray-500">·</span>
-                              <span className="text-gray-600">
+                              <span className="text-ink-warm-500">·</span>
+                              <span className="text-ink-warm-700">
                                 {r.findings_written} signal{r.findings_written !== 1 ? 's' : ''}
                               </span>
                               {typeof r.korea_interest_score === 'number' && (
                                 <>
-                                  <span className="text-gray-500">·</span>
+                                  <span className="text-ink-warm-500">·</span>
                                   <span className={`font-semibold ${
                                     r.korea_interest_score >= 70 ? 'text-emerald-700' :
                                     r.korea_interest_score >= 40 ? 'text-amber-700' :
-                                    'text-gray-500'
+                                    'text-ink-warm-500'
                                   }`}>
                                     score {r.korea_interest_score}
                                   </span>
@@ -2931,7 +3028,7 @@ export default function DiscoveryPanel() {
                               )}
                             </div>
                             {r.summary && (
-                              <p className="text-gray-600 mt-0.5">{r.summary}</p>
+                              <p className="text-ink-warm-700 mt-0.5">{r.summary}</p>
                             )}
                           </div>
                         ))}
@@ -2943,7 +3040,7 @@ export default function DiscoveryPanel() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={closeRowDeepDive}
@@ -2953,10 +3050,9 @@ export default function DiscoveryPanel() {
             </Button>
             {!rowDeepDive.result && (
               <Button
+                variant="brand"
                 onClick={startRowDeepDive}
                 disabled={rowDeepDive.running || rowDeepDive.xPocCount === 0}
-                style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-               
               >
                 {rowDeepDive.running && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {rowDeepDive.running ? 'Running…' : 'Run Deep Dive'}
@@ -2973,7 +3069,7 @@ export default function DiscoveryPanel() {
         open={dmDialog.open}
         onOpenChange={o => { if (!o) setDmDialog(prev => ({ ...prev, open: false })); }}
       >
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Draft Telegram DM</DialogTitle>
             <DialogDescription>
@@ -2981,11 +3077,11 @@ export default function DiscoveryPanel() {
               {dmDialog.prospect && dmDialog.poc && (
                 <>
                   {' '}To:{' '}
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-ink-warm-900">
                     {dmDialog.poc.name}
                   </span>
                   {' '}at{' '}
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-ink-warm-900">
                     {dmDialog.prospect.name}
                   </span>
                   {dmDialog.poc.telegram_handle && (
@@ -2998,12 +3094,12 @@ export default function DiscoveryPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
+          <div className="flex-1 overflow-y-auto px-1 space-y-3 py-2">
             {/* Variant picker — deterministic re-rolls of the template */}
             <div>
               <Label className="mb-1.5 block">
                 Hook style
-                <span className="font-normal text-[10px] text-gray-500 ml-1">
+                <span className="font-normal text-[10px] text-ink-warm-500 ml-1">
                   — re-roll without losing your manual edits
                 </span>
               </Label>
@@ -3020,11 +3116,11 @@ export default function DiscoveryPanel() {
                     className={`text-left rounded-lg border p-2.5 transition-colors ${
                       dmDialog.variant === v
                         ? 'border-brand bg-brand-light ring-1 ring-brand'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-cream-200 hover:border-cream-300'
                     }`}
                   >
-                    <div className="text-xs font-semibold text-gray-900">{label}</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">{help}</div>
+                    <div className="text-xs font-semibold text-ink-warm-900">{label}</div>
+                    <div className="text-[10px] text-ink-warm-700 mt-0.5">{help}</div>
                   </button>
                 ))}
               </div>
@@ -3041,7 +3137,7 @@ export default function DiscoveryPanel() {
                 spellCheck
               />
               <div className="flex items-center justify-between mt-1">
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-ink-warm-500">
                   {dmDialog.text.length} chars · Telegram has no length limit for DMs.
                 </p>
                 {dmDialog.copiedAt && Date.now() - dmDialog.copiedAt < 5000 && (
@@ -3066,7 +3162,7 @@ export default function DiscoveryPanel() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => setDmDialog(prev => ({ ...prev, open: false }))}
@@ -3084,11 +3180,7 @@ export default function DiscoveryPanel() {
                 Open in Telegram
               </a>
             )}
-            <Button
-              onClick={copyDmToClipboard}
-              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-             
-            >
+            <Button variant="brand" onClick={copyDmToClipboard}>
               <CopyIcon className="h-4 w-4 mr-2" />
               Copy
             </Button>

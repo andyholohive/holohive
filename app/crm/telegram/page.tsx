@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -293,8 +294,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error fetching chats:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load Telegram chats',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load Telegram chats',
         variant: 'destructive',
       });
     } finally {
@@ -350,7 +351,7 @@ export default function TelegramChatsPage() {
         );
       case 'Facebook':
         return (
-          <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="h-4 w-4 text-brand" viewBox="0 0 24 24" fill="currentColor">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
           </svg>
         );
@@ -421,7 +422,7 @@ export default function TelegramChatsPage() {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex items-center gap-0.5 ${isTelegram ? 'text-blue-500' : 'text-gray-800'} hover:underline font-medium`}
+          className={`inline-flex items-center gap-0.5 ${isTelegram ? 'text-blue-500' : 'text-ink-warm-700'} hover:underline font-medium`}
           onClick={(e) => e.stopPropagation()}
         >
           {isTelegram ? (
@@ -671,8 +672,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error unlinking chat:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to unlink chat',
+        title: 'Unlink failed',
+        description: error instanceof Error ? error.message : 'Failed to unlink chat',
         variant: 'destructive',
       });
     }
@@ -733,8 +734,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error linking chat:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update chat link',
+        title: 'Link failed',
+        description: error instanceof Error ? error.message : 'Failed to update chat link',
         variant: 'destructive',
       });
     } finally {
@@ -772,8 +773,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error unlinking chat from KOL:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to unlink chat',
+        title: 'Unlink failed',
+        description: error instanceof Error ? error.message : 'Failed to unlink chat',
         variant: 'destructive',
       });
     }
@@ -808,8 +809,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error linking chat to KOL:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update chat link',
+        title: 'Link failed',
+        description: error instanceof Error ? error.message : 'Failed to update chat link',
         variant: 'destructive',
       });
     } finally {
@@ -837,7 +838,7 @@ export default function TelegramChatsPage() {
       fetchChats();
     } catch (error: any) {
       console.error('Error unlinking chat from client:', error);
-      toast({ title: 'Error', description: error?.message || 'Failed to unlink chat', variant: 'destructive' });
+      toast({ title: 'Unlink failed', description: error?.message ?? 'Failed to unlink chat', variant: 'destructive' });
     }
   };
 
@@ -859,7 +860,7 @@ export default function TelegramChatsPage() {
       fetchChats();
     } catch (error: any) {
       console.error('Error linking chat to client:', error);
-      toast({ title: 'Error', description: error?.message || 'Failed to update chat link', variant: 'destructive' });
+      toast({ title: 'Link failed', description: error?.message ?? 'Failed to update chat link', variant: 'destructive' });
     } finally {
       setLinking(false);
     }
@@ -895,7 +896,7 @@ export default function TelegramChatsPage() {
 
       toast({
         title: 'Message sent',
-        description: `Message sent to ${chatToMessage.title || 'the chat'} successfully`,
+        description: `Sent to ${chatToMessage.title || 'the chat'}.`,
       });
 
       setMessageDialogOpen(false);
@@ -907,8 +908,8 @@ export default function TelegramChatsPage() {
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to send message',
+        title: 'Send failed',
+        description: error?.message ?? 'Failed to send message',
         variant: 'destructive',
       });
     } finally {
@@ -930,8 +931,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error fetching commands:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load commands',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load commands',
         variant: 'destructive',
       });
     } finally {
@@ -959,8 +960,7 @@ export default function TelegramChatsPage() {
   const handleSaveCommand = async () => {
     if (!commandForm.command.trim() || !commandForm.response.trim()) {
       toast({
-        title: 'Error',
-        description: 'Command and response are required',
+        title: 'Command and response required',
         variant: 'destructive',
       });
       return;
@@ -1017,10 +1017,10 @@ export default function TelegramChatsPage() {
     } catch (error: any) {
       console.error('Error saving command:', error);
       toast({
-        title: 'Error',
-        description: error.message?.includes('duplicate')
+        title: 'Save failed',
+        description: error?.message?.includes('duplicate')
           ? 'A command with this name already exists'
-          : 'Failed to save command',
+          : error?.message ?? 'Failed to save command',
         variant: 'destructive',
       });
     } finally {
@@ -1047,8 +1047,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error deleting command:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to delete command',
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete command',
         variant: 'destructive',
       });
     }
@@ -1074,8 +1074,8 @@ export default function TelegramChatsPage() {
     } catch (error) {
       console.error('Error toggling command:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update command',
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Failed to update command',
         variant: 'destructive',
       });
     }
@@ -1098,7 +1098,7 @@ export default function TelegramChatsPage() {
   };
 
   const getActivityStatus = (lastMessageAt: string | null) => {
-    if (!lastMessageAt) return { color: 'bg-gray-400', label: 'No activity' };
+    if (!lastMessageAt) return { color: 'bg-ink-warm-400', label: 'No activity' };
     const date = new Date(lastMessageAt);
     const now = new Date();
     const diffHours = (now.getTime() - date.getTime()) / 3600000;
@@ -1240,17 +1240,83 @@ export default function TelegramChatsPage() {
   });
 
   if (loading) {
+    // Structural skeleton mirroring the loaded layout: PageHeader (same
+    // kicker so the title strip doesn't shift) → tab strip → per-tab
+    // filter row (copy left + search + Refresh right) → chat-card grid.
+    // Each chat is a separate Card with a title row (activity dot +
+    // name + type badge) + metadata row (chat id + last message +
+    // count) + action button cluster on the right — mirrors the
+    // actual unassigned/leads/etc. tab content shape.
     return (
       <div className="flex flex-col h-full gap-6">
         <PageHeader
           icon={MessageSquare}
           title="Telegram"
           subtitle="Manage Telegram chats and bot commands"
+          kicker="CRM · TG Chats"
+          kickerDot="brand"
         />
-        <Skeleton className="h-10 w-80" />
+
+        {/* Tab strip skeleton — 9 chip-shaped placeholders inside the
+            v11 cream-100 outer container so the bar lines up exactly
+            with the rendered TabsList. `flex-wrap` matches the loaded
+            TabsList so 9 wide chips can break across rows on
+            narrower viewports without overflowing. */}
+        <div className="flex flex-wrap gap-1 p-1 rounded-md bg-cream-100 border border-cream-200 w-fit max-w-full">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-24 rounded" />
+          ))}
+        </div>
+
+        {/* Per-tab filter row — copy text on the left, search +
+            Refresh button on the right. Refresh has icon + text
+            label in the loaded state (~110px), so the skeleton is
+            sized to that, not the 36px icon-only width. */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Skeleton className="h-4 w-72" />
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-9 w-64 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+          </div>
+        </div>
+
+        {/* Chat-card grid — each chat renders as a separate Card in
+            the loaded state, NOT as table rows. Previously skeleton
+            used a single Card with internal rows, which gave the
+            wrong "density when data arrived" impression. */}
         <div className="grid gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-lg" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  {/* Left: chat info column */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    {/* Title row — activity dot (3x3 round) + chat
+                        title + chat-type badge */}
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-3 h-3 rounded-full flex-shrink-0" />
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-5 w-16 rounded" />
+                    </div>
+                    {/* Metadata row — hash id, last message, count */}
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                  {/* Right: action button cluster (Link to opp / KOL
+                      / Client + ⋯). Sized to the widest 3-action
+                      configuration; tabs with fewer buttons just
+                      under-fill, no shift. */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Skeleton className="h-9 w-32 rounded-md" />
+                    <Skeleton className="h-9 w-28 rounded-md" />
+                    <Skeleton className="h-9 w-9 rounded-md" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
@@ -1263,87 +1329,95 @@ export default function TelegramChatsPage() {
         icon={MessageSquare}
         title="Telegram"
         subtitle="Manage Telegram chats and bot commands"
+        kicker="CRM · TG Chats"
+        kickerDot="brand"
       />
 
-      {/* Tabs */}
+      {/* Tabs — v11 chrome: cream-100 outer container, white active
+          tile with shadow-card + brand text. 2026-06-03. */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-        <TabsList>
-          <TabsTrigger value="unassigned" className="flex items-center gap-2">
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
+          {/* v11 chip styling — brand-light tinted count + rose-100
+              tinted urgent-reply count. The previous solid rose-500
+              urgent badge was hard to read against the cream-100
+              tab strip; the softer tone keeps the urgency signal
+              without the visual shouting. */}
+          <TabsTrigger value="unassigned" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <Unlink className="h-4 w-4" />
             Unassigned
             {unassignedChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{unassignedChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{unassignedChats.length}</span>
             )}
             {unassignedNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${unassignedNeedsReply} chat${unassignedNeedsReply === 1 ? '' : 's'} awaiting reply`}>{unassignedNeedsReply}</Badge>
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${unassignedNeedsReply} chat${unassignedNeedsReply === 1 ? '' : 's'} awaiting reply`}>{unassignedNeedsReply}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="leads" className="flex items-center gap-2">
+          <TabsTrigger value="leads" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <LinkIcon className="h-4 w-4" />
             Leads
             {leadsChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{leadsChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{leadsChats.length}</span>
             )}
             {leadsNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${leadsNeedsReply} chat${leadsNeedsReply === 1 ? '' : 's'} awaiting reply`}>{leadsNeedsReply}</Badge>
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${leadsNeedsReply} chat${leadsNeedsReply === 1 ? '' : 's'} awaiting reply`}>{leadsNeedsReply}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="internal" className="flex items-center gap-2">
+          <TabsTrigger value="internal" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <Briefcase className="h-4 w-4" />
             Internal
             {internalChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{internalChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{internalChats.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="clients" className="flex items-center gap-2">
+          <TabsTrigger value="clients" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <CheckCircle className="h-4 w-4" />
             Clients
             {clientChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{clientChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{clientChats.length}</span>
             )}
             {clientNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${clientNeedsReply} chat${clientNeedsReply === 1 ? '' : 's'} awaiting reply`}>{clientNeedsReply}</Badge>
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${clientNeedsReply} chat${clientNeedsReply === 1 ? '' : 's'} awaiting reply`}>{clientNeedsReply}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="chats" className="flex items-center gap-2">
+          <TabsTrigger value="chats" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <Users className="h-4 w-4" />
             Groups
             {groupChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{groupChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{groupChats.length}</span>
             )}
             {groupNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${groupNeedsReply} chat${groupNeedsReply === 1 ? '' : 's'} awaiting reply`}>{groupNeedsReply}</Badge>
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${groupNeedsReply} chat${groupNeedsReply === 1 ? '' : 's'} awaiting reply`}>{groupNeedsReply}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="dms" className="flex items-center gap-2">
+          <TabsTrigger value="dms" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <User className="h-4 w-4" />
             DMs
             {dmChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{dmChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{dmChats.length}</span>
             )}
             {dmNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${dmNeedsReply} chat${dmNeedsReply === 1 ? '' : 's'} awaiting reply`}>{dmNeedsReply}</Badge>
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${dmNeedsReply} chat${dmNeedsReply === 1 ? '' : 's'} awaiting reply`}>{dmNeedsReply}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="kols" className="flex items-center gap-2">
+          <TabsTrigger value="kols" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <Megaphone className="h-4 w-4" />
             KOLs
             {kolChats.length > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{kolChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{kolChats.length}</span>
             )}
             {kolNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</Badge>
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="commands" className="flex items-center gap-2">
+          <TabsTrigger value="commands" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <Terminal className="h-4 w-4" />
             Commands
           </TabsTrigger>
           {hiddenChats.length > 0 && (
-            <TabsTrigger value="hidden" className="flex items-center gap-2">
+            <TabsTrigger value="hidden" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
               <EyeOff className="h-4 w-4" />
               Hidden
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{hiddenChats.length}</Badge>
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{hiddenChats.length}</span>
             </TabsTrigger>
           )}
         </TabsList>
@@ -1352,12 +1426,12 @@ export default function TelegramChatsPage() {
         <TabsContent value="unassigned" className="mt-4 space-y-4">
           {/* Unassigned Header */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Chats not linked to any opportunity or KOL ({unassignedChats.length} total)
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search chats..."
                   value={searchQuery}
@@ -1380,11 +1454,11 @@ export default function TelegramChatsPage() {
           {filteredUnassignedChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Unlink className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Unlink className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   {unassignedChats.length === 0 ? 'No unassigned chats' : 'No matching chats'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto">
+                <p className="text-ink-warm-500 max-w-md mx-auto">
                   {unassignedChats.length === 0
                     ? 'All chats have been assigned to opportunities or KOLs.'
                     : 'Try a different search term.'}
@@ -1396,14 +1470,14 @@ export default function TelegramChatsPage() {
               {filteredUnassignedChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                  <Card key={chat.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         {/* Left: Chat Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
-                            <h3 className="font-semibold text-gray-900 truncate">
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
                               {chat.title || 'Unnamed Chat'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
@@ -1411,10 +1485,10 @@ export default function TelegramChatsPage() {
                             </Badge>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
                                 {chat.chat_id}
                               </code>
                               <Button
@@ -1440,13 +1514,13 @@ export default function TelegramChatsPage() {
 
                           {/* Recent Messages */}
                           {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
                                 {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
                                   const socialLinks = detectSocialLinks(msg.text);
                                   return (
-                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
                                       <div className="flex items-start gap-1">
                                         {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
                                           <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
@@ -1461,10 +1535,10 @@ export default function TelegramChatsPage() {
                                           </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                          <span className="font-medium text-gray-700">
+                                          <span className="font-medium text-ink-warm-700">
                                             {msg.from_user_name || msg.from_username || 'Unknown'}:
                                           </span>{' '}
-                                          <span className="text-gray-600">
+                                          <span className="text-ink-warm-700">
                                             {renderMessageWithLinks(msg.text, 80)}
                                           </span>
                                         </div>
@@ -1518,12 +1592,12 @@ export default function TelegramChatsPage() {
         <TabsContent value="leads" className="mt-4 space-y-4">
           {/* Leads Header */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Chats linked to opportunities ({leadsChats.length} total)
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search leads..."
                   value={searchQuery}
@@ -1546,11 +1620,11 @@ export default function TelegramChatsPage() {
           {filteredLeadsChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <LinkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <LinkIcon className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   {leadsChats.length === 0 ? 'No leads linked yet' : 'No matching leads'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto">
+                <p className="text-ink-warm-500 max-w-md mx-auto">
                   {leadsChats.length === 0
                     ? 'Link chats to opportunities from the Unassigned tab to track them here.'
                     : 'Try a different search term.'}
@@ -1562,14 +1636,14 @@ export default function TelegramChatsPage() {
               {filteredLeadsChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                  <Card key={chat.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         {/* Left: Chat Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
-                            <h3 className="font-semibold text-gray-900 truncate">
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
                               {chat.title || 'Unnamed Chat'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
@@ -1577,10 +1651,10 @@ export default function TelegramChatsPage() {
                             </Badge>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
                                 {chat.chat_id}
                               </code>
                               <Button
@@ -1608,7 +1682,7 @@ export default function TelegramChatsPage() {
                           {chat.opportunity && (
                             <div className="mt-3 flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-emerald-500" />
-                              <span className="text-sm text-gray-700">
+                              <span className="text-sm text-ink-warm-700">
                                 Linked to: <strong>{chat.opportunity.name}</strong>
                               </span>
                               <Badge variant="outline" className="text-xs">
@@ -1619,13 +1693,13 @@ export default function TelegramChatsPage() {
 
                           {/* Recent Messages */}
                           {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
                                 {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
                                   const socialLinks = detectSocialLinks(msg.text);
                                   return (
-                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
                                       <div className="flex items-start gap-1">
                                         {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
                                           <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
@@ -1640,10 +1714,10 @@ export default function TelegramChatsPage() {
                                           </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                          <span className="font-medium text-gray-700">
+                                          <span className="font-medium text-ink-warm-700">
                                             {msg.from_user_name || msg.from_username || 'Unknown'}:
                                           </span>{' '}
-                                          <span className="text-gray-600">
+                                          <span className="text-ink-warm-700">
                                             {renderMessageWithLinks(msg.text, 80)}
                                           </span>
                                         </div>
@@ -1658,7 +1732,7 @@ export default function TelegramChatsPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="bg-brand text-white">
+                          <Button variant="brand" size="sm" onClick={() => openMessageDialog(chat)}>
                             <MessageSquare className="h-4 w-4 mr-1.5" />
                             Send Message
                           </Button>
@@ -1694,7 +1768,7 @@ export default function TelegramChatsPage() {
         <TabsContent value="chats" className="mt-4 space-y-4">
           {/* Chats Header */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               {showDemo ? (
                 <span className="text-amber-600">Showing demo data • </span>
               ) : null}
@@ -1702,7 +1776,7 @@ export default function TelegramChatsPage() {
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search chats..."
                   value={searchQuery}
@@ -1734,11 +1808,11 @@ export default function TelegramChatsPage() {
       {filteredGroupChats.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <Users className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
               {groupChats.length === 0 ? 'No group chats discovered yet' : 'No matching chats'}
             </h3>
-            <p className="text-gray-500 max-w-md mx-auto">
+            <p className="text-ink-warm-500 max-w-md mx-auto">
               {groupChats.length === 0
                 ? 'Group chats will appear here when messages are sent in groups where your bot is a member. Make sure the webhook is connected in Settings.'
                 : 'Try a different search term.'}
@@ -1750,14 +1824,14 @@ export default function TelegramChatsPage() {
           {filteredGroupChats.map(chat => {
             const activity = getActivityStatus(chat.last_message_at);
             return (
-              <Card key={chat.id} className="hover:shadow-md transition-shadow">
+              <Card key={chat.id}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     {/* Left: Chat Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
                         <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
-                        <h3 className="font-semibold text-gray-900 truncate">
+                        <h3 className="font-semibold text-ink-warm-900 truncate">
                           {chat.title || 'Unnamed Chat'}
                         </h3>
                         <Badge variant="secondary" className="text-xs">
@@ -1765,10 +1839,10 @@ export default function TelegramChatsPage() {
                         </Badge>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                         <div className="flex items-center gap-1.5">
                           <Hash className="h-3.5 w-3.5" />
-                          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                          <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
                             {chat.chat_id}
                           </code>
                           <Button
@@ -1796,7 +1870,7 @@ export default function TelegramChatsPage() {
                       {chat.opportunity && (
                         <div className="mt-3 flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-emerald-500" />
-                          <span className="text-sm text-gray-700">
+                          <span className="text-sm text-ink-warm-700">
                             Linked to: <strong>{chat.opportunity.name}</strong>
                           </span>
                           <Badge variant="outline" className="text-xs">
@@ -1807,15 +1881,15 @@ export default function TelegramChatsPage() {
 
                       {/* Recent Messages */}
                       {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                        <div className="mt-3 pt-3 border-t border-cream-100">
+                          <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
                           <div className="space-y-1.5">
                             {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
-                              <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
-                                <span className="font-medium text-gray-700">
+                              <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
+                                <span className="font-medium text-ink-warm-700">
                                   {msg.from_user_name || msg.from_username || 'Unknown'}:
                                 </span>{' '}
-                                <span className="text-gray-600">
+                                <span className="text-ink-warm-700">
                                   {msg.text && msg.text.length > 80
                                     ? msg.text.substring(0, 80) + '...'
                                     : msg.text || '[No text]'}
@@ -1889,7 +1963,7 @@ export default function TelegramChatsPage() {
         <TabsContent value="dms" className="mt-4 space-y-4">
           {/* DMs Header */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               {showDemo ? (
                 <span className="text-amber-600">Showing demo data • </span>
               ) : null}
@@ -1897,7 +1971,7 @@ export default function TelegramChatsPage() {
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search DMs..."
                   value={searchQuery}
@@ -1920,11 +1994,11 @@ export default function TelegramChatsPage() {
           {filteredDMChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <User className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <User className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   {dmChats.length === 0 ? 'No direct messages yet' : 'No matching DMs'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto">
+                <p className="text-ink-warm-500 max-w-md mx-auto">
                   {dmChats.length === 0
                     ? 'Direct messages will appear here when users message your bot privately.'
                     : 'Try a different search term.'}
@@ -1936,7 +2010,7 @@ export default function TelegramChatsPage() {
               {filteredDMChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                  <Card key={chat.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         {/* Left: DM Info */}
@@ -1944,9 +2018,9 @@ export default function TelegramChatsPage() {
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
                             <div className="p-1.5 bg-blue-50 rounded-full">
-                              <User className="h-4 w-4 text-blue-600" />
+                              <User className="h-4 w-4 text-brand" />
                             </div>
-                            <h3 className="font-semibold text-gray-900 truncate">
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
                               {chat.title || 'Unknown User'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
@@ -1954,10 +2028,10 @@ export default function TelegramChatsPage() {
                             </Badge>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
                                 {chat.chat_id}
                               </code>
                               <Button
@@ -1985,7 +2059,7 @@ export default function TelegramChatsPage() {
                           {chat.master_kol && (
                             <div className="mt-3 flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-emerald-500" />
-                              <span className="text-sm text-gray-700">
+                              <span className="text-sm text-ink-warm-700">
                                 Linked to KOL: <strong>{chat.master_kol.name}</strong>
                               </span>
                             </div>
@@ -1993,13 +2067,13 @@ export default function TelegramChatsPage() {
 
                           {/* Recent Messages */}
                           {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
                                 {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
                                   const socialLinks = detectSocialLinks(msg.text);
                                   return (
-                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
                                       <div className="flex items-start gap-1">
                                         {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
                                           <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
@@ -2014,10 +2088,10 @@ export default function TelegramChatsPage() {
                                           </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                          <span className="font-medium text-gray-700">
+                                          <span className="font-medium text-ink-warm-700">
                                             {msg.from_user_name || msg.from_username || 'Unknown'}:
                                           </span>{' '}
-                                          <span className="text-gray-600">
+                                          <span className="text-ink-warm-700">
                                             {renderMessageWithLinks(msg.text, 80)}
                                           </span>
                                         </div>
@@ -2075,12 +2149,12 @@ export default function TelegramChatsPage() {
         <TabsContent value="kols" className="mt-4 space-y-4">
           {/* KOLs Header */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Chats linked to KOLs ({kolChats.length} total)
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search KOL chats..."
                   value={searchQuery}
@@ -2103,11 +2177,11 @@ export default function TelegramChatsPage() {
           {filteredKolChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Megaphone className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Megaphone className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   {kolChats.length === 0 ? 'No KOL chats linked yet' : 'No matching KOL chats'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto">
+                <p className="text-ink-warm-500 max-w-md mx-auto">
                   {kolChats.length === 0
                     ? 'Link chats to KOLs from the Groups or DMs tab to track conversations with them.'
                     : 'Try a different search term.'}
@@ -2119,14 +2193,14 @@ export default function TelegramChatsPage() {
               {filteredKolChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                  <Card key={chat.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         {/* Left: Chat Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
-                            <h3 className="font-semibold text-gray-900 truncate">
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
                               {chat.title || 'Unnamed Chat'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
@@ -2134,10 +2208,10 @@ export default function TelegramChatsPage() {
                             </Badge>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
                                 {chat.chat_id}
                               </code>
                               <Button
@@ -2165,7 +2239,7 @@ export default function TelegramChatsPage() {
                           {chat.master_kol && (
                             <div className="mt-3 flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-emerald-500" />
-                              <span className="text-sm text-gray-700">
+                              <span className="text-sm text-ink-warm-700">
                                 Linked to KOL: <strong>{chat.master_kol.name}</strong>
                               </span>
                               {chat.master_kol.platform && chat.master_kol.platform.length > 0 && (
@@ -2180,13 +2254,13 @@ export default function TelegramChatsPage() {
 
                           {/* Recent Messages */}
                           {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
                                 {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
                                   const socialLinks = detectSocialLinks(msg.text);
                                   return (
-                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
                                       <div className="flex items-start gap-1">
                                         {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
                                           <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
@@ -2201,10 +2275,10 @@ export default function TelegramChatsPage() {
                                           </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                          <span className="font-medium text-gray-700">
+                                          <span className="font-medium text-ink-warm-700">
                                             {msg.from_user_name || msg.from_username || 'Unknown'}:
                                           </span>{' '}
-                                          <span className="text-gray-600">
+                                          <span className="text-ink-warm-700">
                                             {renderMessageWithLinks(msg.text, 80)}
                                           </span>
                                         </div>
@@ -2219,7 +2293,7 @@ export default function TelegramChatsPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="bg-brand text-white">
+                          <Button variant="brand" size="sm" onClick={() => openMessageDialog(chat)}>
                             <MessageSquare className="h-4 w-4 mr-1.5" />
                             Send Message
                           </Button>
@@ -2254,7 +2328,7 @@ export default function TelegramChatsPage() {
         <TabsContent value="commands" className="mt-4 space-y-4">
           {/* Commands Header */}
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Bot commands that respond to users ({commands.length} total)
             </p>
             <Button variant="brand" onClick={() => openCommandDialog()}>
@@ -2273,11 +2347,11 @@ export default function TelegramChatsPage() {
           ) : commands.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Terminal className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Terminal className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   No commands yet
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto mb-4">
+                <p className="text-ink-warm-500 max-w-md mx-auto mb-4">
                   Add bot commands that will respond when users type them in Telegram chats.
                 </p>
                 <Button variant="brand" onClick={() => openCommandDialog()}>
@@ -2289,20 +2363,20 @@ export default function TelegramChatsPage() {
           ) : (
             <div className="grid gap-4">
               {commands.map(command => (
-                <Card key={command.id} className={`hover:shadow-md transition-shadow ${!command.is_active ? 'opacity-60' : ''}`}>
+                <Card key={command.id} className={!command.is_active ? 'opacity-60' : ''}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       {/* Left: Command Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
-                          <code className="text-lg font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
+                          <code className="text-lg font-semibold text-ink-warm-900 bg-cream-100 px-2 py-0.5 rounded">
                             /{command.command}
                           </code>
                           {command.team_only && (
-                            <Badge variant="outline" className="text-xs border-blue-300 text-blue-600">
+                            <StatusBadge tone="brand" size="sm">
                               <Users className="h-3 w-3 mr-1" />
                               Team Only
-                            </Badge>
+                            </StatusBadge>
                           )}
                           {!command.is_active && (
                             <Badge variant="secondary" className="text-xs">
@@ -2312,14 +2386,14 @@ export default function TelegramChatsPage() {
                         </div>
 
                         {command.description && (
-                          <p className="text-sm text-gray-600 mb-2">
+                          <p className="text-sm text-ink-warm-700 mb-2">
                             {command.description}
                           </p>
                         )}
 
-                        <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                          <p className="text-xs font-medium text-gray-500 mb-1">Response:</p>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                        <div className="mt-2 p-3 bg-cream-50 rounded-md">
+                          <p className="text-xs font-medium text-ink-warm-500 mb-1">Response:</p>
+                          <p className="text-sm text-ink-warm-700 whitespace-pre-wrap">
                             {command.response.length > 200
                               ? command.response.substring(0, 200) + '...'
                               : command.response}
@@ -2338,7 +2412,7 @@ export default function TelegramChatsPage() {
                           {command.is_active ? (
                             <ToggleRight className="h-5 w-5 text-emerald-600" />
                           ) : (
-                            <ToggleLeft className="h-5 w-5 text-gray-400" />
+                            <ToggleLeft className="h-5 w-5 text-ink-warm-400" />
                           )}
                         </Button>
                         <Button
@@ -2371,12 +2445,12 @@ export default function TelegramChatsPage() {
             access to Unmark / Hide / Delete. */}
         <TabsContent value="internal" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Internal team chats ({internalChats.length} total)
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search internal chats..."
                   value={searchQuery}
@@ -2394,11 +2468,11 @@ export default function TelegramChatsPage() {
           {filteredInternalChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Briefcase className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   {internalChats.length === 0 ? 'No internal chats yet' : 'No matching chats'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto">
+                <p className="text-ink-warm-500 max-w-md mx-auto">
                   {internalChats.length === 0
                     ? 'Mark a chat as internal from any other tab via the ⋯ menu to track it here.'
                     : 'Try a different search term.'}
@@ -2410,25 +2484,25 @@ export default function TelegramChatsPage() {
               {filteredInternalChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                  <Card key={chat.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
-                            <Briefcase className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <h3 className="font-semibold text-gray-900 truncate">
+                            <Briefcase className="h-4 w-4 text-ink-warm-500 flex-shrink-0" />
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
                               {chat.title || 'Unnamed Chat'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
                               {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
                             </Badge>
-                            <Badge variant="outline" className="text-xs bg-gray-50">Internal</Badge>
+                            <Badge variant="outline" className="text-xs bg-cream-50">Internal</Badge>
                           </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
                                 <Copy className="h-3 w-3" />
                               </Button>
@@ -2459,12 +2533,12 @@ export default function TelegramChatsPage() {
             via the inline Edit/Unlink buttons. */}
         <TabsContent value="clients" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Chats linked to clients ({clientChats.length} total)
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search clients..."
                   value={searchQuery}
@@ -2482,11 +2556,11 @@ export default function TelegramChatsPage() {
           {filteredClientChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <CheckCircle className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
                   {clientChats.length === 0 ? 'No client chats yet' : 'No matching chats'}
                 </h3>
-                <p className="text-gray-500 max-w-md mx-auto">
+                <p className="text-ink-warm-500 max-w-md mx-auto">
                   {clientChats.length === 0
                     ? 'Link chats to clients from the Unassigned tab via "Link to Client".'
                     : 'Try a different search term.'}
@@ -2498,24 +2572,24 @@ export default function TelegramChatsPage() {
               {filteredClientChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                  <Card key={chat.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
                             <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                            <h3 className="font-semibold text-gray-900 truncate">
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
                               {chat.title || 'Unnamed Chat'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
                               {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
                                 <Copy className="h-3 w-3" />
                               </Button>
@@ -2532,7 +2606,7 @@ export default function TelegramChatsPage() {
                           {chat.client && (
                             <div className="mt-3 flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-emerald-500" />
-                              <span className="text-sm text-gray-700">
+                              <span className="text-sm text-ink-warm-700">
                                 Linked to: <strong>{chat.client.name}</strong>
                               </span>
                             </div>
@@ -2572,12 +2646,12 @@ export default function TelegramChatsPage() {
             same check). Same compact card pattern as Internal. */}
         <TabsContent value="hidden" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Hidden chats ({hiddenChats.length} total) — excluded from every other tab
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
                 <Input
                   placeholder="Search hidden chats..."
                   value={searchQuery}
@@ -2595,9 +2669,9 @@ export default function TelegramChatsPage() {
           {filteredHiddenChats.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <EyeOff className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No matching hidden chats</h3>
-                <p className="text-gray-500 max-w-md mx-auto">Try a different search term.</p>
+                <EyeOff className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">No matching hidden chats</h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">Try a different search term.</p>
               </CardContent>
             </Card>
           ) : (
@@ -2605,24 +2679,24 @@ export default function TelegramChatsPage() {
               {filteredHiddenChats.map(chat => {
                 const activity = getActivityStatus(chat.last_message_at);
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow opacity-75">
+                  <Card key={chat.id} className="opacity-75">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
-                            <EyeOff className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <h3 className="font-semibold text-gray-700 truncate">
+                            <EyeOff className="h-4 w-4 text-ink-warm-400 flex-shrink-0" />
+                            <h3 className="font-semibold text-ink-warm-700 truncate">
                               {chat.title || 'Unnamed Chat'}
                             </h3>
                             <Badge variant="secondary" className="text-xs">
                               {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
-                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <Clock className="h-3.5 w-3.5" />
@@ -2643,7 +2717,7 @@ export default function TelegramChatsPage() {
 
       {/* Link Dialog */}
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Link Chat to Opportunity</DialogTitle>
             <DialogDescription>
@@ -2654,9 +2728,9 @@ export default function TelegramChatsPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Chat</Label>
-              <div className="p-3 bg-gray-50 rounded-md">
+              <div className="p-3 bg-cream-50 rounded-md">
                 <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
-                <code className="text-xs text-gray-500">{selectedChat?.chat_id}</code>
+                <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
               </div>
             </div>
 
@@ -2692,7 +2766,7 @@ export default function TelegramChatsPage() {
                           }}
                         >
                           <Check className={`mr-2 h-4 w-4 ${selectedOpportunityId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
-                          <span className="text-gray-500">No link (unlink)</span>
+                          <span className="text-ink-warm-500">No link (unlink)</span>
                         </CommandItem>
                         {opportunities.map(opp => (
                           <CommandItem
@@ -2712,13 +2786,13 @@ export default function TelegramChatsPage() {
                   </Command>
                 </PopoverContent>
               </Popover>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 This will also update the opportunity's Telegram Chat ID field.
               </p>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
               Cancel
             </Button>
@@ -2731,7 +2805,7 @@ export default function TelegramChatsPage() {
 
       {/* KOL Link Dialog */}
       <Dialog open={kolLinkDialogOpen} onOpenChange={setKolLinkDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Link Chat to KOL</DialogTitle>
             <DialogDescription>
@@ -2742,9 +2816,9 @@ export default function TelegramChatsPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Chat</Label>
-              <div className="p-3 bg-gray-50 rounded-md">
+              <div className="p-3 bg-cream-50 rounded-md">
                 <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
-                <code className="text-xs text-gray-500">{selectedChat?.chat_id}</code>
+                <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
               </div>
             </div>
 
@@ -2780,7 +2854,7 @@ export default function TelegramChatsPage() {
                           }}
                         >
                           <Check className={`mr-2 h-4 w-4 ${selectedKolId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
-                          <span className="text-gray-500">No link (unlink)</span>
+                          <span className="text-ink-warm-500">No link (unlink)</span>
                         </CommandItem>
                         {masterKOLs.map(kol => (
                           <CommandItem
@@ -2809,13 +2883,13 @@ export default function TelegramChatsPage() {
                   </Command>
                 </PopoverContent>
               </Popover>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 Link this chat to a KOL to track your conversations with them.
               </p>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setKolLinkDialogOpen(false)}>
               Cancel
             </Button>
@@ -2830,7 +2904,7 @@ export default function TelegramChatsPage() {
           dialogs. Popover + Command for searchable picker, "__none__"
           sentinel = unlink. */}
       <Dialog open={clientLinkDialogOpen} onOpenChange={setClientLinkDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Link Chat to Client</DialogTitle>
             <DialogDescription>
@@ -2841,9 +2915,9 @@ export default function TelegramChatsPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Chat</Label>
-              <div className="p-3 bg-gray-50 rounded-md">
+              <div className="p-3 bg-cream-50 rounded-md">
                 <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
-                <code className="text-xs text-gray-500">{selectedChat?.chat_id}</code>
+                <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
               </div>
             </div>
 
@@ -2879,7 +2953,7 @@ export default function TelegramChatsPage() {
                           }}
                         >
                           <Check className={`mr-2 h-4 w-4 ${selectedClientId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
-                          <span className="text-gray-500">No link (unlink)</span>
+                          <span className="text-ink-warm-500">No link (unlink)</span>
                         </CommandItem>
                         {clientsList.map(c => (
                           <CommandItem
@@ -2899,13 +2973,13 @@ export default function TelegramChatsPage() {
                   </Command>
                 </PopoverContent>
               </Popover>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 Pick the client this chat belongs to. Archived clients are excluded.
               </p>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setClientLinkDialogOpen(false)}>
               Cancel
             </Button>
@@ -2918,7 +2992,7 @@ export default function TelegramChatsPage() {
 
       {/* Command Dialog (Add/Edit) */}
       <Dialog open={commandDialogOpen} onOpenChange={setCommandDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingCommand ? 'Edit Command' : 'Add Command'}</DialogTitle>
             <DialogDescription>
@@ -2928,11 +3002,11 @@ export default function TelegramChatsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="command">Command</Label>
               <div className="flex items-center gap-2">
-                <span className="text-lg text-gray-500">/</span>
+                <span className="text-lg text-ink-warm-500">/</span>
                 <Input
                   id="command"
                   placeholder="help"
@@ -2941,7 +3015,7 @@ export default function TelegramChatsPage() {
                   className="focus-brand flex-1"
                 />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 Lowercase letters only, no spaces. e.g., help, info, support
               </p>
             </div>
@@ -2955,7 +3029,7 @@ export default function TelegramChatsPage() {
                 onChange={(e) => setCommandForm({ ...commandForm, description: e.target.value })}
                 className="focus-brand"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 A short description of what this command does.
               </p>
             </div>
@@ -2969,7 +3043,7 @@ export default function TelegramChatsPage() {
                 onChange={(e) => setCommandForm({ ...commandForm, image_url: e.target.value })}
                 className="focus-brand"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 If set, the image will appear above the response text.
               </p>
             </div>
@@ -2984,7 +3058,7 @@ export default function TelegramChatsPage() {
                 rows={5}
                 className="focus-brand"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-warm-500">
                 The message the bot will send when this command is used. Supports HTML formatting.
               </p>
             </div>
@@ -2992,7 +3066,7 @@ export default function TelegramChatsPage() {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="space-y-0.5">
                 <Label htmlFor="team_only" className="text-sm font-medium">Team Only</Label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-ink-warm-500">
                   Only team members can use this command
                 </p>
               </div>
@@ -3004,7 +3078,7 @@ export default function TelegramChatsPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setCommandDialogOpen(false)}>
               Cancel
             </Button>
@@ -3017,7 +3091,7 @@ export default function TelegramChatsPage() {
 
       {/* Send Message Dialog */}
       <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Send Message</DialogTitle>
             <DialogDescription>
@@ -3039,14 +3113,14 @@ export default function TelegramChatsPage() {
                 className="focus-brand resize-none"
               />
               {chatToMessage && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-ink-warm-500">
                   Will be sent to: {chatToMessage.title || `Chat ${chatToMessage.chat_id}`}
                 </p>
               )}
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => setMessageDialogOpen(false)}

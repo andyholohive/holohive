@@ -138,13 +138,13 @@ function PipelineBar({ label, count, value, max }: { label: string; count: numbe
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
-        <span className="text-sm font-medium text-gray-700">{label}</span>
-        <span className="text-xs text-gray-500 tabular-nums">
-          <span className="font-semibold text-gray-900">{fmtNum(count)}</span>
-          {value > 0 && <span className="ml-2 text-gray-400">{fmtMoney(value)}</span>}
+        <span className="text-sm font-medium text-ink-warm-700">{label}</span>
+        <span className="text-xs text-ink-warm-500 tabular-nums">
+          <span className="font-semibold text-ink-warm-900">{fmtNum(count)}</span>
+          {value > 0 && <span className="ml-2 text-ink-warm-400">{fmtMoney(value)}</span>}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-cream-100 overflow-hidden">
         <div
           className="h-full bg-brand rounded-full transition-all"
           style={{ width: `${pct}%` }}
@@ -185,7 +185,7 @@ function FunnelStep({
           <div className="text-[10px] opacity-70 mt-0.5">{pct}% of source</div>
         )}
       </div>
-      {!isLast && <ArrowRight className="h-4 w-4 text-gray-300 shrink-0" />}
+      {!isLast && <ArrowRight className="h-4 w-4 text-ink-warm-300 shrink-0" />}
     </div>
   );
 }
@@ -206,12 +206,12 @@ function AlertCard({
   variant?: 'neutral' | 'warn' | 'danger';
 }) {
   const variants = {
-    neutral: 'border-gray-200 bg-white hover:bg-gray-50',
+    neutral: 'border-cream-200 bg-white hover:bg-cream-50',
     warn: 'border-amber-200 bg-amber-50 hover:bg-amber-100',
     danger: 'border-rose-200 bg-rose-50 hover:bg-rose-100',
   };
   const iconColors = {
-    neutral: 'text-gray-500',
+    neutral: 'text-ink-warm-500',
     warn: 'text-amber-600',
     danger: 'text-rose-600',
   };
@@ -220,9 +220,9 @@ function AlertCard({
       <div className="flex items-start gap-2.5">
         <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${iconColors[variant]}`} />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-gray-700">{label}</p>
-          <p className="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">{fmtNum(count)}</p>
-          {detail && <p className="text-[11px] text-gray-500 mt-0.5">{detail}</p>}
+          <p className="text-xs font-medium text-ink-warm-700">{label}</p>
+          <p className="text-xl font-bold text-ink-warm-900 mt-0.5 tabular-nums">{fmtNum(count)}</p>
+          {detail && <p className="text-[11px] text-ink-warm-500 mt-0.5">{detail}</p>}
         </div>
       </div>
     </div>
@@ -388,6 +388,8 @@ export default function AnalyticsPage() {
           icon={BarChart3}
           title="Team Analytics"
           subtitle="Pipeline, Discovery, team workload, and health alerts at a glance."
+          kicker="CRM · Analytics"
+          kickerDot="brand"
         />
         {/* KPI strip skeletons — must mirror the actual `grid-cols-2
             md:grid-cols-4 gap-3` shape so the layout doesn't shift
@@ -409,6 +411,8 @@ export default function AnalyticsPage() {
         icon={BarChart3}
         title="Team Analytics"
         subtitle="Pipeline, Discovery, team workload, and health alerts at a glance."
+        kicker="CRM · Analytics"
+        kickerDot="brand"
         actions={(
           <>
             <Select value={String(windowDays)} onValueChange={(v) => setWindowDays(Number(v) as 7 | 14 | 30 | 90)}>
@@ -477,11 +481,11 @@ export default function AnalyticsPage() {
           Manual entry today via the Edit button; future cron will
           auto-refresh Vercel + xAI rows (see migration 045 + the
           /api/analytics/external-costs endpoint comments). */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-cream-200 p-5">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <div className="flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-brand" />
-            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+            <h3 className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider">
               Infrastructure Spend
             </h3>
             {costs && (
@@ -508,7 +512,7 @@ export default function AnalyticsPage() {
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}
           </div>
         ) : !costs || costs.services.length === 0 ? (
-          <p className="text-sm text-gray-400 py-4 text-center">No cost data entered yet.</p>
+          <p className="text-sm text-ink-warm-400 py-4 text-center">No cost data entered yet.</p>
         ) : (
           <div className="space-y-1">
             {/* Per-service rows */}
@@ -525,14 +529,14 @@ export default function AnalyticsPage() {
                   key={row.service}
                   type="button"
                   onClick={() => openEditDialog(row.service)}
-                  className="w-full flex items-center justify-between gap-3 py-2.5 px-2 rounded hover:bg-gray-50 group text-left"
+                  className="w-full flex items-center justify-between gap-3 py-2.5 px-2 rounded hover:bg-cream-50 group text-left"
                   title="Click to edit this service's spend"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{row.label}</p>
+                    <p className="text-sm font-medium text-ink-warm-900 truncate">{row.label}</p>
                     {row.balance != null && (
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Balance: <span className="font-semibold text-gray-700 tabular-nums">${row.balance.toFixed(2)}</span>
+                      <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                        Balance: <span className="font-semibold text-ink-warm-700 tabular-nums">${row.balance.toFixed(2)}</span>
                         {row.balance < 25 && row.supports_balance && (
                           <span className="ml-1.5 text-rose-600">· low</span>
                         )}
@@ -541,25 +545,25 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right min-w-[70px]">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">Last mo</p>
-                      <p className="text-sm text-gray-500 tabular-nums">${row.last_month.toFixed(2)}</p>
+                      <p className="text-[10px] text-ink-warm-400 uppercase tracking-wider">Last mo</p>
+                      <p className="text-sm text-ink-warm-500 tabular-nums">${row.last_month.toFixed(2)}</p>
                     </div>
                     <div className="text-right min-w-[70px]">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">This mo</p>
-                      <p className="text-sm font-semibold text-gray-900 tabular-nums">${row.current_month.toFixed(2)}</p>
+                      <p className="text-[10px] text-ink-warm-400 uppercase tracking-wider">This mo</p>
+                      <p className="text-sm font-semibold text-ink-warm-900 tabular-nums">${row.current_month.toFixed(2)}</p>
                     </div>
                     <div className="min-w-[60px] text-right">
                       {isNew ? (
                         <StatusBadge tone="info" size="sm">new</StatusBadge>
                       ) : row.trend_pct != null && row.trend_pct !== 0 ? (
                         <span className={`inline-flex items-center text-xs font-semibold tabular-nums ${
-                          isUp ? 'text-rose-600' : isDown ? 'text-emerald-600' : 'text-gray-400'
+                          isUp ? 'text-rose-600' : isDown ? 'text-emerald-600' : 'text-ink-warm-400'
                         }`}>
                           <TrendIcon className="h-3 w-3 mr-0.5" />
                           {Math.abs(row.trend_pct)}%
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-300">—</span>
+                        <span className="text-xs text-ink-warm-300">—</span>
                       )}
                     </div>
                   </div>
@@ -568,14 +572,14 @@ export default function AnalyticsPage() {
             })}
 
             {/* Total row */}
-            <div className="flex items-center justify-between gap-3 py-3 px-2 mt-2 border-t border-gray-200">
-              <p className="text-sm font-semibold text-gray-900">Total</p>
+            <div className="flex items-center justify-between gap-3 py-3 px-2 mt-2 border-t border-cream-200">
+              <p className="text-sm font-semibold text-ink-warm-900">Total</p>
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right min-w-[70px]">
-                  <p className="text-sm text-gray-500 tabular-nums">${costs.totals.last_month.toFixed(2)}</p>
+                  <p className="text-sm text-ink-warm-500 tabular-nums">${costs.totals.last_month.toFixed(2)}</p>
                 </div>
                 <div className="text-right min-w-[70px]">
-                  <p className="text-base font-bold text-gray-900 tabular-nums">${costs.totals.current_month.toFixed(2)}</p>
+                  <p className="text-base font-bold text-ink-warm-900 tabular-nums">${costs.totals.current_month.toFixed(2)}</p>
                 </div>
                 <div className="min-w-[60px] text-right">
                   {costs.totals.trend_pct != null && costs.totals.trend_pct !== 0 ? (
@@ -586,7 +590,7 @@ export default function AnalyticsPage() {
                       {Math.abs(costs.totals.trend_pct)}%
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-300">—</span>
+                    <span className="text-xs text-ink-warm-300">—</span>
                   )}
                 </div>
               </div>
@@ -594,7 +598,7 @@ export default function AnalyticsPage() {
 
             {/* Last-updated footer — gives the operator a sense of staleness. */}
             {costs.services.some(s => s.fetched_at) && (
-              <p className="text-[10px] text-gray-400 text-right pt-1">
+              <p className="text-[10px] text-ink-warm-400 text-right pt-1">
                 Most recent entry: {(() => {
                   const dates = costs.services.map(s => s.fetched_at).filter(Boolean) as string[];
                   if (dates.length === 0) return '—';
@@ -608,11 +612,11 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Discovery funnel */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-cream-200 p-5">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-purple-600" />
-            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+            <h3 className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider">
               Discovery → CRM Funnel
             </h3>
             <Badge variant="secondary" className="text-[10px]">last {windowDays}d</Badge>
@@ -624,7 +628,7 @@ export default function AnalyticsPage() {
               .slice(0, 4)
               .map(([tier, n]) => (
                 <StatusBadge key={tier} tone="neutral" size="sm">
-                  {tier}: <strong className="text-gray-900 ml-1">{n}</strong>
+                  {tier}: <strong className="text-ink-warm-900 ml-1">{n}</strong>
                 </StatusBadge>
               ))}
           </div>
@@ -641,27 +645,27 @@ export default function AnalyticsPage() {
       {/* Two-column: Owner workload + Recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Owner workload */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-xl border border-cream-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-4 w-4 text-brand" />
-            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Team Workload</h3>
+            <h3 className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider">Team Workload</h3>
           </div>
           {data.owners.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">No owned opportunities.</p>
+            <p className="text-sm text-ink-warm-400 py-4 text-center">No owned opportunities.</p>
           ) : (
             <div className="space-y-2.5">
               {data.owners.slice(0, 8).map(o => (
-                <div key={o.id} className="flex items-center justify-between gap-3 pb-2.5 border-b border-gray-100 last:border-0 last:pb-0">
+                <div key={o.id} className="flex items-center justify-between gap-3 pb-2.5 border-b border-cream-100 last:border-0 last:pb-0">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{o.name}</p>
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-sm font-medium text-ink-warm-900 truncate">{o.name}</p>
+                    <p className="text-[11px] text-ink-warm-500">
                       Last activity: {relTime(o.last_activity_at)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900 tabular-nums">{o.open_opps}</p>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">open</p>
+                      <p className="text-sm font-semibold text-ink-warm-900 tabular-nums">{o.open_opps}</p>
+                      <p className="text-[10px] text-ink-warm-500 uppercase tracking-wider">open</p>
                     </div>
                     {o.stale_opps > 0 && (
                       <div className="text-right">
@@ -670,8 +674,8 @@ export default function AnalyticsPage() {
                       </div>
                     )}
                     <div className="text-right min-w-[60px]">
-                      <p className="text-sm font-semibold text-gray-900 tabular-nums">{fmtMoney(o.pipeline_value)}</p>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">pipeline</p>
+                      <p className="text-sm font-semibold text-ink-warm-900 tabular-nums">{fmtMoney(o.pipeline_value)}</p>
+                      <p className="text-[10px] text-ink-warm-500 uppercase tracking-wider">pipeline</p>
                     </div>
                   </div>
                 </div>
@@ -681,36 +685,36 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Recent activity */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-xl border border-cream-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="h-4 w-4 text-brand" />
-            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Recent Activity</h3>
+            <h3 className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider">Recent Activity</h3>
             <Badge variant="secondary" className="text-[10px]">last {windowDays}d</Badge>
           </div>
           {data.recent_activity.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">No activity in this window.</p>
+            <p className="text-sm text-ink-warm-400 py-4 text-center">No activity in this window.</p>
           ) : (
             <div className="space-y-3">
               {data.recent_activity.slice(0, 12).map(a => {
                 const Icon = ACTIVITY_ICONS[a.type] || StickyNote;
                 return (
                   <div key={a.id} className="flex items-start gap-2.5">
-                    <div className="h-7 w-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
-                      <Icon className="h-3.5 w-3.5 text-gray-500" />
+                    <div className="h-7 w-7 rounded-md bg-cream-50 flex items-center justify-center shrink-0">
+                      <Icon className="h-3.5 w-3.5 text-ink-warm-500" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-900 leading-snug">
-                        <span className="text-gray-500 capitalize">{a.type}</span>
+                      <p className="text-sm text-ink-warm-900 leading-snug">
+                        <span className="text-ink-warm-500 capitalize">{a.type}</span>
                         {' on '}
                         <span className="font-medium">{a.opportunity_name || 'unknown'}</span>
                         {a.title && (
                           <>
-                            <span className="text-gray-400">: </span>
-                            <span className="text-gray-700">{a.title}</span>
+                            <span className="text-ink-warm-400">: </span>
+                            <span className="text-ink-warm-700">{a.title}</span>
                           </>
                         )}
                       </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
+                      <p className="text-[11px] text-ink-warm-500 mt-0.5">
                         {a.owner_name || 'Unknown'} · {relTime(a.created_at)}
                       </p>
                     </div>
@@ -723,11 +727,11 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Health alerts */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-cream-200 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="h-4 w-4 text-brand" />
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Health Alerts</h3>
-          <p className="text-[11px] text-gray-500 ml-1">Counts that probably need attention</p>
+          <h3 className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider">Health Alerts</h3>
+          <p className="text-[11px] text-ink-warm-500 ml-1">Counts that probably need attention</p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <AlertCard
@@ -764,7 +768,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Footer */}
-      <div className="text-center text-[11px] text-gray-400 pt-2">
+      <div className="text-center text-[11px] text-ink-warm-400 pt-2">
         Generated {relTime(data.generated_at)} · Window: last {data.window_days} day{data.window_days === 1 ? '' : 's'}
       </div>
 
@@ -839,7 +843,7 @@ export default function AnalyticsPage() {
                   placeholder="10.21"
                   className="h-9 text-sm mt-1"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">
+                <p className="text-[10px] text-ink-warm-500 mt-1">
                   Anthropic shows this on the Console billing page as &quot;Remaining balance.&quot;
                 </p>
               </div>
@@ -857,7 +861,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSubmitting}>
               Cancel
             </Button>

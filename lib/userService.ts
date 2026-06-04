@@ -77,7 +77,14 @@ export class UserService {
   }
 
   /**
-   * Get all users (admin only)
+   * Get all users (admin only) — INCLUDES inactive/pending users.
+   * Use this only on admin-management surfaces (e.g. `/team`) where the
+   * caller needs to see who's awaiting approval or has been deactivated.
+   *
+   * For every other use case — assignment pickers, filter dropdowns,
+   * @-mention lists, etc. — use `getActiveUsers()` instead, which hides
+   * unapproved sign-ups and former teammates so picker UIs don't list
+   * people who can't actually log in.
    */
   static async getAllUsers(): Promise<UserProfile[]> {
     try {
@@ -94,6 +101,39 @@ export class UserService {
       return data || []
     } catch (error) {
       console.error('Error fetching users:', error)
+      return []
+    }
+  }
+
+  /**
+   * Get active users only — filters out pending sign-ups (is_active=false
+   * by default on OAuth create) and deactivated teammates.
+   *
+   * This is the right default for any UI that lists users as a target —
+   * assignment dropdowns, @-mention pickers, filter selects, viewer-as
+   * pickers, etc. — because surfacing an inactive user there means the
+   * action will either fail (user can't be assigned a task) or land in a
+   * dead inbox (notifications to someone who can't log in).
+   *
+   * Added 2026-06-03 after the meetings-page picker showed Andy a
+   * cluttered list of pending and ex-teammates.
+   */
+  static async getActiveUsers(): Promise<UserProfile[]> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching active users:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Error fetching active users:', error)
       return []
     }
   }

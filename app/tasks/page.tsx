@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -49,6 +52,7 @@ import {
   ListChecks,
   X,
   Link2,
+  AlertTriangle,
 } from 'lucide-react';
 
 const STALE_DAYS = 7;
@@ -208,6 +212,46 @@ const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
 const DEFAULT_COLUMN_ORDER: ColumnKey[] = COLUMN_DEFS.map(c => c.key);
 const COLUMN_ORDER_KEY = 'tasks-column-order';
 
+// Group-by dimensions. 'assignee' = original/historical default. 'none'
+// flattens everything into a single ungrouped list (useful when the
+// table is already small enough that bucketing adds friction).
+type GroupByKey = 'assignee' | 'client' | 'type' | 'status' | 'priority' | 'none';
+const GROUP_BY_KEY = 'tasks-group-by';
+const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
+  { value: 'assignee', label: 'Assignee' },
+  { value: 'client',   label: 'Client' },
+  { value: 'type',     label: 'Type' },
+  { value: 'status',   label: 'Status' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'none',     label: 'None (flat)' },
+];
+const isValidGroupBy = (s: string | null): s is GroupByKey =>
+  !!s && GROUP_BY_OPTIONS.some(o => o.value === s);
+
+// Status group ordering — matches the workflow direction so the
+// kanban-ish view reads left-to-right. The label map comes from
+// STATUS_CONFIG above.
+const STATUS_GROUP_ORDER: readonly string[] = STATUSES;
+
+// Priority group ordering — most-urgent first so overdue work is at
+// the top of the page.
+const PRIORITY_GROUP_ORDER: readonly string[] = ['overdue', 'urgent', 'high', 'medium', 'low', 'complete'];
+const PRIORITY_GROUP_LABELS: Record<string, string> = {
+  overdue:  'Overdue',
+  urgent:   'Urgent',
+  high:     'High',
+  medium:   'Medium',
+  low:      'Low',
+  complete: 'Done',
+};
+
+/** Initials helper (e.g. "Andy Lee" → "AL"). Module-scoped so both
+ *  the in-component renderers and the GroupHeaderIcon helper below
+ *  the component can call it. */
+function getUserInitials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
 export default function TasksPage() {
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
@@ -240,7 +284,7 @@ export default function TasksPage() {
   };
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; logo_url: string | null }[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<string>('one-time');
   const [searchTerm, setSearchTerm] = useState('');
@@ -253,6 +297,26 @@ export default function TasksPage() {
     return false;
   });
   const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
+  // Group-by dimension. Default 'assignee' preserves the historical
+  // behavior; other modes let the user re-pivot the same task list
+  // by client / type / status / priority / due-date bucket, or flatten
+  // it into one ungrouped list. Persists across sessions in
+  // localStorage so the user doesn't have to re-select on each visit.
+  const [groupBy, setGroupBy] = useState<GroupByKey>(() => {
+    if (typeof window === 'undefined') return 'assignee';
+    const saved = window.localStorage.getItem(GROUP_BY_KEY);
+    return isValidGroupBy(saved) ? saved : 'assignee';
+  });
+  // Persist + reset collapsed-groups state on each switch — a key set
+  // collected under "assignee" mode wouldn't make sense under "status"
+  // mode (the keys live in different namespaces), so re-expand on
+  // pivot.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(GROUP_BY_KEY, groupBy);
+    }
+    setCollapsedUsers(new Set());
+  }, [groupBy]);
 
   // Column order (persisted to localStorage)
   const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(DEFAULT_COLUMN_ORDER);
@@ -347,7 +411,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     fetchTasks();
-    UserService.getAllUsers().then((users) => {
+    UserService.getActiveUsers().then((users) => {
       setTeamMembers(
         users
           .filter(u => u.role !== 'client')
@@ -362,7 +426,7 @@ export default function TasksPage() {
       // is_active !== false admits NULL too so legacy rows still appear.
       setClients(
         c.filter(cl => (cl as any).is_active !== false)
-          .map(cl => ({ id: cl.id, name: cl.name }))
+          .map(cl => ({ id: cl.id, name: cl.name, logo_url: (cl as any).logo_url ?? null }))
       );
     }).catch(() => {});
   }, []);
@@ -523,39 +587,136 @@ export default function TasksPage() {
     ).sort((a, b) => a.sort_order - b.sort_order);
   }, [tasks, activeTab, searchTerm, showCompleted, clientFilterId, actionItemFilterId]);
 
-  // Group filtered tasks by assigned_to
-  const groupedByUser = useMemo(() => {
-    const groups: { key: string; label: string; tasks: Task[] }[] = [];
-    const map = new Map<string, Task[]>();
+  // Client id → name lookup used by group labels + the Client column.
+  // Hoisted above `grouped` so the useMemo can reference it.
+  const clientMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    clients.forEach(c => { map[c.id] = c.name; });
+    return map;
+  }, [clients]);
+  // Parallel id → logo_url lookup. Used by GroupHeaderIcon when
+  // grouping by client so the header shows the client's actual logo
+  // tile instead of a generic letter chip.
+  const clientLogoMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    clients.forEach(c => { map[c.id] = c.logo_url; });
+    return map;
+  }, [clients]);
 
+  // Group filtered tasks by the user-selected dimension. Returns a
+  // stable list of { key, label, tasks } that the render loop walks
+  // through. Each grouping mode defines its own bucket key (which
+  // doubles as the localStorage-collapsed-set key) and a custom sort
+  // order so e.g. priority groups read overdue→done top-to-bottom,
+  // status groups follow the workflow direction, assignee/client/type
+  // groups are alphabetical.
+  const grouped = useMemo(() => {
+    const groups: { key: string; label: string; tasks: Task[] }[] = [];
+
+    if (groupBy === 'none') {
+      // Flat mode — one synthetic group containing everything. The
+      // group header still renders so users keep the "+ Add" /
+      // collapse affordances; just no per-bucket pivoting.
+      return [{ key: '_all', label: 'All tasks', tasks: filtered }];
+    }
+
+    const map = new Map<string, Task[]>();
     for (const task of filtered) {
-      const key = task.assigned_to || '_unassigned';
+      let key: string;
+      switch (groupBy) {
+        case 'assignee':
+          key = task.assigned_to || '_unassigned';
+          break;
+        case 'client':
+          key = task.client_id || '_internal';
+          break;
+        case 'type':
+          key = task.task_type || '_untyped';
+          break;
+        case 'status':
+          key = task.status || 'to_do';
+          break;
+        case 'priority':
+          key = getComputedPriority(task.due_date, task.status).level;
+          break;
+        default:
+          key = '_other';
+      }
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(task);
     }
 
-    // Resolve group label from teamMembers by ID (not from first task's name)
-    const getLabel = (key: string) => {
-      if (key === '_unassigned') return 'Unassigned';
-      const member = teamMembers.find(m => m.id === key);
-      return member?.name || 'Unknown';
+    const getLabel = (key: string): string => {
+      switch (groupBy) {
+        case 'assignee':
+          if (key === '_unassigned') return 'Unassigned';
+          return teamMembers.find(m => m.id === key)?.name || 'Unknown';
+        case 'client':
+          if (key === '_internal') return 'Internal · No client';
+          // Fall back to "Other" (not "Unknown client") for tasks
+          // pointed at an archived / inaccessible client — reads as
+          // a neutral catch-all instead of a bug signal.
+          return clientMap[key] || 'Other';
+        case 'type':
+          if (key === '_untyped') return 'Untyped';
+          return key;
+        case 'status':
+          return STATUS_CONFIG[key]?.label || key;
+        case 'priority':
+          return PRIORITY_GROUP_LABELS[key] || key;
+        default:
+          return key;
+      }
     };
 
-    const sortedKeys = Array.from(map.keys()).sort((a, b) => {
-      if (a === '_unassigned') return 1;
-      if (b === '_unassigned') return -1;
-      return getLabel(a).localeCompare(getLabel(b));
-    });
+    // Per-mode sort. Falls back to alphabetical by label for the
+    // free-text modes (assignee / client / type) so the same set of
+    // groups renders in the same order each visit.
+    const sortKeys = (keys: string[]): string[] => {
+      const arr = [...keys];
+      switch (groupBy) {
+        case 'status':
+          return arr.sort((a, b) =>
+            STATUS_GROUP_ORDER.indexOf(a) - STATUS_GROUP_ORDER.indexOf(b)
+          );
+        case 'priority':
+          return arr.sort((a, b) =>
+            PRIORITY_GROUP_ORDER.indexOf(a) - PRIORITY_GROUP_ORDER.indexOf(b)
+          );
+        case 'assignee':
+          return arr.sort((a, b) => {
+            // Push the _unassigned / _internal / _untyped catch-all
+            // buckets to the bottom — real names read first.
+            if (a === '_unassigned') return 1;
+            if (b === '_unassigned') return -1;
+            return getLabel(a).localeCompare(getLabel(b));
+          });
+        case 'client':
+          return arr.sort((a, b) => {
+            if (a === '_internal') return 1;
+            if (b === '_internal') return -1;
+            return getLabel(a).localeCompare(getLabel(b));
+          });
+        case 'type':
+          return arr.sort((a, b) => {
+            if (a === '_untyped') return 1;
+            if (b === '_untyped') return -1;
+            return getLabel(a).localeCompare(getLabel(b));
+          });
+        default:
+          return arr;
+      }
+    };
 
-    for (const key of sortedKeys) {
-      const tasks = map.get(key)!;
-      groups.push({ key, label: getLabel(key), tasks });
+    for (const key of sortKeys(Array.from(map.keys()))) {
+      groups.push({ key, label: getLabel(key), tasks: map.get(key)! });
     }
-
     return groups;
-  }, [filtered, teamMembers]);
+  }, [filtered, groupBy, teamMembers, clientMap]);
 
-  const toggleUserCollapse = (key: string) => {
+  // Kept the `collapsedUsers` state name to minimize churn — under
+  // non-assignee group modes it just stores arbitrary group keys.
+  const toggleGroupCollapse = (key: string) => {
     setCollapsedUsers(prev => {
       const newSet = new Set(prev);
       if (newSet.has(key)) newSet.delete(key);
@@ -769,7 +930,7 @@ export default function TasksPage() {
       await fetchTasks();
     } catch (err) {
       console.error('Error adding task:', err);
-      toast({ title: 'Error', description: 'Failed to add task.', variant: 'destructive' });
+      toast({ title: 'Add task failed', description: err instanceof Error ? err.message : 'Failed to add task', variant: 'destructive' });
     }
   };
 
@@ -792,16 +953,6 @@ export default function TasksPage() {
 
   const getColorForIndex = (idx: number) => userColors[idx % userColors.length];
 
-  const getUserInitials = (name: string) => {
-    return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-  };
-
-  const clientMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    clients.forEach(c => { map[c.id] = c.name; });
-    return map;
-  }, [clients]);
-
   const colLabel: Record<ColumnKey, string> = {
     taskName: 'Task Name', priority: 'Priority', assignee: 'Assignee', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
     // [Frequency consolidation] 'frequency' label kept for back-compat
@@ -823,25 +974,29 @@ export default function TasksPage() {
 
   const tableHeader = (
     <thead>
-      <tr className="border-b border-gray-200 bg-gray-50/80">
-        <th className={`text-left py-3 px-3 font-semibold text-gray-600 text-xs uppercase tracking-wider ${COL.reorder}`}></th>
-        <th className={`py-3 px-1 ${COL.status}`}></th>
+      {/* v11 header strip — cream-50/80 background, ink-warm-500
+          tracked-out labels at text-[10px] with 0.18em letter-spacing.
+          Matches the table chrome on /clients, /intelligence,
+          /crm/submissions. 2026-06-03. */}
+      <tr className="border-b border-cream-200 bg-cream-50/80">
+        <th className={`text-left py-2.5 px-3 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] ${COL.reorder}`}></th>
+        <th className={`py-2.5 px-1 ${COL.status}`}></th>
         {visibleColumnOrder.map((col) => (
           <th
             key={col}
-            className={`text-left py-3 px-3 font-semibold text-gray-600 text-xs uppercase tracking-wider ${COL[col]} cursor-grab select-none`}
+            className={`text-left py-2.5 px-3 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] ${COL[col]} cursor-grab select-none`}
             draggable
             onDragStart={() => handleColumnDragStart(col)}
             onDragOver={(e) => handleColumnDragOver(e, col)}
             onDrop={handleColumnDrop}
           >
             <div className="flex items-center gap-1">
-              <GripVertical className="h-3 w-3 text-gray-300 flex-shrink-0" />
+              <GripVertical className="h-3 w-3 text-ink-warm-300 flex-shrink-0" />
               {colLabel[col]}
             </div>
           </th>
         ))}
-        <th className={`text-right py-3 px-3 ${COL.actions}`}></th>
+        <th className={`text-right py-2.5 px-3 ${COL.actions}`}></th>
       </tr>
     </thead>
   );
@@ -867,20 +1022,20 @@ export default function TasksPage() {
       case 'taskName':
         return (
           <td key={col} className={`py-3 px-3 ${COL.taskName}`}>
-            <div className={`flex items-center gap-2 ${isSubtask ? 'pl-6 border-l-2 border-gray-100' : ''}`}>
+            <div className={`flex items-center gap-2 ${isSubtask ? 'pl-6 border-l-2 border-cream-100' : ''}`}>
               {/* Chevron — only on top-level parents that have at least
                   one subtask anywhere. */}
               {!isSubtask && childCount > 0 && (
                 <button
                   type="button"
-                  className="p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                  className="p-0.5 rounded hover:bg-cream-200 transition-colors flex-shrink-0"
                   onClick={(e) => { e.stopPropagation(); toggleTaskExpand(task.id); }}
                   title={isExpanded ? 'Collapse subtasks' : `Expand ${childCount} subtask${childCount === 1 ? '' : 's'}`}
                 >
                   {isExpanded ? (
-                    <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                    <ChevronDown className="h-3.5 w-3.5 text-ink-warm-400" />
                   ) : (
-                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                    <ChevronRight className="h-3.5 w-3.5 text-ink-warm-400" />
                   )}
                 </button>
               )}
@@ -896,7 +1051,7 @@ export default function TasksPage() {
                 onChange={(e) => setEditingValue(e.target.value)}
                 onBlur={saveInlineEdit}
                 onKeyDown={(e) => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') cancelEditing(); }}
-                className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-sm font-medium text-gray-900"
+                className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-sm font-medium text-ink-warm-900"
                 style={{ outline: 'none', boxShadow: 'none' }}
                 autoFocus
               />
@@ -905,7 +1060,7 @@ export default function TasksPage() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
-                      className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5 hover:text-brand transition-colors"
+                      className="text-ink-warm-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5 hover:text-brand transition-colors"
                       // Single click opens the full detail modal — primary
                       // affordance for users who want to see / edit
                       // everything about a task. Double-click stays the
@@ -918,7 +1073,7 @@ export default function TasksPage() {
                     >
                       {task.short_id && (
                         <span
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-gray-100 text-gray-600 flex-shrink-0"
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-cream-100 text-ink-warm-700 flex-shrink-0"
                           title={`Short ID — type "/done ${task.short_id}" in Telegram to close`}
                         >
                           {task.short_id}
@@ -937,7 +1092,7 @@ export default function TasksPage() {
                           className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 hover:opacity-80 transition-opacity ${
                             checklistCounts[task.id].done === checklistCounts[task.id].total
                               ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-gray-100 text-gray-700'
+                              : 'bg-cream-100 text-ink-warm-700'
                           }`}
                           title={`Checklist: ${checklistCounts[task.id].done}/${checklistCounts[task.id].total} done — click to open`}
                         >
@@ -961,14 +1116,14 @@ export default function TasksPage() {
               </TooltipProvider>
             ) : (
               <span
-                className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5 hover:text-brand transition-colors"
+                className="text-ink-warm-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5 hover:text-brand transition-colors"
                 onClick={() => handleTaskNameClick(task)}
                 onDoubleClick={(e) => { e.stopPropagation(); handleTaskNameDoubleClick(task); }}
                 title="Click to expand · Double-click to rename inline"
               >
                 {task.short_id && (
                   <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-gray-100 text-gray-600 flex-shrink-0"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-cream-100 text-ink-warm-700 flex-shrink-0"
                     title={`Short ID — type "/done ${task.short_id}" in Telegram to close`}
                   >
                     {task.short_id}
@@ -1009,7 +1164,7 @@ export default function TasksPage() {
                 expanded parent skip this because context is obvious. */}
             {showParentLink && parentTask && (
               <p
-                className="text-[10px] text-gray-400 mt-0.5 truncate"
+                className="text-[10px] text-ink-warm-400 mt-0.5 truncate"
                 title={`Part of: ${parentTask.task_name}`}
               >
                 ↳ Part of: {parentTask.task_name}
@@ -1047,16 +1202,16 @@ export default function TasksPage() {
               >
                 <SelectValue>
                   {task.assigned_to_name ? (
-                    <span className="text-gray-700 flex items-center gap-1">
+                    <span className="text-ink-warm-700 flex items-center gap-1">
                       {userPhotoMap[task.assigned_to || ''] ? (
                         <img src={userPhotoMap[task.assigned_to || '']!} className="h-4 w-4 rounded-full" />
                       ) : (
-                        <User className="h-3 w-3 text-gray-400" />
+                        <User className="h-3 w-3 text-ink-warm-400" />
                       )}
                       {task.assigned_to_name.split(' ')[0]}
                     </span>
                   ) : (
-                    <span className="text-gray-400">—</span>
+                    <span className="text-ink-warm-400">—</span>
                   )}
                 </SelectValue>
               </SelectTrigger>
@@ -1082,9 +1237,9 @@ export default function TasksPage() {
                 >
                   <SelectValue>
                     {task.client_id && clientMap[task.client_id] ? (
-                      <span className="text-gray-700">{clientMap[task.client_id]}</span>
+                      <span className="text-ink-warm-700">{clientMap[task.client_id]}</span>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-ink-warm-400">—</span>
                     )}
                   </SelectValue>
                 </SelectTrigger>
@@ -1094,8 +1249,8 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
             ) : (
-              <span className="px-2 py-1 text-xs font-medium text-gray-700 truncate max-w-[100px] inline-block">
-                {task.client_id && clientMap[task.client_id] ? clientMap[task.client_id] : <span className="text-gray-400">—</span>}
+              <span className="px-2 py-1 text-xs font-medium text-ink-warm-700 truncate max-w-[100px] inline-block">
+                {task.client_id && clientMap[task.client_id] ? clientMap[task.client_id] : <span className="text-ink-warm-400">—</span>}
               </span>
             )}
           </td>
@@ -1106,7 +1261,7 @@ export default function TasksPage() {
           <td key={col} className={`py-3 px-3 ${COL.dueDate}`}>
             <Popover>
               <PopoverTrigger asChild>
-                <button className={`text-sm hover:text-gray-700 cursor-pointer ${getDueDateColor(task.due_date) || 'text-gray-500'}`}>
+                <button className={`text-sm hover:text-ink-warm-700 cursor-pointer ${getDueDateColor(task.due_date) || 'text-ink-warm-500'}`}>
                   {task.due_date ? new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                 </button>
               </PopoverTrigger>
@@ -1151,7 +1306,7 @@ export default function TasksPage() {
                 />
               ) : (
                 <span
-                  className="text-gray-600 line-clamp-2 whitespace-pre-wrap cursor-pointer text-xs flex-1"
+                  className="text-ink-warm-700 line-clamp-2 whitespace-pre-wrap cursor-pointer text-xs flex-1"
                   onDoubleClick={() => startEditing(task.id, 'latest_comment', task.latest_comment || '')}
                   title="Double-click to edit"
                 >
@@ -1189,12 +1344,12 @@ export default function TasksPage() {
                   type="button"
                   className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                     isOn
-                      ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                      : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent'
+                      ? 'bg-brand-light text-brand hover:bg-brand-light/70 border border-brand/30'
+                      : 'text-ink-warm-400 hover:text-ink-warm-700 hover:bg-cream-100 border border-transparent'
                   }`}
                   title={isOn ? `Auto-recreates on complete (${summary})` : 'Click to enable auto-recreate on completion'}
                 >
-                  <RefreshCw className={`h-3 w-3 ${isOn ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <RefreshCw className={`h-3 w-3 ${isOn ? 'text-brand' : 'text-ink-warm-400'}`} />
                   {isOn ? summary : 'Off'}
                 </button>
               </PopoverTrigger>
@@ -1251,7 +1406,7 @@ export default function TasksPage() {
               </a>
             ) : (
               <span
-                className="text-gray-400 cursor-pointer text-xs"
+                className="text-ink-warm-400 cursor-pointer text-xs"
                 onDoubleClick={() => startEditing(task.id, 'link', '')}
                 title="Double-click to edit"
               >
@@ -1287,7 +1442,7 @@ export default function TasksPage() {
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              <span className="text-gray-400 text-xs">—</span>
+              <span className="text-ink-warm-400 text-xs">—</span>
             )}
           </td>
         );
@@ -1295,7 +1450,7 @@ export default function TasksPage() {
       case 'created':
         return (
           <td key={col} className={`py-3 px-3 whitespace-nowrap ${COL.created}`}>
-            <span className="text-gray-500 text-xs">
+            <span className="text-ink-warm-500 text-xs">
               {new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           </td>
@@ -1312,7 +1467,7 @@ export default function TasksPage() {
                 {new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
             ) : (
-              <span className="text-gray-300 text-xs">—</span>
+              <span className="text-ink-warm-300 text-xs">—</span>
             )}
           </td>
         );
@@ -1325,11 +1480,11 @@ export default function TasksPage() {
     return (
       <tr
         key={task.id}
-        className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors group ${
+        className={`border-b border-cream-100 hover:bg-cream-50/50 transition-colors group ${
           // [Subtasks v1] Subtle background tint + lighter border so subtask
           // rows visually nest under their parent. Combined with the
           // task-name-cell indent (renderCell), it creates the tree look.
-          isSubtask ? 'bg-gray-50/40' : ''
+          isSubtask ? 'bg-cream-50/40' : ''
         }`}
       >
         {/* Reorder arrows — hidden for subtasks (they're ordered within
@@ -1341,20 +1496,20 @@ export default function TasksPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-auto h-auto px-1 py-0 hover:bg-gray-100 disabled:opacity-20"
+                className="w-auto h-auto px-1 py-0 hover:bg-cream-100 disabled:opacity-20"
                 onClick={() => handleReorder(task.id, 'up')}
                 disabled={globalIdx === 0}
               >
-                <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
+                <ChevronUp className="h-3.5 w-3.5 text-ink-warm-400" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-auto h-auto px-1 py-0 hover:bg-gray-100 disabled:opacity-20"
+                className="w-auto h-auto px-1 py-0 hover:bg-cream-100 disabled:opacity-20"
                 onClick={() => handleReorder(task.id, 'down')}
                 disabled={globalIdx === globalSorted.length - 1}
               >
-                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                <ChevronDown className="h-3.5 w-3.5 text-ink-warm-400" />
               </Button>
             </div>
           )}
@@ -1382,7 +1537,7 @@ export default function TasksPage() {
                   return (
                     <button
                       key={s}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm hover:bg-gray-100 transition-colors text-left ${task.status === s ? 'bg-gray-100 font-medium' : ''}`}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm hover:bg-cream-100 transition-colors text-left ${task.status === s ? 'bg-cream-100 font-medium' : ''}`}
                       onClick={() => saveSelectField(task.id, 'status', s)}
                     >
                       <Icon className={`h-4 w-4 ${cfg.color}`} />
@@ -1401,8 +1556,8 @@ export default function TasksPage() {
         {/* Actions - always last */}
         <td className={`py-3 px-3 text-right ${COL.actions}`}>
           <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-200" onClick={() => openForm(task)} title="Edit in popup">
-              <Expand className="h-3.5 w-3.5 text-gray-500" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-200" onClick={() => openForm(task)} title="Edit in popup">
+              <Expand className="h-3.5 w-3.5 text-ink-warm-500" />
             </Button>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingId(task.id)}>
               <Trash2 className="h-3.5 w-3.5 text-rose-500" />
@@ -1476,7 +1631,7 @@ export default function TasksPage() {
         <tbody>
           {rows.map(({ task, isSubtask, showParentLink }) => renderTaskRow(task, isSubtask, showParentLink))}
           {addingToGroup === groupKey && (
-            <tr className="border-b border-gray-100 bg-gray-50/30">
+            <tr className="border-b border-cream-100 bg-cream-50/30">
               <td className={`py-3 px-3 ${COL.reorder}`}></td>
               <td className={`py-3 px-3 ${COL.taskName}`} colSpan={9}>
                 <Input
@@ -1501,118 +1656,216 @@ export default function TasksPage() {
     );
   };
 
+  // Header actions — extracted so loading + loaded states share the
+  // same shape (only the dropdown menu is interactive in the loaded
+  // state; loading shows a Skeleton-disabled version so the title row
+  // doesn't shift when data arrives).
+  const headerActions = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="brand">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Task
+          <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => openForm()}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Task
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setWizardOpen(true)}>
+          <Package className="h-4 w-4 mr-2" />
+          New Deliverable
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // ── Loading branch ────────────────────────────────────────────────
+  // Unified structural skeleton mirroring the loaded layout:
+  // PageHeader (same kicker so the title strip doesn't shift) →
+  // SectionHeader skeleton → tab strip (v11 cream-100 outer) →
+  // filter row → 2 group-card skeletons. The previous version had
+  // TWO separate piecewise skeletons mid-render (one for the tabs,
+  // one for the table content) which made the layout flash twice
+  // and didn't reflect the actual grouped-by-assignee shape.
+  // 2026-06-03 v11 pass.
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={ListTodo}
+          title="Tasks"
+          subtitle="Manage team tasks, SOPs, and recurring work"
+          kicker="Workspace · HQ"
+          kickerDot="brand"
+          actions={headerActions}
+        />
+
+        {/* SectionHeader skeleton */}
+        <div className="section-head first flex items-center gap-3">
+          <span className="dot bg-brand/30" aria-hidden />
+          <Skeleton className="h-3 w-20" />
+          <span className="flex-1 h-px bg-cream-200" aria-hidden />
+          <Skeleton className="h-3 w-40" />
+        </div>
+
+        {/* Tab strip skeleton — 3 chip placeholders inside the v11
+            cream-100 container. */}
+        <div className="flex p-1 rounded-md bg-cream-100 border border-cream-200 w-fit">
+          <Skeleton className="h-9 w-28 rounded" />
+          <Skeleton className="h-9 w-28 rounded" />
+          <Skeleton className="h-9 w-32 rounded" />
+        </div>
+
+        {/* Filter row skeleton — search (max-w-sm) + show-completed
+            toggle. Matches the loaded toolbar. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Skeleton className="h-9 flex-1 max-w-sm rounded-md" />
+          <Skeleton className="h-9 w-44 rounded-md" />
+        </div>
+
+        {/* Two group-card skeletons — most HQ users see 2-3 assignee
+            groups (their own + a teammate or two). Each has a header
+            row (avatar + name + count) + 4 task rows. */}
+        <div className="space-y-4">
+          {Array.from({ length: 2 }).map((_, gi) => (
+            <div key={gi} className="border border-cream-200 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 bg-cream-50 border-b border-cream-200">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-5 w-8 rounded-full" />
+                </div>
+                <Skeleton className="h-7 w-7 rounded-md" />
+              </div>
+              <div className="bg-white">
+                {Array.from({ length: 4 }).map((_, ri) => (
+                  <div key={ri} className="flex items-center gap-3 py-3 px-4 border-b border-cream-100 last:border-0">
+                    <Skeleton className="h-4 w-4 rounded" />
+                    <Skeleton className="h-4 flex-1 max-w-[300px]" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         icon={ListTodo}
         title="Tasks"
         subtitle="Manage team tasks, SOPs, and recurring work"
-        actions={(
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="brand">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Task
-                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => openForm()}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Task
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setWizardOpen(true)}>
-                <Package className="h-4 w-4 mr-2" />
-                New Deliverable
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        kicker="Workspace · HQ"
+        kickerDot="brand"
+        actions={headerActions}
+      />
+
+      {/* v11 chapter divider — counter shows the live narrowing so
+          users can see at a glance how aggressive their filters are
+          ("12 of 47 tasks · one-time · search:foo"). */}
+      <SectionHeader
+        label="Tasks"
+        dot="brand"
+        counter={`${filtered.length} of ${tasks.length} tasks${
+          activeTab === 'recurring' ? ' · recurring' :
+          activeTab === 'deliverables' ? ' · deliverables' :
+          ' · one-time'
+        }${searchTerm ? ` · search:${searchTerm}` : ''}${groupBy !== 'assignee' ? ` · grouped by ${groupBy}` : ''}`}
+        first
       />
 
       {/* Tabs */}
       <div>
-              {loading ? (
-                <div className="flex gap-2">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-28 rounded" />)}
-                </div>
-              ) : (
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  {/* Client-filter pill — visible only when /tasks?client=
-                      is set (e.g. arrived from /clients HQ tasks badge).
-                      Click X to clear the filter back to "all clients". */}
-                  {clientFilterId && (
-                    <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-medium">
-                      <span>Client: {clientMap[clientFilterId] || 'unknown'}</span>
-                      <button
-                        type="button"
-                        onClick={() => router.replace('/tasks')}
-                        className="hover:bg-brand/20 rounded-full p-0.5"
-                        aria-label="Clear client filter"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  {/* [HQ Tasks ↔ Action Board link] Pill for the
-                      ?actionItem= URL filter. Sits next to the client
-                      pill (they typically come together since action
-                      items are scoped per client). Clears just the
-                      actionItem param while preserving ?client=. */}
-                  {actionItemFilterId && (
-                    <div className="mb-2 ml-2 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-medium">
-                      <Link2 className="h-3 w-3" />
-                      <span>
-                        Client task: {actionItemLabels[actionItemFilterId] || '…'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Preserve client filter if it's set
-                          if (clientFilterId) {
-                            router.replace(`/tasks?client=${clientFilterId}`);
-                          } else {
-                            router.replace('/tasks');
-                          }
-                        }}
-                        className="hover:bg-emerald-100 rounded-full p-0.5"
-                        aria-label="Clear action item filter"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
-                    <TabsTrigger
-                      value="one-time"
-                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                {/* Client-filter pill — visible only when /tasks?client=
+                    is set (e.g. arrived from /clients HQ tasks badge).
+                    Click X to clear the filter back to "all clients". */}
+                {clientFilterId && (
+                  <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-medium">
+                    <span>Client: {clientMap[clientFilterId] || 'unknown'}</span>
+                    <button
+                      type="button"
+                      onClick={() => router.replace('/tasks')}
+                      className="hover:bg-brand/20 rounded-full p-0.5"
+                      aria-label="Clear client filter"
                     >
-                      One-Time
-                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{oneTimeCount}</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="recurring"
-                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                {/* [HQ Tasks ↔ Action Board link] Pill for the
+                    ?actionItem= URL filter. Sits next to the client
+                    pill (they typically come together since action
+                    items are scoped per client). Clears just the
+                    actionItem param while preserving ?client=. */}
+                {actionItemFilterId && (
+                  <div className="mb-2 ml-2 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-medium">
+                    <Link2 className="h-3 w-3" />
+                    <span>
+                      Client task: {actionItemLabels[actionItemFilterId] || '…'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Preserve client filter if it's set
+                        if (clientFilterId) {
+                          router.replace(`/tasks?client=${clientFilterId}`);
+                        } else {
+                          router.replace('/tasks');
+                        }
+                      }}
+                      className="hover:bg-emerald-100 rounded-full p-0.5"
+                      aria-label="Clear action item filter"
                     >
-                      Recurring
-                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{recurringCount}</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="deliverables"
-                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
-                    >
-                      Deliverables
-                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{deliverableCount}</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                {/* v11 tab chrome — cream-100 outer, white active tile
+                    with shadow-card + brand text, brand-light count
+                    chips. Replaces the old `bg-gray-100 p-1` + `shadow-sm`
+                    + `bg-gray-200 text-gray-600` count pattern. */}
+                <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
+                  <TabsTrigger
+                    value="one-time"
+                    className="text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+                  >
+                    One-Time
+                    <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full tabular-nums">{oneTimeCount}</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="recurring"
+                    className="text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+                  >
+                    Recurring
+                    <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full tabular-nums">{recurringCount}</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="deliverables"
+                    className="text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+                  >
+                    Deliverables
+                    <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full tabular-nums">{deliverableCount}</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
 
             {/* Search + Show-completed toggle */}
             <div className="flex flex-wrap items-center gap-3 pt-4">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400 pointer-events-none" aria-hidden />
                 <Input
                   placeholder="Search tasks, assignees, comments..."
                   className="pl-10 focus-brand"
@@ -1629,7 +1882,12 @@ export default function TasksPage() {
               {/* Show-completed toggle. Persists choice in localStorage so
                   the user doesn't have to re-toggle every session. The hidden
                   count next to the label gives a quick "you have N done tasks
-                  in the vault" signal so users notice they exist. */}
+                  in the vault" signal so users notice they exist.
+
+                  2026-06-03 v11 — was a bespoke green-tinted button; now
+                  reads as a checked-state chip with brand-tinted active
+                  treatment so it matches other on/off chips elsewhere
+                  in the app. */}
               <button
                 type="button"
                 onClick={() => {
@@ -1643,57 +1901,91 @@ export default function TasksPage() {
                 }}
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-colors ${
                   showCompleted
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    ? 'bg-brand-light border-brand/30 text-brand hover:bg-brand-light/80'
+                    : 'bg-white border-cream-200 text-ink-warm-700 hover:bg-cream-50'
                 }`}
                 title={showCompleted ? 'Hide completed tasks' : 'Show completed tasks'}
               >
-                <CheckCircle2 className={`h-4 w-4 ${showCompleted ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <CheckCircle2 className={`h-4 w-4 ${showCompleted ? 'text-brand' : 'text-ink-warm-400'}`} />
                 <span className="font-medium">
                   {showCompleted ? 'Showing completed' : 'Show completed'}
                 </span>
                 {hiddenCompletedCount > 0 && !showCompleted && (
-                  <span className="text-[11px] bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 tabular-nums">
+                  <span className="text-[11px] bg-cream-100 text-ink-warm-700 rounded-full px-1.5 py-0.5 tabular-nums">
                     {hiddenCompletedCount} hidden
                   </span>
                 )}
               </button>
+
+              {/* Group-by — re-pivots the grouped list. Default
+                  'Assignee' preserves the historical behavior; other
+                  modes bucket by client / type / status / priority,
+                  or flatten everything into one list. Choice persists
+                  in localStorage; the "+ Add" button hides in non-
+                  assignee modes since the row-add flow assumes the
+                  group key maps to assigned_to. */}
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs font-medium text-ink-warm-500 uppercase tracking-wider">Group by</span>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByKey)}>
+                  <SelectTrigger className="h-9 w-[150px] text-sm focus-brand">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GROUP_BY_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-      {/* Grouped Tables */}
-      {loading ? (
-        <div className="p-6 space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="w-full bg-white border border-gray-200 shadow-sm">
-              <div className="text-center py-16">
-                <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">
-                  {tasks.length === 0 ? 'No tasks yet.' : 'No tasks match your filters.'}
-                </p>
+      {/* Grouped Tables — no separate loading branch (handled at the
+          top of the component for a structural skeleton). */}
+      {filtered.length === 0 ? (
+            <Card className="overflow-hidden">
+              <EmptyState
+                icon={ClipboardList}
+                title={tasks.length === 0 ? 'No tasks yet.' : 'No tasks match your filters.'}
+                description={tasks.length === 0 ? 'Create your first task to start tracking work for the team.' : 'Try widening the filter or clearing the search.'}
+                className="py-16"
+              >
                 {tasks.length === 0 && (
-                  <Button variant="brand" className="mt-4" onClick={() => openForm()}
-                  >
+                  <Button variant="brand" onClick={() => openForm()}>
                     <Plus className="h-4 w-4 mr-2" /> Create Your First Task
                   </Button>
                 )}
-              </div>
-            </div>
+              </EmptyState>
+            </Card>
           ) : (
             <div className="space-y-4">
-              {groupedByUser.map((group, groupIdx) => {
+              {grouped.map((group, groupIdx) => {
                 const isCollapsed = collapsedUsers.has(group.key);
-                const colors = group.key === '_unassigned'
+                // Catch-all bucket keys for each mode that we want
+                // visually de-emphasized (slate, not the rotation
+                // brand colors). Reads as "not categorized yet."
+                const isCatchAllBucket = group.key === '_unassigned'
+                  || group.key === '_internal'
+                  || group.key === '_untyped';
+                const colors = isCatchAllBucket
                   ? { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' }
                   : getColorForIndex(groupIdx);
-                const photoUrl = group.key !== '_unassigned' ? userPhotoMap[group.key] : null;
+                // Photo lookup only meaningful in assignee mode.
+                const photoUrl = groupBy === 'assignee' && !isCatchAllBucket
+                  ? userPhotoMap[group.key]
+                  : null;
+                // "+ Add" makes sense only when the group key maps
+                // cleanly to an assigned_to. Other modes hide the
+                // button to avoid the "new task in the 'urgent'
+                // bucket → which assignee?" ambiguity.
+                const showAddButton = groupBy === 'assignee';
 
                 return (
                   <div key={group.key}>
                     {/* Group Header */}
                     <div
                       className={`flex items-center justify-between px-4 py-3 ${colors.bg} ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} border ${colors.border} ${isCollapsed ? '' : 'border-b-0'} cursor-pointer select-none transition-all`}
-                      onClick={() => toggleUserCollapse(group.key)}
+                      onClick={() => toggleGroupCollapse(group.key)}
                     >
                       <div className="flex items-center gap-3">
                         {isCollapsed ? (
@@ -1701,52 +1993,38 @@ export default function TasksPage() {
                         ) : (
                           <ChevronDown className={`w-4 h-4 ${colors.text}`} />
                         )}
-                        {group.key === '_unassigned' ? (
-                          <div className="h-7 w-7 rounded-full bg-slate-200 flex items-center justify-center">
-                            <User className="h-3.5 w-3.5 text-slate-500" />
-                          </div>
-                        ) : photoUrl ? (
-                          <div className="h-7 w-7 rounded-full overflow-hidden relative flex-shrink-0">
-                            <img
-                              src={photoUrl}
-                              alt={group.label}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                target.nextElementSibling?.classList.remove('hidden');
-                              }}
-                            />
-                            <div className="h-7 w-7 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden text-white text-xs font-bold">
-                              {getUserInitials(group.label)}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-brand to-[#2d6470] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                            {getUserInitials(group.label)}
-                          </div>
-                        )}
+                        <GroupHeaderIcon
+                          groupBy={groupBy}
+                          groupKey={group.key}
+                          groupLabel={group.label}
+                          photoUrl={photoUrl}
+                          clientLogoUrl={groupBy === 'client' && !isCatchAllBucket ? clientLogoMap[group.key] : null}
+                          colors={colors}
+                          isCatchAllBucket={isCatchAllBucket}
+                        />
                         <h3 className={`font-semibold ${colors.text}`}>{group.label}</h3>
                         <Badge variant="secondary" className="text-xs font-medium">
                           {group.tasks.length}
                         </Badge>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`h-7 px-2 ${colors.text} hover:bg-black/10`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddNewRow(group.key);
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      {showAddButton && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-7 px-2 ${colors.text} hover:bg-black/10`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddNewRow(group.key);
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
                     {/* Group Table */}
                     {!isCollapsed && (
-                      <div className="bg-white rounded-b-lg border border-gray-200 border-t-0 overflow-hidden">
+                      <div className="bg-white rounded-b-lg border border-cream-200 border-t-0 overflow-hidden">
                         <div className="overflow-x-auto">
                           {renderTaskTable(group.tasks, group.key)}
                         </div>
@@ -1775,7 +2053,7 @@ export default function TasksPage() {
             <DialogTitle>Delete Task</DialogTitle>
             <DialogDescription>Are you sure you want to delete this task? This action cannot be undone.</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deletingId && handleDelete(deletingId)}>Delete</Button>
           </DialogFooter>
@@ -1789,6 +2067,135 @@ export default function TasksPage() {
         clients={clients}
         onCreated={fetchTasks}
       />
+    </div>
+  );
+}
+
+/**
+ * Renders the 28×28 round icon at the left of each group header.
+ * Behavior depends on the grouping dimension:
+ *   - assignee → photo (if available), initials fallback, or User icon
+ *     for the _unassigned bucket.
+ *   - client / type → letter tile in the rotation color.
+ *   - status / priority → semantic mini-icon (Circle/PlayCircle/
+ *     AlertTriangle/etc.) so the bucket reads at a glance without
+ *     reading the label.
+ *
+ * Kept as a sibling component instead of inlining because the assignee
+ * case alone is ~25 lines of conditional render.
+ */
+function GroupHeaderIcon({
+  groupBy,
+  groupKey,
+  groupLabel,
+  photoUrl,
+  clientLogoUrl,
+  colors,
+  isCatchAllBucket,
+}: {
+  groupBy: GroupByKey;
+  groupKey: string;
+  groupLabel: string;
+  photoUrl: string | null | undefined;
+  /** Client logo URL — only meaningful when groupBy === 'client' AND
+   *  the bucket isn't a catch-all (`_internal` / 'Other'). */
+  clientLogoUrl?: string | null;
+  colors: { bg: string; text: string; border: string };
+  isCatchAllBucket: boolean;
+}) {
+  // Assignee mode → photo / initials / generic User catch-all.
+  if (groupBy === 'assignee') {
+    if (isCatchAllBucket) {
+      return (
+        <div className="h-7 w-7 rounded-full bg-slate-200 flex items-center justify-center">
+          <User className="h-3.5 w-3.5 text-slate-500" />
+        </div>
+      );
+    }
+    if (photoUrl) {
+      return (
+        <div className="h-7 w-7 rounded-full overflow-hidden relative flex-shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photoUrl}
+            alt={groupLabel}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="h-7 w-7 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden text-white text-xs font-bold">
+            {getUserInitials(groupLabel)}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="h-7 w-7 rounded-full bg-gradient-to-br from-brand to-[#2d6470] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+        {getUserInitials(groupLabel)}
+      </div>
+    );
+  }
+
+  // Status mode → status mini-icon (Circle/PlayCircle/etc.) in the
+  // status-config tint, on a neutral background so the icon does the
+  // signaling.
+  if (groupBy === 'status') {
+    const cfg = STATUS_CONFIG[groupKey] || STATUS_CONFIG.to_do;
+    const Icon = cfg.icon;
+    return (
+      <div className="h-7 w-7 rounded-full bg-white border border-cream-200 flex items-center justify-center">
+        <Icon className={`h-4 w-4 ${cfg.color}`} />
+      </div>
+    );
+  }
+
+  // Priority mode → AlertTriangle for overdue/urgent, ChevronUp for
+  // high/medium, ChevronDown for low, CheckCircle2 for done. Tinted
+  // by the computed-priority palette.
+  if (groupBy === 'priority') {
+    const palette: Record<string, { Icon: typeof Circle; color: string }> = {
+      overdue:  { Icon: AlertTriangle, color: 'text-rose-700' },
+      urgent:   { Icon: AlertTriangle, color: 'text-rose-600' },
+      high:     { Icon: ChevronUp,     color: 'text-orange-600' },
+      medium:   { Icon: ChevronUp,     color: 'text-blue-600' },
+      low:      { Icon: ChevronDown,   color: 'text-ink-warm-400' },
+      complete: { Icon: CheckCircle2,  color: 'text-emerald-500' },
+    };
+    const cfg = palette[groupKey] || palette.low;
+    const Icon = cfg.Icon;
+    return (
+      <div className="h-7 w-7 rounded-full bg-white border border-cream-200 flex items-center justify-center">
+        <Icon className={`h-4 w-4 ${cfg.color}`} />
+      </div>
+    );
+  }
+
+  // Client mode → show the client's logo when available, otherwise
+  // fall through to the letter-tile fallback. Logo tile sits on a
+  // white background with a cream hairline so dark client logos
+  // don't blend into the colored header bg.
+  if (groupBy === 'client' && clientLogoUrl) {
+    return (
+      <div className="h-7 w-7 rounded-md overflow-hidden border border-cream-200 bg-white shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={clientLogoUrl}
+          alt={`${groupLabel} logo`}
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  // Client / type / none modes (no logo, or non-client) → first-letter
+  // tile in the rotation color, slate for catch-all buckets.
+  const letter = (groupLabel || '?').trim().charAt(0).toUpperCase();
+  return (
+    <div className={`h-7 w-7 rounded-md flex items-center justify-center text-xs font-semibold ${colors.bg} ${colors.text} border ${colors.border}`}>
+      {letter}
     </div>
   );
 }

@@ -38,9 +38,9 @@ export default function AIInsightsPage() {
     } catch (error) {
       console.error('Error loading insights:', error);
       toast({
-        title: "Error",
-        description: "Failed to load AI insights.",
-        variant: "destructive",
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load AI insights',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -58,7 +58,7 @@ export default function AIInsightsPage() {
 
   const handleApplyInsight = (insight: PredictiveInsight) => {
     toast({
-      title: "Insight Applied",
+      title: 'Insight applied',
       description: `Applied ${insight.type.replace('_', ' ')} insight to your campaign strategy.`,
     });
     // Here you would implement the actual application logic
@@ -82,6 +82,8 @@ export default function AIInsightsPage() {
           icon={Sparkles}
           title="AI Insights & Analytics"
           subtitle="Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns."
+          kicker="CRM · AI Insights"
+          kickerDot="brand"
         />
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
@@ -94,7 +96,7 @@ export default function AIInsightsPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="hover:shadow-md transition-shadow">
+            <Card key={i}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-4 w-4" />
@@ -107,7 +109,7 @@ export default function AIInsightsPage() {
         </div>
         <div className="grid gap-4">
           {[...Array(3)].map((_, i) => (
-            <Card key={i} className="hover:shadow-md transition-shadow">
+            <Card key={i}>
               <CardContent className="pt-6">
                 <Skeleton className="h-48 w-full" />
               </CardContent>
@@ -124,6 +126,8 @@ export default function AIInsightsPage() {
         icon={Sparkles}
         title="AI Insights & Analytics"
         subtitle="Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns."
+        kicker="CRM · AI Insights"
+        kickerDot="brand"
       />
 
       <Tabs defaultValue="insights" className="w-full">
@@ -147,9 +151,9 @@ export default function AIInsightsPage() {
         <TabsContent value="insights" className="space-y-6">
           {/* Time Range Selector */}
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Predictive Insights</h2>
+            <h2 className="text-xl font-semibold text-ink-warm-900">Predictive Insights</h2>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Time Range:</span>
+              <span className="text-sm text-ink-warm-700">Time Range:</span>
               <Select value={timeRange} onValueChange={setTimeRange}>
                 <SelectTrigger className="w-32">
                   <SelectValue />
@@ -180,7 +184,7 @@ export default function AIInsightsPage() {
           />
 
           {/* Quick Actions */}
-          <Card className="hover:shadow-md transition-shadow">
+          <Card>
             <CardHeader>
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
@@ -217,7 +221,7 @@ export default function AIInsightsPage() {
 
         <TabsContent value="analytics" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Performance Analytics</h2>
+            <h2 className="text-xl font-semibold text-ink-warm-900">Performance Analytics</h2>
             <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -235,49 +239,49 @@ export default function AIInsightsPage() {
             <div className="space-y-6">
               {/* Key Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2">
                       {getMetricIcon('campaigns')}
-                      <span className="text-sm font-medium text-gray-600">Total Campaigns</span>
+                      <span className="text-sm font-medium text-ink-warm-700">Total Campaigns</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">
+                    <p className="text-2xl font-bold text-ink-warm-900 mt-2">
                       {performanceData.campaignPerformance?.totalCampaigns || 0}
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2">
                       {getMetricIcon('engagement')}
-                      <span className="text-sm font-medium text-gray-600">Avg Engagement</span>
+                      <span className="text-sm font-medium text-ink-warm-700">Avg Engagement</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">
+                    <p className="text-2xl font-bold text-ink-warm-900 mt-2">
                       {((performanceData.campaignPerformance?.avgEngagement || 0) * 100).toFixed(1)}%
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2">
                       {getMetricIcon('budget')}
-                      <span className="text-sm font-medium text-gray-600">Total Spent</span>
+                      <span className="text-sm font-medium text-ink-warm-700">Total Spent</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">
+                    <p className="text-2xl font-bold text-ink-warm-900 mt-2">
                       ${(performanceData.budgetEfficiency?.totalSpent || 0).toLocaleString()}
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2">
                       {getMetricIcon('kols')}
-                      <span className="text-sm font-medium text-gray-600">ROI</span>
+                      <span className="text-sm font-medium text-ink-warm-700">ROI</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">
+                    <p className="text-2xl font-bold text-ink-warm-900 mt-2">
                       {(performanceData.budgetEfficiency?.roi || 0).toFixed(1)}x
                     </p>
                   </CardContent>
@@ -286,44 +290,44 @@ export default function AIInsightsPage() {
 
               {/* Performance Details */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardHeader>
                     <CardTitle>Campaign Performance</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Top Performing Region</span>
+                        <span className="text-sm text-ink-warm-700">Top Performing Region</span>
                         <span className="font-medium">{performanceData.campaignPerformance?.topPerformingRegion || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Top Platform</span>
+                        <span className="text-sm text-ink-warm-700">Top Platform</span>
                         <span className="font-medium">{performanceData.campaignPerformance?.topPerformingPlatform || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Cost per Engagement</span>
+                        <span className="text-sm text-ink-warm-700">Cost per Engagement</span>
                         <span className="font-medium">${performanceData.budgetEfficiency?.avgCostPerEngagement || 0}</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardHeader>
                     <CardTitle>Engagement Trends</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Trend</span>
+                        <span className="text-sm text-ink-warm-700">Trend</span>
                         <span className="font-medium capitalize">{performanceData.engagementTrends?.trend || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Growth Rate</span>
+                        <span className="text-sm text-ink-warm-700">Growth Rate</span>
                         <span className="font-medium">{(performanceData.engagementTrends?.growthRate || 0) * 100}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Peak Days</span>
+                        <span className="text-sm text-ink-warm-700">Peak Days</span>
                         <span className="font-medium">{(performanceData.engagementTrends?.peakDays || []).join(', ')}</span>
                       </div>
                     </div>
@@ -333,7 +337,7 @@ export default function AIInsightsPage() {
 
               {/* Recommendations */}
               {performanceData.recommendations && performanceData.recommendations.length > 0 && (
-                <Card className="hover:shadow-md transition-shadow">
+                <Card>
                   <CardHeader>
                     <CardTitle>AI Recommendations</CardTitle>
                   </CardHeader>
@@ -341,7 +345,7 @@ export default function AIInsightsPage() {
                     <div className="space-y-3">
                       {performanceData.recommendations.map((rec: string, index: number) => (
                         <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                          <Target className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <Target className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
                           <p className="text-sm text-blue-900">{rec}</p>
                         </div>
                       ))}

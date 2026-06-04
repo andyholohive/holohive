@@ -40,8 +40,8 @@ export function TaskChecklist({ taskId }: TaskChecklistProps) {
       await TaskService.addChecklistItem(taskId, newItemText.trim(), items.length);
       setNewItemText('');
       await loadItems();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to add item.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Add failed', description: err instanceof Error ? err.message : 'Failed to add item', variant: 'destructive' });
     }
   };
 
@@ -65,8 +65,8 @@ export function TaskChecklist({ taskId }: TaskChecklistProps) {
       setEditingItemId(null);
       setEditText('');
       await loadItems();
-    } catch {
-      toast({ title: 'Error', description: 'Failed to update item.', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Update failed', description: err instanceof Error ? err.message : 'Failed to update item', variant: 'destructive' });
     }
   };
 

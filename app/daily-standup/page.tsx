@@ -74,7 +74,7 @@ export default function DailyStandupPage() {
 
   useEffect(() => {
     fetchStandups();
-    UserService.getAllUsers().then((users) => {
+    UserService.getActiveUsers().then((users) => {
       setTeamMembers(
         users
           .filter(u => u.role !== 'client')
@@ -178,7 +178,7 @@ export default function DailyStandupPage() {
           .update(payload)
           .eq('id', editingId);
         if (error) throw error;
-        toast({ title: 'Updated', description: 'Stand-up entry updated.' });
+        toast({ title: 'Stand-up updated' });
       } else {
         const { error } = await supabase
           .from('daily_standups')
@@ -189,7 +189,7 @@ export default function DailyStandupPage() {
             submission_date: todayStr,
           });
         if (error) throw error;
-        toast({ title: 'Submitted', description: 'Daily stand-up submitted.' });
+        toast({ title: 'Stand-up submitted' });
       }
 
       setIsFormOpen(false);
@@ -198,7 +198,7 @@ export default function DailyStandupPage() {
       await fetchStandups();
     } catch (err) {
       console.error('Error submitting standup:', err);
-      toast({ title: 'Error', description: 'Failed to submit stand-up.', variant: 'destructive' });
+      toast({ title: 'Submit failed', description: err instanceof Error ? err.message : 'Failed to submit stand-up', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -237,6 +237,8 @@ export default function DailyStandupPage() {
         icon={CheckCircle}
         title="Daily Stand-Up"
         subtitle="Track daily priorities and progress across the team"
+        kicker="Workspace · Daily Stand-Up"
+        kickerDot="brand"
         actions={(
           <>
             <Button
@@ -262,13 +264,13 @@ export default function DailyStandupPage() {
                 </div>
               ) : (
                 <Tabs value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
+                  <TabsList className="bg-cream-100 p-1 h-auto flex-wrap">
                     <TabsTrigger
                       value="all"
                       className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                     >
                       All
-                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{standups.length}</span>
+                      <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full">{standups.length}</span>
                     </TabsTrigger>
                     {activeMembers.map((member) => (
                       <TabsTrigger
@@ -287,7 +289,7 @@ export default function DailyStandupPage() {
             {/* Search */}
             <div className="flex flex-wrap items-center gap-3 pt-4">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                 <Input
                   placeholder="Search priorities, goals, blockers..."
                   className="pl-10 focus-brand"
@@ -315,8 +317,8 @@ export default function DailyStandupPage() {
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-16">
-                  <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">
+                  <ClipboardList className="h-12 w-12 text-ink-warm-300 mx-auto mb-3" />
+                  <p className="text-ink-warm-500 font-medium">
                     {standups.length === 0 ? 'No stand-up submissions yet.' : 'No entries match your filters.'}
                   </p>
                   {standups.length === 0 && !hasSubmittedToday && (
@@ -332,18 +334,18 @@ export default function DailyStandupPage() {
                     <div key={date} className="px-6 py-5">
                       {/* Date header */}
                       <div className="flex items-center gap-2 mb-4">
-                        <CalendarIcon className="h-4 w-4 text-gray-400" />
-                        <h3 className="text-sm font-semibold text-gray-700">{formatDate(date)}</h3>
-                        <span className="text-xs text-gray-400">{date}</span>
-                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{entries.length} {entries.length === 1 ? 'submission' : 'submissions'}</span>
+                        <CalendarIcon className="h-4 w-4 text-ink-warm-400" />
+                        <h3 className="text-sm font-semibold text-ink-warm-700">{formatDate(date)}</h3>
+                        <span className="text-xs text-ink-warm-400">{date}</span>
+                        <span className="text-xs bg-cream-100 text-ink-warm-500 px-2 py-0.5 rounded-full">{entries.length} {entries.length === 1 ? 'submission' : 'submissions'}</span>
                       </div>
 
                       {/* Entries grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {entries.map((entry) => (
-                          <div key={entry.id} className="border border-gray-200 rounded-xl bg-white hover:shadow-md transition-all group overflow-hidden">
+                          <div key={entry.id} className="border border-cream-200 rounded-xl bg-white group overflow-hidden">
                             {/* Card header with colored top border */}
-                            <div className="border-b border-gray-100 bg-gray-50/50 px-5 py-3">
+                            <div className="border-b border-cream-100 bg-cream-50/50 px-5 py-3">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   {userPhotoMap[entry.user_id] ? (
@@ -360,8 +362,8 @@ export default function DailyStandupPage() {
                                     </div>
                                   )}
                                   <div>
-                                    <p className="text-sm font-semibold text-gray-900">{entry.user_name}</p>
-                                    <p className="text-xs text-gray-400">{formatTime(entry.submitted_at)}</p>
+                                    <p className="text-sm font-semibold text-ink-warm-900">{entry.user_name}</p>
+                                    <p className="text-xs text-ink-warm-400">{formatTime(entry.submitted_at)}</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -376,8 +378,8 @@ export default function DailyStandupPage() {
                                   )}
                                   {entry.user_id === user?.id && (
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-200" onClick={() => openForm(entry)}>
-                                        <Edit className="h-3.5 w-3.5 text-gray-500" />
+                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-200" onClick={() => openForm(entry)}>
+                                        <Edit className="h-3.5 w-3.5 text-ink-warm-500" />
                                       </Button>
                                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
                                         <Trash2 className="h-3.5 w-3.5 text-rose-500" />
@@ -393,13 +395,13 @@ export default function DailyStandupPage() {
                               {/* Priorities */}
                               <div>
                                 <p className="text-xs font-semibold text-brand uppercase tracking-wider mb-1.5">Top Priorities</p>
-                                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{entry.priorities}</p>
+                                <p className="text-sm text-ink-warm-700 whitespace-pre-wrap leading-relaxed">{entry.priorities}</p>
                               </div>
 
                               {/* Output Goal */}
                               <div>
-                                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1.5">Output Goal</p>
-                                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{entry.output_goal}</p>
+                                <p className="text-xs font-semibold text-brand uppercase tracking-wider mb-1.5">Output Goal</p>
+                                <p className="text-sm text-ink-warm-700 whitespace-pre-wrap leading-relaxed">{entry.output_goal}</p>
                               </div>
 
                               {/* Blockers */}
@@ -446,7 +448,7 @@ export default function DailyStandupPage() {
             {/* Top Priorities */}
             <div className="grid gap-2">
               <Label>Top 1-2 Priorities <span className="text-rose-500">*</span></Label>
-              <p className="text-xs text-gray-400 -mt-1">What will you finish or move forward significantly today? (e.g., "Send outbound pitch deck to 10 partners" instead of "Work on deck")</p>
+              <p className="text-xs text-ink-warm-400 -mt-1">What will you finish or move forward significantly today? (e.g., "Send outbound pitch deck to 10 partners" instead of "Work on deck")</p>
               <Textarea
                 value={form.priorities}
                 onChange={(e) => setForm({ ...form, priorities: e.target.value })}
@@ -459,7 +461,7 @@ export default function DailyStandupPage() {
             {/* Output Goal */}
             <div className="grid gap-2">
               <Label>Output Goal <span className="text-rose-500">*</span></Label>
-              <p className="text-xs text-gray-400 -mt-1">Quantify what success looks like today (e.g., "Book 2 calls")</p>
+              <p className="text-xs text-ink-warm-400 -mt-1">Quantify what success looks like today (e.g., "Book 2 calls")</p>
               <Textarea
                 value={form.output_goal}
                 onChange={(e) => setForm({ ...form, output_goal: e.target.value })}
@@ -472,7 +474,7 @@ export default function DailyStandupPage() {
             {/* Blockers */}
             <div className="grid gap-2">
               <Label>Any blockers, comments, etc.</Label>
-              <p className="text-xs text-gray-400 -mt-1">Is anything slowing you down?</p>
+              <p className="text-xs text-ink-warm-400 -mt-1">Is anything slowing you down?</p>
               <Textarea
                 value={form.blockers}
                 onChange={(e) => setForm({ ...form, blockers: e.target.value })}
@@ -482,7 +484,7 @@ export default function DailyStandupPage() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
             <Button variant="brand" onClick={handleSubmit} disabled={!form.completed_yesterday || !form.priorities.trim() || !form.output_goal.trim() || submitting}>
               {submitting ? (
@@ -500,7 +502,7 @@ export default function DailyStandupPage() {
             <DialogTitle>Delete Stand-Up Entry</DialogTitle>
             <DialogDescription>Are you sure you want to delete this stand-up entry? This action cannot be undone.</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deletingId && handleDelete(deletingId)}>Delete</Button>
           </DialogFooter>

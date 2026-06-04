@@ -255,13 +255,10 @@ export default function TeamPage() {
             member.id === userId ? { ...member, role: newRole } : member
           )
         );
-        toast({
-          title: 'Role updated',
-          description: 'User role has been updated successfully.',
-        });
+        toast({ title: 'Role updated' });
       } else {
         toast({
-          title: 'Error',
+          title: 'Update failed',
           description: 'Failed to update user role.',
           variant: 'destructive',
         });
@@ -269,8 +266,8 @@ export default function TeamPage() {
     } catch (error) {
       console.error('Error updating role:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update user role.',
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Failed to update user role',
         variant: 'destructive',
       });
     } finally {
@@ -298,11 +295,11 @@ export default function TeamPage() {
         );
         toast({
           title: 'User approved',
-          description: `${member.name} has been approved and can now access the app.`,
+          description: `${member.name} can now access the app.`,
         });
       } else {
         toast({
-          title: 'Error',
+          title: 'Approve failed',
           description: 'Failed to approve user.',
           variant: 'destructive',
         });
@@ -310,8 +307,8 @@ export default function TeamPage() {
     } catch (error) {
       console.error('Error approving user:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to approve user.',
+        title: 'Approve failed',
+        description: error instanceof Error ? error.message : 'Failed to approve user',
         variant: 'destructive',
       });
     } finally {
@@ -327,11 +324,11 @@ export default function TeamPage() {
         setTeamMembers(prev => prev.filter(m => m.id !== member.id));
         toast({
           title: 'User rejected',
-          description: `${member.name}'s sign-up request has been rejected.`,
+          description: `${member.name}'s sign-up request rejected.`,
         });
       } else {
         toast({
-          title: 'Error',
+          title: 'Reject failed',
           description: 'Failed to reject user.',
           variant: 'destructive',
         });
@@ -339,8 +336,8 @@ export default function TeamPage() {
     } catch (error) {
       console.error('Error rejecting user:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to reject user.',
+        title: 'Reject failed',
+        description: error instanceof Error ? error.message : 'Failed to reject user',
         variant: 'destructive',
       });
     } finally {
@@ -360,11 +357,11 @@ export default function TeamPage() {
         );
         toast({
           title: 'User deactivated',
-          description: `${member.name} has been deactivated and can no longer access the app.`,
+          description: `${member.name} can no longer access the app.`,
         });
       } else {
         toast({
-          title: 'Error',
+          title: 'Deactivate failed',
           description: 'Failed to deactivate user.',
           variant: 'destructive',
         });
@@ -372,8 +369,8 @@ export default function TeamPage() {
     } catch (error) {
       console.error('Error deactivating user:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to deactivate user.',
+        title: 'Deactivate failed',
+        description: error instanceof Error ? error.message : 'Failed to deactivate user',
         variant: 'destructive',
       });
     } finally {
@@ -390,11 +387,11 @@ export default function TeamPage() {
         setConfirmDeleteId(null);
         toast({
           title: 'User removed',
-          description: `${member.name} has been removed from the team.`,
+          description: `${member.name} removed from the team.`,
         });
       } else {
         toast({
-          title: 'Error',
+          title: 'Remove failed',
           description: 'Failed to remove user.',
           variant: 'destructive',
         });
@@ -402,8 +399,8 @@ export default function TeamPage() {
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to remove user.',
+        title: 'Remove failed',
+        description: error instanceof Error ? error.message : 'Failed to remove user',
         variant: 'destructive',
       });
     } finally {
@@ -423,8 +420,8 @@ export default function TeamPage() {
       if (error) {
         console.error('Error fetching team members:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to fetch team members.',
+          title: 'Load failed',
+          description: error instanceof Error ? error.message : 'Failed to fetch team members',
           variant: 'destructive',
         });
         return;
@@ -434,8 +431,8 @@ export default function TeamPage() {
     } catch (error) {
       console.error('Error fetching team members:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to fetch team members.',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to fetch team members',
         variant: 'destructive',
       });
     } finally {
@@ -717,12 +714,11 @@ export default function TeamPage() {
                           onClick={() => handleReject(member)}
                           disabled={approvingId === member.id || rejectingId === member.id}
                           variant="outline"
-                          // Explicit hover:text-rose-700 — without it,
-                          // the shadcn outline variant's
-                          // `hover:text-accent-foreground` kicks in and
-                          // the label turns dark gray on hover. Same
-                          // fix applied to Deactivate / Remove below.
-                          className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                          // The outline variant's hover:text-accent-foreground
+                          // was stripped at the source (2026-06-03 audit) so
+                          // text-rose-600 holds on hover without needing an
+                          // inline override.
+                          className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50"
                           size="sm"
                         >
                           {rejectingId === member.id ? (
@@ -861,9 +857,9 @@ export default function TeamPage() {
                                 variant="ghost"
                                 size="sm"
                                 className={`h-7 px-2 text-sm font-medium ${
-                                  state === 'linked' ? 'text-emerald-600 hover:text-emerald-700'
-                                    : state === 'orphan' ? 'text-amber-600 hover:text-amber-700'
-                                    : 'text-rose-600 hover:text-rose-700'
+                                  state === 'linked' ? 'text-emerald-600'
+                                    : state === 'orphan' ? 'text-amber-600'
+                                    : 'text-rose-600'
                                 }`}
                                 disabled={linkingMemberId === member.id}
                               >
@@ -952,7 +948,7 @@ export default function TeamPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                    className="w-full text-rose-600 hover:bg-rose-50"
                                     onClick={() => handleLinkTelegram(member, null)}
                                   >
                                     <X className="h-3.5 w-3.5 mr-1.5" />
@@ -1053,7 +1049,7 @@ export default function TeamPage() {
                                 onClick={() => handleDeactivate(member)}
                                 disabled={deactivatingId === member.id}
                                 variant="outline"
-                                className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                                className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
                                 size="sm"
                               >
                                 {deactivatingId === member.id ? (
@@ -1068,7 +1064,7 @@ export default function TeamPage() {
                               <Button
                                 onClick={() => setConfirmDeleteId(member.id)}
                                 variant="outline"
-                                className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50"
                                 size="sm"
                               >
                                 <Trash2 className="h-3 w-3 mr-1" />

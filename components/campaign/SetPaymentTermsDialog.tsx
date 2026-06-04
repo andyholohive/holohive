@@ -154,7 +154,7 @@ export default function SetPaymentTermsDialog({
     } catch (err: any) {
       console.error('Error saving payment terms:', err);
       toast({
-        title: 'Error',
+        title: 'Save failed',
         description: err?.message ?? 'Failed to save payment terms',
         variant: 'destructive',
       });
@@ -245,7 +245,7 @@ export default function SetPaymentTermsDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

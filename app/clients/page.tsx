@@ -389,7 +389,7 @@ export default function ClientsPage() {
       setAccessLogRows((data || []) as any);
     } catch (err) {
       console.error('Error loading portal access log:', err);
-      toast({ title: 'Error', description: 'Failed to load access log.', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to load access log', variant: 'destructive' });
     } finally {
       setAccessLogLoading(false);
     }
@@ -400,8 +400,8 @@ export default function ClientsPage() {
     const portalUrl = `${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`;
     navigator.clipboard.writeText(portalUrl);
     toast({
-      title: 'Link Copied',
-      description: 'Portal link has been copied to clipboard',
+      title: 'Link copied',
+      description: 'Portal link copied to clipboard.',
     });
   };
 
@@ -417,8 +417,8 @@ export default function ClientsPage() {
     if (!url) return;
     navigator.clipboard.writeText(url);
     toast({
-      title: 'Link Copied',
-      description: `${formName} link has been copied to clipboard`,
+      title: 'Link copied',
+      description: `${formName} link copied to clipboard.`,
     });
   };
 
@@ -427,7 +427,7 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchClients();
     if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') {
-      UserService.getAllUsers().then(setAllUsers);
+      UserService.getActiveUsers().then(setAllUsers);
     }
     fetchPartners();
   }, [user?.id, userProfile?.role]);
@@ -1318,7 +1318,7 @@ export default function ClientsPage() {
     } catch (err: any) {
       console.error('Failed to update phase:', err);
       setLatestCampaign({ ...latestCampaign, current_phase: prevPhase });
-      toast({ title: 'Error', description: 'Failed to update phase.', variant: 'destructive' });
+      toast({ title: 'Phase update failed', description: err?.message ?? 'Failed to update phase', variant: 'destructive' });
     } finally {
       setSavingPhase(false);
     }
@@ -2882,7 +2882,7 @@ export default function ClientsPage() {
                                 key={account.id}
                                 variant="outline"
                                 className="text-xs cursor-pointer hover:bg-cream-100 max-w-full"
-                                onClick={() => router.push('/crm/pipeline?tab=accounts')}
+                                onClick={() => router.push('/crm/sales-pipeline?tab=accounts')}
                               >
                                 <LinkIcon className="h-3 w-3 mr-1 flex-shrink-0" />
                                 <span className="font-semibold truncate">{account.name}</span>
@@ -3154,7 +3154,7 @@ export default function ClientsPage() {
                 Are you sure you want to archive <span className="font-semibold">{clientToDelete?.name}</span>? The client and its data will be moved to the Archive and can be restored later.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
                 Cancel
               </Button>

@@ -203,7 +203,7 @@ export default function Sidebar({ children }: SidebarProps) {
   // Helper: hide items that guests should never see
   const guestHideAlways = guestStillLoading || isGuestUser;
 
-  // ─── Auto-scroll active nav item into view ───────────────────────
+  // ─── Auto-scroll + auto-expand active nav item to top ───────────
   // The sidebar's <nav> overflows scrollable when the nav list is
   // long. When a user navigates to a page whose link sits below the
   // current scroll viewport (e.g. Claude MCP, Archive, anything in
@@ -211,22 +211,96 @@ export default function Sidebar({ children }: SidebarProps) {
   // off-screen — they have to scroll down to confirm which page
   // they're on.
   //
-  // Fix: on every pathname change, find the element marked
-  // data-nav-active="true" inside the nav and scroll it into view
-  // with `block: 'nearest'` (only scrolls if needed; no-op when
-  // already visible). Smooth behavior so it feels intentional, not
-  // jarring. requestAnimationFrame waits for React to commit the
-  // new active state to the DOM before we measure.
+  // Three-step fix:
+  //
+  // STEP 1 — auto-expand the section that contains the active route.
+  // CollapsibleSection's `{!isCollapsed && <div>{children}</div>}`
+  // means children aren't rendered at all when the section is
+  // collapsed; if the user has the section folded and navigates
+  // INTO it, `data-nav-active` doesn't exist in the DOM and
+  // scrollIntoView has nothing to find. We use a path-prefix
+  // registry (SECTION_PREFIXES) to figure out which section owns
+  // the current pathname, then flip its collapsed state to false
+  // before the scroll runs.
+  //
+  // STEP 2 — double-rAF to wait for the auto-expand re-render. A
+  // single requestAnimationFrame fires before React has committed
+  // the state change from step 1, so the active element may still
+  // not be in the DOM when we query for it. Two RAFs guarantee at
+  // least one commit cycle has flushed. (One RAF is enough when
+  // the section was already expanded; double-RAF only matters on
+  // first navigation into a collapsed section.)
+  //
+  // STEP 3 — scrollIntoView({ block: 'start' }) pins the active
+  // item to the TOP of the scroll viewport — "as high as possible"
+  // so it's the most-prominent thing visible on the sidebar after
+  // navigation. Was 'nearest' before, which only nudged the item
+  // into view at the nearest edge (worked but kept the active item
+  // wherever it happened to land — felt inconsistent). `behavior:
+  // 'auto'` keeps it instant (no scroll-animation lag).
+  //
+  // Deps:
+  //   - pathname:        the obvious trigger for in-app navigation
+  //   - userProfile?.id: the nav is gated on userProfile (loading
+  //     branch renders skeleton rows with no data-nav-active marker).
+  //     Without this dep, when the profile loads AFTER first paint,
+  //     the active item mounts but the effect doesn't re-fire and
+  //     the sidebar stays scrolled to the top.
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const active = navRef.current?.querySelector('[data-nav-active="true"]');
-      if (active && active instanceof HTMLElement) {
-        active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // Section path-prefix registry. Keep in sync with CollapsibleSection
+    // `id` values + the NavItems rendered inside each section.
+    const SECTION_PREFIXES: Record<string, string[]> = {
+      people:    ['/team', '/clients'],
+      kols:      ['/kols', '/lists', '/campaigns'],
+      crm:       ['/crm/', '/intelligence', '/analytics'],
+      workspace: ['/tasks', '/templates', '/sops', '/reminders', '/daily-standup'],
+      documents: ['/delivery-logs', '/mindshare', '/wallets', '/forms', '/expenses', '/links'],
+      admin:     ['/admin'],
+    };
+
+    // Find which section (if any) owns the current path.
+    let owningSection: string | null = null;
+    for (const [id, prefixes] of Object.entries(SECTION_PREFIXES)) {
+      if (prefixes.some(p => pathname.startsWith(p))) {
+        owningSection = id;
+        break;
       }
+    }
+
+    // STEP 1: expand the owning section if it's currently collapsed.
+    // Functional setState — only fires a re-render when something
+    // actually changes, so non-collapsed paths are a no-op.
+    if (owningSection && collapsedSections[owningSection]) {
+      setCollapsedSections(prev => {
+        if (!prev[owningSection!]) return prev;
+        const next = { ...prev };
+        delete next[owningSection!];
+        return next;
+      });
+    }
+
+    // STEP 2 + 3: double-rAF, then scroll to top.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        const active = navRef.current?.querySelector('[data-nav-active="true"]');
+        if (active && active instanceof HTMLElement) {
+          active.scrollIntoView({ block: 'start', behavior: 'auto' });
+        }
+      });
     });
-    return () => cancelAnimationFrame(id);
-  }, [pathname]);
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+    // collapsedSections intentionally excluded — it changes inside
+    // this effect via setCollapsedSections, and including it would
+    // re-fire the effect immediately after the expand, double-
+    // running the scroll. The expand-then-scroll happens in two
+    // commits within the same pathname/userProfile change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, userProfile?.id]);
 
   // ─── Nav-item helpers ──────────────────────────────────────────────
   // Extract the repeated <Link><Button>...</Button></Link> pattern that
@@ -289,16 +363,27 @@ export default function Sidebar({ children }: SidebarProps) {
     );
   };
 
-  /** A nested item under a NavItem (currently used by the Tasks
-   *  sub-nav). Smaller, indented, uses 'secondary' variant for active
-   *  state instead of the brand-color default. `exact` matches the
-   *  pathname exactly (for "/tasks") rather than starts-with (for
-   *  "/tasks/admin" etc.).
+  /** A nested item under a NavItem (currently used by the HQ sub-nav).
+   *  Smaller than NavItem (h-7 vs h-8, text-[12px] vs text-[13px], 13px
+   *  icons vs 15px) but otherwise mirrors NavItem's v11 chrome so the
+   *  HQ sub-menu reads as the same family as the top-level sidebar:
+   *  active rows get brand-soft + brand-deep + 3px accent rail + bold;
+   *  inactive rows hover to cream-100 with ink-warm-700 text.
+   *
+   *  `exact` matches the pathname exactly (for "/tasks") rather than
+   *  starts-with (for "/tasks/admin" etc.) — so the parent /tasks
+   *  doesn't stay highlighted when the user is on a deeper sub-route.
    *
    *  Note: a sub-nav item never sets data-nav-active because the
    *  parent NavItem already does (its prefix match catches the sub-
    *  route too). Otherwise we'd scroll twice and the nav would land
-   *  on the sub-item, which buries the parent. */
+   *  on the sub-item, which buries the parent.
+   *
+   *  Pre-v11 the active state used shadcn's `secondary` variant
+   *  (cream-ish fill, gray text) and the inactive used `ghost` — both
+   *  bypass the brand palette and read as a different design family
+   *  than NavItem. Updated 2026-06-03 to match the rest of the
+   *  sidebar. */
   const SubNavItem = ({
     href,
     icon: Icon,
@@ -311,15 +396,18 @@ export default function Sidebar({ children }: SidebarProps) {
     exact?: boolean;
   }) => {
     const isActive = exact ? pathname === href : pathname.startsWith(href);
+    const activeClass = isActive
+      ? 'bg-brand-soft text-brand-deep accent-l-brand font-semibold'
+      : 'hover:bg-cream-100 text-ink-warm-700';
     return (
       <Link href={href} legacyBehavior>
         <Button
           asChild
-          variant={isActive ? 'secondary' : 'ghost'}
-          className="w-full justify-start h-7 text-xs"
+          variant="ghost"
+          className={`w-full justify-start h-7 px-2.5 text-[12px] font-medium transition-colors ${activeClass}`}
         >
           <span>
-            <Icon className="h-3.5 w-3.5 mr-2" />
+            <Icon className="h-[13px] w-[13px] mr-2" />
             {label}
           </span>
         </Button>
@@ -625,16 +713,34 @@ export default function Sidebar({ children }: SidebarProps) {
                   {!isSidebarCollapsed && (pathname.startsWith('/tasks') || pathname === '/templates' || pathname === '/sops') && (
                     <div className="pl-6 space-y-0.5">
                       <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
-                      <SubNavItem href="/tasks/my-dashboard" icon={LayoutDashboard} label="My Dashboard" exact />
+                      {/* "My Dashboard" sub-nav removed 2026-06-03 — the
+                          personal view was merged into /dashboard as the
+                          first tab, so it now sits under the main
+                          Dashboard sidebar item (not HQ). The old route
+                          /tasks/my-dashboard still works via a redirect
+                          so existing bookmarks/Telegram links don't 404. */}
                       <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
                       {!guestHideAlways && <SubNavItem href="/templates" icon={MessageSquare} label="Templates" exact />}
                       {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                         <>
                           <SubNavItem href="/sops" icon={BookOpen} label="SOPs" exact />
-                          <SubNavItem href="/tasks/admin" icon={ShieldCheck} label="Admin Overview" exact />
+                          {/* "Admin Overview" sub-nav removed 2026-06-03 —
+                              the page was killed per Jdot's Priority
+                              Dashboard v2 spec; its three sections
+                              (Overall Stats / Tasks per Member / Tasks
+                              per Client) all live richer on /dashboard
+                              under the Internal Success + Client Success
+                              tabs. The old route /tasks/admin still works
+                              via a redirect for bookmarks/SOP links. */}
                           <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
-                          <SubNavItem href="/tasks/templates" icon={FileText} label="Task Templates" exact />
-                          <SubNavItem href="/tasks/deliverables/templates" icon={Sliders} label="Deliverable Templates" exact />
+                          {/* "Task Templates" + "Deliverable Templates" sub-nav
+                              entries removed 2026-06-03 — both consolidated
+                              into /templates as the "Tasks" + "Deliverables"
+                              tabs. The unified "Templates" sub-nav above
+                              (visible to non-guests) is the single entry
+                              point now. Old routes /tasks/templates and
+                              /tasks/deliverables/templates still work via
+                              redirects so bookmarks/SOP links don't 404. */}
                         </>
                       )}
                     </div>

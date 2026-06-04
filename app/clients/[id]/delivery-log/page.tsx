@@ -12,6 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
@@ -63,7 +64,7 @@ const TRIGGERS = ['Client Request', 'Follow-Up Needed', 'SOP', 'Extra'] as const
 const workTypeBadge = (type: string) => {
   return type === 'Client-Facing'
     ? 'bg-blue-100 text-blue-800'
-    : 'bg-gray-100 text-gray-700';
+    : 'bg-cream-100 text-ink-warm-700';
 };
 
 const triggerBadge = (trigger: string) => {
@@ -72,7 +73,7 @@ const triggerBadge = (trigger: string) => {
     case 'Follow-Up Needed': return 'bg-yellow-100 text-yellow-800';
     case 'SOP': return 'bg-emerald-100 text-emerald-800';
     case 'Extra': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-700';
+    default: return 'bg-cream-100 text-ink-warm-700';
   }
 };
 
@@ -143,7 +144,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     fetchClient();
     fetchEntries(true);
-    UserService.getAllUsers().then((users) => {
+    UserService.getActiveUsers().then((users) => {
       setTeamMembers(users.filter(u => u.role !== 'client').map(u => ({ id: u.id, name: u.name || u.email })));
     });
   }, [clientId]);
@@ -430,7 +431,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
             onValueChange={(v) => saveSelectField(entry.id, 'trigger', v)}
           >
             <SelectTrigger
-              className={`border-none shadow-none bg-transparent w-auto h-auto ${entry.trigger ? triggerBadge(entry.trigger) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+              className={`border-none shadow-none bg-transparent w-auto h-auto ${entry.trigger ? triggerBadge(entry.trigger) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
               style={{ outline: 'none', boxShadow: 'none' }}
             >
               <SelectValue placeholder="—" />
@@ -476,7 +477,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               <button type="button" className="text-[10px] text-brand hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
                 {inlineWhoMode === 'team' ? 'Manual' : 'Team'}
               </button>
-              <button type="button" className="text-[10px] text-gray-400 hover:underline" onClick={cancelEditing}>Cancel</button>
+              <button type="button" className="text-[10px] text-ink-warm-400 hover:underline" onClick={cancelEditing}>Cancel</button>
             </div>
           </td>
         );
@@ -487,7 +488,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
           onDoubleClick={() => startEditing(entry.id, field, value)}
           title="Double-click to edit"
         >
-          <span className="text-gray-600">{value || '—'}</span>
+          <span className="text-ink-warm-700">{value || '—'}</span>
         </td>
       );
     }
@@ -516,7 +517,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
           onDoubleClick={() => startEditing(entry.id, field, value)}
           title="Double-click to edit"
         >
-          <span className="text-gray-600 line-clamp-2 whitespace-pre-wrap">{value || '—'}</span>
+          <span className="text-ink-warm-700 line-clamp-2 whitespace-pre-wrap">{value || '—'}</span>
         </td>
       );
     }
@@ -547,7 +548,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
         onDoubleClick={() => startEditing(entry.id, field, value)}
         title="Double-click to edit"
       >
-        <span className={`${field === 'action' ? 'line-clamp-2 text-gray-900 font-medium' : 'text-gray-600'} ${field === 'location' ? 'truncate block' : ''}`}>
+        <span className={`${field === 'action' ? 'line-clamp-2 text-ink-warm-900 font-medium' : 'text-ink-warm-700'} ${field === 'location' ? 'truncate block' : ''}`}>
           {value || '—'}
         </span>
       </td>
@@ -558,46 +559,36 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     <div className="space-y-6">
       <Button
         variant="ghost"
-        className="py-2 px-3 rounded-md text-gray-600 hover:text-brand transition-colors text-sm w-fit"
+        className="py-2 px-3 rounded-md text-ink-warm-700 transition-colors text-sm w-fit"
         onClick={() => router.push('/clients')}
       >
         <ArrowLeft className="h-4 w-4 mr-2" />Back to Clients
       </Button>
 
-      {/* Header — custom block (not PageHeader) because the icon slot
-          shows the client logo when set, falling back to a Building2
-          square. PageHeader's icon prop only accepts a component, not
-          an img URL, so this stays inline. */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          {client?.logo_url ? (
-            <img src={client.logo_url} alt={client.name} className="h-10 w-10 object-contain rounded-lg flex-shrink-0" />
-          ) : (
-            <Building2 className="h-5 w-5 text-gray-700 flex-shrink-0" />
-          )}
-          <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <span className="truncate">Delivery Log</span>
-            </h2>
-            <p className="text-sm text-gray-600 mt-0.5">{client?.name || 'Loading...'}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Inline
-          </Button>
-          <Button variant="brand" onClick={() => openForm()}>
-            <Expand className="h-4 w-4 mr-2" />
-            Add via Form
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={ClipboardList}
+        title={`${client?.name || 'Client'} — Delivery Log`}
+        subtitle="Per-client delivery log entries"
+        kicker="Clients · Delivery Log"
+        kickerDot="brand"
+        actions={(
+          <>
+            <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Inline
+            </Button>
+            <Button variant="brand" onClick={() => openForm()}>
+              <Expand className="h-4 w-4 mr-2" />
+              Add via Form
+            </Button>
+          </>
+        )}
+      />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                 <Input
                   placeholder="Search actions, who, notes..."
                   className="pl-10 focus-brand"
@@ -607,7 +598,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               </div>
               <Select value={filterWorkType} onValueChange={setFilterWorkType}>
                 <SelectTrigger className="w-[160px] focus-brand">
-                  <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                  <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
                   <SelectValue placeholder="Work Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -617,7 +608,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               </Select>
               <Select value={filterTrigger} onValueChange={setFilterTrigger}>
                 <SelectTrigger className="w-[180px] focus-brand">
-                  <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                  <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
                   <SelectValue placeholder="Trigger" />
                 </SelectTrigger>
                 <SelectContent>
@@ -640,8 +631,8 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 </div>
               ) : filtered.length === 0 && !isAddingInline ? (
                 <div className="text-center py-16">
-                  <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">
+                  <ClipboardList className="h-12 w-12 text-ink-warm-300 mx-auto mb-3" />
+                  <p className="text-ink-warm-500 font-medium">
                     {entries.length === 0 ? 'No delivery log entries yet.' : 'No entries match your filters.'}
                   </p>
                   {entries.length === 0 && (
@@ -659,21 +650,21 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-t border-b border-gray-200 bg-gray-50/80">
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap w-14">
-                          <button className="inline-flex items-center gap-1 hover:text-gray-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>
+                      <tr className="border-t border-b border-cream-200 bg-cream-50/80">
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap w-14">
+                          <button className="inline-flex items-center gap-1 hover:text-ink-warm-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>
                             Day
                             <ArrowUpDown className="h-3 w-3" />
                           </button>
                         </th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Type</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Action</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Who</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">How</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Where</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Trigger</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Notes</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Date</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Type</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider">Action</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Who</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">How</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Where</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Trigger</th>
+                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider">Notes</th>
                         <th className="text-right py-3 px-4 w-20"></th>
                       </tr>
                     </thead>
@@ -681,11 +672,11 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                       {/* Inline add row */}
                       {isAddingInline && (
                         <tr className="border-b border-brand/20 bg-brand-light/20">
-                          <td className="py-3 px-4 text-gray-400 text-xs">—</td>
+                          <td className="py-3 px-4 text-ink-warm-400 text-xs">—</td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="text-sm text-gray-500 hover:text-gray-700 cursor-pointer">
+                                <button className="text-sm text-ink-warm-500 hover:text-ink-warm-700 cursor-pointer">
                                   {inlineNew.logged_at ? new Date(inlineNew.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Select date'}
                                 </button>
                               </PopoverTrigger>
@@ -705,7 +696,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                             <div className="inline-flex items-center">
                               <Select value={inlineNew.work_type} onValueChange={(v) => setInlineNew({ ...inlineNew, work_type: v })}>
                                 <SelectTrigger
-                                  className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.work_type ? workTypeBadge(inlineNew.work_type) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+                                  className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.work_type ? workTypeBadge(inlineNew.work_type) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
                                   style={{ outline: 'none', boxShadow: 'none' }}
                                 >
                                   <SelectValue placeholder="Type" />
@@ -723,7 +714,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                 value={inlineNew.action}
                                 onChange={(e) => setInlineNew({ ...inlineNew, action: e.target.value })}
                                 placeholder="Action"
-                                className="flex-1 border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs font-medium text-gray-900"
+                                className="flex-1 border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs font-medium text-ink-warm-900"
                                 style={{ outline: 'none', boxShadow: 'none' }}
                               />
                               {!inlineNew.action && <RequiredAsterisk />}
@@ -734,7 +725,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               <div>
                                 <Select value={inlineNew.who} onValueChange={(v) => setInlineNew({ ...inlineNew, who: v })}>
                                   <SelectTrigger
-                                    className="border-none shadow-none bg-transparent w-auto h-auto px-0 py-0 text-xs text-gray-600 inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                    className="border-none shadow-none bg-transparent w-auto h-auto px-0 py-0 text-xs text-ink-warm-700 inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
                                     style={{ outline: 'none', boxShadow: 'none' }}
                                   >
                                     <SelectValue placeholder="Who" />
@@ -751,7 +742,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                   value={inlineNew.who}
                                   onChange={(e) => setInlineNew({ ...inlineNew, who: e.target.value })}
                                   placeholder="Who"
-                                  className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                                  className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                                   style={{ outline: 'none', boxShadow: 'none' }}
                                 />
                                 <button type="button" className="text-[10px] text-brand hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('team'); setInlineNew({ ...inlineNew, who: '' }); }}>Team</button>
@@ -763,7 +754,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               value={inlineNew.method}
                               onChange={(e) => setInlineNew({ ...inlineNew, method: e.target.value })}
                               placeholder="How"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
@@ -772,14 +763,14 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               value={inlineNew.location}
                               onChange={(e) => setInlineNew({ ...inlineNew, location: e.target.value })}
                               placeholder="Where"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
                           <td className="py-3 px-4">
                             <Select value={inlineNew.trigger} onValueChange={(v) => setInlineNew({ ...inlineNew, trigger: v })}>
                               <SelectTrigger
-                                className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.trigger ? triggerBadge(inlineNew.trigger) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+                                className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.trigger ? triggerBadge(inlineNew.trigger) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
                                 style={{ outline: 'none', boxShadow: 'none' }}
                               >
                                 <SelectValue placeholder="Trigger" />
@@ -794,7 +785,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               value={inlineNew.notes}
                               onChange={(e) => setInlineNew({ ...inlineNew, notes: e.target.value })}
                               placeholder="Notes"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
@@ -804,23 +795,23 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                 <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: new Date().toISOString().split('T')[0] }); }}>
-                                <X className="h-4 w-4 text-gray-400" />
+                                <X className="h-4 w-4 text-ink-warm-400" />
                               </Button>
                             </div>
                           </td>
                         </tr>
                       )}
                       {filtered.map((entry) => (
-                        <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors group">
+                        <tr key={entry.id} className="border-b border-cream-100 hover:bg-cream-50/50 transition-colors group">
                           {/* Day number — not editable */}
                           <td className="py-3 px-4">
-                            <span className="inline-flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold rounded-full h-6 w-6">{getDayNumber(entry.logged_at)}</span>
+                            <span className="inline-flex items-center justify-center bg-cream-100 text-ink-warm-700 text-xs font-bold rounded-full h-6 w-6">{getDayNumber(entry.logged_at)}</span>
                           </td>
                           {/* Date — Popover+Calendar picker */}
                           <td className="py-3 px-4 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="text-gray-500 text-sm hover:text-gray-700 cursor-pointer">
+                                <button className="text-ink-warm-500 text-sm hover:text-ink-warm-700 cursor-pointer">
                                   {new Date(entry.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </button>
                               </PopoverTrigger>
@@ -864,28 +855,28 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="w-auto px-1 hover:bg-gray-100 disabled:opacity-30"
+                                      className="w-auto px-1 hover:bg-cream-100 disabled:opacity-30"
                                       onClick={() => handleReorder(entry.id, 'up')}
                                       disabled={posInGroup === 0}
                                       title="Move up within same date"
                                     >
-                                      <ChevronUp className="h-3.5 w-3.5 text-gray-500" />
+                                      <ChevronUp className="h-3.5 w-3.5 text-ink-warm-500" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="w-auto px-1 hover:bg-gray-100 disabled:opacity-30"
+                                      className="w-auto px-1 hover:bg-cream-100 disabled:opacity-30"
                                       onClick={() => handleReorder(entry.id, 'down')}
                                       disabled={posInGroup === sameDateSorted.length - 1}
                                       title="Move down within same date"
                                     >
-                                      <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                                      <ChevronDown className="h-3.5 w-3.5 text-ink-warm-500" />
                                     </Button>
                                   </>
                                 );
                               })()}
-                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-gray-100" onClick={() => openForm(entry)} title="Edit in popup">
-                                <Expand className="h-3.5 w-3.5 text-gray-600" />
+                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-cream-100" onClick={() => openForm(entry)} title="Edit in popup">
+                                <Expand className="h-3.5 w-3.5 text-ink-warm-700" />
                               </Button>
                               <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
                                 <Trash2 className="h-3.5 w-3.5 text-rose-600" />
@@ -983,7 +974,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." className="focus-brand" rows={3} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
             <Button variant="brand" onClick={handleSubmit} disabled={!form.work_type || !form.action.trim() || !form.logged_at}>
               {editingId ? 'Save Changes' : 'Add Entry'}
@@ -999,7 +990,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
             <DialogTitle>Delete Entry</DialogTitle>
             <DialogDescription>Are you sure you want to delete this delivery log entry? This action cannot be undone.</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deletingId && handleDelete(deletingId)}>Delete</Button>
           </DialogFooter>

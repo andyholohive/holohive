@@ -10,6 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card } from '@/components/ui/card';
+import { CardHeaderEditorial } from '@/components/ui/card-header-editorial';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { TaskService, TaskAutomation, TaskAutomationLog } from '@/lib/taskService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -21,9 +25,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ArrowLeft,
 } from 'lucide-react';
-import Link from 'next/link';
 
 const TRIGGER_TYPES = [
   { value: 'status_change', label: 'Status Change' },
@@ -99,7 +101,7 @@ export default function AutomationsPage() {
         is_active: true,
         created_by: userProfile?.id || null,
       });
-      toast({ title: 'Created', description: 'Automation rule created.' });
+      toast({ title: 'Automation created' });
       setShowCreateDialog(false);
       setNewRule({
         name: '', trigger_type: '', trigger_config: {},
@@ -108,7 +110,7 @@ export default function AutomationsPage() {
       loadData();
     } catch (err) {
       console.error('Error creating automation:', err);
-      toast({ title: 'Error', description: 'Failed to create automation.', variant: 'destructive' });
+      toast({ title: 'Create failed', description: err instanceof Error ? err.message : 'Failed to create automation', variant: 'destructive' });
     } finally {
       setCreating(false);
     }
@@ -127,7 +129,7 @@ export default function AutomationsPage() {
     try {
       await TaskService.deleteAutomation(id);
       setAutomations(prev => prev.filter(a => a.id !== id));
-      toast({ title: 'Deleted', description: 'Automation rule deleted.' });
+      toast({ title: 'Automation deleted' });
     } catch (err) {
       console.error('Error deleting automation:', err);
     }
@@ -143,153 +145,214 @@ export default function AutomationsPage() {
     return `${days}d ago`;
   };
 
+  // ── Locked-out branch ────────────────────────────────────────────
   if (!isAdmin) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-amber-400 mx-auto mb-3" />
-          <p className="text-gray-600">Admin access required.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
       <div className="space-y-6">
-        <Link href="/tasks" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
-          <ArrowLeft className="h-3 w-3 mr-1" />
-          Back to Tasks
-        </Link>
         <PageHeader
           icon={Zap}
           title="Task Automations"
           subtitle="Manage automation rules and view execution history"
+          kicker="Workspace · HQ · Automations"
+          kickerDot="brand"
         />
-        <div className="grid gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-lg" />
-          ))}
-        </div>
+        <Card className="border-cream-200 overflow-hidden">
+          <EmptyState
+            icon={AlertTriangle}
+            title="Admin access required."
+            description="Automation rules are managed by team admins. Reach out if you think you should have access."
+            className="py-16"
+          />
+        </Card>
       </div>
     );
   }
 
+  // Header CTA — shared between loading + loaded so the row doesn't
+  // shift when data arrives.
+  const headerActions = (
+    <Button variant="brand" onClick={() => setShowCreateDialog(true)} disabled={loading}>
+      <Plus className="h-4 w-4 mr-2" /> New Rule
+    </Button>
+  );
+
+  // ── Loading branch ───────────────────────────────────────────────
+  // Structural skeleton mirroring loaded shape: PageHeader (same
+  // kicker) + 2 Card skeletons (Rules + Log) each with a header strip
+  // and 3 row skeletons. Was 3 generic h-20 rounded blocks before.
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={Zap}
+          title="Task Automations"
+          subtitle="Manage automation rules and view execution history"
+          kicker="Workspace · HQ · Automations"
+          kickerDot="brand"
+          actions={headerActions}
+        />
+        {Array.from({ length: 2 }).map((_, ci) => (
+          <Card key={ci} className="border-cream-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-cream-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-[18px] w-[18px] rounded" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <Skeleton className="h-4 w-20" />
+            </div>
+            <div>
+              {Array.from({ length: 3 }).map((_, ri) => (
+                <div key={ri} className="px-4 py-3 flex items-center gap-3 border-b border-cream-100 last:border-0">
+                  <Skeleton className="h-5 w-9 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-72" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded" />
+                  <Skeleton className="h-5 w-16 rounded" />
+                  <Skeleton className="h-7 w-7 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Loaded branch ────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <Link href="/tasks" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
-        <ArrowLeft className="h-3 w-3 mr-1" />
-        Back to Tasks
-      </Link>
       <PageHeader
         icon={Zap}
         title="Task Automations"
         subtitle="Manage automation rules and view execution history"
-        actions={(
-          <Button variant="brand" onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" /> New Rule
-          </Button>
-        )}
+        kicker="Workspace · HQ · Automations"
+        kickerDot="brand"
+        actions={headerActions}
       />
 
-      {/* Automation Rules */}
-        <div className="bg-white border border-gray-200 shadow-sm rounded-lg">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-600" />
-            <h3 className="font-semibold text-sm text-gray-900">Active Rules</h3>
-            <Badge variant="secondary" className="text-xs">{automations.length}</Badge>
-          </div>
+      {/* Automation Rules — Card + CardHeaderEditorial matches the
+          treatment on /templates so HQ admin surfaces feel like the
+          same family. */}
+      <Card className="border-cream-200 overflow-hidden">
+        <CardHeaderEditorial
+          icon={Zap}
+          iconClassName="text-amber-600"
+          title="Active Rules"
+          action={
+            <span className="text-sm text-ink-warm-700 tabular-nums">
+              <span className="font-semibold text-ink-warm-900">{automations.length}</span>
+              <span className="text-ink-warm-500 ml-1">rule{automations.length === 1 ? '' : 's'}</span>
+            </span>
+          }
+        />
 
-          {automations.length === 0 ? (
-            <div className="p-8 text-center">
-              <Zap className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">No automation rules yet. Create one to get started.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {automations.map((auto) => (
-                <div key={auto.id} className="px-4 py-3 flex items-center gap-3">
-                  <Switch
-                    checked={auto.is_active}
-                    onCheckedChange={() => handleToggle(auto.id, auto.is_active)}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{auto.name}</p>
-                    <p className="text-xs text-gray-500">
-                      When: <span className="font-medium">{TRIGGER_TYPES.find(t => t.value === auto.trigger_type)?.label || auto.trigger_type}</span>
-                      {' → '}
-                      Then: <span className="font-medium">{ACTION_TYPES.find(a => a.value === auto.action_type)?.label || auto.action_type}</span>
-                    </p>
-                  </div>
-                  <Badge variant={auto.is_active ? 'default' : 'secondary'} className="text-xs">
-                    {auto.is_active ? 'Active' : 'Paused'}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {SCOPE_OPTIONS.find(s => s.value === auto.scope)?.label || auto.scope}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-gray-400 hover:text-rose-500"
-                    onClick={() => handleDelete(auto.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+        {automations.length === 0 ? (
+          <EmptyState
+            icon={Zap}
+            title="No automation rules yet."
+            description="Create one with the button above to trigger Telegram pings, status changes, or auto-assignments on task events."
+            className="py-12"
+          />
+        ) : (
+          <div className="divide-y divide-cream-100">
+            {automations.map((auto) => (
+              <div key={auto.id} className="px-4 py-3 flex items-center gap-3 hover:bg-cream-50/60 transition-colors">
+                <Switch
+                  checked={auto.is_active}
+                  onCheckedChange={() => handleToggle(auto.id, auto.is_active)}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink-warm-900">{auto.name}</p>
+                  <p className="text-xs text-ink-warm-500">
+                    When: <span className="font-medium">{TRIGGER_TYPES.find(t => t.value === auto.trigger_type)?.label || auto.trigger_type}</span>
+                    {' → '}
+                    Then: <span className="font-medium">{ACTION_TYPES.find(a => a.value === auto.action_type)?.label || auto.action_type}</span>
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Execution Log */}
-        <div className="bg-white border border-gray-200 shadow-sm rounded-lg">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-gray-600" />
-            <h3 className="font-semibold text-sm text-gray-900">Execution Log</h3>
-            <Badge variant="secondary" className="text-xs">{logs.length}</Badge>
+                <StatusBadge tone={auto.is_active ? 'success' : 'neutral'} size="sm">
+                  {auto.is_active ? 'Active' : 'Paused'}
+                </StatusBadge>
+                <Badge variant="outline" className="text-xs">
+                  {SCOPE_OPTIONS.find(s => s.value === auto.scope)?.label || auto.scope}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 hover:bg-rose-50"
+                  onClick={() => handleDelete(auto.id)}
+                  aria-label="Delete automation"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                </Button>
+              </div>
+            ))}
           </div>
+        )}
+      </Card>
 
-          {logs.length === 0 ? (
-            <div className="p-8 text-center">
-              <Clock className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">No automation executions yet.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-              {logs.map((log) => (
-                <div key={log.id} className="px-4 py-2.5 flex items-center gap-3">
-                  {log.action_taken === 'recurring_clone' ? (
-                    <RefreshCw className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+      {/* Execution Log */}
+      <Card className="border-cream-200 overflow-hidden">
+        <CardHeaderEditorial
+          icon={Clock}
+          iconClassName="text-ink-warm-500"
+          title="Execution Log"
+          action={
+            <span className="text-sm text-ink-warm-700 tabular-nums">
+              <span className="font-semibold text-ink-warm-900">{logs.length}</span>
+              <span className="text-ink-warm-500 ml-1">event{logs.length === 1 ? '' : 's'}</span>
+            </span>
+          }
+        />
+
+        {logs.length === 0 ? (
+          <EmptyState
+            icon={Clock}
+            title="No automation executions yet."
+            description="When a rule fires, its execution will show up here with the action taken."
+            className="py-12"
+          />
+        ) : (
+          <div className="divide-y divide-cream-100 max-h-[400px] overflow-y-auto">
+            {logs.map((log) => (
+              <div key={log.id} className="px-4 py-2.5 flex items-center gap-3">
+                {log.action_taken === 'recurring_clone' ? (
+                  <RefreshCw className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-ink-warm-900">
+                    {log.action_taken === 'recurring_clone' ? 'Recurring task cloned' : log.action_taken}
+                  </p>
+                  {log.details && (
+                    <p className="text-xs text-ink-warm-500 truncate">
+                      {log.details.next_due_date && `Next due: ${log.details.next_due_date}`}
+                      {log.details.source_task_id && ` | Source: ${log.details.source_task_id.substring(0, 8)}...`}
+                    </p>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900">
-                      {log.action_taken === 'recurring_clone' ? 'Recurring task cloned' : log.action_taken}
-                    </p>
-                    {log.details && (
-                      <p className="text-xs text-gray-500 truncate">
-                        {log.details.next_due_date && `Next due: ${log.details.next_due_date}`}
-                        {log.details.source_task_id && ` | Source: ${log.details.source_task_id.substring(0, 8)}...`}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-xs text-gray-400">{formatTimeAgo(log.executed_at)}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <span className="text-xs text-ink-warm-400 tabular-nums">{formatTimeAgo(log.executed_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
-      {/* Create Rule Dialog */}
+      {/* Create Rule Dialog — v11 scroll/footer pattern (max-h-[85vh]
+          flex flex-col + inner scroll surface + footer with border-t). */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Create Automation Rule</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-brand" />
+              Create Automation Rule
+            </DialogTitle>
             <DialogDescription>Set up a new task automation trigger and action.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
             <div className="grid gap-2">
               <Label>Rule Name</Label>
               <Input
@@ -339,7 +402,7 @@ export default function AutomationsPage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
             <Button variant="brand" onClick={handleCreate} disabled={!newRule.name || !newRule.trigger_type || !newRule.action_type || creating}>
               {creating ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : 'Create Rule'}

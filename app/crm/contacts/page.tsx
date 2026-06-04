@@ -343,6 +343,8 @@ export default function ContactsPage() {
           icon={UserPlus}
           title="Contacts"
           subtitle="Manage your contact directory"
+          kicker="CRM · Contacts"
+          kickerDot="brand"
           actions={(
             <>
               <Skeleton className="h-10 w-64" />
@@ -382,10 +384,12 @@ export default function ContactsPage() {
         icon={UserPlus}
         title="Contacts"
         subtitle="Manage your contact directory"
+        kicker="CRM · Contacts"
+        kickerDot="brand"
         actions={(
           <>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
               <Input
                 placeholder="Search contacts..."
                 className="pl-10 w-64 focus-brand"
@@ -437,8 +441,8 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Filters:</span>
+            <Filter className="h-4 w-4 text-ink-warm-500" />
+            <span className="text-sm text-ink-warm-700">Filters:</span>
           </div>
           <Select value={filterCategory} onValueChange={setFilterCategory}>
             <SelectTrigger className="w-40 h-9 text-sm focus-brand">
@@ -463,8 +467,8 @@ export default function ContactsPage() {
           </Select>
           <div className="h-6 w-px bg-gray-300" />
           <div className="flex items-center gap-2">
-            <ArrowUpDown className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Sort:</span>
+            <ArrowUpDown className="h-4 w-4 text-ink-warm-500" />
+            <span className="text-sm text-ink-warm-700">Sort:</span>
           </div>
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-40 h-9 text-sm focus-brand">
@@ -482,7 +486,7 @@ export default function ContactsPage() {
               variant="ghost"
               size="sm"
               onClick={clearFilters}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-ink-warm-500"
             >
               <X className="h-4 w-4 mr-1" />
               Clear Filters
@@ -545,7 +549,7 @@ export default function ContactsPage() {
         <div className="rounded-lg border bg-white overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
+              <TableRow className="bg-cream-50">
                 <TableHead className="w-10">#</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
@@ -565,31 +569,31 @@ export default function ContactsPage() {
                 const totalLinks = linkedOpps.length + linkedParts.length + linkedAffs.length;
 
                 return (
-                  <TableRow key={contact.id} className="group hover:bg-gray-50">
-                    <TableCell className="text-gray-400 text-sm">{index + 1}</TableCell>
+                  <TableRow key={contact.id} className="group hover:bg-cream-50">
+                    <TableCell className="text-ink-warm-400 text-sm">{index + 1}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-gradient-to-br from-blue-100 to-cyan-50 rounded-lg">
-                          <UserPlus className="h-4 w-4 text-blue-600" />
+                          <UserPlus className="h-4 w-4 text-brand" />
                         </div>
                         <span className="font-medium">{contact.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-600">{contact.role || <span className="text-gray-400">-</span>}</TableCell>
+                    <TableCell className="text-ink-warm-700">{contact.role || <span className="text-ink-warm-400">-</span>}</TableCell>
                     <TableCell>
                       {contact.email ? (
-                        <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline text-sm">
+                        <a href={`mailto:${contact.email}`} className="text-brand hover:underline text-sm">
                           {contact.email}
                         </a>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-ink-warm-400">-</span>
                       )}
                     </TableCell>
                     <TableCell>
                       {contact.telegram_id ? (
-                        <span className="text-gray-600 text-sm">@{contact.telegram_id}</span>
+                        <span className="text-ink-warm-700 text-sm">@{contact.telegram_id}</span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-ink-warm-400">-</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -598,7 +602,7 @@ export default function ContactsPage() {
                           {contact.category}
                         </Badge>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-ink-warm-400">-</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -621,10 +625,10 @@ export default function ContactsPage() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-ink-warm-400">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-gray-500 text-sm">
+                    <TableCell className="text-ink-warm-500 text-sm">
                       {new Date(contact.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </TableCell>
                     <TableCell>
@@ -666,17 +670,17 @@ export default function ContactsPage() {
             const hasContactInfo = contact.email || contact.telegram_id || contact.x_id;
 
             return (
-              <Card key={contact.id} className="group hover:shadow-md transition-shadow duration-200">
+              <Card key={contact.id}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-gradient-to-br from-blue-100 to-cyan-50 rounded-lg">
-                        <UserPlus className="h-5 w-5 text-blue-600" />
+                        <UserPlus className="h-5 w-5 text-brand" />
                       </div>
                       <div>
                         <CardTitle className="text-base">{contact.name}</CardTitle>
                         {contact.role && (
-                          <p className="text-sm text-gray-500">{contact.role}</p>
+                          <p className="text-sm text-ink-warm-500">{contact.role}</p>
                         )}
                       </div>
                     </div>
@@ -705,25 +709,25 @@ export default function ContactsPage() {
                 <CardContent className="pt-0 space-y-3">
                   {/* Contact Info Section */}
                   {hasContactInfo && (
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <div className="bg-cream-50 rounded-lg p-3 space-y-2">
                       {contact.email && (
                         <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline truncate">
+                          <Mail className="h-4 w-4 text-ink-warm-400" />
+                          <a href={`mailto:${contact.email}`} className="text-brand hover:underline truncate">
                             {contact.email}
                           </a>
                         </div>
                       )}
                       {contact.telegram_id && (
                         <div className="flex items-center gap-2 text-sm">
-                          <MessageSquare className="h-4 w-4 text-gray-400" />
-                          <span className="text-gray-600">@{contact.telegram_id}</span>
+                          <MessageSquare className="h-4 w-4 text-ink-warm-400" />
+                          <span className="text-ink-warm-700">@{contact.telegram_id}</span>
                         </div>
                       )}
                       {contact.x_id && (
                         <div className="flex items-center gap-2 text-sm">
-                          <span className="h-4 w-4 flex items-center justify-center font-bold text-xs text-gray-400">𝕏</span>
-                          <span className="text-gray-600">@{contact.x_id}</span>
+                          <span className="h-4 w-4 flex items-center justify-center font-bold text-xs text-ink-warm-400">𝕏</span>
+                          <span className="text-ink-warm-700">@{contact.x_id}</span>
                         </div>
                       )}
                     </div>
@@ -738,7 +742,7 @@ export default function ContactsPage() {
 
                   {/* Linked Entities */}
                   {totalLinks > 0 && (
-                    <div className="pt-3 border-t border-gray-100 space-y-2">
+                    <div className="pt-3 border-t border-cream-100 space-y-2">
                       {linkedOpps.length > 0 && (
                         <div className="flex items-start gap-2">
                           <TrendingUp className="h-4 w-4 text-emerald-600 mt-0.5" />
@@ -753,7 +757,7 @@ export default function ContactsPage() {
                       )}
                       {linkedParts.length > 0 && (
                         <div className="flex items-start gap-2">
-                          <Handshake className="h-4 w-4 text-blue-600 mt-0.5" />
+                          <Handshake className="h-4 w-4 text-brand mt-0.5" />
                           <div className="flex flex-wrap gap-1">
                             {linkedParts.map(part => (
                               <Badge key={part.id} variant="secondary" className="text-xs bg-blue-50 text-blue-700">
@@ -861,7 +865,7 @@ export default function ContactsPage() {
                       aria-expanded={categoryPopoverOpen}
                       className="w-full justify-between focus-brand font-normal"
                     >
-                      {contactForm.category || <span className="text-gray-400">Select or enter category...</span>}
+                      {contactForm.category || <span className="text-ink-warm-400">Select or enter category...</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
@@ -1020,7 +1024,7 @@ export default function ContactsPage() {
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button type="button" variant="outline" onClick={() => setIsNewContactOpen(false)}>
                 Cancel
               </Button>
@@ -1039,11 +1043,11 @@ export default function ContactsPage() {
             <DialogTitle>Delete Contact</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-gray-600">
+            <p className="text-ink-warm-700">
               Are you sure you want to delete <strong>{contactToDelete?.name}</strong>? This action cannot be undone.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>

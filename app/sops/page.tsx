@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -237,8 +238,8 @@ export default function SOPsPage() {
     } catch (error) {
       console.error('Error fetching SOPs:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load SOPs',
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load SOPs',
         variant: 'destructive',
       });
     } finally {
@@ -248,9 +249,15 @@ export default function SOPsPage() {
 
   const fetchTeamMembers = async () => {
     try {
+      // is_active + role filter: powers both the Owner filter dropdown
+      // and the SOP form Owner picker. Excludes deactivated teammates,
+      // pending sign-ups (is_active=false), and client-role accounts.
+      // 2026-06-04.
       const { data, error } = await supabase
         .from('users')
         .select('id, name, email')
+        .eq('is_active', true)
+        .in('role', ['admin', 'super_admin', 'member'])
         .order('name');
 
       if (error) throw error;
@@ -392,8 +399,7 @@ export default function SOPsPage() {
     e.preventDefault();
     if (!formData.name.trim()) {
       toast({
-        title: 'Error',
-        description: 'SOP name is required',
+        title: 'SOP name required',
         variant: 'destructive',
       });
       return;
@@ -424,10 +430,7 @@ export default function SOPsPage() {
         // Save version
         await saveVersion(editingSOP.id, formData, 'Updated SOP');
 
-        toast({
-          title: 'Success',
-          description: 'SOP updated successfully',
-        });
+        toast({ title: 'SOP updated' });
       } else {
         // Create new SOP
         const { data, error } = await (supabase as any)
@@ -455,10 +458,7 @@ export default function SOPsPage() {
           await saveVersion(data.id, formData, 'Initial version');
         }
 
-        toast({
-          title: 'Success',
-          description: 'SOP created successfully',
-        });
+        toast({ title: 'SOP created' });
       }
 
       setIsCreateEditOpen(false);
@@ -466,8 +466,8 @@ export default function SOPsPage() {
     } catch (error) {
       console.error('Error saving SOP:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save SOP',
+        title: 'Save failed',
+        description: error instanceof Error ? error.message : 'Failed to save SOP',
         variant: 'destructive',
       });
     } finally {
@@ -486,18 +486,15 @@ export default function SOPsPage() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'SOP deleted successfully',
-      });
+      toast({ title: 'SOP deleted' });
       setIsDeleteOpen(false);
       setDeletingSOP(null);
       fetchSOPs();
     } catch (error) {
       console.error('Error deleting SOP:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to delete SOP',
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete SOP',
         variant: 'destructive',
       });
     }
@@ -515,16 +512,13 @@ export default function SOPsPage() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Automation review requested',
-      });
+      toast({ title: 'Automation review requested' });
       fetchSOPs();
     } catch (error) {
       console.error('Error requesting review:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to request review',
+        title: 'Request failed',
+        description: error instanceof Error ? error.message : 'Failed to request review',
         variant: 'destructive',
       });
     }
@@ -542,10 +536,7 @@ export default function SOPsPage() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Automation review completed',
-      });
+      toast({ title: 'Automation review completed' });
       fetchSOPs();
     } catch (error) {
       console.error('Error completing review:', error);
@@ -583,6 +574,8 @@ export default function SOPsPage() {
             icon={BookOpen}
             title="SOPs"
             subtitle="Standard Operating Procedures"
+            kicker="Workspace · HQ · SOPs"
+            kickerDot="brand"
             actions={(
               <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
@@ -619,6 +612,8 @@ export default function SOPsPage() {
           icon={BookOpen}
           title="SOPs"
           subtitle="Standard Operating Procedures"
+          kicker="Workspace · HQ · SOPs"
+          kickerDot="brand"
           actions={(
             <Button variant="brand" onClick={handleCreateNew}>
               <Plus className="h-4 w-4 mr-2" />
@@ -658,7 +653,7 @@ export default function SOPsPage() {
         {/* Search and Filters */}
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input
               placeholder="Search SOPs..."
               className="pl-10 focus-brand"
@@ -690,42 +685,45 @@ export default function SOPsPage() {
           </Select>
         </div>
 
-        {/* Status Tabs */}
+        {/* Status Tabs — v11 chrome (cream-100 outer, white active tile
+            with shadow-card). Per-tab semantic active text color
+            preserved (yellow-700 for Draft, brand for Active, ink-warm
+            for All/Inactive). Was bg-cream-100 + shadow-sm before. */}
         <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-          <TabsList className="bg-gray-100 p-1 h-auto">
+          <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             <TabsTrigger
               value="all"
-              className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card px-4 py-2"
             >
               All
-              <span className="ml-2 text-xs bg-gray-200 data-[state=active]:bg-gray-100 px-2 py-0.5 rounded-full pointer-events-none">
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
                 {statusCounts.all}
               </span>
             </TabsTrigger>
             <TabsTrigger
               value="draft"
-              className="data-[state=active]:bg-white data-[state=active]:text-yellow-700 data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-yellow-700 data-[state=active]:shadow-card px-4 py-2"
             >
               Draft
-              <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full pointer-events-none">
+              <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
                 {statusCounts.draft}
               </span>
             </TabsTrigger>
             <TabsTrigger
               value="active"
-              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card px-4 py-2"
             >
               Active
-              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
                 {statusCounts.active}
               </span>
             </TabsTrigger>
             <TabsTrigger
               value="inactive"
-              className="data-[state=active]:bg-white data-[state=active]:text-gray-700 data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-700 data-[state=active]:shadow-card px-4 py-2"
             >
               Inactive
-              <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full pointer-events-none">
+              <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
                 {statusCounts.inactive}
               </span>
             </TabsTrigger>
@@ -734,31 +732,40 @@ export default function SOPsPage() {
 
         {/* SOP Cards */}
         {filteredSOPs.length === 0 ? (
-          <div className="text-center py-12">
-            <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">
-              {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' || ownerFilter !== 'all'
-                ? 'No SOPs found matching your filters.'
-                : 'No SOPs yet. Create your first SOP to get started.'}
-            </p>
-            {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && ownerFilter === 'all' && (
-              <Button variant="brand" onClick={handleCreateNew}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First SOP
-              </Button>
-            )}
-          </div>
+          <Card className="border-cream-200 overflow-hidden">
+            <EmptyState
+              icon={BookOpen}
+              title={
+                searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' || ownerFilter !== 'all'
+                  ? 'No SOPs found matching your filters.'
+                  : 'No SOPs yet.'
+              }
+              description={
+                searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' || ownerFilter !== 'all'
+                  ? 'Try widening the filters or clearing the search.'
+                  : 'Create your first SOP to get started.'
+              }
+              className="py-16"
+            >
+              {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && ownerFilter === 'all' && (
+                <Button variant="brand" onClick={handleCreateNew}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First SOP
+                </Button>
+              )}
+            </EmptyState>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginatedSOPs.map((sop) => (
-              <Card key={sop.id} className="h-full flex flex-col group hover:shadow-md transition-shadow">
+              <Card key={sop.id} className="h-full flex flex-col group border-cream-200">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="bg-gray-100 p-1.5 rounded-lg flex-shrink-0">
-                        <BookOpen className="h-4 w-4 text-gray-600" />
+                      <div className="bg-cream-100 p-1.5 rounded-lg flex-shrink-0">
+                        <BookOpen className="h-4 w-4 text-ink-warm-700" />
                       </div>
-                      <h3 className="font-semibold text-gray-900 truncate">{sop.name}</h3>
+                      <h3 className="font-semibold text-ink-warm-900 truncate">{sop.name}</h3>
                     </div>
                     <Badge className={`flex-shrink-0 pointer-events-none ${getStatusColor(sop.status)}`}>
                       {sop.status.charAt(0).toUpperCase() + sop.status.slice(1)}
@@ -791,17 +798,17 @@ export default function SOPsPage() {
                 <CardContent className="flex-1 flex flex-col">
                   {sop.trigger && (
                     <div className="mb-2">
-                      <p className="text-xs text-gray-500 font-medium">Trigger:</p>
-                      <p className="text-sm text-gray-700 line-clamp-1 whitespace-pre-wrap">{sop.trigger}</p>
+                      <p className="text-xs text-ink-warm-500 font-medium">Trigger:</p>
+                      <p className="text-sm text-ink-warm-700 line-clamp-1 whitespace-pre-wrap">{sop.trigger}</p>
                     </div>
                   )}
                   {sop.outcome && (
                     <div className="mb-3">
-                      <p className="text-xs text-gray-500 font-medium">Outcome:</p>
-                      <p className="text-sm text-gray-700 line-clamp-2 whitespace-pre-wrap">{sop.outcome}</p>
+                      <p className="text-xs text-ink-warm-500 font-medium">Outcome:</p>
+                      <p className="text-sm text-ink-warm-700 line-clamp-2 whitespace-pre-wrap">{sop.outcome}</p>
                     </div>
                   )}
-                  <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                  <div className="flex items-center gap-4 text-xs text-ink-warm-500 mb-3">
                     {sop.owner && (
                       <span className="flex items-center gap-1">
                         <User className="h-3 w-3" />
@@ -839,7 +846,7 @@ export default function SOPsPage() {
         {/* Pagination */}
         {filteredSOPs.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink-warm-700">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredSOPs.length)} of {filteredSOPs.length} SOPs
             </p>
             <div className="flex items-center gap-2">
@@ -852,7 +859,7 @@ export default function SOPsPage() {
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Previous
               </Button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-ink-warm-700">
                 Page {currentPage} of {totalPages}
               </span>
               <Button
@@ -870,14 +877,14 @@ export default function SOPsPage() {
 
         {/* Create/Edit Dialog */}
         <Dialog open={isCreateEditOpen} onOpenChange={setIsCreateEditOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>{editingSOP ? 'Edit SOP' : 'Create New SOP'}</DialogTitle>
               <DialogDescription>
                 {editingSOP ? 'Update the SOP details below.' : 'Fill in the details to create a new SOP.'}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0"><div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label htmlFor="name">SOP Name <RequiredAsterisk /></Label>
@@ -962,7 +969,7 @@ export default function SOPsPage() {
                     DeliverableWizard pre-loaded with this template
                     (added 2026-05-07, migration 048). */}
                 <div className="col-span-2">
-                  <Label htmlFor="deliverable_template_id">Linked Deliverable Template <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Label htmlFor="deliverable_template_id">Linked Deliverable Template <span className="text-ink-warm-400 font-normal">(optional)</span></Label>
                   <Select
                     value={formData.deliverable_template_id || 'none'}
                     onValueChange={(value) => setFormData({ ...formData, deliverable_template_id: value === 'none' ? '' : value })}
@@ -977,7 +984,7 @@ export default function SOPsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-ink-warm-500 mt-1">
                     Linking a template adds a &quot;Run this SOP&quot; button to the detail view, which spawns a multi-person task tree from the template.
                   </p>
                 </div>
@@ -1039,10 +1046,11 @@ export default function SOPsPage() {
                       className="bg-white"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Drag the bottom-right corner to resize</p>
+                  <p className="text-xs text-ink-warm-500 mt-1">Drag the bottom-right corner to resize</p>
                 </div>
               </div>
-              <DialogFooter>
+              </div>
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                 <Button type="button" variant="outline" onClick={() => setIsCreateEditOpen(false)}>
                   Cancel
                 </Button>
@@ -1056,7 +1064,7 @@ export default function SOPsPage() {
 
         {/* View Dialog */}
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <DialogTitle className="flex items-center gap-2">
@@ -1071,7 +1079,7 @@ export default function SOPsPage() {
               </div>
             </DialogHeader>
             {viewingSOP && (
-              <div className="space-y-4">
+              <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className={`pointer-events-none ${getCategoryColor(viewingSOP.category)}`}>
                     {CATEGORIES.find(c => c.value === viewingSOP.category)?.label}
@@ -1086,23 +1094,23 @@ export default function SOPsPage() {
 
                 {viewingSOP.trigger && (
                   <div>
-                    <h4 className="font-semibold text-sm text-gray-700 mb-1">Trigger</h4>
-                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{viewingSOP.trigger}</p>
+                    <h4 className="font-semibold text-sm text-ink-warm-700 mb-1">Trigger</h4>
+                    <p className="text-ink-warm-700 bg-cream-50 p-3 rounded-lg whitespace-pre-wrap">{viewingSOP.trigger}</p>
                   </div>
                 )}
 
                 {viewingSOP.outcome && (
                   <div>
-                    <h4 className="font-semibold text-sm text-gray-700 mb-1">Outcome</h4>
-                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{viewingSOP.outcome}</p>
+                    <h4 className="font-semibold text-sm text-ink-warm-700 mb-1">Outcome</h4>
+                    <p className="text-ink-warm-700 bg-cream-50 p-3 rounded-lg whitespace-pre-wrap">{viewingSOP.outcome}</p>
                   </div>
                 )}
 
                 {viewingSOP.content && (
                   <div>
-                    <h4 className="font-semibold text-sm text-gray-700 mb-1">SOP Content</h4>
+                    <h4 className="font-semibold text-sm text-ink-warm-700 mb-1">SOP Content</h4>
                     <div
-                      className="prose prose-sm max-w-none bg-gray-50 p-4 rounded-lg"
+                      className="prose prose-sm max-w-none bg-cream-50 p-4 rounded-lg"
                       dangerouslySetInnerHTML={{ __html: viewingSOP.content }}
                     />
                   </div>
@@ -1141,7 +1149,7 @@ export default function SOPsPage() {
                 )}
 
                 <div className="flex justify-between items-center pt-4 border-t">
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-ink-warm-500">
                     Last updated: {formatDate(viewingSOP.updated_at)}
                   </p>
                   <div className="flex gap-2">
@@ -1194,14 +1202,14 @@ export default function SOPsPage() {
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Delete SOP</DialogTitle>
               <DialogDescription>
                 Are you sure you want to delete "{deletingSOP?.name}"? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
                 Cancel
               </Button>
@@ -1214,13 +1222,14 @@ export default function SOPsPage() {
 
         {/* Version History Dialog */}
         <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Version History: {viewingSOP?.name}</DialogTitle>
               <DialogDescription>
                 View all changes made to this SOP over time.
               </DialogDescription>
             </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-1 py-2">
             {loadingVersions ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -1228,32 +1237,33 @@ export default function SOPsPage() {
                 ))}
               </div>
             ) : sopVersions.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No version history available.</p>
+              <p className="text-ink-warm-500 text-center py-8">No version history available.</p>
             ) : (
               <div className="space-y-3">
                 {sopVersions.map((version) => (
                   <div
                     key={version.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50"
+                    className="border rounded-lg p-4 hover:bg-cream-50"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">v{version.version_number}</Badge>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-ink-warm-700">
                           {version.changer?.name || 'Unknown'}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-ink-warm-500">
                         {new Date(version.changed_at).toLocaleString()}
                       </span>
                     </div>
                     {version.change_summary && (
-                      <p className="text-sm text-gray-700">{version.change_summary}</p>
+                      <p className="text-sm text-ink-warm-700">{version.change_summary}</p>
                     )}
                   </div>
                 ))}
               </div>
             )}
+            </div>
           </DialogContent>
         </Dialog>
 

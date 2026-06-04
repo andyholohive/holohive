@@ -62,7 +62,7 @@ export function MessageTemplateCard({ template, onUseTemplate, onPreviewTemplate
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -133,7 +133,7 @@ export function MessageTemplateCard({ template, onUseTemplate, onPreviewTemplate
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
-            <Button size="sm" onClick={() => onUseTemplate(template)} className="flex-1 bg-brand text-white">
+            <Button variant="brand" size="sm" onClick={() => onUseTemplate(template)} className="flex-1">
               <MessageSquare className="w-4 h-4 mr-2" />
               Use Template
             </Button>

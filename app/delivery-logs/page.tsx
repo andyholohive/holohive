@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
@@ -92,11 +95,21 @@ export default function DeliveryLogsPage() {
   const [entries, setEntries] = useState<DeliveryLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
-  // Active vs Archived view. "Active" matches the original behavior
-  // (is_active=true + archived_at IS NULL). "Archived" surfaces clients
-  // we've offboarded — useful for back-filling delivery logs after a
-  // contract ends or pulling history during a renewal pitch.
-  const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
+  // [2026-06-04 v2] Active / Inactive view. Both views EXCLUDE
+  // archived clients (archived_at IS NOT NULL) — archived clients
+  // never surface here. Inactive = is_active=false but NOT archived,
+  // i.e. paused or between contracts but still on the books.
+  //   Active   → is_active = true  AND archived_at IS NULL
+  //   Inactive → is_active = false AND archived_at IS NULL
+  const [viewMode, setViewMode] = useState<'active' | 'inactive'>('active');
+  // Both tab counts tracked independently so badges stay stable
+  // when switching views (otherwise the inactive tab badge would
+  // flip to the loaded view's count and the other would blank out).
+  // Single mount-time head-count query each — no row payload.
+  const [tabCounts, setTabCounts] = useState<{ active: number | null; inactive: number | null }>({
+    active: null,
+    inactive: null,
+  });
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [whoMode, setWhoMode] = useState<'team' | 'custom'>('team');
   const [searchTerm, setSearchTerm] = useState('');
@@ -151,22 +164,17 @@ export default function DeliveryLogsPage() {
     return Math.round((d - dayZeroDate) / (1000 * 60 * 60 * 24));
   };
 
-  // Fetch clients on mount AND whenever viewMode changes. The Active
-  // tab keeps the historical filter (is_active=true, not archived). The
-  // Archived tab includes anything that's been deactivated OR has an
-  // archived_at timestamp — both are signals the relationship has
-  // wound down, and we want either to show up.
+  // Fetch clients on mount AND whenever viewMode changes. Both views
+  // exclude archived clients (archived_at IS NULL); the only thing that
+  // varies is the is_active flag.
   useEffect(() => {
     const fetchClients = async () => {
       setClientsLoading(true);
-      const baseQuery = supabase
+      const clientsQuery = supabase
         .from('clients')
-        .select('id, name, logo_url, is_active');
-      const clientsQuery = viewMode === 'active'
-        ? baseQuery.eq('is_active', true).is('archived_at', null)
-        // Archived = is_active=false OR archived_at is set. Postgrest's
-        // .or() takes a comma-joined filter string.
-        : baseQuery.or('is_active.eq.false,archived_at.not.is.null');
+        .select('id, name, logo_url, is_active')
+        .eq('is_active', viewMode === 'active')
+        .is('archived_at', null);
 
       const [{ data: clientData }, { data: logData }] = await Promise.all([
         clientsQuery,
@@ -195,10 +203,9 @@ export default function DeliveryLogsPage() {
       });
 
       setClients(sorted);
-      // If the currently-selected client isn't in the new list (we
-      // switched view modes), fall back to the first one. Otherwise
-      // keep the existing selection so toggling back-and-forth doesn't
-      // lose the user's place.
+      // Default to the first client if nothing is selected (or the
+      // selection has dropped off the list, e.g. we just switched
+      // viewMode and the picked client is in the other bucket).
       const stillVisible = sorted.some(c => c.id === selectedClientId);
       if (!stillVisible) {
         setSelectedClientId(sorted.length > 0 ? sorted[0].id : '');
@@ -208,11 +215,36 @@ export default function DeliveryLogsPage() {
     fetchClients();
   }, [viewMode]);
 
-  // Team members only need to load once — they don't depend on viewMode
+  // Team members only need to load once — independent of viewMode
   useEffect(() => {
-    UserService.getAllUsers().then((users) => {
+    UserService.getActiveUsers().then((users) => {
       setTeamMembers(users.filter(u => u.role !== 'client').map(u => ({ id: u.id, name: u.name || u.email })));
     });
+  }, []);
+
+  // Tab counts: fetch both Active and Inactive totals once so the
+  // badges stay stable regardless of which tab is currently selected.
+  // Head-count queries (no row payload). Both views exclude archived.
+  useEffect(() => {
+    const fetchTabCounts = async () => {
+      const [activeRes, inactiveRes] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_active', true)
+          .is('archived_at', null),
+        supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_active', false)
+          .is('archived_at', null),
+      ]);
+      setTabCounts({
+        active: activeRes.count ?? 0,
+        inactive: inactiveRes.count ?? 0,
+      });
+    };
+    fetchTabCounts();
   }, []);
 
   // Fetch entries when client changes
@@ -465,7 +497,7 @@ export default function DeliveryLogsPage() {
 
     if (type === 'select-type') {
       return (
-        <td className="py-3 px-4">
+        <td className="py-3.5 px-4 border-r border-cream-200">
           <Select value={entry.work_type} onValueChange={(v) => saveSelectField(entry.id, 'work_type', v)}>
             <SelectTrigger
               className={`border-none shadow-none bg-transparent w-auto h-auto ${workTypeBadge(entry.work_type)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
@@ -483,10 +515,10 @@ export default function DeliveryLogsPage() {
 
     if (type === 'select-trigger') {
       return (
-        <td className="py-3 px-4">
+        <td className="py-3.5 px-4 border-r border-cream-200">
           <Select value={entry.trigger || ''} onValueChange={(v) => saveSelectField(entry.id, 'trigger', v)}>
             <SelectTrigger
-              className={`border-none shadow-none bg-transparent w-auto h-auto ${entry.trigger ? triggerBadge(entry.trigger) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+              className={`border-none shadow-none bg-transparent w-auto h-auto ${entry.trigger ? triggerBadge(entry.trigger) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
               style={{ outline: 'none', boxShadow: 'none' }}
             >
               <SelectValue placeholder="—" />
@@ -531,14 +563,14 @@ export default function DeliveryLogsPage() {
               <button type="button" className="text-[10px] text-brand hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
                 {inlineWhoMode === 'team' ? 'Manual' : 'Team'}
               </button>
-              <button type="button" className="text-[10px] text-gray-400 hover:underline" onClick={cancelEditing}>Cancel</button>
+              <button type="button" className="text-[10px] text-ink-warm-400 hover:underline" onClick={cancelEditing}>Cancel</button>
             </div>
           </td>
         );
       }
       return (
-        <td className="py-3 px-4 cursor-pointer whitespace-nowrap" onDoubleClick={() => startEditing(entry.id, field, value)} title="Double-click to edit">
-          <span className="text-gray-600">{value || '—'}</span>
+        <td className="py-3.5 px-4 border-r border-cream-200 cursor-pointer whitespace-nowrap" onDoubleClick={() => startEditing(entry.id, field, value)} title="Double-click to edit">
+          <span className="text-ink-warm-700">{value || '—'}</span>
         </td>
       );
     }
@@ -561,8 +593,8 @@ export default function DeliveryLogsPage() {
         );
       }
       return (
-        <td className="py-3 px-4 cursor-pointer max-w-[200px]" onDoubleClick={() => startEditing(entry.id, field, value)} title="Double-click to edit">
-          <span className="text-gray-600 line-clamp-2 whitespace-pre-wrap">{value || '—'}</span>
+        <td className="py-3.5 px-4 border-r border-cream-200 cursor-pointer max-w-[200px]" onDoubleClick={() => startEditing(entry.id, field, value)} title="Double-click to edit">
+          <span className="text-ink-warm-700 line-clamp-2 whitespace-pre-wrap">{value || '—'}</span>
         </td>
       );
     }
@@ -588,11 +620,11 @@ export default function DeliveryLogsPage() {
 
     return (
       <td
-        className={`py-3 px-4 cursor-pointer ${field === 'action' ? 'max-w-[200px]' : field === 'location' ? 'max-w-[150px]' : ''}`}
+        className={`py-3.5 px-4 border-r border-cream-200 cursor-pointer ${field === 'action' ? 'max-w-[200px]' : field === 'location' ? 'max-w-[150px]' : ''}`}
         onDoubleClick={() => startEditing(entry.id, field, value)}
         title="Double-click to edit"
       >
-        <span className={`${field === 'action' ? 'line-clamp-2 text-gray-900 font-medium' : 'text-gray-600'} ${field === 'location' ? 'truncate block' : ''}`}>
+        <span className={`${field === 'action' ? 'line-clamp-2 text-ink-warm-900 font-medium' : 'text-ink-warm-700'} ${field === 'location' ? 'truncate block' : ''}`}>
           {value || '—'}
         </span>
       </td>
@@ -601,10 +633,14 @@ export default function DeliveryLogsPage() {
 
   return (
     <div className="space-y-6">
+      {/* v11 PageHeader — icon dropped 2026-06-03 to match /kols and
+          other v11 list pages that read cleaner without an icon next
+          to the title. */}
       <PageHeader
-        icon={ClipboardList}
         title="Delivery Logs"
         subtitle="Track work delivered for each client"
+        kicker="Documents · Delivery Logs"
+        kickerDot="brand"
         actions={(selectedClientId ? (
           <>
             <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
@@ -619,114 +655,164 @@ export default function DeliveryLogsPage() {
         ) : undefined)}
       />
 
-      {/* Active / Archived view toggle. Sits above the per-client
-          tabs so the client list reloads when you switch. */}
-      <div>
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'active' | 'archived')}>
-                <TabsList className="bg-gray-100 p-1 h-auto">
-                  <TabsTrigger
-                    value="active"
-                    className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
-                  >
-                    Active Clients
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="archived"
-                    className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
-                  >
-                    Archived
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+      {/* v11 chapter divider — counter shows live narrowing the same
+          way /kols's Roster header does. When no client is picked yet,
+          counter shows the client-pool size. */}
+      <SectionHeader
+        label="Entries"
+        dot="brand"
+        counter={
+          !selectedClientId
+            ? `${clients.length} ${viewMode} client${clients.length === 1 ? '' : 's'}`
+            : `${filtered.length} of ${entries.length} entries${
+                (filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm)
+                  ? ' · filtered'
+                  : ''
+              }`
+        }
+        first
+      />
+
+      {/* v11 filter toolbar — Active/Inactive view-mode tabs (left) +
+          Search (middle) + Work-type / Trigger filters (right). The
+          Inactive tab is for paused/between-contracts clients that
+          aren't archived — both views exclude archived. */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'active' | 'inactive')}>
+          <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+            <TabsTrigger
+              value="active"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+            >
+              Active
+              {tabCounts.active !== null && (
+                <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                  {tabCounts.active}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="inactive"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+            >
+              Inactive
+              {tabCounts.inactive !== null && (
+                <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                  {tabCounts.inactive}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {selectedClientId && (
+          <>
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400 pointer-events-none" />
+              <Input
+                placeholder="Search actions, who, notes..."
+                className="pl-10 focus-brand"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
 
-            {/* Client Tabs */}
-            <div className="pt-3">
-              {clientsLoading ? (
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-24 rounded" />)}
-                </div>
-              ) : clients.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  {viewMode === 'active' ? 'No active clients found.' : 'No archived clients found.'}
-                </p>
-              ) : (
-                <Tabs value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
-                    {clients.map((client) => (
-                      <TabsTrigger
-                        key={client.id}
-                        value={client.id}
-                        className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
-                      >
-                        {client.logo_url ? (
-                          <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded mr-2 inline-block" />
-                        ) : (
-                          <Building2 className="h-3.5 w-3.5 mr-2 inline-block" />
-                        )}
-                        {client.name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+            <div className="flex items-center gap-2 ml-auto">
+              <Select value={filterWorkType} onValueChange={setFilterWorkType}>
+                <SelectTrigger className="w-[150px] h-9 text-sm focus-brand">
+                  <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
+                  <SelectValue placeholder="Work Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterTrigger} onValueChange={setFilterTrigger}>
+                <SelectTrigger className="w-[150px] h-9 text-sm focus-brand">
+                  <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
+                  <SelectValue placeholder="Trigger" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Triggers</SelectItem>
+                  {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {(filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm) && (
+                <Button variant="ghost" size="sm" onClick={() => { setFilterWorkType('all'); setFilterTrigger('all'); setSearchTerm(''); }}>
+                  Clear
+                </Button>
               )}
             </div>
+          </>
+        )}
+      </div>
 
-            {/* Filters */}
-            {selectedClientId && (
-              <div className="flex flex-wrap items-center gap-3 pt-4">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search actions, who, notes..."
-                    className="pl-10 focus-brand"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Select value={filterWorkType} onValueChange={setFilterWorkType}>
-                  <SelectTrigger className="w-[160px] focus-brand">
-                    <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                    <SelectValue placeholder="Work Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={filterTrigger} onValueChange={setFilterTrigger}>
-                  <SelectTrigger className="w-[180px] focus-brand">
-                    <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                    <SelectValue placeholder="Trigger" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Triggers</SelectItem>
-                    {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {(filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm) && (
-                  <Button variant="ghost" size="sm" onClick={() => { setFilterWorkType('all'); setFilterTrigger('all'); setSearchTerm(''); }}>
-                    Clear
-                  </Button>
-                )}
-              </div>
-            )}
+      {/* Client picker — secondary tabs row for picking which client
+          to view. Sits between the primary toolbar above and the
+          table below. */}
+      <div>
+        {clientsLoading ? (
+          <div className="flex gap-2">
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-24 rounded" />)}
+          </div>
+        ) : clients.length === 0 ? (
+          <Card className="border-cream-200 overflow-hidden">
+            <EmptyState
+              icon={Building2}
+              title={viewMode === 'active' ? 'No active clients found.' : 'No inactive clients found.'}
+              description={viewMode === 'active'
+                ? 'Activate a client (or create one on /clients) to start logging deliveries.'
+                : 'No paused or between-contract clients right now — when one is deactivated (without being archived) it will show up here.'}
+              className="py-12"
+            />
+          </Card>
+        ) : (
+          <Tabs value={selectedClientId} onValueChange={setSelectedClientId}>
+            <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
+              {clients.map((client) => (
+                <TabsTrigger
+                  key={client.id}
+                  value={client.id}
+                  className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+                >
+                  {client.logo_url ? (
+                    <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded mr-2 inline-block" />
+                  ) : (
+                    <Building2 className="h-3.5 w-3.5 mr-2 inline-block" />
+                  )}
+                  {client.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
+      </div>
 
-            {/* Table */}
-            <div className="mt-5 -mx-6 -mb-6">
+            {/* Table — used to have `-mx-6 -mb-6` negative margins
+                that pushed it beyond the page's horizontal padding,
+                making the table visibly wider than the PageHeader +
+                toolbar above. Dropped 2026-06-03 so the table sits
+                inside the same horizontal grid as the rest of the
+                page content. */}
+            <div className="mt-5">
               {!selectedClientId ? (
-                <div className="text-center py-16">
-                  <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">Select a client to view their delivery log.</p>
-                </div>
+                <Card className="border-cream-200 overflow-hidden">
+                  <EmptyState
+                    icon={Building2}
+                    title="Pick a client to view their delivery log."
+                    description="Use the client picker above. The table loads its entries once a client is selected."
+                    className="py-12"
+                  />
+                </Card>
               ) : loading ? (
                 <div className="p-6 space-y-3">
                   {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
                 </div>
               ) : filtered.length === 0 && !isAddingInline ? (
                 <div className="text-center py-16">
-                  <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">
+                  <ClipboardList className="h-12 w-12 text-ink-warm-300 mx-auto mb-3" />
+                  <p className="text-ink-warm-500 font-medium">
                     {entries.length === 0 ? 'No delivery log entries yet.' : 'No entries match your filters.'}
                   </p>
                   {entries.length === 0 && (
@@ -741,36 +827,48 @@ export default function DeliveryLogsPage() {
                   )}
                 </div>
               ) : (
+                // Card wrapper gives the table the same v11 chrome
+                // (border-cream-200 + rounded) as other v11 surfaces;
+                // inner overflow-x-auto preserves horizontal scroll
+                // for wider-than-viewport tables on narrow screens.
+                <Card className="border-cream-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-t border-b border-gray-200 bg-gray-50/80">
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap w-14">
-                          <button className="inline-flex items-center gap-1 hover:text-gray-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>
+                      {/* v11 spreadsheet header — matches /kols pattern
+                          (solid `bg-cream-50` + `border-r border-cream-200`
+                          between cells) since delivery-logs is also an
+                          inline-editable spreadsheet. Was the lighter
+                          `bg-cream-50/80` with no column separators,
+                          which made the table feel different from
+                          the rest of v11. 2026-06-03. */}
+                      <tr className="bg-cream-50 hover:bg-cream-50 border-b border-cream-200">
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap w-14">
+                          <button className="inline-flex items-center gap-1 hover:text-ink-warm-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>
                             Day
                             <ArrowUpDown className="h-3 w-3" />
                           </button>
                         </th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Type</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Action</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Who</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">How</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Where</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">Trigger</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Notes</th>
-                        <th className="text-right py-3 px-4 w-20"></th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Date</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Type</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200">Action</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Who</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">How</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Where</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Trigger</th>
+                        <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200">Notes</th>
+                        <th className="bg-cream-50 text-right py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] whitespace-nowrap w-20">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {/* Inline add row */}
                       {isAddingInline && (
                         <tr className="border-b border-brand/20 bg-brand-light/20">
-                          <td className="py-3 px-4 text-gray-400 text-xs">—</td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3.5 px-4 border-r border-cream-200 text-ink-warm-400 text-xs">—</td>
+                          <td className="py-3.5 px-4 border-r border-cream-200 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="text-sm text-gray-500 hover:text-gray-700 cursor-pointer">
+                                <button className="text-sm text-ink-warm-500 hover:text-ink-warm-700 cursor-pointer">
                                   {inlineNew.logged_at ? new Date(inlineNew.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Select date'}
                                 </button>
                               </PopoverTrigger>
@@ -786,11 +884,11 @@ export default function DeliveryLogsPage() {
                               </PopoverContent>
                             </Popover>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <div className="inline-flex items-center">
                               <Select value={inlineNew.work_type} onValueChange={(v) => setInlineNew({ ...inlineNew, work_type: v })}>
                                 <SelectTrigger
-                                  className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.work_type ? workTypeBadge(inlineNew.work_type) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+                                  className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.work_type ? workTypeBadge(inlineNew.work_type) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
                                   style={{ outline: 'none', boxShadow: 'none' }}
                                 >
                                   <SelectValue placeholder="Type" />
@@ -802,24 +900,24 @@ export default function DeliveryLogsPage() {
                               {!inlineNew.work_type && <RequiredAsterisk />}
                             </div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <div className="flex items-center">
                               <Input
                                 value={inlineNew.action}
                                 onChange={(e) => setInlineNew({ ...inlineNew, action: e.target.value })}
                                 placeholder="Action"
-                                className="flex-1 border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs font-medium text-gray-900"
+                                className="flex-1 border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs font-medium text-ink-warm-900"
                                 style={{ outline: 'none', boxShadow: 'none' }}
                               />
                               {!inlineNew.action && <RequiredAsterisk />}
                             </div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             {inlineNewWhoMode === 'team' ? (
                               <div>
                                 <Select value={inlineNew.who} onValueChange={(v) => setInlineNew({ ...inlineNew, who: v })}>
                                   <SelectTrigger
-                                    className="border-none shadow-none bg-transparent w-auto h-auto px-0 py-0 text-xs text-gray-600 inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                    className="border-none shadow-none bg-transparent w-auto h-auto px-0 py-0 text-xs text-ink-warm-700 inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
                                     style={{ outline: 'none', boxShadow: 'none' }}
                                   >
                                     <SelectValue placeholder="Who" />
@@ -836,35 +934,35 @@ export default function DeliveryLogsPage() {
                                   value={inlineNew.who}
                                   onChange={(e) => setInlineNew({ ...inlineNew, who: e.target.value })}
                                   placeholder="Who"
-                                  className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                                  className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                                   style={{ outline: 'none', boxShadow: 'none' }}
                                 />
                                 <button type="button" className="text-[10px] text-brand hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('team'); setInlineNew({ ...inlineNew, who: '' }); }}>Team</button>
                               </div>
                             )}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Input
                               value={inlineNew.method}
                               onChange={(e) => setInlineNew({ ...inlineNew, method: e.target.value })}
                               placeholder="How"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Input
                               value={inlineNew.location}
                               onChange={(e) => setInlineNew({ ...inlineNew, location: e.target.value })}
                               placeholder="Where"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Select value={inlineNew.trigger} onValueChange={(v) => setInlineNew({ ...inlineNew, trigger: v })}>
                               <SelectTrigger
-                                className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.trigger ? triggerBadge(inlineNew.trigger) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+                                className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.trigger ? triggerBadge(inlineNew.trigger) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
                                 style={{ outline: 'none', boxShadow: 'none' }}
                               >
                                 <SelectValue placeholder="Trigger" />
@@ -874,36 +972,40 @@ export default function DeliveryLogsPage() {
                               </SelectContent>
                             </Select>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Input
                               value={inlineNew.notes}
                               onChange={(e) => setInlineNew({ ...inlineNew, notes: e.target.value })}
                               placeholder="Notes"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
+                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-ink-warm-700"
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 border-r border-cream-200 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
                                 <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) }); }}>
-                                <X className="h-4 w-4 text-gray-400" />
+                                <X className="h-4 w-4 text-ink-warm-400" />
                               </Button>
                             </div>
                           </td>
                         </tr>
                       )}
-                      {filtered.map((entry) => (
-                        <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors group">
-                          <td className="py-3 px-4">
-                            <span className="inline-flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold rounded-full h-6 w-6">{getDayNumber(entry.logged_at)}</span>
+                      {filtered.map((entry, idx) => (
+                        // v11 spreadsheet body row — alternating bg
+                        // (white / cream-50) + visible column separators
+                        // via border-r on each cell (added via replace
+                        // below). Matches /kols spreadsheet chrome.
+                        <tr key={entry.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200 group`}>
+                          <td className="py-3.5 px-4 border-r border-cream-200">
+                            <span className="inline-flex items-center justify-center bg-cream-100 text-ink-warm-700 text-xs font-bold rounded-full h-6 w-6">{getDayNumber(entry.logged_at)}</span>
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3.5 px-4 border-r border-cream-200 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="text-gray-500 text-sm hover:text-gray-700 cursor-pointer">
+                                <button className="text-ink-warm-500 text-sm hover:text-ink-warm-700 cursor-pointer">
                                   {new Date(entry.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </button>
                               </PopoverTrigger>
@@ -926,7 +1028,7 @@ export default function DeliveryLogsPage() {
                           {renderEditableCell(entry, 'location', 'text')}
                           {renderEditableCell(entry, 'trigger', 'select-trigger')}
                           {renderEditableCell(entry, 'notes', 'textarea')}
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 border-r border-cream-200 text-right">
                             <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               {(() => {
                                 const sameDateEntries = filtered.filter(e => e.logged_at === entry.logged_at);
@@ -938,28 +1040,28 @@ export default function DeliveryLogsPage() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="w-auto px-1 hover:bg-gray-100 disabled:opacity-30"
+                                      className="w-auto px-1 hover:bg-cream-100 disabled:opacity-30"
                                       onClick={() => handleReorder(entry.id, 'up')}
                                       disabled={posInGroup === 0}
                                       title="Move up within same date"
                                     >
-                                      <ChevronUp className="h-3.5 w-3.5 text-gray-500" />
+                                      <ChevronUp className="h-3.5 w-3.5 text-ink-warm-500" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="w-auto px-1 hover:bg-gray-100 disabled:opacity-30"
+                                      className="w-auto px-1 hover:bg-cream-100 disabled:opacity-30"
                                       onClick={() => handleReorder(entry.id, 'down')}
                                       disabled={posInGroup === sameDateSorted.length - 1}
                                       title="Move down within same date"
                                     >
-                                      <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                                      <ChevronDown className="h-3.5 w-3.5 text-ink-warm-500" />
                                     </Button>
                                   </>
                                 );
                               })()}
-                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-gray-100" onClick={() => openForm(entry)} title="Edit in popup">
-                                <Expand className="h-3.5 w-3.5 text-gray-600" />
+                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-cream-100" onClick={() => openForm(entry)} title="Edit in popup">
+                                <Expand className="h-3.5 w-3.5 text-ink-warm-700" />
                               </Button>
                               <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
                                 <Trash2 className="h-3.5 w-3.5 text-rose-600" />
@@ -971,6 +1073,7 @@ export default function DeliveryLogsPage() {
                     </tbody>
                   </table>
                 </div>
+                </Card>
               )}
             </div>
 
@@ -1057,7 +1160,7 @@ export default function DeliveryLogsPage() {
               <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." className="focus-brand" rows={3} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
             <Button variant="brand" onClick={handleSubmit} disabled={!form.work_type || !form.action.trim() || !form.logged_at}>
               {editingId ? 'Save Changes' : 'Add Entry'}
@@ -1073,7 +1176,7 @@ export default function DeliveryLogsPage() {
             <DialogTitle>Delete Entry</DialogTitle>
             <DialogDescription>Are you sure you want to delete this delivery log entry? This action cannot be undone.</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deletingId && handleDelete(deletingId)}>Delete</Button>
           </DialogFooter>

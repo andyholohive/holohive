@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -109,7 +110,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         setDraftCronFailed(data.channel?.templates?.cron_failed ?? '');
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Failed to load', variant: 'destructive' });
+      toast({ title: 'Load failed', description: err?.message ?? 'Failed to load', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -152,10 +153,10 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         // Reflect what the server actually saved (e.g. is_enabled may be
         // forced false if no chat was selected).
         setDraftEnabled(!!data.channel.is_enabled);
-        toast({ title: 'Saved', description: 'Alert config updated.' });
+        toast({ title: 'Alert config saved' });
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Save failed', variant: 'destructive' });
+      toast({ title: 'Save failed', description: err?.message ?? 'Save failed', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -191,7 +192,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         load();
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Test failed', variant: 'destructive' });
+      toast({ title: 'Test failed', description: err?.message ?? 'Test failed', variant: 'destructive' });
     } finally {
       setTesting(null);
     }
@@ -211,7 +212,11 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      {/* v11 dialog: max-h-[85vh] + flex-col, inner scroll surface flex-1
+          overflow-y-auto, footer pinned with border-t. Loading state
+          renders structurally (no spinner) so the dialog height doesn't
+          jump when config arrives. */}
+      <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-brand" />
@@ -225,17 +230,28 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         </DialogHeader>
 
         {loading ? (
-          <div className="py-8 flex items-center justify-center text-gray-500 text-sm">
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Loading config…
+          // Structural skeleton — chat picker + master toggle + 4
+          // template panels, matching the loaded shape.
+          <div className="flex-1 overflow-y-auto px-1 space-y-5 py-2">
+            <div>
+              <Skeleton className="h-3 w-24 mb-1" />
+              <Skeleton className="h-9 w-full rounded-md" />
+            </div>
+            <Skeleton className="h-16 w-full rounded-lg" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className="h-3 w-32 mb-1" />
+                <Skeleton className="h-24 w-full rounded-md" />
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="space-y-5 py-2">
+          <div className="flex-1 overflow-y-auto px-1 space-y-5 py-2">
             {/* Chat picker */}
             <div>
               <Label htmlFor="chat-picker">Telegram chat</Label>
               <Select value={draftChatId || 'none'} onValueChange={v => setDraftChatId(v === 'none' ? '' : v)}>
-                <SelectTrigger id="chat-picker" className="mt-1">
+                <SelectTrigger id="chat-picker" className="mt-1 focus-brand">
                   <SelectValue placeholder="Pick a chat…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,13 +263,13 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-warm-500 mt-1">
                 Bot must already be in the chat. {chats.length} known chats.
               </p>
             </div>
 
             {/* Master enable toggle */}
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-cream-200 bg-cream-50">
               <Switch
                 id="alerts-enabled"
                 checked={draftEnabled}
@@ -262,7 +278,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               />
               <Label htmlFor="alerts-enabled" className="text-sm cursor-pointer flex-1">
                 <div className="font-medium">{draftEnabled ? 'Alerts ON' : 'Alerts OFF'}</div>
-                <div className="text-xs text-gray-500 font-normal">
+                <div className="text-xs text-ink-warm-500 font-normal">
                   {!draftChatId
                     ? 'Pick a chat above to enable'
                     : draftEnabled
@@ -296,10 +312,10 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                 onChange={e => setDraftHotTier(e.target.value)}
                 spellCheck={false}
               />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Variables: {HOT_TIER_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              <p className="text-[10px] text-ink-warm-500 mt-1">
+                Variables: {HOT_TIER_VARS.map(v => <code key={v} className="bg-cream-100 px-1 rounded mr-1">{v}</code>)}
               </p>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-ink-warm-500">
                 HTML allowed: <code>&lt;b&gt;</code> <code>&lt;i&gt;</code> <code>&lt;a href&gt;</code>. Use <code>\n</code> for line breaks.
               </p>
             </div>
@@ -328,8 +344,8 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                 onChange={e => setDraftGrokHot(e.target.value)}
                 spellCheck={false}
               />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Variables: {GROK_HOT_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              <p className="text-[10px] text-ink-warm-500 mt-1">
+                Variables: {GROK_HOT_VARS.map(v => <code key={v} className="bg-cream-100 px-1 rounded mr-1">{v}</code>)}
               </p>
             </div>
 
@@ -357,10 +373,10 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                 onChange={e => setDraftKoreaListing(e.target.value)}
                 spellCheck={false}
               />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Variables: {KOREA_LISTING_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              <p className="text-[10px] text-ink-warm-500 mt-1">
+                Variables: {KOREA_LISTING_VARS.map(v => <code key={v} className="bg-cream-100 px-1 rounded mr-1">{v}</code>)}
               </p>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-ink-warm-500">
                 Fires when an Upbit/Bithumb cron-detected listing matches one of our prospects.
               </p>
             </div>
@@ -389,10 +405,10 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                 onChange={e => setDraftCronFailed(e.target.value)}
                 spellCheck={false}
               />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Variables: {CRON_FAILED_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              <p className="text-[10px] text-ink-warm-500 mt-1">
+                Variables: {CRON_FAILED_VARS.map(v => <code key={v} className="bg-cream-100 px-1 rounded mr-1">{v}</code>)}
               </p>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-ink-warm-500">
                 Fires when a scheduled job (e.g. the daily Auto Discovery scan) returns a failed status.
                 Operational alert — separate from prospect-related alerts above.
               </p>
@@ -409,7 +425,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                   ? <CheckCircle className="h-3.5 w-3.5" />
                   : <XCircle className="h-3.5 w-3.5" />}
                 Last test: <span className="font-semibold">{config.last_test_status}</span>
-                <span className="text-gray-500">
+                <span className="text-ink-warm-500">
                   · {new Date(config.last_test_at).toLocaleString()}
                 </span>
               </div>
@@ -425,15 +441,14 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Close
           </Button>
           <Button
+            variant="brand"
             onClick={save}
             disabled={saving || !dirty || loading}
-            style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-           
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {saving ? 'Saving…' : 'Save'}

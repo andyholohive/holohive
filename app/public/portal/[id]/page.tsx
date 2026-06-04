@@ -3268,7 +3268,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-lg border-gray-200 hover:border-brand hover:text-brand transition-colors"
+                              className="rounded-lg border-gray-200 hover:border-brand transition-colors"
                               onClick={() => {
                                 const url = campaign.slug
                                   ? `/public/campaigns/${campaign.slug}`
@@ -3435,7 +3435,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                         <Button
                           variant="outline"
                           size="sm"
-                          className="rounded-lg border-gray-200 hover:border-brand hover:text-brand transition-colors flex-shrink-0 ml-4"
+                          className="rounded-lg border-gray-200 hover:border-brand transition-colors flex-shrink-0 ml-4"
                           onClick={(e) => { e.stopPropagation(); setViewingNote(note); }}
                         >
                           <ExternalLink className="h-4 w-4 mr-1.5" />

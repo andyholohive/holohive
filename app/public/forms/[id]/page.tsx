@@ -329,7 +329,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     className={`focus-brand flex-1 ${hasError ? 'border-rose-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
-                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="bg-brand text-white">
+                    <Button type="button" variant="brand" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }}>
                       +
                     </Button>
                   )}
@@ -466,7 +466,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     className={`focus-brand flex-1 ${hasError ? 'border-rose-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
-                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="bg-brand text-white">
+                    <Button type="button" variant="brand" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }}>
                       +
                     </Button>
                   )}
