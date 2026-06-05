@@ -19,7 +19,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { CardHeaderEditorial } from '@/components/ui/card-header-editorial';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
+import { CustomColorPicker } from '@/components/ui/custom-color-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -45,6 +48,38 @@ import {
   BarChart3,
   ClipboardList,
 } from 'lucide-react';
+
+// kebab-case slug from a free-text name. Used as a fallback when the
+// user doesn't type a custom slug — see handleSaveTemplate below.
+// Mirrors the slug shape that the existing six 2026-06-05 templates
+// landed with (`client-onboarding-week-0`, `kol-brief-cycle`, etc.).
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')   // strip diacritics
+    .replace(/[^a-z0-9]+/g, '-')                          // non-alnum → hyphen
+    .replace(/^-+|-+$/g, '')                              // trim leading/trailing
+    .slice(0, 60);                                        // safety cap
+}
+
+// v11 preset palette for the Color picker — anchored on the same
+// tones the rest of the app uses (brand teal, the 8 StatusBadge
+// accent tones, plus a few neutrals). The CustomColorPicker behind
+// "Custom…" is the escape hatch for anything outside this set.
+const PRESET_COLORS = [
+  '#3E8692', // brand teal
+  '#10B981', // emerald
+  '#0EA5E9', // sky
+  '#A855F7', // purple
+  '#F59E0B', // amber
+  '#F43F5E', // rose
+  '#EC4899', // pink
+  '#64748B', // slate
+  '#84CC16', // lime
+  '#06B6D4', // cyan
+  '#F97316', // orange
+  '#1F2937', // ink-warm-900-ish
+];
 
 function SortableStepRow({ step, onEdit, onDelete }: { step: DeliverableTemplateStep; onEdit: () => void; onDelete: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: step.id });
@@ -104,6 +139,18 @@ export default function DeliverableTemplatesTab() {
 
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<DeliverableTemplateStep | null>(null);
+
+  // v11 destructive-confirm state — replaces the native confirm() calls
+  // that used to live in handleDeleteTemplate / handleDeleteStep. The
+  // *Pending entries hold the row(s) to delete on user confirm; null
+  // means the dialog is closed. 2026-06-05.
+  const [deleteTemplatePending, setDeleteTemplatePending] = useState<DeliverableTemplate | null>(null);
+  const [deleteStepPending, setDeleteStepPending] = useState<{ step: DeliverableTemplateStep; templateId: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Custom color picker dialog state. Triggered from the Color popover
+  // when the user wants something off-palette. 2026-06-05.
+  const [customColorOpen, setCustomColorOpen] = useState(false);
   const [stepForm, setStepForm] = useState({
     step_name: '', description: '', default_role: '', role_label: '',
     estimated_duration_days: 1, task_type: 'Client Delivery', is_blocking: false,
@@ -180,16 +227,25 @@ export default function DeliverableTemplatesTab() {
 
   const handleSaveTemplate = async () => {
     try {
+      // Auto-generate slug from name when the user leaves the field
+      // empty. This matches the pattern Andy wanted: the slug field
+      // is optional, and we fall back to a kebab-case version of the
+      // name. Trim first so a slug of pure whitespace doesn't sneak
+      // through. 2026-06-05.
+      const trimmedSlug = (editForm.slug || '').trim();
+      const finalSlug = trimmedSlug || slugify(editForm.name);
+      const payload = { ...editForm, slug: finalSlug };
+
       if (editingTemplate) {
         // `as any` matches the pattern used on createTemplate below —
         // editForm's `category`/`icon` are typed `string` while
         // updateTemplate wants stricter unions. Pre-existing in the
         // original /tasks/deliverables/templates page; carried over
         // unchanged in the 2026-06-03 consolidation.
-        await DeliverableService.updateTemplate(editingTemplate.id, editForm as any);
+        await DeliverableService.updateTemplate(editingTemplate.id, payload as any);
         toast({ title: 'Template updated' });
       } else {
-        await DeliverableService.createTemplate({ ...editForm, created_by: user?.id } as any);
+        await DeliverableService.createTemplate({ ...payload, created_by: user?.id } as any);
         toast({ title: 'Template created' });
       }
       setEditDialogOpen(false);
@@ -199,14 +255,27 @@ export default function DeliverableTemplatesTab() {
     }
   };
 
-  const handleDeleteTemplate = async (id: string) => {
-    if (!confirm('Delete this template and all its steps?')) return;
+  // Stages the template for delete; the actual deletion fires from
+  // the v11 destructive Dialog below on user confirm. 2026-06-05.
+  const handleDeleteTemplate = (template: DeliverableTemplate) => {
+    setDeleteTemplatePending(template);
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!deleteTemplatePending) return;
+    setDeleting(true);
     try {
-      await DeliverableService.deleteTemplate(id);
-      toast({ title: 'Template deleted' });
+      await DeliverableService.deleteTemplate(deleteTemplatePending.id);
+      toast({
+        title: 'Template deleted',
+        description: `"${deleteTemplatePending.name}" and its steps are gone.`,
+      });
+      setDeleteTemplatePending(null);
       await loadTemplates();
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -265,15 +334,29 @@ export default function DeliverableTemplatesTab() {
     }
   };
 
-  const handleDeleteStep = async (stepId: string, templateId: string) => {
-    if (!confirm('Delete this step?')) return;
+  // Stages the step for delete; the actual deletion fires from the
+  // v11 destructive Dialog below on user confirm. 2026-06-05.
+  const handleDeleteStep = (step: DeliverableTemplateStep, templateId: string) => {
+    setDeleteStepPending({ step, templateId });
+  };
+
+  const confirmDeleteStep = async () => {
+    if (!deleteStepPending) return;
+    const { step, templateId } = deleteStepPending;
+    setDeleting(true);
     try {
-      await DeliverableService.deleteStep(stepId);
-      toast({ title: 'Step deleted' });
+      await DeliverableService.deleteStep(step.id);
+      toast({
+        title: 'Step deleted',
+        description: `"${step.step_name}" removed.`,
+      });
+      setDeleteStepPending(null);
       const data = await DeliverableService.getTemplateWithSteps(templateId);
       if (data) setSteps(prev => ({ ...prev, [templateId]: data.steps }));
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -384,7 +467,7 @@ export default function DeliverableTemplatesTab() {
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditTemplate(t)} aria-label="Edit template">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => handleDeleteTemplate(t.id)} aria-label="Delete template">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => handleDeleteTemplate(t)} aria-label="Delete template">
                         <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                       </Button>
                     </div>
@@ -408,7 +491,7 @@ export default function DeliverableTemplatesTab() {
                                   key={s.id}
                                   step={s}
                                   onEdit={() => openEditStep(t.id, s)}
-                                  onDelete={() => handleDeleteStep(s.id, t.id)}
+                                  onDelete={() => handleDeleteStep(s, t.id)}
                                 />
                               ))}
                             </div>
@@ -444,8 +527,16 @@ export default function DeliverableTemplatesTab() {
               <Input className="focus-brand" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Slug</Label>
-              <Input className="focus-brand" value={editForm.slug} onChange={e => setEditForm(f => ({ ...f, slug: e.target.value }))} placeholder="unique-slug" />
+              <Label className="text-xs">Slug <span className="text-ink-warm-400 font-normal">(optional)</span></Label>
+              <Input
+                className="focus-brand"
+                value={editForm.slug}
+                onChange={e => setEditForm(f => ({ ...f, slug: e.target.value }))}
+                placeholder={editForm.name ? slugify(editForm.name) || 'auto-generated-on-save' : 'auto-generated-on-save'}
+              />
+              <p className="text-[11px] text-ink-warm-500">
+                Leave blank and we&apos;ll generate one from the name (e.g. <code className="bg-cream-100 px-1 rounded font-mono">{editForm.name ? (slugify(editForm.name) || 'my-template') : 'my-template'}</code>).
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Description</Label>
@@ -463,17 +554,110 @@ export default function DeliverableTemplatesTab() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Icon</Label>
+                {/* Icon picker — renders the actual lucide icon next to
+                    its name in both the trigger and the dropdown
+                    options. Was a name-only `<SelectItem>i</SelectItem>`
+                    that just showed strings like "ClipboardList". The
+                    trigger preview uses the brand color so the picked
+                    icon matches what the user sees on the template
+                    card. 2026-06-05. */}
                 <Select value={editForm.icon} onValueChange={v => setEditForm(f => ({ ...f, icon: v }))}>
-                  <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="focus-brand">
+                    <SelectValue>
+                      {(() => {
+                        const Picked = ICON_MAP[editForm.icon] || ClipboardList;
+                        return (
+                          <span className="inline-flex items-center gap-2">
+                            <Picked className="h-4 w-4 text-brand" />
+                            <span className="text-sm">{editForm.icon}</span>
+                          </span>
+                        );
+                      })()}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
-                    {ICON_OPTIONS.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                    {ICON_OPTIONS.map(name => {
+                      const Icon = ICON_MAP[name] || ClipboardList;
+                      return (
+                        <SelectItem key={name} value={name}>
+                          <span className="inline-flex items-center gap-2">
+                            <Icon className="h-4 w-4 text-ink-warm-700" />
+                            <span className="text-sm">{name}</span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Color</Label>
-              <Input type="color" className="h-9 w-20" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))} />
+              {/* v11 color picker — preset swatches in a Popover with
+                  an inline "Custom…" escape hatch that opens the full
+                  CustomColorPicker (HSL grid + hue slider + hex input).
+                  Was a raw `<Input type="color">` which surfaced the
+                  unstyled browser native picker. 2026-06-05. */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 w-full justify-start gap-2 focus-brand"
+                  >
+                    <span
+                      className="w-5 h-5 rounded border border-cream-300 shrink-0"
+                      style={{ backgroundColor: editForm.color }}
+                      aria-hidden
+                    />
+                    <span className="font-mono text-xs text-ink-warm-700">{(editForm.color || '#000000').toUpperCase()}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-72 p-3 bg-white border-cream-200"
+                  align="start"
+                >
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500">Presets</Label>
+                      <div className="grid grid-cols-6 gap-2 mt-1.5">
+                        {PRESET_COLORS.map(c => {
+                          const isActive = (editForm.color || '').toUpperCase() === c.toUpperCase();
+                          return (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setEditForm(f => ({ ...f, color: c }))}
+                              className={`h-8 w-full rounded transition-all ${isActive ? 'ring-2 ring-brand ring-offset-1' : 'border border-cream-200 hover:scale-110'}`}
+                              style={{ backgroundColor: c }}
+                              aria-label={`Use ${c}`}
+                              title={c}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500">Hex</Label>
+                      <Input
+                        value={editForm.color}
+                        onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))}
+                        className="focus-brand h-8 text-xs font-mono"
+                        placeholder="#3E8692"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setCustomColorOpen(true)}
+                    >
+                      Custom Color Picker…
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
@@ -520,9 +704,19 @@ export default function DeliverableTemplatesTab() {
                 <Input className="focus-brand" value={stepForm.task_type} onChange={e => setStepForm(f => ({ ...f, task_type: e.target.value }))} />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="is_blocking" checked={stepForm.is_blocking} onChange={e => setStepForm(f => ({ ...f, is_blocking: e.target.checked }))} />
-              <Label htmlFor="is_blocking" className="text-xs">Blocking step</Label>
+            {/* v11 Switch (was a raw HTML checkbox). Matches every
+                other toggle in the app — /admin/changelog Publish
+                switch, /reminders Active toggle, etc. 2026-06-05. */}
+            <div className="flex items-center justify-between gap-2 border border-cream-200 rounded-md p-3">
+              <div className="flex flex-col">
+                <Label htmlFor="is_blocking" className="text-sm cursor-pointer">Blocking step</Label>
+                <span className="text-[11px] text-ink-warm-500">Downstream steps can&apos;t start until this one&apos;s done.</span>
+              </div>
+              <Switch
+                id="is_blocking"
+                checked={stepForm.is_blocking}
+                onCheckedChange={(checked) => setStepForm(f => ({ ...f, is_blocking: checked }))}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Checklist Items (one per line)</Label>
@@ -540,6 +734,80 @@ export default function DeliverableTemplatesTab() {
               {editingStep ? 'Update' : 'Add'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete template confirm — v11 destructive Dialog replacing
+          the native confirm() that used to live in
+          handleDeleteTemplate. Icon + Title Case header, bolded
+          subject in the description, variant="destructive" primary
+          + disabled state during the in-flight delete. 2026-06-05. */}
+      <Dialog open={!!deleteTemplatePending} onOpenChange={(open) => { if (!open) setDeleteTemplatePending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Template?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deleteTemplatePending?.name ?? ''}</strong> and all its steps will be permanently deleted. Deliverables already spawned from this template are not affected. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteTemplatePending(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteTemplate} disabled={deleting}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete step confirm — same pattern as Delete Template. */}
+      <Dialog open={!!deleteStepPending} onOpenChange={(open) => { if (!open) setDeleteStepPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Step?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deleteStepPending?.step.step_name ?? ''}</strong> will be permanently removed from this template. Existing tasks already spawned from this step are not affected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteStepPending(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteStep} disabled={deleting}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom color picker — the off-palette escape hatch behind
+          the "Custom Color Picker…" button in the template editor's
+          Color popover. CustomColorPicker is self-contained
+          modal-style content; we wrap it in a Dialog so it stacks
+          cleanly above the template editor (the depth-aware overlay
+          shipped in `components/ui/dialog.tsx` keeps the backdrop
+          from doubling). 2026-06-05. */}
+      <Dialog open={customColorOpen} onOpenChange={setCustomColorOpen}>
+        <DialogContent className="sm:max-w-md">
+          <CustomColorPicker
+            isOpen={customColorOpen}
+            onClose={() => setCustomColorOpen(false)}
+            onApply={(color) => {
+              setEditForm(f => ({ ...f, color }));
+              setCustomColorOpen(false);
+            }}
+            initialColor={editForm.color || '#3E8692'}
+            presetColors={PRESET_COLORS}
+          />
         </DialogContent>
       </Dialog>
     </div>

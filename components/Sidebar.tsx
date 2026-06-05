@@ -281,9 +281,24 @@ export default function Sidebar({ children }: SidebarProps) {
     }
 
     // STEP 2 + 3: double-rAF, then scroll to top.
+    //
+    // [2026-06-05] Skip the scroll for routes where the active item
+    // is already comfortably in view by default. /templates and /sops
+    // both sit near the top of the Workspace section, so the scroll-
+    // to-top behavior was actually displacing them DOWN (because
+    // `block: 'start'` pinned them to the viewport top and rolled the
+    // KOLs section above them off-screen). User-reported as "sidebar
+    // scrolls to the selected tab" — confusing UX where clicking
+    // either page made the sidebar visibly jump. The simpler fix is
+    // to just opt these routes out of the scroll-to-top step; the
+    // active highlight is already visible without intervention.
+    const SCROLL_OPT_OUT = ['/templates', '/sops'];
+    const optOut = SCROLL_OPT_OUT.some(p => pathname === p || pathname.startsWith(p + '/'));
+
     let inner = 0;
     const outer = requestAnimationFrame(() => {
       inner = requestAnimationFrame(() => {
+        if (optOut) return;
         const active = navRef.current?.querySelector('[data-nav-active="true"]');
         if (active && active instanceof HTMLElement) {
           active.scrollIntoView({ block: 'start', behavior: 'auto' });

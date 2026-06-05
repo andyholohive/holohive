@@ -278,17 +278,26 @@ export default function FormsPage() {
     }
   };
 
-  const handleDeleteForm = async (formId: string, formName: string) => {
-    if (!confirm(`Are you sure you want to archive "${formName}"? You can restore it later from the Archive page.`)) {
-      return;
-    }
+  // [v11 destructive Dialog] confirm() replaced by archivePending state +
+  // confirmArchiveForm below. Archive (not hard-delete) but visually
+  // destructive in context. 2026-06-05.
+  const [archiveFormPending, setArchiveFormPending] = useState<{ id: string; name: string } | null>(null);
+  const [archivingForm, setArchivingForm] = useState(false);
 
+  const handleDeleteForm = (formId: string, formName: string) => {
+    setArchiveFormPending({ id: formId, name: formName });
+  };
+
+  const confirmArchiveForm = async () => {
+    if (!archiveFormPending) return;
+    setArchivingForm(true);
     try {
-      await FormService.archiveForm(formId);
+      await FormService.archiveForm(archiveFormPending.id);
       toast({
         title: 'Form archived',
         description: 'You can restore it from the Archive page.',
       });
+      setArchiveFormPending(null);
       await fetchForms();
     } catch (error) {
       console.error('Error archiving form:', error);
@@ -297,6 +306,8 @@ export default function FormsPage() {
         description: error instanceof Error ? error.message : 'Failed to archive form',
         variant: 'destructive',
       });
+    } finally {
+      setArchivingForm(false);
     }
   };
 
@@ -438,14 +449,23 @@ export default function FormsPage() {
     setIsResponseDetailOpen(true);
   };
 
-  const handleDeleteResponse = async (responseId: string) => {
-    if (!confirm('Delete this response?')) return;
+  // [v11 destructive Dialog] confirm() replaced by deleteResponsePending
+  // state + confirmDeleteResponse below. 2026-06-05.
+  const [deleteResponsePending, setDeleteResponsePending] = useState<string | null>(null);
+  const [deletingResponse, setDeletingResponse] = useState(false);
 
+  const handleDeleteResponse = (responseId: string) => {
+    setDeleteResponsePending(responseId);
+  };
+
+  const confirmDeleteResponse = async () => {
+    if (!deleteResponsePending) return;
+    setDeletingResponse(true);
     try {
-      await FormService.deleteResponse(responseId);
+      await FormService.deleteResponse(deleteResponsePending);
       toast({ title: 'Response deleted' });
       // Refresh responses
-      setResponses(prev => prev.filter(r => r.id !== responseId));
+      setResponses(prev => prev.filter(r => r.id !== deleteResponsePending));
       // Update response count in forms list
       if (viewingResponsesForm) {
         setForms(prev => prev.map(f =>
@@ -454,6 +474,7 @@ export default function FormsPage() {
             : f
         ));
       }
+      setDeleteResponsePending(null);
     } catch (error) {
       console.error('Error deleting response:', error);
       toast({
@@ -461,6 +482,8 @@ export default function FormsPage() {
         description: error instanceof Error ? error.message : 'Failed to delete response',
         variant: 'destructive',
       });
+    } finally {
+      setDeletingResponse(false);
     }
   };
 
@@ -1481,6 +1504,59 @@ export default function FormsPage() {
             <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsResponseDetailOpen(false)}>
                 Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Archive form confirm — v11 destructive Dialog replacing the
+            native confirm() that used to live in handleDeleteForm.
+            Archive is the soft-delete here, but visually destructive
+            since the form leaves the active list. 2026-06-05. */}
+        <Dialog open={!!archiveFormPending} onOpenChange={(open) => { if (!open) setArchiveFormPending(null); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Archive Form?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                <strong>{archiveFormPending?.name ?? ''}</strong> will be archived. You can restore it later from the Archive page.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setArchiveFormPending(null)} disabled={archivingForm}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmArchiveForm} disabled={archivingForm}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {archivingForm ? 'Archiving…' : 'Archive'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete response confirm — v11 destructive Dialog replacing the
+            native confirm() that used to live in handleDeleteResponse.
+            2026-06-05. */}
+        <Dialog open={!!deleteResponsePending} onOpenChange={(open) => { if (!open) setDeleteResponsePending(null); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Delete Response?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                This response will be permanently removed.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setDeleteResponsePending(null)} disabled={deletingResponse}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteResponse} disabled={deletingResponse}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {deletingResponse ? 'Deleting…' : 'Delete'}
               </Button>
             </DialogFooter>
           </DialogContent>

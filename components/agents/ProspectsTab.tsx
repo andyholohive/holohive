@@ -250,6 +250,11 @@ export default function ProspectsTab() {
   // Action loading
   const [promoting, setPromoting] = useState<string | null>(null);
   const [bulkActing, setBulkActing] = useState(false);
+  // v11 destructive-Dialog state — replaces the native confirm() that
+  // previously gated `handleBulkDelete` (2026-06-05). Boolean: the
+  // payload (which IDs to delete) is already in `selected`; the dialog
+  // just opens, the user confirms, the existing bulk-delete loop fires.
+  const [bulkDeletePending, setBulkDeletePending] = useState(false);
 
   // Scraper
   const [scraperOpen, setScraperOpen] = useState(false);
@@ -438,8 +443,15 @@ export default function ProspectsTab() {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selected.length} prospect(s)? This cannot be undone.`)) return;
+  // Stage the bulk delete for the v11 confirm Dialog; the actual loop
+  // fires from confirmBulkDelete below.
+  const handleBulkDelete = () => {
+    if (selected.length === 0) return;
+    setBulkDeletePending(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    const count = selected.length;
     setBulkActing(true);
     try {
       await fetch('/api/prospects/promote', {
@@ -448,8 +460,9 @@ export default function ProspectsTab() {
         body: JSON.stringify({ ids: selected }),
       });
       setSelected([]);
+      setBulkDeletePending(false);
       fetchProspects();
-      toast({ title: 'Deleted', description: `${selected.length} prospect(s) deleted` });
+      toast({ title: 'Deleted', description: `${count} prospect(s) deleted` });
     } finally {
       setBulkActing(false);
     }
@@ -1077,6 +1090,35 @@ export default function ProspectsTab() {
                 )}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk-delete prospects confirm — v11 destructive Dialog
+          replacing the native confirm() that previously gated
+          `handleBulkDelete`. The IDs to delete are already in
+          `selected`; the dialog just opens, the user confirms,
+          confirmBulkDelete fires the existing bulk-delete loop.
+          2026-06-05. */}
+      <Dialog open={bulkDeletePending} onOpenChange={(open) => { if (!open && !bulkActing) setBulkDeletePending(false); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Prospects?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{selected.length}</strong> prospect{selected.length === 1 ? '' : 's'} will be permanently deleted. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setBulkDeletePending(false)} disabled={bulkActing}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmBulkDelete} disabled={bulkActing}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {bulkActing ? 'Deleting…' : `Delete ${selected.length}`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

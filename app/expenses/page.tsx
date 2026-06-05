@@ -862,6 +862,14 @@ function DetailDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  // [v11 destructive Dialog] confirm() replaced by deletePending state +
+  // confirmDelete below. softDelete keeps the soft-delete (no hard
+  // erase), but the UX is now a styled Dialog. 2026-06-05.
+  const [deleteExpensePending, setDeleteExpensePending] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState(false);
+  const [deleteAttachmentPending, setDeleteAttachmentPending] = useState<Attachment | null>(null);
+  const [deletingAttachment, setDeletingAttachment] = useState(false);
+
   const userById = useMemo(() => {
     const m = new Map<string, SimpleUser>();
     for (const u of users) m.set(u.id, u);
@@ -883,16 +891,23 @@ function DetailDialog({
     }
   };
 
-  const softDelete = async () => {
-    if (!confirm('Delete this expense? Soft-delete — can be restored from DB.')) return;
+  const softDelete = () => {
+    setDeleteExpensePending(true);
+  };
+
+  const confirmSoftDelete = async () => {
+    setDeletingExpense(true);
     try {
       const r = await fetch(`/api/expenses/${expense.id}`, { method: 'DELETE' });
       if (!r.ok) throw new Error(await r.text());
       toast({ title: 'Deleted' });
+      setDeleteExpensePending(false);
       onClose();
       await onRefresh();
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeletingExpense(false);
     }
   };
 
@@ -923,20 +938,30 @@ function DetailDialog({
     }
   };
 
-  const deleteAttachment = async (att: Attachment) => {
-    if (!confirm(`Delete attachment "${att.file_name}"?`)) return;
+  const deleteAttachment = (att: Attachment) => {
+    setDeleteAttachmentPending(att);
+  };
+
+  const confirmDeleteAttachment = async () => {
+    if (!deleteAttachmentPending) return;
+    setDeletingAttachment(true);
     try {
-      const r = await fetch(`/api/expenses/attachments/${att.id}`, { method: 'DELETE' });
+      const r = await fetch(`/api/expenses/attachments/${deleteAttachmentPending.id}`, { method: 'DELETE' });
       if (!r.ok) throw new Error(await r.text());
+      setDeleteAttachmentPending(null);
       await onRefresh();
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeletingAttachment(false);
     }
   };
 
   const user = userById.get(expense.user_id);
 
   return (
+    <>
+
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       {/* v11 canonical scroll model: header + scrolling body + sticky footer.
           DialogContent itself is flex-col so the footer's `border-t` stays
@@ -1101,5 +1126,59 @@ function DetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Delete expense confirm — v11 destructive Dialog replacing the
+        native confirm() that used to live in softDelete. The endpoint
+        soft-deletes (DB row stays), so the copy reflects that.
+        2026-06-05. */}
+    <Dialog open={deleteExpensePending} onOpenChange={(open) => { if (!open) setDeleteExpensePending(false); }}>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Trash2 className="h-4 w-4 text-rose-500" />
+            Delete Expense?
+          </DialogTitle>
+          <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+            Soft-deletes the expense — can be restored from the DB.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+          <Button variant="outline" onClick={() => setDeleteExpensePending(false)} disabled={deletingExpense}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={confirmSoftDelete} disabled={deletingExpense}>
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            {deletingExpense ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Delete attachment confirm — v11 destructive Dialog replacing the
+        native confirm() that used to live in deleteAttachment.
+        2026-06-05. */}
+    <Dialog open={!!deleteAttachmentPending} onOpenChange={(open) => { if (!open) setDeleteAttachmentPending(null); }}>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Trash2 className="h-4 w-4 text-rose-500" />
+            Delete Attachment?
+          </DialogTitle>
+          <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+            <strong>{deleteAttachmentPending?.file_name ?? ''}</strong> will be removed from this expense.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+          <Button variant="outline" onClick={() => setDeleteAttachmentPending(null)} disabled={deletingAttachment}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={confirmDeleteAttachment} disabled={deletingAttachment}>
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            {deletingAttachment ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

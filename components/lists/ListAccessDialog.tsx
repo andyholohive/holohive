@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Shield, Eye, MousePointerClick, Calendar, Trash2, UserPlus, Loader2, Clock, Activity,
+  Shield, Eye, MousePointerClick, Calendar, Trash2, UserPlus, Loader2, Clock, Activity, RotateCcw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -105,6 +105,13 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null); // tracks per-row spinners
   const [newEmail, setNewEmail] = useState('');
+  // v11 destructive-Dialog state — replaces the two native confirm()s
+  // that previously gated the revoke + apply-expiry-to-all flows
+  // (2026-06-05). `revokePending` holds the email being revoked;
+  // `applyExpiryPending` is a boolean since the bulk-apply has no
+  // per-row payload.
+  const [revokePending, setRevokePending] = useState<string | null>(null);
+  const [applyExpiryPending, setApplyExpiryPending] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!listId) return;
@@ -158,9 +165,17 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
     }
   };
 
-  const handleRevoke = async (email: string) => {
-    if (!confirm(`Revoke access for ${email}? They will need to be re-added to view the list again.`)) return;
+  // Stage the revoke for the v11 confirm Dialog; the actual revoke
+  // fires from confirmRevoke below.
+  const handleRevoke = (email: string) => {
+    setRevokePending(email);
+  };
+
+  const confirmRevoke = async () => {
+    if (!revokePending) return;
+    const email = revokePending;
     await post('revoke', { email }, `revoke-${email}`);
+    setRevokePending(null);
     toast({ title: 'Access revoked', description: email });
   };
 
@@ -170,10 +185,17 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
     toast({ title: 'Auto-expire updated' });
   };
 
-  const handleApplyDuration = async () => {
+  // Stage the bulk apply for the v11 confirm Dialog; the actual mutate
+  // fires from confirmApplyDuration below.
+  const handleApplyDuration = () => {
     if (!data?.list.access_duration_days) return;
-    if (!confirm(`Apply ${data.list.access_duration_days}-day expiry to all current active grants? Each grant will get expires_at = its granted_at + ${data.list.access_duration_days} days. Existing expiries will be overwritten.`)) return;
+    setApplyExpiryPending(true);
+  };
+
+  const confirmApplyDuration = async () => {
+    if (!data?.list.access_duration_days) return;
     const result = await post('apply_duration_to_existing', {}, 'apply');
+    setApplyExpiryPending(false);
     if (result?.ok) {
       toast({ title: 'Applied', description: `${result.updated} grant(s) updated.` });
     }
@@ -429,6 +451,61 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
             )}
           </div>
         )}
+
+        {/* Revoke-access confirm — v11 destructive Dialog replacing
+            the native confirm() that used to gate `handleRevoke`.
+            Nested inside the parent ListAccessDialog; depth-aware
+            overlay in `components/ui/dialog.tsx` handles the
+            stacked backdrop. 2026-06-05. */}
+        <Dialog open={!!revokePending} onOpenChange={(open) => { if (!open) setRevokePending(null); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Revoke Access?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                <strong>{revokePending ?? ''}</strong> will lose access to this list. They&apos;ll need to be re-added to view it again.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setRevokePending(null)} disabled={busyKey === `revoke-${revokePending}`}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmRevoke} disabled={busyKey === `revoke-${revokePending}`}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {busyKey === `revoke-${revokePending}` ? 'Revoking…' : 'Revoke'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Apply-expiry-to-all confirm — v11 destructive Dialog. Not
+            a deletion (uses RotateCcw, not Trash2), but still
+            variant="destructive" because it overwrites existing
+            expires_at values across every active grant. 2026-06-05. */}
+        <Dialog open={applyExpiryPending} onOpenChange={(open) => { if (!open) setApplyExpiryPending(false); }}>
+          <DialogContent className="sm:max-w-[440px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <RotateCcw className="h-4 w-4 text-rose-500" />
+                Apply Expiry To All?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                Each of the <strong>{activeGrants.length}</strong> current active grant{activeGrants.length === 1 ? '' : 's'} will get <code className="px-1 rounded bg-cream-100 text-[12px]">expires_at = granted_at + {data?.list.access_duration_days ?? 0} days</code>. Existing expiries will be overwritten.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setApplyExpiryPending(false)} disabled={busyKey === 'apply'}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmApplyDuration} disabled={busyKey === 'apply'}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                {busyKey === 'apply' ? 'Applying…' : 'Apply Expiry'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

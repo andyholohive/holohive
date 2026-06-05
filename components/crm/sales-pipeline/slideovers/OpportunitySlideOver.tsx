@@ -49,6 +49,14 @@ import { Button } from '@/components/ui/button';
 import {
   Calendar as CalendarPicker,
 } from '@/components/ui/calendar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -78,7 +86,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useSalesPipeline } from '@/contexts/SalesPipelineContext';
@@ -148,26 +156,43 @@ export function OpportunitySlideOver() {
     // moved into <BumpCounter /> on 2026-06-03 (Pass 1).
   } = useSalesPipeline();
 
+  // v11 discard-changes Dialog state — replaces the native confirm()
+  // that previously gated the Esc-to-close in edit mode (2026-06-05).
+  // Boolean (not a row reference) because the close action is pure
+  // state cleanup; nothing to identify or echo back in the prompt.
+  const [discardChangesPending, setDiscardChangesPending] = useState(false);
+
+  // Run the close-flow that the old confirm() gated: drop edit mode,
+  // clear the edit form, close the slide-over, clear action guidance.
+  // Called by the Discard Changes Dialog's confirm button.
+  const confirmDiscardChanges = () => {
+    setSlideOverMode('view');
+    setEditingOpp(null);
+    setForm({ name: '' });
+    setSlideOverOpp(null);
+    setActionGuidance(null);
+    setDiscardChangesPending(false);
+  };
+
   // Esc-to-close — the slide-over no longer has a backdrop click-out
   // (it's a true side panel post-2026-06-02), so we need a non-mouse
-  // dismiss. Esc closes view mode immediately; in edit mode it prompts
-  // for confirmation (same UX as the old backdrop-click handler).
+  // dismiss. Esc closes view mode immediately; in edit mode it opens
+  // the v11 destructive Discard Changes Dialog (same UX as the old
+  // backdrop-click handler, just routed through a proper Dialog).
   useEffect(() => {
     if (!slideOverOpp) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (slideOverMode === 'edit') {
-        if (!confirm('You have unsaved changes. Close anyway?')) return;
-        setSlideOverMode('view');
-        setEditingOpp(null);
-        setForm({ name: '' });
+        setDiscardChangesPending(true);
+        return;
       }
       setSlideOverOpp(null);
       setActionGuidance(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [slideOverOpp, slideOverMode, setSlideOverMode, setEditingOpp, setForm, setSlideOverOpp, setActionGuidance]);
+  }, [slideOverOpp, slideOverMode, setSlideOverOpp, setActionGuidance]);
 
   if (!slideOverOpp || typeof document === 'undefined') return null;
   const opp = opportunities.find(o => o.id === slideOverOpp.id) || slideOverOpp;
@@ -603,6 +628,34 @@ export function OpportunitySlideOver() {
         </ScrollArea>
         )}
       </div>
+
+      {/* Discard-changes confirm — v11 destructive Dialog replacing
+          the native confirm() that previously gated Esc-to-close in
+          edit mode. Sync flow: no in-flight API call, so no loading
+          state — just route through a proper Dialog for visual
+          consistency. 2026-06-05. */}
+      <Dialog open={discardChangesPending} onOpenChange={(open) => { if (!open) setDiscardChangesPending(false); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-rose-500" />
+              Discard Changes?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              You have unsaved changes. Close anyway? Your edits will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDiscardChangesPending(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDiscardChanges}>
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Close Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>,
     document.body
   );

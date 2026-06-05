@@ -577,23 +577,33 @@ export default function TelegramChatsPage() {
   /**
    * Hard-delete the row from telegram_chats. The webhook will recreate
    * it if a new message arrives — for permanent removal the user should
-   * Hide instead. confirm() prompt because this is destructive.
+   * Hide instead. v11 destructive Dialog (replaces the old native
+   * confirm() — 2026-06-05).
    */
-  const handleDeleteChat = async (chat: TelegramChat) => {
-    if (!confirm(`Delete "${chat.title || chat.chat_id}" from telegram_chats? The row will be recreated if the chat sends a new message — use Hide if you want it gone for good.`)) {
-      return;
-    }
+  const [deleteChatPending, setDeleteChatPending] = useState<TelegramChat | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
+
+  const handleDeleteChat = (chat: TelegramChat) => {
+    setDeleteChatPending(chat);
+  };
+
+  const confirmDeleteChat = async () => {
+    if (!deleteChatPending) return;
+    setDeletingChat(true);
     try {
       const { error } = await (supabase as any)
         .from('telegram_chats')
         .delete()
-        .eq('id', chat.id);
+        .eq('id', deleteChatPending.id);
       if (error) throw error;
-      setChats(prev => prev.filter(c => c.id !== chat.id));
-      toast({ title: 'Chat deleted', description: chat.title || chat.chat_id });
+      setChats(prev => prev.filter(c => c.id !== deleteChatPending.id));
+      toast({ title: 'Chat deleted', description: deleteChatPending.title || deleteChatPending.chat_id });
+      setDeleteChatPending(null);
     } catch (err: any) {
       console.error('Error deleting chat:', err);
       toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeletingChat(false);
     }
   };
 
@@ -1028,21 +1038,31 @@ export default function TelegramChatsPage() {
     }
   };
 
-  const handleDeleteCommand = async (command: TelegramCommand) => {
-    if (!confirm(`Are you sure you want to delete /${command.command}?`)) return;
+  // [v11 destructive Dialog] confirm() replaced by deleteCommandPending
+  // state + confirmDeleteCommand below. 2026-06-05.
+  const [deleteCommandPending, setDeleteCommandPending] = useState<TelegramCommand | null>(null);
+  const [deletingCommand, setDeletingCommand] = useState(false);
 
+  const handleDeleteCommand = (command: TelegramCommand) => {
+    setDeleteCommandPending(command);
+  };
+
+  const confirmDeleteCommand = async () => {
+    if (!deleteCommandPending) return;
+    setDeletingCommand(true);
     try {
       const { error } = await supabase
         .from('telegram_commands')
         .delete()
-        .eq('id', command.id);
+        .eq('id', deleteCommandPending.id);
 
       if (error) throw error;
 
       toast({
         title: 'Command deleted',
-        description: `/${command.command} has been removed`,
+        description: `/${deleteCommandPending.command} has been removed`,
       });
+      setDeleteCommandPending(null);
       fetchCommands();
     } catch (error) {
       console.error('Error deleting command:', error);
@@ -1051,6 +1071,8 @@ export default function TelegramChatsPage() {
         description: error instanceof Error ? error.message : 'Failed to delete command',
         variant: 'destructive',
       });
+    } finally {
+      setDeletingCommand(false);
     }
   };
 
@@ -3130,6 +3152,59 @@ export default function TelegramChatsPage() {
             </Button>
             <Button variant="brand" onClick={handleSendMessage} disabled={sendingMessage || !messageContent.trim()}>
               {sendingMessage ? 'Sending...' : 'Send Message'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete chat confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in handleDeleteChat.
+          The row gets recreated if the chat sends a new message —
+          surface that caveat in the body. 2026-06-05. */}
+      <Dialog open={!!deleteChatPending} onOpenChange={(open) => { if (!open) setDeleteChatPending(null); }}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Chat?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deleteChatPending?.title || deleteChatPending?.chat_id || ''}</strong> will be removed from telegram_chats. The row will be recreated if the chat sends a new message — use Hide if you want it gone for good.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteChatPending(null)} disabled={deletingChat}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteChat} disabled={deletingChat}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingChat ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete command confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in handleDeleteCommand.
+          2026-06-05. */}
+      <Dialog open={!!deleteCommandPending} onOpenChange={(open) => { if (!open) setDeleteCommandPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Command?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>/{deleteCommandPending?.command ?? ''}</strong> will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteCommandPending(null)} disabled={deletingCommand}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteCommand} disabled={deletingCommand}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingCommand ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

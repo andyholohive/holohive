@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -685,6 +687,11 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
   const [list, setList] = useState<KolChannelSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  // v11 destructive-Dialog state — replaces the native confirm() that
+  // previously gated the snapshot delete (2026-06-05). Holds the full
+  // snapshot row so the Dialog title can show the month label.
+  const [deleteSnapshotPending, setDeleteSnapshotPending] = useState<KolChannelSnapshot | null>(null);
+  const [deletingSnapshot, setDeletingSnapshot] = useState(false);
   const { toast } = useToast();
 
   const refresh = async () => {
@@ -714,16 +721,27 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
     onMetricsChanged?.();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this snapshot?")) return;
+  // Stage the snapshot for the v11 confirm Dialog; the actual delete
+  // fires from confirmDeleteSnapshot below.
+  const handleDelete = (snapshot: KolChannelSnapshot) => {
+    setDeleteSnapshotPending(snapshot);
+  };
+
+  const confirmDeleteSnapshot = async () => {
+    if (!deleteSnapshotPending) return;
+    const id = deleteSnapshotPending.id;
     const previous = list;
+    setDeletingSnapshot(true);
     setList((prev) => prev.filter((s) => s.id !== id));
     try {
       await KolChannelSnapshotService.delete(id);
       onMetricsChanged?.();
+      setDeleteSnapshotPending(null);
     } catch (err) {
       setList(previous);
       toast({ title: "Failed to delete snapshot", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setDeletingSnapshot(false);
     }
   };
 
@@ -768,10 +786,38 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
       ) : (
         <div className="space-y-2">
           {list.map((s) => (
-            <SnapshotRow key={s.id} s={s} onDelete={() => handleDelete(s.id)} />
+            <SnapshotRow key={s.id} s={s} onDelete={() => handleDelete(s)} />
           ))}
         </div>
       )}
+
+      {/* Delete-snapshot confirm — v11 destructive Dialog replacing
+          the native confirm() that previously gated `handleDelete`.
+          Nested inside the parent KolProfileModal Dialog; depth-aware
+          overlay in `components/ui/dialog.tsx` handles the stacked
+          backdrop. 2026-06-05. */}
+      <Dialog open={!!deleteSnapshotPending} onOpenChange={(open) => { if (!open && !deletingSnapshot) setDeleteSnapshotPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Snapshot?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              This follower-count snapshot will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteSnapshotPending(null)} disabled={deletingSnapshot}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteSnapshot} disabled={deletingSnapshot}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingSnapshot ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -941,6 +987,11 @@ function CallLogsTab({ kolId }: { kolId: string }) {
   const [list, setList] = useState<KolCallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  // v11 destructive-Dialog state — replaces the native confirm() that
+  // previously gated the call-log delete (2026-06-05). Holds the full
+  // log row so the Dialog can include the call date if we want it later.
+  const [deleteCallLogPending, setDeleteCallLogPending] = useState<KolCallLog | null>(null);
+  const [deletingCallLog, setDeletingCallLog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -965,15 +1016,26 @@ function CallLogsTab({ kolId }: { kolId: string }) {
     toast({ title: "Call log added" });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this call log?")) return;
+  // Stage the call log for the v11 confirm Dialog; the actual delete
+  // fires from confirmDeleteCallLog below.
+  const handleDelete = (log: KolCallLog) => {
+    setDeleteCallLogPending(log);
+  };
+
+  const confirmDeleteCallLog = async () => {
+    if (!deleteCallLogPending) return;
+    const id = deleteCallLogPending.id;
     const previous = list;
+    setDeletingCallLog(true);
     setList((prev) => prev.filter((c) => c.id !== id));
     try {
       await KolCallLogService.delete(id);
+      setDeleteCallLogPending(null);
     } catch (err) {
       setList(previous);
       toast({ title: "Failed to delete call log", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setDeletingCallLog(false);
     }
   };
 
@@ -1011,10 +1073,37 @@ function CallLogsTab({ kolId }: { kolId: string }) {
       ) : (
         <div className="space-y-2">
           {list.map((c) => (
-            <CallLogRow key={c.id} c={c} onDelete={() => handleDelete(c.id)} />
+            <CallLogRow key={c.id} c={c} onDelete={() => handleDelete(c)} />
           ))}
         </div>
       )}
+
+      {/* Delete-call-log confirm — v11 destructive Dialog replacing
+          the native confirm() that previously gated `handleDelete`.
+          Own pending state (separate from Snapshots) to avoid
+          mix-ups. 2026-06-05. */}
+      <Dialog open={!!deleteCallLogPending} onOpenChange={(open) => { if (!open && !deletingCallLog) setDeleteCallLogPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Call Log?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              This call log will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteCallLogPending(null)} disabled={deletingCallLog}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteCallLog} disabled={deletingCallLog}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingCallLog ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

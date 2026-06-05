@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Plus, ArrowLeft, Trash2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Send, Plus, ArrowLeft, Trash2, MessageSquare } from 'lucide-react';
 import Image from 'next/image';
 import { ChatService, ChatSessionWithMessages, AgentChatMessage } from '@/lib/chatService';
 import { useToast } from '@/hooks/use-toast';
@@ -72,7 +74,7 @@ export default function ChatPage() {
         const sizeClass = level === 1 ? 'text-lg' : level === 2 ? 'text-base' : 'text-sm';
 
         return (
-          <HeaderTag key={pIndex} className={`font-bold ${sizeClass} my-2 text-gray-900`}>
+          <HeaderTag key={pIndex} className={`font-bold ${sizeClass} my-2 text-ink-warm-900`}>
             {formatInlineText(headerText)}
           </HeaderTag>
         );
@@ -86,7 +88,7 @@ export default function ChatPage() {
 
         return (
           <div key={pIndex}>
-            <HeaderTag className={`font-bold ${sizeClass} my-2 text-gray-900`}>
+            <HeaderTag className={`font-bold ${sizeClass} my-2 text-ink-warm-900`}>
               {formatInlineText(headerText)}
             </HeaderTag>
             <div className="text-sm leading-relaxed my-1">
@@ -144,7 +146,7 @@ export default function ChatPage() {
       if (part.startsWith('`') && part.endsWith('`')) {
         // Code block
         return (
-          <code key={index} className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">
+          <code key={index} className="bg-cream-200 text-ink-warm-700 px-1 py-0.5 rounded text-xs font-mono">
             {part.slice(1, -1)}
           </code>
         );
@@ -602,13 +604,13 @@ export default function ChatPage() {
   return (
     <div className="-m-6 h-[calc(100vh-56px)] flex">
       {/* Session List Sidebar */}
-      <div className="w-80 border-r border-gray-200 bg-white flex flex-col min-h-0">
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+      <div className="w-80 border-r border-cream-200 bg-white flex flex-col min-h-0">
+        <div className="p-4 border-b border-cream-200 flex-shrink-0">
           <div className="flex items-center space-x-3 mb-4">
             <Image src="/images/logo.png" alt="Logo" width={32} height={32} />
             <div>
-              <h2 className="font-semibold text-gray-900">Holo GPT</h2>
-              <p className="text-xs text-gray-500">Powered by GPT-4o</p>
+              <h2 className="font-semibold text-ink-warm-900">Holo GPT</h2>
+              <p className="text-xs text-ink-warm-500">Powered by GPT-4o</p>
             </div>
           </div>
           <Button variant="brand" onClick={createNewSession} className="w-full" disabled={loading}>
@@ -626,15 +628,15 @@ export default function ChatPage() {
                 className={`p-3 rounded-lg cursor-pointer transition-colors group ${
                   currentSession?.id === session.id
                     ? 'bg-brand/10 border border-brand/30'
-                    : 'hover:bg-gray-50 border border-transparent'
+                    : 'hover:bg-cream-50 border border-transparent'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900 truncate">
+                    <div className="font-medium text-sm text-ink-warm-900 truncate">
                       {session.title || `Chat ${session.id.slice(0, 8)}`}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-ink-warm-500 mt-1">
                       {new Date(session.updated_at || "").toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
                   </div>
@@ -642,7 +644,7 @@ export default function ChatPage() {
                     variant="ghost"
                     size="sm"
                     onClick={(e) => openDeleteDialog(session.id, e)}
-                    className="h-6 w-6 p-0 text-gray-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-6 w-6 p-0 text-ink-warm-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -653,25 +655,28 @@ export default function ChatPage() {
 
           {loading && sessions.length === 0 && (
             <div className="space-y-2">
-              {[1, 2, 3].map((index) => (
-                <div key={index} className="p-3 border border-gray-200 rounded-lg animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="p-3 border border-cream-200 rounded-lg space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
                 </div>
               ))}
             </div>
           )}
 
           {sessions.length === 0 && !loading && (
-            <div className="text-center py-8">
-              <p className="text-sm text-gray-500">No chat sessions yet</p>
-            </div>
+            <EmptyState
+              icon={MessageSquare}
+              title="No chat sessions yet"
+              description="Start a new conversation to begin."
+              className="py-8"
+            />
           )}
         </ScrollArea>
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
+      <div className="flex-1 flex flex-col bg-cream-50 min-h-0">
         {!currentSession ? (
           /* Welcome Screen */
           <>
@@ -680,41 +685,41 @@ export default function ChatPage() {
                 <div className="rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center shadow-lg" style={{ backgroundColor: '#f6feff' }}>
                   <Image src="/images/logo.png" alt="Logo" width={48} height={48} className="rounded-full" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Holo GPT</h2>
-                <p className="text-gray-600 mb-6">
+                <h2 className="text-2xl font-bold text-ink-warm-900 mb-2">Welcome to Holo GPT</h2>
+                <p className="text-ink-warm-700 mb-6">
                   Your AI assistant for managing campaigns, KOLs, and more. Select a chat or start a new conversation.
                 </p>
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold text-gray-700">Try asking me:</p>
+                  <p className="text-sm font-semibold text-ink-warm-700">Try Asking Me:</p>
                   <button
                     onClick={() => {
                       createNewSession().then(() => setMessage('Find KOLs interested in gaming and crypto'));
                     }}
-                    className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-gray-100 border border-gray-200 transition-colors"
+                    className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-cream-100 border border-cream-200 transition-colors"
                   >
-                    <p className="text-sm text-gray-700">Find KOLs interested in gaming and crypto</p>
+                    <p className="text-sm text-ink-warm-700">Find KOLs interested in gaming and crypto</p>
                   </button>
                   <button
                     onClick={() => {
                       createNewSession().then(() => setMessage('Generate an initial outreach for Jdot'));
                     }}
-                    className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-gray-100 border border-gray-200 transition-colors"
+                    className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-cream-100 border border-cream-200 transition-colors"
                   >
-                    <p className="text-sm text-gray-700">Generate an initial outreach for Jdot</p>
+                    <p className="text-sm text-ink-warm-700">Generate an initial outreach for Jdot</p>
                   </button>
                   <button
                     onClick={() => {
                       createNewSession().then(() => setMessage('Give me insights on my campaign'));
                     }}
-                    className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-gray-100 border border-gray-200 transition-colors"
+                    className="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-cream-100 border border-cream-200 transition-colors"
                   >
-                    <p className="text-sm text-gray-700">Give me insights on my campaign</p>
+                    <p className="text-sm text-ink-warm-700">Give me insights on my campaign</p>
                   </button>
                 </div>
               </div>
             </div>
             {/* Input for welcome screen */}
-            <div className="border-t bg-white p-4 flex-shrink-0">
+            <div className="border-t border-cream-200 bg-white p-4 flex-shrink-0">
               <div className="max-w-3xl mx-auto flex space-x-3 items-end">
                 <Textarea
                   placeholder="Type a message to start a new chat..."
@@ -741,9 +746,22 @@ export default function ChatPage() {
             <ScrollArea className="flex-1 min-h-0 p-4">
               <div className="max-w-3xl mx-auto space-y-4">
                 {loading && (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand mx-auto"></div>
-                    <p className="text-xs text-gray-500 mt-2">Loading...</p>
+                  <div className="space-y-4">
+                    {/* Structural skeleton mirroring the message-bubble
+                        cadence: short user bubble (right) → wide assistant
+                        bubble (left) → another user bubble → assistant. */}
+                    <div className="flex justify-end">
+                      <Skeleton className="h-12 w-48 rounded-2xl" />
+                    </div>
+                    <div className="flex justify-start">
+                      <Skeleton className="h-24 w-[80%] rounded-2xl" />
+                    </div>
+                    <div className="flex justify-end">
+                      <Skeleton className="h-10 w-40 rounded-2xl" />
+                    </div>
+                    <div className="flex justify-start">
+                      <Skeleton className="h-20 w-[70%] rounded-2xl" />
+                    </div>
                   </div>
                 )}
 
@@ -752,8 +770,8 @@ export default function ChatPage() {
                     <div className="rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center shadow-md" style={{ backgroundColor: '#f6feff' }}>
                       <Image src="/images/logo.png" alt="Logo" width={32} height={32} className="rounded-full" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">New Conversation</h3>
-                    <p className="text-sm text-gray-600 max-w-sm mx-auto">
+                    <h3 className="text-lg font-semibold text-ink-warm-900 mb-2">New Conversation</h3>
+                    <p className="text-sm text-ink-warm-700 max-w-sm mx-auto">
                       Hello! I'm here to help you with campaigns, KOLs, and more. How can I assist you today?
                     </p>
                   </div>
@@ -821,7 +839,7 @@ export default function ChatPage() {
                         className={`${isGeneratedMessage ? 'w-full' : msg.role === 'user' ? 'max-w-[70%]' : 'max-w-[80%]'} px-4 py-3 rounded-2xl text-sm ${
                           msg.role === 'user'
                             ? 'bg-gradient-to-r from-brand to-[#2d5a63] text-white shadow-md'
-                            : 'bg-white text-gray-900 border border-gray-200 shadow-sm'
+                            : 'bg-white text-ink-warm-900 border border-cream-200 shadow-sm'
                         }`}
                       >
                         <div className="flex items-start space-x-3">
@@ -831,7 +849,7 @@ export default function ChatPage() {
                             </div>
                           )}
                           <div className="flex-1 min-w-0 overflow-hidden">
-                            <div className={`break-words ${msg.role === 'user' ? 'text-white' : 'text-gray-900'}`}>
+                            <div className={`break-words ${msg.role === 'user' ? 'text-white' : 'text-ink-warm-900'}`}>
                               {msg.role === 'assistant' ? formatMessageContent(displayContent) : (
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
                               )}
@@ -846,7 +864,7 @@ export default function ChatPage() {
                               const feedback = feedbackStates[messageExampleId] || { sent: false };
 
                               return (
-                                <div className="mt-3 p-3 bg-gray-50 border border-gray-300 rounded-lg relative">
+                                <div className="mt-3 p-3 bg-cream-50 border border-cream-300 rounded-lg relative">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-xs font-semibold text-brand">Client Message (Telegram)</span>
                                     <Button
@@ -866,15 +884,15 @@ export default function ChatPage() {
                                       Copy
                                     </Button>
                                   </div>
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans overflow-x-auto mb-3">
+                                  <pre className="text-xs text-ink-warm-700 whitespace-pre-wrap font-sans overflow-x-auto mb-3">
                                     {generatedMessageContent}
                                   </pre>
 
                                   {/* Feedback Section */}
                                   {messageExampleId && (
-                                    <div className="border-t border-gray-200 pt-3 mt-3 space-y-2">
+                                    <div className="border-t border-cream-200 pt-3 mt-3 space-y-2">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs text-gray-600 whitespace-nowrap">Rate:</span>
+                                        <span className="text-xs text-ink-warm-700 whitespace-nowrap">Rate:</span>
                                         <div className="flex gap-1">
                                           {[1, 2, 3, 4, 5].map((star) => (
                                             <button
@@ -883,7 +901,7 @@ export default function ChatPage() {
                                               className={`text-sm transition-colors ${
                                                 feedback.rating && star <= feedback.rating
                                                   ? 'text-yellow-500'
-                                                  : 'text-gray-300 hover:text-yellow-400'
+                                                  : 'text-ink-warm-300 hover:text-yellow-400'
                                               }`}
                                             >
                                               *
@@ -896,7 +914,7 @@ export default function ChatPage() {
                                           className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ml-auto ${
                                             feedback.sent
                                               ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed'
-                                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                              : 'bg-brand-light text-brand hover:bg-brand-light/80'
                                           }`}
                                         >
                                           {feedback.sent ? 'Sent' : 'Mark as Sent'}
@@ -930,7 +948,7 @@ export default function ChatPage() {
                               </div>
                             )}
 
-                            <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                            <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-white/70' : 'text-ink-warm-500'}`}>
                               {formatTime(msg.created_at || '')}
                             </p>
                           </div>
@@ -943,17 +961,17 @@ export default function ChatPage() {
                 {/* Typing Indicator */}
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                    <div className="bg-white border border-cream-200 rounded-2xl px-4 py-3 shadow-sm">
                       <div className="flex items-center space-x-2">
                         <div className="rounded-full p-1 w-6 h-6 shadow-sm" style={{ backgroundColor: '#f6feff' }}>
                           <Image src="/images/logo.png" alt="Logo" width={16} height={16} className="rounded-full" />
                         </div>
                         <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-ink-warm-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-ink-warm-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-ink-warm-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                         </div>
-                        <span className="text-xs text-gray-500 ml-2">AI is typing...</span>
+                        <span className="text-xs text-ink-warm-500 ml-2">AI is typing...</span>
                       </div>
                     </div>
                   </div>
@@ -998,7 +1016,7 @@ export default function ChatPage() {
             </ScrollArea>
 
             {/* Input */}
-            <div className="border-t bg-white p-4 flex-shrink-0">
+            <div className="border-t border-cream-200 bg-white p-4 flex-shrink-0">
               <div className="max-w-3xl mx-auto flex space-x-3 items-end">
                 <Textarea
                   ref={textareaRef}
@@ -1025,9 +1043,12 @@ export default function ChatPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Delete Chat Session</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Delete Chat Session
+            </DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this chat session? This action cannot be undone.
             </DialogDescription>
@@ -1040,9 +1061,8 @@ export default function ChatPage() {
               Cancel
             </Button>
             <Button
+              variant="destructive"
               onClick={handleDeleteSession}
-
-              style={{ backgroundColor: "#dc2626", color: "white" }}
             >
               Delete
             </Button>
@@ -1052,14 +1072,17 @@ export default function ChatPage() {
 
       {/* Create List from KOLs Dialog */}
       <Dialog open={createListDialogOpen} onOpenChange={setCreateListDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Create KOL List</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-brand" />
+              Create KOL List
+            </DialogTitle>
             <DialogDescription>
               Create a new list with {pendingListKOLs.length} KOL(s) from your search results.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="flex-1 overflow-y-auto px-1 py-4">
             <Input
               placeholder="Enter list name..."
               value={newListName}

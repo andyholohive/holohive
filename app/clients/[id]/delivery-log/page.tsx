@@ -13,6 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
@@ -20,13 +23,11 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Plus,
-  Edit,
   Trash2,
   Calendar as CalendarIcon,
   Search,
   Filter,
   ClipboardList,
-  Building2,
   Check,
   X,
   Expand,
@@ -61,23 +62,30 @@ type Client = {
 const WORK_TYPES = ['Client-Facing', 'Internal'] as const;
 const TRIGGERS = ['Client Request', 'Follow-Up Needed', 'SOP', 'Extra'] as const;
 
-const workTypeBadge = (type: string) => {
-  return type === 'Client-Facing'
-    ? 'bg-blue-100 text-blue-800'
-    : 'bg-cream-100 text-ink-warm-700';
+// Tone maps migrated to the centralized palette to match the parent
+// /delivery-logs page. 'yellow' and 'orange' aren't in the shared
+// palette; mapped to warning (amber).
+const TRIGGER_TONES: Record<string, BadgeTone> = {
+  'Client Request':    'purple',
+  'Follow-Up Needed':  'warning', // amber, was yellow
+  'SOP':               'success', // emerald, was green
+  'Extra':             'warning', // amber, was orange — same family
 };
 
-const triggerBadge = (trigger: string) => {
-  switch (trigger) {
-    case 'Client Request': return 'bg-purple-100 text-purple-800';
-    case 'Follow-Up Needed': return 'bg-yellow-100 text-yellow-800';
-    case 'SOP': return 'bg-emerald-100 text-emerald-800';
-    case 'Extra': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-cream-100 text-ink-warm-700';
-  }
-};
+const workTypeBadge = (type: string) =>
+  toneClassName(type === 'Client-Facing' ? 'info' : 'neutral');
+
+const triggerBadge = (trigger: string) =>
+  toneClassName(TRIGGER_TONES[trigger] ?? 'neutral');
 
 type EditingCell = { entryId: string; field: string } | null;
+
+const toLocalDateStr = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function DeliveryLogPage({ params }: { params: { id: string } }) {
   const { user } = useAuth();
@@ -109,7 +117,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     location: '',
     trigger: '',
     notes: '',
-    logged_at: new Date().toISOString().split('T')[0],
+    logged_at: toLocalDateStr(new Date()),
   });
   const [inlineNewWhoMode, setInlineNewWhoMode] = useState<'team' | 'custom'>('team');
 
@@ -223,7 +231,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
   // Save date via Popover+Calendar
   const saveDateField = async (entryId: string, date: Date | undefined) => {
     if (!date) return;
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalDateStr(date);
     setEditingCell(null);
     setEditingValue('');
     // Optimistic update
@@ -255,7 +263,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       created_by: user?.id,
     });
     setIsAddingInline(false);
-    setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: new Date().toISOString().split('T')[0] });
+    setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) });
     setInlineNewWhoMode('team');
     await fetchEntries();
   };
@@ -304,7 +312,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       location: form.location.trim() || null,
       trigger: form.trigger || null,
       notes: form.notes.trim() || null,
-      logged_at: form.logged_at.toISOString().split('T')[0],
+      logged_at: toLocalDateStr(form.logged_at),
       updated_at: new Date().toISOString(),
     };
     setIsFormOpen(false);
@@ -404,7 +412,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     // Select fields: always-visible inline dropdown, saves immediately on change (no hover effect)
     if (type === 'select-type') {
       return (
-        <td className="py-3 px-4">
+        <td className="py-3.5 px-4 border-r border-cream-200">
           <Select
             value={entry.work_type}
             onValueChange={(v) => saveSelectField(entry.id, 'work_type', v)}
@@ -425,7 +433,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
 
     if (type === 'select-trigger') {
       return (
-        <td className="py-3 px-4">
+        <td className="py-3.5 px-4 border-r border-cream-200">
           <Select
             value={entry.trigger || ''}
             onValueChange={(v) => saveSelectField(entry.id, 'trigger', v)}
@@ -484,7 +492,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       }
       return (
         <td
-          className="py-3 px-4 cursor-pointer whitespace-nowrap"
+          className="py-3.5 px-4 border-r border-cream-200 cursor-pointer whitespace-nowrap"
           onDoubleClick={() => startEditing(entry.id, field, value)}
           title="Double-click to edit"
         >
@@ -513,7 +521,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       }
       return (
         <td
-          className="py-3 px-4 cursor-pointer max-w-[200px]"
+          className="py-3.5 px-4 border-r border-cream-200 cursor-pointer max-w-[200px]"
           onDoubleClick={() => startEditing(entry.id, field, value)}
           title="Double-click to edit"
         >
@@ -544,7 +552,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
 
     return (
       <td
-        className={`py-3 px-4 cursor-pointer ${field === 'action' ? 'max-w-[200px]' : field === 'location' ? 'max-w-[150px]' : ''}`}
+        className={`py-3.5 px-4 border-r border-cream-200 cursor-pointer ${field === 'action' ? 'max-w-[200px]' : field === 'location' ? 'max-w-[150px]' : ''}`}
         onDoubleClick={() => startEditing(entry.id, field, value)}
         title="Double-click to edit"
       >
@@ -555,18 +563,72 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     );
   };
 
+  // v11 structural loading skeleton — PageHeader + SectionHeader +
+  // filter toolbar + table card mirror the loaded layout so the
+  // title doesn't shift when data arrives.
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* v11 breadcrumb back affordance — matches /campaigns/[id]
+            ("Campaigns / NAME"). Was previously a ghost Button with
+            `Back to Clients` copy; the breadcrumb shows location
+            context ("Clients > Delivery Log") instead of just an
+            undo affordance. 2026-06-05. */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <button
+            onClick={() => router.push('/clients')}
+            className="text-ink-warm-500 hover:text-brand font-medium inline-flex items-center gap-1.5 transition"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Clients
+          </button>
+          <span className="text-ink-warm-300">/</span>
+          <span className="text-ink-warm-700 font-medium uppercase text-[10px] tracking-[0.2em] truncate">
+            Delivery Log
+          </span>
+        </div>
+        <PageHeader
+          title={`${client?.name || 'Client'} — Delivery Log`}
+          subtitle="Per-client delivery log entries"
+          kicker="Clients · Delivery Log"
+          kickerDot="brand"
+        />
+        <SectionHeader label="Entries" dot="brand" counter="Loading…" first />
+        <div className="flex items-center gap-3 flex-wrap">
+          <Skeleton className="h-9 w-[260px] rounded-md" />
+          <div className="flex items-center gap-2 ml-auto">
+            <Skeleton className="h-9 w-[150px] rounded-md" />
+            <Skeleton className="h-9 w-[150px] rounded-md" />
+          </div>
+        </div>
+        <Card className="border-cream-200">
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded" />
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <Button
-        variant="ghost"
-        className="py-2 px-3 rounded-md text-ink-warm-700 transition-colors text-sm w-fit"
-        onClick={() => router.push('/clients')}
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />Back to Clients
-      </Button>
+      <div className="flex items-center gap-1.5 text-xs">
+        <button
+          onClick={() => router.push('/clients')}
+          className="text-ink-warm-500 hover:text-brand font-medium inline-flex items-center gap-1.5 transition"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Clients
+        </button>
+        <span className="text-ink-warm-300">/</span>
+        <span className="text-ink-warm-700 font-medium uppercase text-[10px] tracking-[0.2em] truncate">
+          {client?.name ?? '…'} · Delivery Log
+        </span>
+      </div>
 
       <PageHeader
-        icon={ClipboardList}
         title={`${client?.name || 'Client'} — Delivery Log`}
         subtitle="Per-client delivery log entries"
         kicker="Clients · Delivery Log"
@@ -585,95 +647,117 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
         )}
       />
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
-                <Input
-                  placeholder="Search actions, who, notes..."
-                  className="pl-10 focus-brand"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={filterWorkType} onValueChange={setFilterWorkType}>
-                <SelectTrigger className="w-[160px] focus-brand">
-                  <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
-                  <SelectValue placeholder="Work Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterTrigger} onValueChange={setFilterTrigger}>
-                <SelectTrigger className="w-[180px] focus-brand">
-                  <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
-                  <SelectValue placeholder="Trigger" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Triggers</SelectItem>
-                  {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {(filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm) && (
-                <Button variant="ghost" size="sm" onClick={() => { setFilterWorkType('all'); setFilterTrigger('all'); setSearchTerm(''); }}>
-                  Clear
-                </Button>
-              )}
-            </div>
+      {/* v11 chapter divider — counter narrows the same way the
+          parent /delivery-logs SectionHeader does. */}
+      <SectionHeader
+        label="Entries"
+        dot="brand"
+        counter={`${filtered.length} of ${entries.length} entries${
+          (filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm)
+            ? ' · filtered'
+            : ''
+        }`}
+        first
+      />
 
-            {/* Table */}
-            <div className="mt-5 -mx-6 -mb-6">
-              {loading ? (
-                <div className="p-6 space-y-3">
-                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
+      {/* v11 filter toolbar — Search (left, flex-1) + Work-type /
+          Trigger filters (right, ml-auto). Matches parent
+          /delivery-logs toolbar minus the view-mode tabs (this page
+          is already scoped to a single client). */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-warm-400 pointer-events-none" />
+          <Input
+            placeholder="Search actions, who, notes..."
+            className="pl-10 focus-brand"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <Select value={filterWorkType} onValueChange={setFilterWorkType}>
+            <SelectTrigger className="w-[150px] h-9 text-sm focus-brand">
+              <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
+              <SelectValue placeholder="Work Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterTrigger} onValueChange={setFilterTrigger}>
+            <SelectTrigger className="w-[150px] h-9 text-sm focus-brand">
+              <Filter className="h-3.5 w-3.5 mr-2 text-ink-warm-400" />
+              <SelectValue placeholder="Trigger" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Triggers</SelectItem>
+              {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {(filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFilterWorkType('all'); setFilterTrigger('all'); setSearchTerm(''); }}>
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Table — v11 spreadsheet chrome matching parent
+          /delivery-logs: Card wrapper + bg-cream-50 header +
+          border-r border-cream-200 separators + alternating row
+          backgrounds. */}
+      <div className="mt-5">
+        {filtered.length === 0 && !isAddingInline ? (
+          <Card className="border-cream-200 overflow-hidden">
+            <EmptyState
+              icon={ClipboardList}
+              title={entries.length === 0 ? 'No delivery log entries yet.' : 'No entries match your filters.'}
+              description={entries.length === 0 ? 'Add the first entry to start tracking work delivered for this client.' : undefined}
+              className="py-12"
+            >
+              {entries.length === 0 && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setIsAddingInline(true)}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Inline
+                  </Button>
+                  <Button variant="brand" onClick={() => openForm()}>
+                    <Expand className="h-4 w-4 mr-2" /> Add via Form
+                  </Button>
                 </div>
-              ) : filtered.length === 0 && !isAddingInline ? (
-                <div className="text-center py-16">
-                  <ClipboardList className="h-12 w-12 text-ink-warm-300 mx-auto mb-3" />
-                  <p className="text-ink-warm-500 font-medium">
-                    {entries.length === 0 ? 'No delivery log entries yet.' : 'No entries match your filters.'}
-                  </p>
-                  {entries.length === 0 && (
-                    <div className="flex items-center justify-center gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setIsAddingInline(true)}>
-                        <Plus className="h-4 w-4 mr-1" /> Add Inline
-                      </Button>
-                      <Button variant="brand" onClick={() => openForm()}>
-                        <Expand className="h-4 w-4 mr-2" /> Add via Form
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-t border-b border-cream-200 bg-cream-50/80">
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap w-14">
-                          <button className="inline-flex items-center gap-1 hover:text-ink-warm-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>
-                            Day
-                            <ArrowUpDown className="h-3 w-3" />
-                          </button>
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Type</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider">Action</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Who</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">How</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Where</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider whitespace-nowrap">Trigger</th>
-                        <th className="text-left py-3 px-4 font-semibold text-ink-warm-700 text-xs uppercase tracking-wider">Notes</th>
-                        <th className="text-right py-3 px-4 w-20"></th>
-                      </tr>
-                    </thead>
+              )}
+            </EmptyState>
+          </Card>
+        ) : (
+          <Card className="border-cream-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-cream-50 hover:bg-cream-50 border-b border-cream-200">
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap w-14">
+                      <button className="inline-flex items-center gap-1 hover:text-ink-warm-900 transition-colors" onClick={() => setSortAsc(!sortAsc)}>
+                        Day
+                        <ArrowUpDown className="h-3 w-3" />
+                      </button>
+                    </th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Date</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Type</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200">Action</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Who</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">How</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Where</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap">Trigger</th>
+                    <th className="bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200">Notes</th>
+                    <th className="bg-cream-50 text-right py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] whitespace-nowrap w-20">Actions</th>
+                  </tr>
+                </thead>
                     <tbody>
                       {/* Inline add row */}
                       {isAddingInline && (
                         <tr className="border-b border-brand/20 bg-brand-light/20">
-                          <td className="py-3 px-4 text-ink-warm-400 text-xs">—</td>
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3.5 px-4 border-r border-cream-200 text-ink-warm-400 text-xs">—</td>
+                          <td className="py-3.5 px-4 border-r border-cream-200 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
                                 <button className="text-sm text-ink-warm-500 hover:text-ink-warm-700 cursor-pointer">
@@ -684,7 +768,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                 <Calendar
                                   mode="single"
                                   selected={inlineNew.logged_at ? new Date(inlineNew.logged_at + 'T00:00:00') : undefined}
-                                  onSelect={(date) => setInlineNew({ ...inlineNew, logged_at: date ? date.toISOString().split('T')[0] : '' })}
+                                  onSelect={(date) => setInlineNew({ ...inlineNew, logged_at: date ? toLocalDateStr(date) : '' })}
                                   initialFocus
                                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
                                   modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
@@ -692,7 +776,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               </PopoverContent>
                             </Popover>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <div className="inline-flex items-center">
                               <Select value={inlineNew.work_type} onValueChange={(v) => setInlineNew({ ...inlineNew, work_type: v })}>
                                 <SelectTrigger
@@ -708,7 +792,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               {!inlineNew.work_type && <RequiredAsterisk />}
                             </div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <div className="flex items-center">
                               <Input
                                 value={inlineNew.action}
@@ -720,7 +804,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               {!inlineNew.action && <RequiredAsterisk />}
                             </div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             {inlineNewWhoMode === 'team' ? (
                               <div>
                                 <Select value={inlineNew.who} onValueChange={(v) => setInlineNew({ ...inlineNew, who: v })}>
@@ -749,7 +833,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               </div>
                             )}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Input
                               value={inlineNew.method}
                               onChange={(e) => setInlineNew({ ...inlineNew, method: e.target.value })}
@@ -758,7 +842,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Input
                               value={inlineNew.location}
                               onChange={(e) => setInlineNew({ ...inlineNew, location: e.target.value })}
@@ -767,7 +851,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Select value={inlineNew.trigger} onValueChange={(v) => setInlineNew({ ...inlineNew, trigger: v })}>
                               <SelectTrigger
                                 className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.trigger ? triggerBadge(inlineNew.trigger) : 'text-ink-warm-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
@@ -780,7 +864,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               </SelectContent>
                             </Select>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <Input
                               value={inlineNew.notes}
                               onChange={(e) => setInlineNew({ ...inlineNew, notes: e.target.value })}
@@ -789,26 +873,30 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               style={{ outline: 'none', boxShadow: 'none' }}
                             />
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 border-r border-cream-200 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
                                 <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: new Date().toISOString().split('T')[0] }); }}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) }); }}>
                                 <X className="h-4 w-4 text-ink-warm-400" />
                               </Button>
                             </div>
                           </td>
                         </tr>
                       )}
-                      {filtered.map((entry) => (
-                        <tr key={entry.id} className="border-b border-cream-100 hover:bg-cream-50/50 transition-colors group">
+                      {filtered.map((entry, idx) => (
+                        // v11 spreadsheet body row — alternating bg
+                        // (white / cream-50) + visible column separators
+                        // via border-r on each cell. Matches parent
+                        // /delivery-logs chrome.
+                        <tr key={entry.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200 group`}>
                           {/* Day number — not editable */}
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4 border-r border-cream-200">
                             <span className="inline-flex items-center justify-center bg-cream-100 text-ink-warm-700 text-xs font-bold rounded-full h-6 w-6">{getDayNumber(entry.logged_at)}</span>
                           </td>
                           {/* Date — Popover+Calendar picker */}
-                          <td className="py-3 px-4 whitespace-nowrap">
+                          <td className="py-3.5 px-4 border-r border-cream-200 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
                                 <button className="text-ink-warm-500 text-sm hover:text-ink-warm-700 cursor-pointer">
@@ -842,13 +930,13 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                           {/* Notes */}
                           {renderEditableCell(entry, 'notes', 'textarea')}
                           {/* Actions */}
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 border-r border-cream-200 text-right">
                             <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               {/* Reorder arrows — only show if there are other entries with the same date */}
                               {(() => {
                                 const sameDateEntries = filtered.filter(e => e.logged_at === entry.logged_at);
                                 if (sameDateEntries.length <= 1) return null;
-                                const sameDateSorted = sameDateEntries.sort((a, b) => a.sort_order - b.sort_order);
+                                const sameDateSorted = [...sameDateEntries].sort((a, b) => a.sort_order - b.sort_order);
                                 const posInGroup = sameDateSorted.findIndex(e => e.id === entry.id);
                                 return (
                                   <>
@@ -888,20 +976,24 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
+              </Card>
+            )}
+          </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) { setIsFormOpen(false); setEditingId(null); } }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Entry' : 'Add Delivery Log Entry'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-brand" />
+              {editingId ? 'Edit Entry' : 'Add Delivery Log Entry'}
+            </DialogTitle>
             <DialogDescription>Log work delivered for {client?.name}.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
+          <div className="flex-1 overflow-y-auto px-1 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Work Type <span className="text-rose-500">*</span></Label>
+                <Label>Work Type <RequiredAsterisk /></Label>
                 <Select value={form.work_type} onValueChange={(v) => setForm({ ...form, work_type: v })}>
                   <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
@@ -910,7 +1002,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Date <span className="text-rose-500">*</span></Label>
+                <Label>Date <RequiredAsterisk /></Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
@@ -925,7 +1017,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Action <span className="text-rose-500">*</span></Label>
+              <Label>Action <RequiredAsterisk /></Label>
               <Input value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })} placeholder="What was done?" className="focus-brand" />
             </div>
             <div className="grid gap-2">
@@ -987,7 +1079,10 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Entry</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-600" />
+              Delete Entry
+            </DialogTitle>
             <DialogDescription>Are you sure you want to delete this delivery log entry? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-t border-cream-100 pt-3 mt-0">

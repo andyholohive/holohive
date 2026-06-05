@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RequiredAsterisk } from '@/components/ui/required-asterisk'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { supabase } from '@/lib/supabase'
@@ -65,11 +66,11 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
   if (success) {
     return (
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md border-cream-200 shadow-card">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Check your email</CardTitle>
+          <CardTitle className="text-2xl text-center">Check Your Email</CardTitle>
           <CardDescription className="text-center">
-            We've sent you a confirmation link. After verifying your email, an admin will review and approve your account.
+            We&apos;ve sent you a confirmation link. After verifying your email, an admin will review and approve your account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -82,11 +83,11 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md border-cream-200 shadow-card">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl text-center">Create an account</CardTitle>
+        <CardTitle className="text-2xl text-center">Create An Account</CardTitle>
         <CardDescription className="text-center">
-          Enter your information to get started
+          Enter your information to get started.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -96,21 +97,21 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">Name <RequiredAsterisk /></Label>
             <Input
               id="name"
               placeholder="Enter your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+              className="focus-brand"
             />
           </div>
-          
+
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email <RequiredAsterisk /></Label>
             <Input
               id="email"
               type="email"
@@ -118,12 +119,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+              className="focus-brand"
             />
           </div>
-          
+
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Password <RequiredAsterisk /></Label>
             <Input
               id="password"
               type="password"
@@ -131,12 +132,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+              className="focus-brand"
             />
           </div>
-          
+
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">Confirm Password <RequiredAsterisk /></Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -144,29 +145,29 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+              className="focus-brand"
             />
           </div>
-          
+
           <Button variant="brand" type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Account
+            {loading ? 'Creating Account…' : 'Create Account'}
           </Button>
 
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full border-t border-cream-200" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">or</span>
+              <span className="bg-white px-2 text-ink-warm-500">or</span>
             </div>
           </div>
 
           <GoogleSignInButton mode="signup" />
 
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm text-ink-warm-500">
             Already have an account?{' '}
-            <button type="button" onClick={onToggleMode} className="hover:underline text-brand">
+            <button type="button" onClick={onToggleMode} className="text-brand hover:text-brand-dark hover:underline">
               Sign in
             </button>
           </div>
@@ -174,4 +175,4 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
       </CardContent>
     </Card>
   )
-} 
+}

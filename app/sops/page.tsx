@@ -18,17 +18,40 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Plus, Search, Edit, BookOpen, User, Trash2, Calendar, ExternalLink,
   AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight, Link as LinkIcon,
-  Play, FileText, History
+  Play, FileText, History, ArrowUp, ArrowDown, X, RotateCcw,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
+import { StatusBadge, toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import dynamic from 'next/dynamic';
 
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 import 'react-quill/dist/quill.snow.css';
+
+/**
+ * One entry in an SOP's deliverable_template_sequence. Stored as jsonb
+ * on the sops row. See migration sops_deliverable_template_sequence
+ * for the column comment + rationale.
+ *
+ * [2026-06-05] trigger_type semantics:
+ *   - 'on_sop_start'   — spawn immediately when the user clicks Run All
+ *   - 'after_previous' — display-only in v1; user manually triggers via Run Next
+ *   - 'recurring'      — display-only in v1; cron will fire later (Week 2 build)
+ *   - 'manual'         — never auto-spawns; only via per-entry Run button
+ */
+type SequenceTriggerType = 'on_sop_start' | 'after_previous' | 'recurring' | 'manual';
+type RecurrenceCadence = 'weekly' | 'biweekly' | 'monthly';
+
+interface SequenceEntry {
+  template_id: string;
+  sort_order: number;
+  trigger_type: SequenceTriggerType;
+  recurrence_cadence: RecurrenceCadence | null;
+  timing_offset_label: string | null;
+  timing_offset_days: number | null;
+}
 
 interface SOP {
   id: string;
@@ -44,10 +67,17 @@ interface SOP {
   automation_review_requested: boolean;
   automation_review_completed: boolean;
   automation_notes: string | null;
-  /** Optional link to a deliverable_template. When set, the SOP detail
-   *  view shows a "Run this SOP" button that opens the DeliverableWizard
-   *  pre-loaded with the linked template (added 2026-05-07, migration 048). */
+  /** Legacy: optional link to a single deliverable_template. Kept for
+   *  backward compatibility — the canonical multi-template wiring is
+   *  `deliverable_template_sequence` below. On save we keep
+   *  `deliverable_template_id` in sync with sequence[0].template_id so
+   *  any code that reads only the legacy column still works.
+   *  (added 2026-05-07, migration 048; deprecated 2026-06-05). */
   deliverable_template_id: string | null;
+  /** Ordered list of deliverable templates to fire when this SOP is
+   *  run. Empty when no templates are linked. (added 2026-06-05, see
+   *  migration sops_deliverable_template_sequence.) */
+  deliverable_template_sequence: SequenceEntry[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -105,6 +135,29 @@ const STATUSES = [
   { value: 'active',   label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
 ];
+
+// [2026-06-05] Trigger-type display labels for the sequence editor.
+// `recurring` and `after_previous` are valid options on save (the
+// jsonb supports them) but they're display-only in v1 — Run still
+// has to be manual. The Recurring cron is a Week-2 build; the
+// "after previous completes" auto-spawn likewise.
+const TRIGGER_LABEL: Record<SequenceTriggerType, string> = {
+  on_sop_start:    'On SOP start',
+  after_previous:  'After previous completes',
+  recurring:       'Recurring',
+  manual:          'Manual',
+};
+const TRIGGER_TONE: Record<SequenceTriggerType, BadgeTone> = {
+  on_sop_start:    'brand',
+  after_previous:  'info',
+  recurring:       'purple',
+  manual:          'neutral',
+};
+const CADENCE_LABEL: Record<RecurrenceCadence, string> = {
+  weekly:   'Weekly',
+  biweekly: 'Biweekly',
+  monthly:  'Monthly',
+};
 
 const CATEGORY_TONES: Record<string, BadgeTone> = {
   campaign:   'info',    // sky, was blue
@@ -164,8 +217,27 @@ export default function SOPsPage() {
   const [sopVersions, setSopVersions] = useState<SOPVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState({
+  // Form state. Tracks the editable shape of an SOP:
+  //   - `deliverable_template_sequence` is the canonical multi-template
+  //     wiring (added 2026-06-05). Rendered as a sortable list in the
+  //     edit dialog and persisted as-is to the jsonb column.
+  //   - `deliverable_template_id` is the legacy single-template field.
+  //     We keep it in sync with sequence[0]?.template_id on save so any
+  //     code reading only the legacy column still works (e.g. the list
+  //     card's "Runnable" badge before sequence migration).
+  const [formData, setFormData] = useState<{
+    name: string;
+    trigger: string;
+    outcome: string;
+    content: string;
+    clickup_link: string;
+    documentation_link: string;
+    owner_id: string;
+    category: string;
+    status: string;
+    deliverable_template_id: string;
+    deliverable_template_sequence: SequenceEntry[];
+  }>({
     name: '',
     trigger: '',
     outcome: '',
@@ -176,6 +248,7 @@ export default function SOPsPage() {
     category: 'general',
     status: 'draft',
     deliverable_template_id: '',  // empty string = unlinked (form convention)
+    deliverable_template_sequence: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -312,10 +385,12 @@ export default function SOPsPage() {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, categoryFilter, ownerFilter]);
 
-  // Count for automation review queue
-  const automationReviewCount = sops.filter(
-    sop => sop.automation_review_requested && !sop.automation_review_completed
-  ).length;
+  // [2026-06-05] Automation Review feature removed — the underlying
+  // workflow was half-built (only the "Request" half existed; no UI
+  // ever shipped to mark a review complete or write the notes). DB
+  // columns `automation_review_requested` / `automation_review_completed`
+  // / `automation_notes` left in place so existing flagged SOPs aren't
+  // blown away; they're just no longer read or written by any UI.
 
   // Status counts
   const statusCounts = {
@@ -338,8 +413,31 @@ export default function SOPsPage() {
       category: 'general',
       status: 'draft',
       deliverable_template_id: '',
+      deliverable_template_sequence: [],
     });
     setIsCreateEditOpen(true);
+  };
+
+  // Build a sequence array from a SOP row. Legacy single-template SOPs
+  // (sequence is empty but `deliverable_template_id` is set) get a
+  // synthetic 1-entry sequence so the new editor renders the right
+  // initial state. Saves the legacy-→-canonical migration silently
+  // the first time the user opens the dialog.
+  const sequenceFromSop = (sop: SOP): SequenceEntry[] => {
+    if (sop.deliverable_template_sequence && sop.deliverable_template_sequence.length > 0) {
+      return sop.deliverable_template_sequence;
+    }
+    if (sop.deliverable_template_id) {
+      return [{
+        template_id: sop.deliverable_template_id,
+        sort_order: 0,
+        trigger_type: 'on_sop_start',
+        recurrence_cadence: null,
+        timing_offset_label: null,
+        timing_offset_days: null,
+      }];
+    }
+    return [];
   };
 
   const handleEdit = (sop: SOP) => {
@@ -355,6 +453,7 @@ export default function SOPsPage() {
       category: sop.category,
       status: sop.status,
       deliverable_template_id: sop.deliverable_template_id || '',
+      deliverable_template_sequence: sequenceFromSop(sop),
     });
     setIsCreateEditOpen(true);
   };
@@ -407,6 +506,23 @@ export default function SOPsPage() {
 
     setIsSubmitting(true);
     try {
+      // Normalize the sequence — reassign sort_order in array index
+      // order so it always stays canonical regardless of how the user
+      // reordered entries in the editor.
+      const normalizedSequence: SequenceEntry[] = formData.deliverable_template_sequence.map((entry, i) => ({
+        ...entry,
+        sort_order: i,
+      }));
+      // Sync the legacy single-template column with sequence[0] so any
+      // older code reading `deliverable_template_id` still works (the
+      // "Runnable" card badge, the legacy single-template Run button,
+      // etc.). When sequence is empty, fall back to whatever the user
+      // typed in the legacy picker (still works for SOPs created
+      // before this feature shipped).
+      const legacyTemplateId = normalizedSequence.length > 0
+        ? normalizedSequence[0].template_id
+        : (formData.deliverable_template_id || null);
+
       if (editingSOP) {
         // Update existing SOP
         const { error } = await (supabase as any)
@@ -421,7 +537,8 @@ export default function SOPsPage() {
             owner_id: formData.owner_id || null,
             category: formData.category,
             status: formData.status,
-            deliverable_template_id: formData.deliverable_template_id || null,
+            deliverable_template_id: legacyTemplateId,
+            deliverable_template_sequence: normalizedSequence,
           })
           .eq('id', editingSOP.id);
 
@@ -445,7 +562,8 @@ export default function SOPsPage() {
             owner_id: formData.owner_id || null,
             category: formData.category,
             status: formData.status,
-            deliverable_template_id: formData.deliverable_template_id || null,
+            deliverable_template_id: legacyTemplateId,
+            deliverable_template_sequence: normalizedSequence,
             created_by: user?.id,
           })
           .select()
@@ -500,48 +618,9 @@ export default function SOPsPage() {
     }
   };
 
-  const handleRequestAutomationReview = async (sop: SOP) => {
-    try {
-      const { error } = await (supabase as any)
-        .from('sops')
-        .update({
-          automation_review_requested: true,
-          automation_review_completed: false,
-        })
-        .eq('id', sop.id);
-
-      if (error) throw error;
-
-      toast({ title: 'Automation review requested' });
-      fetchSOPs();
-    } catch (error) {
-      console.error('Error requesting review:', error);
-      toast({
-        title: 'Request failed',
-        description: error instanceof Error ? error.message : 'Failed to request review',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleCompleteAutomationReview = async (sop: SOP, notes: string) => {
-    try {
-      const { error } = await (supabase as any)
-        .from('sops')
-        .update({
-          automation_review_completed: true,
-          automation_notes: notes,
-        })
-        .eq('id', sop.id);
-
-      if (error) throw error;
-
-      toast({ title: 'Automation review completed' });
-      fetchSOPs();
-    } catch (error) {
-      console.error('Error completing review:', error);
-    }
-  };
+  // [2026-06-05] Automation-review handlers removed — see the count
+  // comment above for context. The "Request" half was the only one
+  // ever wired to a button; the "Complete" half had no UI at all.
 
   // Loading skeleton
   const SOPCardSkeleton = () => (
@@ -621,34 +700,6 @@ export default function SOPsPage() {
             </Button>
           )}
         />
-
-        {/* Automation Review Queue Alert */}
-        {automationReviewCount > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600" />
-              <div>
-                <p className="font-medium text-amber-800">Automation Review Queue</p>
-                <p className="text-sm text-amber-700">
-                  {automationReviewCount} SOP{automationReviewCount !== 1 ? 's' : ''} waiting for automation review
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setStatusFilter('all');
-                setCategoryFilter('all');
-                setOwnerFilter('all');
-                setSearchTerm('');
-              }}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100"
-            >
-              View Queue
-            </Button>
-          </div>
-        )}
 
         {/* Search and Filters */}
         <div className="flex items-center space-x-4">
@@ -775,24 +826,19 @@ export default function SOPsPage() {
                     <Badge variant="outline" className={`pointer-events-none ${getCategoryColor(sop.category)}`}>
                       {CATEGORIES.find(c => c.value === sop.category)?.label || sop.category}
                     </Badge>
-                    {sop.deliverable_template_id && (
+                    {(sop.deliverable_template_id || (sop.deliverable_template_sequence?.length ?? 0) > 0) && (
                       <Badge variant="outline" className="bg-brand/10 text-brand border-brand/30 pointer-events-none">
                         <Play className="h-3 w-3 mr-1" />
                         Runnable
+                        {(sop.deliverable_template_sequence?.length ?? 0) > 1 && (
+                          <span className="ml-1 tabular-nums">· {sop.deliverable_template_sequence.length}</span>
+                        )}
                       </Badge>
                     )}
-                    {sop.automation_review_requested && !sop.automation_review_completed && (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 pointer-events-none">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Review Pending
-                      </Badge>
-                    )}
-                    {sop.automation_review_completed && (
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 pointer-events-none">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Reviewed
-                      </Badge>
-                    )}
+                    {/* Review Pending / Reviewed badges removed
+                        2026-06-05 alongside the Automation Review
+                        feature retire — see the count-removal comment
+                        above for context. */}
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
@@ -944,16 +990,25 @@ export default function SOPsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="clickup_link">ClickUp Template Link</Label>
-                  <Input
-                    id="clickup_link"
-                    className="focus-brand"
-                    value={formData.clickup_link}
-                    onChange={(e) => setFormData({ ...formData, clickup_link: e.target.value })}
-                    placeholder="https://app.clickup.com/..."
-                  />
-                </div>
+                {/* [2026-06-05] ClickUp Template Link field HIDDEN
+                    per Andy. The team is off ClickUp; `documentation_link`
+                    below covers external-doc needs. DB column +
+                    formData field kept for backward compat so existing
+                    `clickup_link` values aren't blown away on save —
+                    flip the `false &&` to true if the field needs to
+                    return. */}
+                {false && (
+                  <div>
+                    <Label htmlFor="clickup_link">ClickUp Template Link</Label>
+                    <Input
+                      id="clickup_link"
+                      className="focus-brand"
+                      value={formData.clickup_link}
+                      onChange={(e) => setFormData({ ...formData, clickup_link: e.target.value })}
+                      placeholder="https://app.clickup.com/..."
+                    />
+                  </div>
+                )}
                 <div className="col-span-2">
                   <Label htmlFor="documentation_link">Documentation Link</Label>
                   <Input
@@ -964,28 +1019,158 @@ export default function SOPsPage() {
                     placeholder="https://notion.so/... or other documentation"
                   />
                 </div>
-                {/* Linked deliverable template — when set, the SOP detail
-                    view shows a "Run this SOP" button that opens the
-                    DeliverableWizard pre-loaded with this template
-                    (added 2026-05-07, migration 048). */}
+                {/* Deliverable Template Sequence — the canonical
+                    multi-template wiring. Was a single Select linking
+                    one template; replaced 2026-06-05 with a sortable
+                    list so an SOP can fire several templates in
+                    sequence (master campaign lifecycle pattern). The
+                    legacy `deliverable_template_id` column is kept in
+                    sync with sequence[0].template_id on save for
+                    backward compat. */}
                 <div className="col-span-2">
-                  <Label htmlFor="deliverable_template_id">Linked Deliverable Template <span className="text-ink-warm-400 font-normal">(optional)</span></Label>
-                  <Select
-                    value={formData.deliverable_template_id || 'none'}
-                    onValueChange={(value) => setFormData({ ...formData, deliverable_template_id: value === 'none' ? '' : value })}
-                  >
-                    <SelectTrigger className="focus-brand">
-                      <SelectValue placeholder="No linked template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— No linked template</SelectItem>
-                      {deliverableTemplates.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-ink-warm-500 mt-1">
-                    Linking a template adds a &quot;Run this SOP&quot; button to the detail view, which spawns a multi-person task tree from the template.
+                  <Label>Deliverable Templates <span className="text-ink-warm-400 font-normal">(optional, ordered)</span></Label>
+                  <div className="mt-2 space-y-2">
+                    {formData.deliverable_template_sequence.length === 0 && (
+                      <div className="text-xs text-ink-warm-500 italic border border-dashed border-cream-200 rounded-md p-3 text-center">
+                        No templates linked yet. Add one below — when the SOP is run, each template spawns a multi-person task tree in the order listed.
+                      </div>
+                    )}
+                    {formData.deliverable_template_sequence.map((entry, idx) => {
+                      const tpl = deliverableTemplates.find(t => t.id === entry.template_id);
+                      const isFirst = idx === 0;
+                      const isLast = idx === formData.deliverable_template_sequence.length - 1;
+                      const updateEntry = (patch: Partial<SequenceEntry>) => {
+                        setFormData(f => ({
+                          ...f,
+                          deliverable_template_sequence: f.deliverable_template_sequence.map((e, i) =>
+                            i === idx ? { ...e, ...patch } : e
+                          ),
+                        }));
+                      };
+                      const removeEntry = () => {
+                        setFormData(f => ({
+                          ...f,
+                          deliverable_template_sequence: f.deliverable_template_sequence.filter((_, i) => i !== idx),
+                        }));
+                      };
+                      const move = (dir: -1 | 1) => {
+                        const target = idx + dir;
+                        if (target < 0 || target >= formData.deliverable_template_sequence.length) return;
+                        setFormData(f => {
+                          const next = [...f.deliverable_template_sequence];
+                          [next[idx], next[target]] = [next[target], next[idx]];
+                          return { ...f, deliverable_template_sequence: next };
+                        });
+                      };
+                      return (
+                        <div key={idx} className="border border-cream-200 rounded-md p-3 bg-white">
+                          <div className="flex items-start gap-2">
+                            <span className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500 mt-2 tabular-nums w-6 text-right">{idx + 1}.</span>
+                            <div className="flex-1 space-y-2 min-w-0">
+                              {/* Row 1: Template picker */}
+                              <Select
+                                value={entry.template_id || 'none'}
+                                onValueChange={(value) => updateEntry({ template_id: value === 'none' ? '' : value })}
+                              >
+                                <SelectTrigger className="focus-brand h-9 text-sm">
+                                  <SelectValue placeholder="Select a deliverable template" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">— Select template</SelectItem>
+                                  {deliverableTemplates.map(t => (
+                                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {/* Row 2: Trigger / Cadence / Timing */}
+                              <div className="grid grid-cols-3 gap-2">
+                                <Select
+                                  value={entry.trigger_type}
+                                  onValueChange={(value) => updateEntry({
+                                    trigger_type: value as SequenceTriggerType,
+                                    recurrence_cadence: value === 'recurring' ? (entry.recurrence_cadence || 'weekly') : null,
+                                  })}
+                                >
+                                  <SelectTrigger className="focus-brand h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(Object.keys(TRIGGER_LABEL) as SequenceTriggerType[]).map(t => (
+                                      <SelectItem key={t} value={t}>{TRIGGER_LABEL[t]}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {entry.trigger_type === 'recurring' ? (
+                                  <Select
+                                    value={entry.recurrence_cadence || 'weekly'}
+                                    onValueChange={(value) => updateEntry({ recurrence_cadence: value as RecurrenceCadence })}
+                                  >
+                                    <SelectTrigger className="focus-brand h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(Object.keys(CADENCE_LABEL) as RecurrenceCadence[]).map(c => (
+                                        <SelectItem key={c} value={c}>{CADENCE_LABEL[c]}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    placeholder="Day 0"
+                                    value={entry.timing_offset_label || ''}
+                                    onChange={(e) => updateEntry({ timing_offset_label: e.target.value || null })}
+                                    className="focus-brand h-8 text-xs"
+                                  />
+                                )}
+                                <Input
+                                  type="number"
+                                  placeholder="Days"
+                                  value={entry.timing_offset_days ?? ''}
+                                  onChange={(e) => updateEntry({ timing_offset_days: e.target.value === '' ? null : Number(e.target.value) })}
+                                  className="focus-brand h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+                            {/* Row controls */}
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => move(-1)} disabled={isFirst} title="Move up">
+                                <ArrowUp className="h-3 w-3" />
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => move(1)} disabled={isLast} title="Move down">
+                                <ArrowDown className="h-3 w-3" />
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50" onClick={removeEntry} title="Remove">
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData(f => ({
+                        ...f,
+                        deliverable_template_sequence: [
+                          ...f.deliverable_template_sequence,
+                          {
+                            template_id: '',
+                            sort_order: f.deliverable_template_sequence.length,
+                            trigger_type: f.deliverable_template_sequence.length === 0 ? 'on_sop_start' : 'manual',
+                            recurrence_cadence: null,
+                            timing_offset_label: null,
+                            timing_offset_days: null,
+                          },
+                        ],
+                      }))}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Template
+                    </Button>
+                  </div>
+                  <p className="text-xs text-ink-warm-500 mt-2">
+                    Each linked template adds a Run button to the SOP detail view. Use trigger types like <code className="bg-cream-100 px-1 rounded">On SOP start</code> (spawns immediately on Run All) or <code className="bg-cream-100 px-1 rounded">Manual</code> (spawn later via the per-template Run button). Recurring is display-only in v1 — the cron will fire it automatically once that's wired up.
                   </p>
                 </div>
                 <div className="col-span-2">
@@ -1062,34 +1247,38 @@ export default function SOPsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* View Dialog */}
+        {/* View Dialog — v11-aligned: icon-prefixed Title Case header
+            with h-4 w-4 brand icon (was h-5 w-5 plain), StatusBadge
+            tones for status + category chips (was Badge with manual
+            color class), DialogDescription pulling owner + last-
+            updated into the natural subtitle slot. 2026-06-05. */}
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
           <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  {viewingSOP?.name}
-                </DialogTitle>
-                {viewingSOP && (
-                  <Badge className={`pointer-events-none ${getStatusColor(viewingSOP.status)}`}>
-                    {viewingSOP.status.charAt(0).toUpperCase() + viewingSOP.status.slice(1)}
-                  </Badge>
-                )}
-              </div>
+              <DialogTitle className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-brand" />
+                {viewingSOP?.name}
+              </DialogTitle>
+              {viewingSOP && (
+                <DialogDescription>
+                  {viewingSOP.owner && <>Owned by <strong>{viewingSOP.owner.name}</strong> · </>}
+                  Last updated {formatDate(viewingSOP.updated_at)}
+                </DialogDescription>
+              )}
             </DialogHeader>
             {viewingSOP && (
               <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className={`pointer-events-none ${getCategoryColor(viewingSOP.category)}`}>
-                    {CATEGORIES.find(c => c.value === viewingSOP.category)?.label}
-                  </Badge>
-                  {viewingSOP.owner && (
-                    <Badge variant="outline" className="pointer-events-none">
-                      <User className="h-3 w-3 mr-1" />
-                      {viewingSOP.owner.name}
-                    </Badge>
-                  )}
+                {/* Status + category chips — moved out of the header
+                    into a meta row inside the scroll body so they
+                    flow with the rest of the content rather than
+                    competing with the title for header space. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={STATUS_TONES[viewingSOP.status] ?? 'neutral'} size="sm">
+                    {viewingSOP.status.charAt(0).toUpperCase() + viewingSOP.status.slice(1)}
+                  </StatusBadge>
+                  <StatusBadge tone={CATEGORY_TONES[viewingSOP.category] ?? 'neutral'} size="sm" bordered>
+                    {CATEGORIES.find(c => c.value === viewingSOP.category)?.label ?? viewingSOP.category}
+                  </StatusBadge>
                 </div>
 
                 {viewingSOP.trigger && (
@@ -1117,17 +1306,8 @@ export default function SOPsPage() {
                 )}
 
                 <div className="flex flex-wrap gap-3 pt-2">
-                  {viewingSOP.clickup_link && (
-                    <a
-                      href={viewingSOP.clickup_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm text-brand hover:underline"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      ClickUp Template
-                    </a>
-                  )}
+                  {/* ClickUp Template link hidden 2026-06-05 — see
+                      the edit dialog for context. */}
                   {viewingSOP.documentation_link && (
                     <a
                       href={viewingSOP.documentation_link}
@@ -1141,61 +1321,124 @@ export default function SOPsPage() {
                   )}
                 </div>
 
-                {viewingSOP.automation_notes && (
-                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
-                    <h4 className="font-semibold text-sm text-emerald-800 mb-1">Automation Notes</h4>
-                    <p className="text-emerald-700 text-sm">{viewingSOP.automation_notes}</p>
-                  </div>
-                )}
+                {/* Automation Notes block removed 2026-06-05 — see
+                    the automation-review removal comment above. */}
 
-                <div className="flex justify-between items-center pt-4 border-t">
-                  <p className="text-xs text-ink-warm-500">
-                    Last updated: {formatDate(viewingSOP.updated_at)}
-                  </p>
-                  <div className="flex gap-2">
-                    {/* Run this SOP — only when a deliverable template is
-                        linked. Closes the view dialog and opens the
-                        DeliverableWizard pre-loaded with the template +
-                        SOP name as the initial deliverable title. */}
-                    {viewingSOP.deliverable_template_id && (
-                      <Button variant="brand" size="sm" onClick={() => {
-                          setWizardTemplateId(viewingSOP.deliverable_template_id);
-                          setWizardInitialTitle(viewingSOP.name);
-                          setIsViewOpen(false);
-                          setWizardOpen(true);
-                        }}
-                      >
-                        <Play className="h-3 w-3 mr-1" />
-                        Run this SOP
-                      </Button>
-                    )}
-                    {!viewingSOP.automation_review_requested && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleRequestAutomationReview(viewingSOP);
-                          setIsViewOpen(false);
-                        }}
-                      >
-                        <Play className="h-3 w-3 mr-1" />
-                        Request Automation Review
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
+                {/* Deliverable Template Sequence — visual timeline of
+                    the linked templates with a per-template Run button.
+                    Each Run opens the DeliverableWizard pre-loaded with
+                    that specific template. Synthesizes a 1-entry
+                    sequence for legacy SOPs that only have
+                    deliverable_template_id set (so they keep working
+                    without a manual edit + save). 2026-06-05. */}
+                {(() => {
+                  const seq = sequenceFromSop(viewingSOP);
+                  if (seq.length === 0) return null;
+                  return (
+                    <div className="border border-cream-200 rounded-lg p-4 bg-cream-50/40">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-sm text-ink-warm-900 flex items-center gap-2">
+                          <Play className="h-3.5 w-3.5 text-brand" />
+                          Deliverable Sequence
+                          <span className="text-xs text-ink-warm-500 font-normal tabular-nums">· {seq.length} template{seq.length === 1 ? '' : 's'}</span>
+                        </h4>
+                      </div>
+                      <ol className="space-y-2">
+                        {seq.map((entry, idx) => {
+                          const tpl = deliverableTemplates.find(t => t.id === entry.template_id);
+                          const tplName = tpl?.name ?? '(template not found)';
+                          const tone = TRIGGER_TONE[entry.trigger_type];
+                          const triggerLabel = entry.trigger_type === 'recurring' && entry.recurrence_cadence
+                            ? `${TRIGGER_LABEL.recurring} · ${CADENCE_LABEL[entry.recurrence_cadence]}`
+                            : TRIGGER_LABEL[entry.trigger_type];
+                          return (
+                            <li key={idx} className="flex items-start gap-3 bg-white border border-cream-200 rounded-md p-2.5">
+                              <span className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500 mt-1 tabular-nums w-5 text-right shrink-0">{idx + 1}.</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-ink-warm-900 truncate">{tplName}</div>
+                                <div className="flex items-center gap-2 flex-wrap mt-1">
+                                  <StatusBadge tone={tone} size="sm">{triggerLabel}</StatusBadge>
+                                  {entry.timing_offset_label && (
+                                    <span className="text-[11px] text-ink-warm-500">{entry.timing_offset_label}</span>
+                                  )}
+                                  {entry.timing_offset_days !== null && entry.timing_offset_days !== undefined && (
+                                    <span className="text-[11px] text-ink-warm-500 tabular-nums">+{entry.timing_offset_days}d</span>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="shrink-0 h-8"
+                                disabled={!tpl}
+                                onClick={() => {
+                                  setWizardTemplateId(entry.template_id);
+                                  setWizardInitialTitle(`${viewingSOP.name} — ${tplName}`);
+                                  setIsViewOpen(false);
+                                  setWizardOpen(true);
+                                }}
+                              >
+                                <Play className="h-3 w-3 mr-1" />
+                                Run
+                              </Button>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
+            {/* v11 DialogFooter — was an inline div with manual
+                `pt-4 border-t` styling that didn't match other v11
+                dialogs (which use the proper DialogFooter primitive
+                with `border-t border-cream-100 pt-3 mt-0`). The
+                "Last updated" metadata moved up to the
+                DialogDescription so the footer is just actions. */}
+            {viewingSOP && (
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+                {/* Run First — spawns the first `on_sop_start`
+                    template immediately. The rest of the sequence sits
+                    in the timeline above with per-template Run buttons
+                    until the auto-trigger / cron infra lands. For SOPs
+                    with no `on_sop_start` entry, falls back to
+                    sequence[0]. 2026-06-05. */}
+                {(() => {
+                  const seq = sequenceFromSop(viewingSOP);
+                  if (seq.length === 0) return null;
+                  const first = seq.find(e => e.trigger_type === 'on_sop_start') ?? seq[0];
+                  const tpl = deliverableTemplates.find(t => t.id === first.template_id);
+                  if (!tpl) return null;
+                  return (
+                    <Button variant="brand" size="sm" onClick={() => {
+                        setWizardTemplateId(first.template_id);
+                        setWizardInitialTitle(`${viewingSOP.name} — ${tpl.name}`);
                         setIsViewOpen(false);
-                        handleEdit(viewingSOP);
+                        setWizardOpen(true);
                       }}
                     >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Edit
+                      <Play className="h-3 w-3 mr-1" />
+                      {seq.length > 1 ? 'Run First' : 'Run this SOP'}
                     </Button>
-                  </div>
-                </div>
-              </div>
+                  );
+                })()}
+                {/* Request Automation Review button removed
+                    2026-06-05 — see the handler-removal comment above. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsViewOpen(false);
+                    handleEdit(viewingSOP);
+                  }}
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+              </DialogFooter>
             )}
           </DialogContent>
         </Dialog>

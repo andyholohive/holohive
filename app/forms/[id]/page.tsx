@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -15,7 +15,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
-import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon, Building2, Check, ChevronsUpDown, ClipboardList } from 'lucide-react';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon, Building2, Check, ChevronsUpDown, ClipboardList, Pencil, Link2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +30,16 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { CSS } from '@dnd-kit/utilities';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+
+// v11: tone map for form status pills. Replaces FormService.getStatusColor
+// (which returns inline bg-X-100 text-X-800 pills) — render with <StatusBadge>.
+const FORM_STATUS_TONES: Record<string, BadgeTone> = {
+  draft: 'neutral',
+  published: 'success',
+  closed: 'danger',
+};
+
+const titleCase = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 
 // Sortable Field Item Component
 interface SortableFieldItemProps {
@@ -295,7 +308,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                     <Palette className="h-4 w-4" />
                   </Button>
                   {showColorPicker && !showCustomColorPicker && (
-                    <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                    <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-cream-200 rounded-lg shadow-lg p-3 w-64">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium">Text Color</span>
                         <Button
@@ -399,7 +412,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
-                className="font-semibold text-ink-warm-900 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand"
+                className="font-semibold text-ink-warm-900 border border-cream-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand"
                 style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
               />
             </div>
@@ -421,7 +434,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => setEditingFieldId(field.id)}
-                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                className="hover:bg-brand-soft hover:text-brand hover:border-brand-light"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -493,7 +506,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                     <Palette className="h-4 w-4" />
                   </Button>
                   {showColorPicker && !showCustomColorPicker && (
-                    <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                    <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-cream-200 rounded-lg shadow-lg p-3 w-64">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium">Text Color</span>
                         <Button
@@ -597,7 +610,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
-                className="text-ink-warm-700 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand"
+                className="text-ink-warm-700 border border-cream-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand"
                 style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
               />
             </div>
@@ -619,7 +632,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => setEditingFieldId(field.id)}
-                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                className="hover:bg-brand-soft hover:text-brand hover:border-brand-light"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -654,7 +667,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               {field.label && (
                 <div className="font-medium text-ink-warm-900 mb-2" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
               )}
-              <div className="text-sm text-ink-warm-700 bg-white rounded p-3 border">
+              <div className="text-sm text-ink-warm-700 bg-white rounded p-3 border border-cream-200">
                 <p className="font-medium mb-1">Embedded Content</p>
                 <p className="text-xs text-ink-warm-500 mb-2">URL: {linkUrl || 'No URL set'}</p>
                 <p className="text-xs italic">View the embedded content in the Preview tab</p>
@@ -665,7 +678,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => handleOpenFieldDialog(field)}
-                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                className="hover:bg-brand-soft hover:text-brand hover:border-brand-light"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -693,7 +706,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
         </div>
       </div>
       {isEditing ? (
-        <div className="space-y-3 p-4 border-2 border-brand rounded-lg bg-blue-50/30">
+        <div className="space-y-3 p-4 border-2 border-brand rounded-lg bg-brand-soft/30">
           <div>
             <Label className="text-sm text-ink-warm-700">Field Label</Label>
             <div className="flex gap-1 mb-2">
@@ -737,7 +750,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                   <Palette className="h-4 w-4" />
                 </Button>
                 {showColorPicker && !showCustomColorPicker && (
-                  <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                  <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-cream-200 rounded-lg shadow-lg p-3 w-64">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium">Text Color</span>
                       <Button
@@ -841,7 +854,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               contentEditable
               suppressContentEditableWarning
               onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
-              className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand bg-white"
+              className="p-2 border border-cream-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand bg-white"
               style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
             />
           </div>
@@ -936,7 +949,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               </div>
               <div className="space-y-1">
                 {editOptions.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-white border rounded">
+                  <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded">
                     <span className="flex-1">{option}</span>
                     <Button variant="ghost" size="sm" onClick={() => removeOption(index)} disabled={editFieldType === 'select' && isYesNoDropdown}>
                       <X className="h-4 w-4" />
@@ -947,11 +960,11 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
             </div>
           )}
           {editFieldType === 'select' && isYesNoDropdown && (
-            <div className="p-3 bg-cream-50 border rounded-md">
+            <div className="p-3 bg-cream-50 border border-cream-200 rounded-md">
               <Label className="text-sm text-ink-warm-700 mb-2">Dropdown Options (Locked)</Label>
               <div className="space-y-1 mt-2">
                 {editOptions.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-white border rounded">
+                  <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded">
                     <span className="flex-1">{option}</span>
                   </div>
                 ))}
@@ -980,7 +993,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => setEditingFieldId(field.id)}
-                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                className="hover:bg-brand-soft hover:text-brand hover:border-brand-light"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -1124,23 +1137,22 @@ function SortablePageTab({ pageNum, currentPage, fieldsCount, totalPages, onPage
 
   return (
     <div ref={setNodeRef} style={style} className="relative flex items-center">
-      <div className="flex items-center border rounded-md overflow-hidden">
+      <div className="flex items-center border border-cream-200 rounded-md overflow-hidden">
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing px-1 py-2 bg-cream-50 hover:bg-cream-100 border-r"
+          className="cursor-grab active:cursor-grabbing px-1 py-2 bg-cream-50 hover:bg-cream-100 border-r border-cream-200"
         >
           <GripVertical className="h-4 w-4 text-ink-warm-400" />
         </div>
         <Button
-          variant={currentPage === pageNum ? 'default' : 'outline'}
+          variant={currentPage === pageNum ? 'brand' : 'outline'}
           size="sm"
           onClick={() => onPageClick(pageNum)}
-          className={`rounded-none border-0 `}
-          style={currentPage === pageNum ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+          className="rounded-none border-0"
         >
           Page {pageNum}
-          <span className="ml-2 text-xs opacity-75">({fieldsCount})</span>
+          <span className="ml-2 text-xs opacity-75 tabular-nums">({fieldsCount})</span>
         </Button>
       </div>
       {totalPages > 1 && (
@@ -1447,12 +1459,22 @@ export default function FormBuilderPage() {
     }
   };
 
-  const handleDeleteField = async (fieldId: string, fieldLabel: string) => {
-    if (!confirm(`Delete field "${fieldLabel}"?`)) return;
+  // [v11 destructive Dialog] confirm() replaced by deleteFieldPending
+  // state + confirmDeleteField below. 2026-06-05.
+  const [deleteFieldPending, setDeleteFieldPending] = useState<{ id: string; label: string } | null>(null);
+  const [deletingField, setDeletingField] = useState(false);
 
+  const handleDeleteField = (fieldId: string, fieldLabel: string) => {
+    setDeleteFieldPending({ id: fieldId, label: fieldLabel });
+  };
+
+  const confirmDeleteField = async () => {
+    if (!deleteFieldPending) return;
+    setDeletingField(true);
     try {
-      await FormService.deleteField(fieldId);
+      await FormService.deleteField(deleteFieldPending.id);
       toast({ title: 'Field deleted' });
+      setDeleteFieldPending(null);
       await fetchForm();
     } catch (error) {
       console.error('Error deleting field:', error);
@@ -1461,6 +1483,8 @@ export default function FormBuilderPage() {
         description: error instanceof Error ? error.message : 'Failed to delete field',
         variant: 'destructive',
       });
+    } finally {
+      setDeletingField(false);
     }
   };
 
@@ -1567,12 +1591,22 @@ export default function FormBuilderPage() {
     setIsResponseDialogOpen(true);
   };
 
-  const handleDeleteResponse = async (responseId: string) => {
-    if (!confirm('Delete this response?')) return;
+  // [v11 destructive Dialog] confirm() replaced by deleteResponsePending
+  // state + confirmDeleteResponse below. 2026-06-05.
+  const [deleteResponsePending, setDeleteResponsePending] = useState<string | null>(null);
+  const [deletingResponse, setDeletingResponse] = useState(false);
 
+  const handleDeleteResponse = (responseId: string) => {
+    setDeleteResponsePending(responseId);
+  };
+
+  const confirmDeleteResponse = async () => {
+    if (!deleteResponsePending) return;
+    setDeletingResponse(true);
     try {
-      await FormService.deleteResponse(responseId);
+      await FormService.deleteResponse(deleteResponsePending);
       toast({ title: 'Response deleted' });
+      setDeleteResponsePending(null);
       await fetchResponses();
     } catch (error) {
       console.error('Error deleting response:', error);
@@ -1581,6 +1615,8 @@ export default function FormBuilderPage() {
         description: error instanceof Error ? error.message : 'Failed to delete response',
         variant: 'destructive',
       });
+    } finally {
+      setDeletingResponse(false);
     }
   };
 
@@ -1960,6 +1996,63 @@ export default function FormBuilderPage() {
     setCurrentPage(newPageNum);
   };
 
+  // [v11 destructive Dialog] confirm() replaced by deletePagePending
+  // state + confirmDeletePage below. Pre-existing behavior preserved:
+  // empty pages delete immediately (no prompt), pages with fields go
+  // through the Dialog. 2026-06-05.
+  const [deletePagePending, setDeletePagePending] = useState<{ pageNumber: number; fieldCount: number } | null>(null);
+  const [deletingPage, setDeletingPage] = useState(false);
+
+  const deletePageWithFieldsWork = async (pageNumber: number) => {
+    if (!form) return;
+    const fieldsOnPage = form.fields.filter(f => f.page_number === pageNumber);
+    try {
+      // Delete all fields on this page
+      await Promise.all(fieldsOnPage.map(f => FormService.deleteField(f.id)));
+
+      // Update page numbers for fields after this page
+      const fieldsToUpdate = form.fields
+        .filter(f => f.page_number > pageNumber)
+        .map(f => ({
+          id: f.id,
+          display_order: f.display_order,
+          page_number: f.page_number - 1
+        }));
+
+      if (fieldsToUpdate.length > 0) {
+        await FormService.updateFieldPositions(fieldsToUpdate);
+      }
+
+      setTotalPages(prev => prev - 1);
+      setPageOrder(prev => prev.filter(p => p !== pageNumber).map(p => p > pageNumber ? p - 1 : p));
+      if (currentPage >= pageNumber && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
+
+      await fetchForm();
+
+      toast({ title: 'Page deleted' });
+    } catch (error) {
+      console.error('Error deleting page:', error);
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete page',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const confirmDeletePage = async () => {
+    if (!deletePagePending) return;
+    setDeletingPage(true);
+    try {
+      await deletePageWithFieldsWork(deletePagePending.pageNumber);
+      setDeletePagePending(null);
+    } finally {
+      setDeletingPage(false);
+    }
+  };
+
   const handleDeletePage = async (pageNumber: number) => {
     if (totalPages === 1) {
       toast({
@@ -1974,45 +2067,12 @@ export default function FormBuilderPage() {
     const fieldsOnPage = form.fields.filter(f => f.page_number === pageNumber);
 
     if (fieldsOnPage.length > 0) {
-      if (!confirm(`Page ${pageNumber} has ${fieldsOnPage.length} field(s). Are you sure you want to delete it? Fields will be deleted.`)) {
-        return;
-      }
+      // Defer to the destructive Dialog — work runs in confirmDeletePage.
+      setDeletePagePending({ pageNumber, fieldCount: fieldsOnPage.length });
+      return;
+    }
 
-      try {
-        // Delete all fields on this page
-        await Promise.all(fieldsOnPage.map(f => FormService.deleteField(f.id)));
-
-        // Update page numbers for fields after this page
-        const fieldsToUpdate = form.fields
-          .filter(f => f.page_number > pageNumber)
-          .map(f => ({
-            id: f.id,
-            display_order: f.display_order,
-            page_number: f.page_number - 1
-          }));
-
-        if (fieldsToUpdate.length > 0) {
-          await FormService.updateFieldPositions(fieldsToUpdate);
-        }
-
-        setTotalPages(prev => prev - 1);
-        setPageOrder(prev => prev.filter(p => p !== pageNumber).map(p => p > pageNumber ? p - 1 : p));
-        if (currentPage >= pageNumber && currentPage > 1) {
-          setCurrentPage(prev => prev - 1);
-        }
-
-        await fetchForm();
-
-        toast({ title: 'Page deleted' });
-      } catch (error) {
-        console.error('Error deleting page:', error);
-        toast({
-          title: 'Delete failed',
-          description: error instanceof Error ? error.message : 'Failed to delete page',
-          variant: 'destructive',
-        });
-      }
-    } else {
+    {
       // Empty page, just remove it
       const fieldsToUpdate = form.fields
         .filter(f => f.page_number > pageNumber)
@@ -2048,10 +2108,59 @@ export default function FormBuilderPage() {
   };
 
   if (loading) {
+    // Structural skeleton mirrors the loaded layout: back link + PageHeader
+    // + meta row + tabs + the build-tab Card (info block + page tabs + fields).
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-3 w-28" />
+        <PageHeader
+          icon={ClipboardList}
+          title="Form Editor"
+          kicker="Documents · Forms · Editor"
+          kickerDot="brand"
+        />
+        <div className="flex items-center gap-2 -mt-3">
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-3 w-32" />
+        </div>
+        <div className="section-head first flex items-center gap-3">
+          <span className="dot bg-brand/30" />
+          <Skeleton className="h-3 w-24" />
+          <span className="flex-1 h-px bg-cream-200" />
+          <Skeleton className="h-3 w-32" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-24" />
+          <Skeleton className="h-9 w-28" />
+        </div>
+        <Card className="border-cream-200">
+          <CardHeader>
+            <Skeleton className="h-8 w-1/3 mb-3" />
+            <Skeleton className="h-4 w-2/3" />
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-cream-100">
+              <div className="flex gap-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-9 w-24 rounded-md" />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-24" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-4 w-1/4" />
+                  <Skeleton className="h-9 w-full rounded-md" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -2095,34 +2204,59 @@ export default function FormBuilderPage() {
 
         {/* Status + created date meta (was inside the custom header) */}
         <div className="flex items-center gap-2 -mt-3">
-          <Badge className={`${FormService.getStatusColor(form.status)} pointer-events-none`}>
-            {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
-          </Badge>
+          <StatusBadge tone={FORM_STATUS_TONES[form.status] ?? 'neutral'}>
+            {titleCase(form.status)}
+          </StatusBadge>
           <span className="text-sm text-ink-warm-500">
             Created {new Date(form.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — v11 chrome */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="build">Build</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-            <TabsTrigger value="responses">
-              Responses ({responses.length})
+          <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+            <TabsTrigger
+              value="build"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Build
+            </TabsTrigger>
+            <TabsTrigger
+              value="preview"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              Preview
+            </TabsTrigger>
+            <TabsTrigger
+              value="responses"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Responses
+              <span className="ml-1 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                {responses.length}
+              </span>
             </TabsTrigger>
           </TabsList>
 
           {/* Build Tab */}
           <TabsContent value="build" className="space-y-6">
-            <Card>
+            <SectionHeader
+              label="Build"
+              dot="brand"
+              counter={`Page ${currentPage} of ${totalPages} · ${form.fields.filter(f => f.page_number === currentPage).length} field${form.fields.filter(f => f.page_number === currentPage).length === 1 ? '' : 's'}`}
+              first
+            />
+            <Card className="border-cream-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     {isEditingInfo ? (
                       <div className="space-y-3">
                         <div>
-                          <Label className="text-sm text-ink-warm-700">Form Name</Label>
+                          <Label className="text-sm text-ink-warm-700">Form Name <RequiredAsterisk /></Label>
                           <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="focus-brand text-2xl font-bold h-auto py-2" />
                         </div>
                         <div>
@@ -2161,9 +2295,9 @@ export default function FormBuilderPage() {
                           <p className="text-ink-warm-700 mt-2">{form.description}</p>
                         )}
                         <div className="flex items-center gap-3 mt-3">
-                          <Badge className={`${FormService.getStatusColor(form.status)} pointer-events-none`}>
-                            {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
-                          </Badge>
+                          <StatusBadge tone={FORM_STATUS_TONES[form.status] ?? 'neutral'}>
+                            {titleCase(form.status)}
+                          </StatusBadge>
                           <Button variant="ghost" size="sm" onClick={() => setIsEditingInfo(true)} className="text-ink-warm-500 h-7">
                             <Edit className="h-3 w-3 mr-1" />
                             Edit Info
@@ -2180,7 +2314,7 @@ export default function FormBuilderPage() {
                 </div>
 
                 {/* Page Navigation and Actions */}
-                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-cream-100">
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -2215,9 +2349,8 @@ export default function FormBuilderPage() {
                     </Button>
                     <Button
                       onClick={() => handleOpenFieldDialog()}
+                      variant="brand"
                       size="sm"
-                     
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Add Field
@@ -2228,7 +2361,7 @@ export default function FormBuilderPage() {
               <CardContent>
                 {/* Thank You Page Section - Only show on last page */}
                 {currentPage === totalPages && totalPages > 1 && (
-                  <div className="mb-6 pb-6 border-b">
+                  <div className="mb-6 pb-6 border-b border-cream-100">
                     <div className="flex items-center gap-3">
                       <Checkbox
                         checked={form.enable_thank_you_page || false}
@@ -2268,14 +2401,16 @@ export default function FormBuilderPage() {
 
                     if (fieldsOnCurrentPage.length === 0) {
                       return (
-                        <div className="text-center py-12">
-                          <FileText className="h-12 w-12 text-ink-warm-400 mx-auto mb-4" />
-                          <p className="text-ink-warm-700">No fields on this page yet.</p>
-                          <Button onClick={() => handleOpenFieldDialog()} variant="outline" className="mt-4">
+                        <EmptyState
+                          icon={FileText}
+                          title="No fields on this page yet"
+                          description="Add your first field to start building this page."
+                        >
+                          <Button onClick={() => handleOpenFieldDialog()} variant="brand">
                             <Plus className="h-4 w-4 mr-2" />
                             Add First Field
                           </Button>
-                        </div>
+                        </EmptyState>
                       );
                     }
 
@@ -2310,7 +2445,7 @@ export default function FormBuilderPage() {
 
                 {/* Page Navigation */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-8 pt-6 border-t">
+                  <div className="flex items-center justify-between mt-8 pt-6 border-t border-cream-100">
                     <Button
                       variant="outline"
                       onClick={() => setCurrentPage(prev => prev - 1)}
@@ -2324,8 +2459,7 @@ export default function FormBuilderPage() {
                     <Button
                       onClick={() => setCurrentPage(prev => prev + 1)}
                       disabled={currentPage === totalPages}
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                     
+                      variant="brand"
                     >
                       {form.enable_thank_you_page
                         ? (currentPage === totalPages - 1 ? 'Submit' : currentPage === totalPages ? 'Done' : 'Next')
@@ -2339,7 +2473,13 @@ export default function FormBuilderPage() {
 
           {/* Preview Tab */}
           <TabsContent value="preview" className="space-y-6">
-            <Card>
+            <SectionHeader
+              label="Preview"
+              dot="brand"
+              counter={`Page ${currentPage} of ${totalPages}`}
+              first
+            />
+            <Card className="border-cream-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -2364,11 +2504,11 @@ export default function FormBuilderPage() {
 
                     if (fieldsOnCurrentPage.length === 0) {
                       return (
-                        <div className="text-center py-12 text-ink-warm-500">
-                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No fields on this page</p>
-                          <p className="text-sm mt-2">Add fields in the Build tab</p>
-                        </div>
+                        <EmptyState
+                          icon={FileText}
+                          title="No fields on this page"
+                          description="Add fields in the Build tab to see them here."
+                        />
                       );
                     }
 
@@ -2404,7 +2544,7 @@ export default function FormBuilderPage() {
                               {field.label && typeof field.label === 'string' && (
                                 <div className="font-medium text-ink-warm-900" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
                               )}
-                              <div className="w-full border rounded-lg overflow-hidden bg-cream-50">
+                              <div className="w-full border border-cream-200 rounded-lg overflow-hidden bg-cream-50">
                                 <iframe
                                   src={linkUrl}
                                   className="w-full"
@@ -2588,7 +2728,7 @@ export default function FormBuilderPage() {
 
                 {/* Page Navigation */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-8 pt-6 border-t">
+                  <div className="flex items-center justify-between mt-8 pt-6 border-t border-cream-100">
                     <Button
                       variant="outline"
                       onClick={() => setCurrentPage(prev => prev - 1)}
@@ -2602,8 +2742,7 @@ export default function FormBuilderPage() {
                     <Button
                       onClick={() => setCurrentPage(prev => prev + 1)}
                       disabled={currentPage === totalPages}
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                     
+                      variant="brand"
                     >
                       {form.enable_thank_you_page
                         ? (currentPage === totalPages - 1 ? 'Submit' : currentPage === totalPages ? 'Done' : 'Next')
@@ -2617,7 +2756,13 @@ export default function FormBuilderPage() {
 
           {/* Responses Tab */}
           <TabsContent value="responses" className="space-y-6">
-            <Card>
+            <SectionHeader
+              label="Responses"
+              dot="brand"
+              counter={`${responses.length} response${responses.length === 1 ? '' : 's'}`}
+              first
+            />
+            <Card className="border-cream-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Responses ({responses.length})</CardTitle>
@@ -2632,39 +2777,40 @@ export default function FormBuilderPage() {
               <CardContent>
                 {loadingResponses ? (
                   <div className="space-y-2">
-                    {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-md" />)}
                   </div>
                 ) : responses.length === 0 ? (
-                  <div className="text-center py-12">
-                    <FileText className="h-12 w-12 text-ink-warm-400 mx-auto mb-4" />
-                    <p className="text-ink-warm-700">No responses yet</p>
-                  </div>
+                  <EmptyState
+                    icon={FileText}
+                    title="No responses yet"
+                    description="Responses will appear here once the form is submitted."
+                  />
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Submitted</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Actions</TableHead>
+                      <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                        <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Submitted</TableHead>
+                        <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                        <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Email</TableHead>
+                        <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
+                        <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {responses.map((response) => (
-                        <TableRow key={response.id}>
-                          <TableCell>
+                        <TableRow key={response.id} className="border-cream-100 row-accent">
+                          <TableCell className="py-3.5 px-5">
                             {new Date(response.submitted_at).toLocaleString()}
                           </TableCell>
-                          <TableCell>{response.submitted_by_name || '-'}</TableCell>
-                          <TableCell>{response.submitted_by_email || '-'}</TableCell>
-                          <TableCell>
+                          <TableCell className="py-3.5 px-5">{response.submitted_by_name || '-'}</TableCell>
+                          <TableCell className="py-3.5 px-5">{response.submitted_by_email || '-'}</TableCell>
+                          <TableCell className="py-3.5 px-5">
                             {response.client_name ? (
                               <div className="flex items-center gap-1.5">
-                                <Badge variant="secondary" className="text-xs bg-brand-light text-brand">
+                                <StatusBadge tone="brand">
                                   <Building2 className="h-3 w-3 mr-1" />
                                   {response.client_name}
-                                </Badge>
+                                </StatusBadge>
                                 <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-ink-warm-400 hover:text-rose-500" onClick={() => handleUnlinkClient(response.id)} title="Unlink client">
                                   <X className="h-3 w-3" />
                                 </Button>
@@ -2699,7 +2845,7 @@ export default function FormBuilderPage() {
                               </Popover>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-3.5 px-5">
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm" onClick={() => handleViewResponse(response)} title="View response">
                                 <Eye className="h-4 w-4" />
@@ -2724,13 +2870,16 @@ export default function FormBuilderPage() {
 
         {/* Field Editor Dialog */}
         <Dialog open={isFieldDialogOpen} onOpenChange={setIsFieldDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>{editingField ? 'Edit Field' : 'Add Field'}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                {editingField ? <Pencil className="h-4 w-4 text-brand" /> : <Plus className="h-4 w-4 text-brand" />}
+                {editingField ? 'Edit Field' : 'Add Field'}
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
               <div>
-                <Label>Field Type</Label>
+                <Label>Field Type <RequiredAsterisk /></Label>
                 <Select value={fieldForm.field_type} onValueChange={(value) => setFieldForm(prev => ({ ...prev, field_type: value as FieldType }))}>
                   <SelectTrigger className="focus-brand">
                     <SelectValue />
@@ -2751,7 +2900,7 @@ export default function FormBuilderPage() {
                 </Select>
               </div>
               <div>
-                <Label>Label</Label>
+                <Label>Label <RequiredAsterisk /></Label>
                 <div className="space-y-2">
                   <div className="flex gap-1 mb-2">
                     <Button
@@ -2794,7 +2943,7 @@ export default function FormBuilderPage() {
                         <Palette className="h-4 w-4" />
                       </Button>
                       {showColorPicker && !showCustomColorPicker && (
-                        <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                        <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-cream-200 rounded-lg shadow-lg p-3 w-64">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium">Text Color</span>
                             <Button
@@ -2886,7 +3035,7 @@ export default function FormBuilderPage() {
                       const text = e.clipboardData.getData('text/plain');
                       document.execCommand('insertText', false, text);
                     }}
-                    className="focus-brand p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand overflow-auto"
+                    className="focus-brand p-2 border border-cream-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand overflow-auto"
                     style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
                   />
                 </div>
@@ -2914,7 +3063,7 @@ export default function FormBuilderPage() {
               )}
               {fieldForm.field_type === 'link' && (
                 <div>
-                  <Label>URL</Label>
+                  <Label>URL <RequiredAsterisk /></Label>
                   <Input
                     value={fieldForm.options[0] || ''}
                     onChange={(e) => setFieldForm(prev => ({ ...prev, options: [e.target.value] }))}
@@ -2927,14 +3076,14 @@ export default function FormBuilderPage() {
               )}
               {['select', 'radio', 'checkbox'].includes(fieldForm.field_type) && (
                 <div>
-                  <Label>Options</Label>
+                  <Label>Options <RequiredAsterisk /></Label>
                   <div className="flex gap-2 mb-2">
                     <Input value={optionInput} onChange={(e) => setOptionInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())} placeholder="Add option" className="focus-brand" />
                     <Button variant="brand" type="button" onClick={addOption} size="sm">Add</Button>
                   </div>
                   <div className="space-y-1">
                     {fieldForm.options.map((option, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 border rounded">
+                      <div key={index} className="flex items-center gap-2 p-2 border border-cream-200 rounded">
                         <span className="flex-1">{option}</span>
                         <Button variant="ghost" size="sm" onClick={() => removeOption(index)}>
                           <X className="h-4 w-4" />
@@ -2956,12 +3105,15 @@ export default function FormBuilderPage() {
 
         {/* Response Viewer Dialog */}
         <Dialog open={isResponseDialogOpen} onOpenChange={setIsResponseDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">Response Details</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-brand" />
+                Response Details
+              </DialogTitle>
             </DialogHeader>
             {selectedResponse && (
-              <div className="space-y-6">
+              <div className="flex-1 overflow-y-auto px-1 space-y-6 py-2">
                 {/* Submission Info */}
                 <div className="bg-cream-50 rounded-lg p-4 border border-cream-200">
                   <div className="grid grid-cols-4 gap-4">
@@ -2987,10 +3139,10 @@ export default function FormBuilderPage() {
                       <Label className="text-xs font-semibold text-ink-warm-700 uppercase">Client</Label>
                       <p className="text-sm font-medium text-ink-warm-900 mt-1">
                         {selectedResponse.client_name ? (
-                          <Badge variant="secondary" className="text-xs bg-brand-light text-brand">
+                          <StatusBadge tone="brand">
                             <Building2 className="h-3 w-3 mr-1" />
                             {selectedResponse.client_name}
-                          </Badge>
+                          </StatusBadge>
                         ) : (
                           <span className="text-ink-warm-400">Unlinked</span>
                         )}
@@ -3030,15 +3182,11 @@ export default function FormBuilderPage() {
                               {/* Show the main field value */}
                               {field.field_type === 'yes_no' ? (
                                 <div>
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                    value === 'Yes'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : value === 'No'
-                                      ? 'bg-rose-100 text-rose-800'
-                                      : 'bg-cream-100 text-ink-warm-700'
-                                  }`}>
+                                  <StatusBadge
+                                    tone={value === 'Yes' ? 'success' : value === 'No' ? 'danger' : 'neutral'}
+                                  >
                                     {value || '-'}
-                                  </span>
+                                  </StatusBadge>
                                   {reason && (
                                     <div className="mt-2 pl-4 border-l-2 border-cream-300">
                                       <Label className="text-xs text-ink-warm-700">Reason:</Label>
@@ -3079,7 +3227,7 @@ export default function FormBuilderPage() {
                                         href={url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-brand hover:text-blue-800 underline text-sm"
+                                        className="flex items-center gap-2 text-brand hover:text-brand-dark underline text-sm"
                                       >
                                         <Upload className="h-4 w-4" />
                                         Attachment {idx + 1}
@@ -3124,14 +3272,17 @@ export default function FormBuilderPage() {
 
         {/* Connect Subdomain Dialog */}
         <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Connect to Subdomain</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-brand" />
+                Connect to Subdomain
+              </DialogTitle>
               <DialogDescription>
                 Link this form to a custom subdomain URL for embedding.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="subdomain-enabled"
@@ -3144,7 +3295,7 @@ export default function FormBuilderPage() {
               </div>
               {subdomainEnabled && (
                 <div className="space-y-2">
-                  <Label htmlFor="subdomain-url">Subdomain URL</Label>
+                  <Label htmlFor="subdomain-url">Subdomain URL <RequiredAsterisk /></Label>
                   <Input
                     id="subdomain-url"
                     placeholder="https://forms.yourdomain.com"
@@ -3152,7 +3303,7 @@ export default function FormBuilderPage() {
                     onChange={(e) => setSubdomainUrl(e.target.value)}
                     className="focus-brand"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-ink-warm-500">
                     Enter the full URL where this form will be accessible.
                   </p>
                 </div>
@@ -3164,6 +3315,85 @@ export default function FormBuilderPage() {
               </Button>
               <Button variant="brand" onClick={handleSaveConnect} disabled={savingConnect}>
                 {savingConnect ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete field confirm — v11 destructive Dialog replacing the
+            native confirm() that used to live in handleDeleteField.
+            2026-06-05. */}
+        <Dialog open={!!deleteFieldPending} onOpenChange={(open) => { if (!open) setDeleteFieldPending(null); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Delete Field?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                <strong>{deleteFieldPending?.label ?? ''}</strong> will be removed from the form.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setDeleteFieldPending(null)} disabled={deletingField}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteField} disabled={deletingField}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {deletingField ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete response confirm — v11 destructive Dialog replacing the
+            native confirm() that used to live in handleDeleteResponse.
+            2026-06-05. */}
+        <Dialog open={!!deleteResponsePending} onOpenChange={(open) => { if (!open) setDeleteResponsePending(null); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Delete Response?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                This response will be permanently removed.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setDeleteResponsePending(null)} disabled={deletingResponse}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteResponse} disabled={deletingResponse}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {deletingResponse ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete page confirm — v11 destructive Dialog replacing the
+            native confirm() that used to live in handleDeletePage.
+            Only triggered when the page has fields; empty pages delete
+            immediately. 2026-06-05. */}
+        <Dialog open={!!deletePagePending} onOpenChange={(open) => { if (!open) setDeletePagePending(null); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Delete Page?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                Page <strong>{deletePagePending?.pageNumber ?? ''}</strong> has <strong>{deletePagePending?.fieldCount ?? 0}</strong> field(s). Deleting the page will also delete those fields.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setDeletePagePending(null)} disabled={deletingPage}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeletePage} disabled={deletingPage}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {deletingPage ? 'Deleting…' : 'Delete'}
               </Button>
             </DialogFooter>
           </DialogContent>

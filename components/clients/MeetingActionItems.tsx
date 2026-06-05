@@ -25,6 +25,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { Trash2, ListChecks, Plus, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -129,14 +132,27 @@ export default function MeetingActionItems({
     }
   };
 
-  const handleDelete = async (item: ActionItem) => {
-    if (!confirm('Delete this action item? Auto-created tasks are NOT removed.')) return;
+  // [v11 destructive Dialog] confirm() replaced by deletePending state +
+  // confirmDelete below. 2026-06-05.
+  const [deletePending, setDeletePending] = useState<ActionItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = (item: ActionItem) => {
+    setDeletePending(item);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletePending) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/meeting-action-items/${item.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/meeting-action-items/${deletePending.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setDeletePending(null);
       await fetchItems();
     } catch (err) {
       toast({ title: 'Failed to delete', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -236,6 +252,32 @@ export default function MeetingActionItems({
           <Plus className="h-3.5 w-3.5 mr-1" />Add
         </Button>
       </div>
+
+      {/* Delete action item confirm — v11 destructive Dialog replacing
+          the native confirm() that used to live in handleDelete.
+          2026-06-05. */}
+      <Dialog open={!!deletePending} onOpenChange={(open) => { if (!open) setDeletePending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Action Item?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              Auto-created tasks are NOT removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeletePending(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

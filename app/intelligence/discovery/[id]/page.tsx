@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { KpiCard } from '@/components/ui/kpi-card';
 import {
-  ArrowLeft, ExternalLink, RefreshCw, Loader2, Twitter, Send, Globe,
+  ArrowLeft, ExternalLink, RefreshCw, Twitter, Send, Globe,
   Radar, CheckCircle, XCircle, AlertTriangle, Clock, DollarSign,
-  Activity,
+  Activity, Star, FileQuestion,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,13 +30,30 @@ interface DetailResponse {
   runs: any[];
 }
 
-const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = {
-  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-rose-100 text-rose-700 border-rose-200' },
-  PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
-  RESEARCH:            { label: 'RESEARCH',           className: 'bg-blue-100 text-blue-700 border-blue-200' },
-  WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  NURTURE:             { label: 'NURTURE',            className: 'bg-cream-100 text-ink-warm-700 border-cream-200' },
-  SKIP:                { label: 'SKIP',               className: 'bg-cream-50 text-ink-warm-400 border-cream-200 line-through' },
+// Tone maps — migrated from inline `bg-X-100 text-X-700` pills to
+// StatusBadge tones for cross-page consistency. 2026-06-05.
+// `SKIP` keeps its `line-through` decoration since that's not a tone
+// — it's applied via a separate className on the wrapping element.
+const ACTION_TIER_TONES: Record<string, { tone: BadgeTone; label: string; lineThrough?: boolean }> = {
+  REACH_OUT_NOW:       { tone: 'danger',  label: 'REACH OUT NOW' },
+  PRE_TOKEN_PRIORITY:  { tone: 'warning', label: 'PRE-TOKEN PRIORITY' },
+  RESEARCH:            { tone: 'info',    label: 'RESEARCH' },
+  WATCH:               { tone: 'warning', label: 'WATCH' },
+  NURTURE:             { tone: 'neutral', label: 'NURTURE' },
+  SKIP:                { tone: 'neutral', label: 'SKIP', lineThrough: true },
+};
+
+const CONFIDENCE_TONES: Record<string, BadgeTone> = {
+  high: 'success',
+  medium: 'warning',
+  low: 'neutral',
+};
+
+const RUN_STATUS_TONES: Record<string, BadgeTone> = {
+  completed: 'success',
+  failed: 'danger',
+  running: 'info',
+  pending: 'neutral',
 };
 
 const RUN_TYPE_LABEL: Record<string, string> = {
@@ -86,8 +105,13 @@ function telegramUrl(handle?: string): string | null {
   return `https://t.me/${clean}`;
 }
 
-export default function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ProspectDetailPage({ params }: { params: { id: string } }) {
+  // [2026-06-05] Was `params: Promise<{ id: string }>` + `use(params)`,
+  // but the rest of the project (every other `[id]` page) uses the
+  // synchronous params shape — the async form only works on Next.js
+  // 15+ and we're not there yet, so it threw "An unsupported type was
+  // passed to use()" at runtime.
+  const { id } = params;
   const router = useRouter();
   const { toast } = useToast();
   const [data, setData] = useState<DetailResponse | null>(null);
@@ -114,23 +138,70 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
 
   if (loading && !data) {
+    // Structural skeleton — mirrors the loaded layout so the kicker/
+    // title don't shift when data arrives. Back link + PageHeader +
+    // meta-row + KPI strip + Card placeholders below.
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-5 pb-8">
+        <Skeleton className="h-4 w-32" />
+        <PageHeader
+          icon={Radar}
+          title="Loading prospect…"
+          subtitle="Discovered prospect · score / triggers / outreach context"
+          kicker="CRM · Intelligence · Prospect"
+          kickerDot="brand"
+          actions={<Skeleton className="h-9 w-24" />}
+        />
+        <div className="flex items-center gap-2 flex-wrap -mt-2">
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-12 rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-40 rounded-lg" />
+          <Skeleton className="h-40 rounded-lg" />
+        </div>
+        <Skeleton className="h-32 rounded-lg" />
+        <Skeleton className="h-32 rounded-lg" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-16">
-        <p className="text-ink-warm-900 font-medium">Prospect not found.</p>
-        <Button variant="outline" className="mt-4" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Go back
-        </Button>
+      <div className="space-y-5 pb-8">
+        <button
+          type="button"
+          onClick={() => router.push('/intelligence')}
+          className="inline-flex items-center text-xs text-ink-warm-500 hover:text-brand transition-colors w-fit"
+        >
+          <ArrowLeft className="h-3 w-3 mr-1" />
+          Back to Intelligence
+        </button>
+        <PageHeader
+          icon={Radar}
+          title="Prospect not found"
+          subtitle="The prospect you were looking for couldn't be loaded."
+          kicker="CRM · Intelligence · Prospect"
+          kickerDot="brand"
+        />
+        <Card className="border-cream-200">
+          <EmptyState
+            icon={FileQuestion}
+            title="Prospect not found"
+            description="It may have been deleted, or the link is wrong. Head back to Intelligence to pick another."
+          >
+            <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Go Back
+            </Button>
+          </EmptyState>
+        </Card>
       </div>
     );
   }
@@ -172,76 +243,69 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       {/* Title-adjacent meta — symbol + action tier chip + grok-hot chip + status */}
       <div className="flex items-center gap-2 flex-wrap -mt-2">
         {p.symbol && <span className="text-sm text-ink-warm-500 font-mono">{p.symbol}</span>}
-        {p.discovery_action_tier && (
-          <span
-            className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
-          >
-            {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
+        {p.discovery_action_tier && ACTION_TIER_TONES[p.discovery_action_tier] && (
+          <span className={ACTION_TIER_TONES[p.discovery_action_tier].lineThrough ? 'line-through' : undefined}>
+            <StatusBadge tone={ACTION_TIER_TONES[p.discovery_action_tier].tone} size="sm">
+              {ACTION_TIER_TONES[p.discovery_action_tier].label}
+            </StatusBadge>
           </span>
         )}
         {maxKoreaScore >= 70 && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 pointer-events-none">
-            <Radar className="h-2.5 w-2.5" />
+          <StatusBadge tone="purple" size="sm">
+            <Radar className="h-2.5 w-2.5 mr-1" />
             GROK-HOT {maxKoreaScore}
-          </span>
+          </StatusBadge>
         )}
         <span className="text-ink-warm-700 text-xs">
           {p.category || 'Uncategorized'} · Status: <span className="font-medium">{p.status.replace('_', ' ')}</span>
         </span>
       </div>
 
-      {/* Stat cards */}
+      <SectionHeader
+        label="Prospect Details"
+        dot="brand"
+        counter={`${signals.length} trigger${signals.length === 1 ? '' : 's'} · ${runs.length} scan${runs.length === 1 ? '' : 's'}`}
+        first
+      />
+
+      {/* Stat cards — KpiCard matches /dashboard, /expenses, /wallets,
+          and the rest of the v11 surface. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Score</div>
-            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">
-              {p.prospect_score?.total ?? '—'}
-              <span className="text-sm text-ink-warm-400 font-normal">/100</span>
-            </div>
-            {p.prospect_score && (
-              <div className="text-[10px] text-ink-warm-500 mt-0.5">
-                {p.prospect_score.icp_fit} + {p.prospect_score.signal_strength} + {p.prospect_score.timing}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Funding</div>
-            <div className="text-2xl font-bold text-ink-warm-900">
-              {formatMoney(p.funding?.amount_usd)}
-            </div>
-            {p.funding?.round && (
-              <div className="text-[10px] text-ink-warm-500 mt-0.5">{p.funding.round}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Triggers</div>
-            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{signals.length}</div>
-            <div className="text-[10px] text-ink-warm-500 mt-0.5">
-              {grokSignals.length} Grok · {claudeSignals.length} Claude
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-ink-warm-500 uppercase tracking-wide mb-1">Scan history</div>
-            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">
-              ${totalRunCost.toFixed(2)}
-            </div>
-            <div className="text-[10px] text-ink-warm-500 mt-0.5">
-              {runs.length} run{runs.length !== 1 ? 's' : ''} recorded
-            </div>
-          </CardContent>
-        </Card>
+        <KpiCard
+          icon={Star}
+          label="Score"
+          value={p.prospect_score?.total != null ? `${p.prospect_score.total}/100` : '—'}
+          sub={p.prospect_score
+            ? `${p.prospect_score.icp_fit} + ${p.prospect_score.signal_strength} + ${p.prospect_score.timing}`
+            : undefined}
+          accent="brand"
+        />
+        <KpiCard
+          icon={DollarSign}
+          label="Funding"
+          value={formatMoney(p.funding?.amount_usd)}
+          sub={p.funding?.round || undefined}
+          accent="emerald"
+        />
+        <KpiCard
+          icon={Activity}
+          label="Triggers"
+          value={signals.length}
+          sub={`${grokSignals.length} Grok · ${claudeSignals.length} Claude`}
+          accent="amber"
+        />
+        <KpiCard
+          icon={Clock}
+          label="Scan History"
+          value={`$${totalRunCost.toFixed(2)}`}
+          sub={`${runs.length} run${runs.length !== 1 ? 's' : ''} recorded`}
+          accent="sky"
+        />
       </div>
 
       {/* Links row */}
       {(p.website_url || p.twitter_url || p.telegram_url || p.source_url) && (
-        <Card>
+        <Card className="border-cream-200">
           <CardContent className="p-3">
             <div className="flex items-center gap-4 flex-wrap text-sm">
               {p.website_url && (
@@ -271,7 +335,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Fit reasoning + ICP checks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+        <Card className="border-cream-200">
           <CardContent className="p-4">
             <h3 className="font-semibold text-ink-warm-700 mb-2 text-sm">Why they're a fit</h3>
             {p.fit_reasoning ? (
@@ -294,7 +358,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-cream-200">
           <CardContent className="p-4">
             <h3 className="font-semibold text-ink-warm-700 mb-2 text-sm">ICP checklist</h3>
             {p.icp_checks ? (
@@ -325,7 +389,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* POCs */}
-      <Card>
+      <Card className="border-cream-200">
         <CardContent className="p-4">
           <h3 className="font-semibold text-ink-warm-700 mb-2 text-sm">
             Outreach POCs ({(p.outreach_contacts || []).length})
@@ -338,25 +402,21 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 <div
                   key={i}
                   className={`border rounded-lg p-2.5 text-xs ${
-                    c.is_grok_sourced ? 'bg-amber-50 border-amber-200' : 'bg-white'
+                    c.is_grok_sourced ? 'bg-amber-50 border-amber-200' : 'bg-white border-cream-200'
                   }`}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-ink-warm-900">{c.name}</span>
                     {c.confidence && (
-                      <span className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${
-                        c.confidence === 'high' ? 'bg-emerald-100 text-emerald-700' :
-                        c.confidence === 'medium' ? 'bg-amber-100 text-amber-700' :
-                        'bg-cream-100 text-ink-warm-700'
-                      }`}>
+                      <StatusBadge tone={CONFIDENCE_TONES[c.confidence] ?? 'neutral'} size="sm">
                         {c.confidence}
-                      </span>
+                      </StatusBadge>
                     )}
                     {c.is_grok_sourced && (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 pointer-events-none">
-                        <AlertTriangle className="h-2.5 w-2.5" />
+                      <StatusBadge tone="warning" size="sm">
+                        <AlertTriangle className="h-2.5 w-2.5 mr-1" />
                         UNVERIFIED
-                      </span>
+                      </StatusBadge>
                     )}
                   </div>
                   <div className="text-ink-warm-500 text-[11px] mt-0.5">{c.role}</div>
@@ -388,7 +448,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       </Card>
 
       {/* Scan-run timeline */}
-      <Card>
+      <Card className="border-cream-200">
         <CardContent className="p-4">
           <h3 className="font-semibold text-ink-warm-700 mb-3 text-sm flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 text-ink-warm-500" />
@@ -402,26 +462,18 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
           ) : (
             <div className="space-y-2">
               {runs.map((r: any) => (
-                <div key={r.id} className="border rounded-lg p-2.5 text-xs flex items-start justify-between gap-3">
+                <div key={r.id} className="border border-cream-200 rounded-lg p-2.5 text-xs flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] pointer-events-none ${
-                          r.run_type === 'grok_deep_dive' ? 'bg-violet-50 text-violet-700 border-violet-200' :
-                          r.run_type?.includes('grok') ? 'bg-violet-50/50 text-violet-600 border-violet-100' :
-                          ''
-                        }`}
+                      <StatusBadge
+                        tone={r.run_type?.includes('grok') ? 'purple' : 'neutral'}
+                        size="sm"
                       >
                         {RUN_TYPE_LABEL[r.run_type] || r.run_type}
-                      </Badge>
-                      <span className={`text-[10px] font-semibold ${
-                        r.status === 'completed' ? 'text-emerald-700' :
-                        r.status === 'failed' ? 'text-rose-700' :
-                        'text-ink-warm-700'
-                      }`}>
+                      </StatusBadge>
+                      <StatusBadge tone={RUN_STATUS_TONES[r.status] ?? 'neutral'} size="sm">
                         {r.status}
-                      </span>
+                      </StatusBadge>
                       <span className="text-[10px] text-ink-warm-500">· {timeAgo(r.started_at)}</span>
                     </div>
                     {r.output_summary && (
@@ -455,7 +507,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
       </Card>
 
       {/* Signals */}
-      <Card>
+      <Card className="border-cream-200">
         <CardContent className="p-4">
           <h3 className="font-semibold text-ink-warm-700 mb-3 text-sm flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-ink-warm-500" />
@@ -469,20 +521,20 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 <div
                   key={s.id}
                   className={`border rounded-lg p-2.5 text-xs ${
-                    s.source_name === 'grok_x_deep_scan' ? 'bg-violet-50/40 border-violet-200' : 'bg-white'
+                    s.source_name === 'grok_x_deep_scan' ? 'bg-violet-50/40 border-violet-200' : 'bg-white border-cream-200'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-[10px] pointer-events-none">
+                        <StatusBadge tone="neutral" size="sm">
                           {formatSignalType(s.signal_type)}
-                        </Badge>
+                        </StatusBadge>
                         {s.source_name === 'grok_x_deep_scan' && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
-                            <Radar className="h-2.5 w-2.5" />
+                          <StatusBadge tone="purple" size="sm">
+                            <Radar className="h-2.5 w-2.5 mr-1" />
                             GROK
-                          </span>
+                          </StatusBadge>
                         )}
                         {s.relevancy_weight && (
                           <span className="text-[10px] text-ink-warm-500">w:{s.relevancy_weight}</span>

@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Mail, AtSign, Camera, Loader2, Save, ArrowLeft, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink, Video } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Settings as SettingsIcon, User, Mail, AtSign, Camera, Loader2, Save, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink, Video } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -508,74 +511,77 @@ function SettingsContent() {
 
   if (loading) {
     return (
-      // /settings uses a deliberate max-w-2xl mx-auto centered-form shell
-      // (different from the standard admin space-y-6 layout). This is
-      // intentional per the May 2026 audit decision; account-settings
-      // pages benefit from a narrow centered form rather than full-width.
-      // lint-conventions: disable-next-line no-card-shell
-      <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50 py-8">
-        <div className="w-full max-w-2xl mx-auto">
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-10 w-10 rounded-md" />
-              <div>
-                <Skeleton className="h-8 w-48 mb-2" />
-                <Skeleton className="h-5 w-72" />
-              </div>
-            </div>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center space-x-6">
-                  <Skeleton className="h-24 w-24 rounded-full" />
-                  <Skeleton className="h-10 w-32" />
-                </div>
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      // /settings uses a deliberate max-w-3xl mx-auto centered-form shell
+      // so account-settings forms render at a comfortable reading width
+      // rather than the full-width admin layout used by data-dense pages.
+      <div className="max-w-3xl mx-auto space-y-6">
+        <PageHeader
+          icon={SettingsIcon}
+          title="Settings"
+          subtitle="Manage your account settings and profile"
+          kicker="Account · Settings"
+          kickerDot="brand"
+        />
+
+        {/* SectionHeader skeleton — mirrors the loaded layout. */}
+        <div className="section-head first flex items-center gap-3">
+          <span className="dot bg-brand/30" aria-hidden />
+          <Skeleton className="h-3 w-32" />
+          <span className="flex-1 h-px bg-cream-200" aria-hidden />
+          <Skeleton className="h-3 w-24" />
         </div>
+
+        {/* Profile card skeleton */}
+        <Card className="border-cream-200">
+          <CardContent className="space-y-6 p-6">
+            <div className="flex items-center space-x-6">
+              <Skeleton className="h-24 w-24 rounded-full" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Secondary cards skeleton (Account info / Booking / Integrations) */}
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="border-cream-200">
+            <CardContent className="space-y-4 p-6">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-72" />
+              <Skeleton className="h-32 w-full rounded-lg" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
   return (
-    // /settings uses a deliberate max-w-2xl mx-auto centered-form shell.
-    // See the loading branch above for the rationale.
-    // lint-conventions: disable-next-line no-card-shell
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50 py-8">
-      <div className="w-full max-w-2xl mx-auto">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => router.back()}
-              className="h-10 w-10"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-              <p className="text-gray-600">Manage your account settings and profile</p>
-            </div>
-          </div>
+    // /settings uses a deliberate max-w-3xl mx-auto centered-form shell
+    // so account-settings forms render at a comfortable reading width
+    // rather than the full-width admin layout used by data-dense pages.
+    <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeader
+        icon={SettingsIcon}
+        title="Settings"
+        subtitle="Manage your account settings and profile"
+        kicker="Account · Settings"
+        kickerDot="brand"
+      />
 
-          {/* Profile Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information and profile photo</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+      {/* ── Profile ──────────────────────────────────────────── */}
+      <SectionHeader
+        label="Profile Information"
+        dot="brand"
+        counter="Personal details & photo"
+        first
+      />
+      <Card className="border-cream-200">
+        <CardContent className="space-y-6 p-6">
               {/* Profile Photo */}
               <div className="flex items-center space-x-6">
                 <div className="relative">
@@ -586,7 +592,7 @@ function SettingsContent() {
                     const displayUrl = photoPreviewUrl || formData.profile_photo_url;
                     if (displayUrl && !photoLoadFailed) {
                       return (
-                        <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100">
+                        <div className="w-24 h-24 rounded-full overflow-hidden bg-cream-100">
                           <img
                             // key forces React to remount the <img> when the
                             // URL changes. Without this, browsers sometimes
@@ -640,7 +646,7 @@ function SettingsContent() {
                     <Camera className="h-4 w-4 mr-2" />
                     {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
                   </Button>
-                  <p className="text-sm text-gray-500 mt-2">JPG, PNG, GIF, or WebP. Max 5MB.</p>
+                  <p className="text-sm text-ink-warm-500 mt-2">JPG, PNG, GIF, or WebP. Max 5MB.</p>
                   {photoLoadFailed && !uploadingPhoto && (
                     <p className="text-xs text-rose-600 mt-1">
                       Saved photo failed to load. Try uploading again.
@@ -655,7 +661,7 @@ function SettingsContent() {
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                     <Input
                       id="name"
                       value={formData.name}
@@ -670,22 +676,22 @@ function SettingsContent() {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                     <Input
                       id="email"
                       value={formData.email}
                       disabled
-                      className="pl-10 focus-brand bg-gray-50 text-gray-500"
+                      className="pl-10 focus-brand bg-cream-50 text-ink-warm-500"
                     />
                   </div>
-                  <p className="text-sm text-gray-500">Email cannot be changed</p>
+                  <p className="text-sm text-ink-warm-500">Email cannot be changed</p>
                 </div>
 
                 {/* Telegram ID */}
                 <div className="space-y-2">
                   <Label htmlFor="telegram_id">Telegram Username</Label>
                   <div className="relative">
-                    <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                     <Input
                       id="telegram_id"
                       value={formData.telegram_id}
@@ -700,7 +706,7 @@ function SettingsContent() {
                 <div className="space-y-2">
                   <Label htmlFor="x_id">X (Twitter) Username</Label>
                   <div className="relative">
-                    <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                     <Input
                       id="x_id"
                       value={formData.x_id}
@@ -713,7 +719,7 @@ function SettingsContent() {
               </div>
 
               {/* Save Button */}
-              <div className="flex justify-end pt-4 border-t">
+              <div className="flex justify-end pt-4 border-t border-cream-100">
                 <Button variant="brand" onClick={handleSave} disabled={saving}>
                   {saving ? (
                     <>
@@ -731,38 +737,33 @@ function SettingsContent() {
             </CardContent>
           </Card>
 
-          {/* Account Info Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-              <CardDescription>View your account details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          {/* ── Account Information ──────────────────────────────── */}
+          <SectionHeader
+            label="Account Information"
+            dot="brand"
+            counter="Role · Status · Membership"
+          />
+          <Card className="border-cream-200">
+            <CardContent className="space-y-4 p-6">
               <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">Role</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  userProfile?.role === 'super_admin'
-                    ? 'bg-purple-100 text-purple-800'
-                    : 'bg-blue-100 text-blue-800'
-                }`}>
+                <span className="text-sm text-ink-warm-500">Role</span>
+                <StatusBadge tone={userProfile?.role === 'super_admin' ? 'purple' : 'info'}>
                   {userProfile?.role === 'super_admin'
                     ? 'Super Admin'
                     : userProfile?.role
                       ? userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1)
                       : 'Unknown'}
-                </span>
+                </StatusBadge>
               </div>
-              <div className="flex items-center justify-between py-2 border-t">
-                <span className="text-sm text-gray-600">Status</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  userProfile?.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                }`}>
+              <div className="flex items-center justify-between py-2 border-t border-cream-100">
+                <span className="text-sm text-ink-warm-500">Status</span>
+                <StatusBadge tone={userProfile?.is_active ? 'success' : 'danger'}>
                   {userProfile?.is_active ? 'Active' : 'Inactive'}
-                </span>
+                </StatusBadge>
               </div>
-              <div className="flex items-center justify-between py-2 border-t">
-                <span className="text-sm text-gray-600">Member Since</span>
-                <span className="text-sm font-medium text-gray-900">
+              <div className="flex items-center justify-between py-2 border-t border-cream-100">
+                <span className="text-sm text-ink-warm-500">Member Since</span>
+                <span className="text-sm font-medium text-ink-warm-900 tabular-nums">
                   {userProfile?.created_at
                     ? new Date(userProfile.created_at).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -775,20 +776,16 @@ function SettingsContent() {
             </CardContent>
           </Card>
 
-          {/* Booking Page Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Booking Page
-              </CardTitle>
-              <CardDescription>
-                Manage your public booking page where prospects can schedule meetings with you
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
+          {/* ── Booking Page ─────────────────────────────────────── */}
+          <SectionHeader
+            label="Booking Page"
+            dot="brand"
+            counter="Public scheduling link"
+          />
+          <Card className="border-cream-200">
+            <CardContent className="space-y-5 p-6">
               {bookingLoading ? (
-                <div className="flex items-center gap-2 text-gray-500">
+                <div className="flex items-center gap-2 text-ink-warm-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading booking settings...</span>
                 </div>
@@ -797,13 +794,13 @@ function SettingsContent() {
                   {/* Active toggle */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Page Active</span>
-                      <p className="text-xs text-gray-500">When disabled, your booking page won&apos;t be accessible</p>
+                      <span className="text-sm font-medium text-ink-warm-700">Page Active</span>
+                      <p className="text-xs text-ink-warm-500">When disabled, your booking page won&apos;t be accessible</p>
                     </div>
                     <button
                       onClick={() => setBookingForm(prev => ({ ...prev, is_active: !prev.is_active }))}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        bookingForm.is_active ? 'bg-brand' : 'bg-gray-300'
+                        bookingForm.is_active ? 'bg-brand' : 'bg-cream-300'
                       }`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -816,8 +813,8 @@ function SettingsContent() {
                   <div className="space-y-2">
                     <Label className="text-sm">Public Booking URL</Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-600 border">
-                        <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <div className="flex-1 flex items-center gap-2 bg-cream-50 rounded-md px-3 py-2 text-sm text-ink-warm-700 border border-cream-200">
+                        <Link2 className="h-4 w-4 text-ink-warm-400 flex-shrink-0" />
                         <span className="truncate">app.holohive.io/public/book/{bookingForm.slug}</span>
                       </div>
                       <Button variant="outline" size="sm" onClick={copyBookingUrl}>
@@ -841,6 +838,7 @@ function SettingsContent() {
                       value={bookingForm.title}
                       onChange={e => setBookingForm(prev => ({ ...prev, title: e.target.value }))}
                       placeholder={`Book a call with ${formData.name}`}
+                      className="focus-brand"
                     />
                   </div>
 
@@ -851,6 +849,7 @@ function SettingsContent() {
                       value={bookingForm.description}
                       onChange={e => setBookingForm(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Optional subtitle"
+                      className="focus-brand"
                     />
                   </div>
 
@@ -862,6 +861,7 @@ function SettingsContent() {
                       value={bookingForm.slug}
                       onChange={e => setBookingForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
                       placeholder="your-slug"
+                      className="focus-brand"
                     />
                   </div>
 
@@ -872,7 +872,7 @@ function SettingsContent() {
                       value={String(bookingForm.slot_duration_minutes)}
                       onValueChange={v => setBookingForm(prev => ({ ...prev, slot_duration_minutes: Number(v) }))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="focus-brand">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -898,7 +898,7 @@ function SettingsContent() {
                                 checked={isEnabled}
                                 onCheckedChange={() => toggleDay(dayIndex)}
                               />
-                              <span className="text-sm text-gray-700">{name}</span>
+                              <span className="text-sm text-ink-warm-700">{name}</span>
                             </div>
                             {isEnabled && (
                               <div className="flex items-center gap-2 text-sm">
@@ -911,7 +911,7 @@ function SettingsContent() {
                                   // the START so no upper bound is needed.
                                   maxTime={slot!.end}
                                 />
-                                <span className="text-gray-400">to</span>
+                                <span className="text-ink-warm-400">to</span>
                                 <TimePicker
                                   value={slot!.end}
                                   onChange={(v) => updateSlotTime(dayIndex, 'end', v)}
@@ -928,7 +928,7 @@ function SettingsContent() {
                   </div>
 
                   {/* Save Button */}
-                  <div className="flex justify-end pt-4 border-t">
+                  <div className="flex justify-end pt-4 border-t border-cream-100">
                     <Button variant="brand" onClick={handleSaveBooking} disabled={bookingSaving}>
                       {bookingSaving ? (
                         <>
@@ -945,46 +945,50 @@ function SettingsContent() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-gray-500">No booking page found for your account.</p>
+                <p className="text-sm text-ink-warm-500">No booking page found for your account.</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Google Calendar Integration Card — every user can self-connect */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Video className="h-5 w-5" />
-                Google Calendar
-              </CardTitle>
-              <CardDescription>
-                Connect your Google account to receive Telegram DMs 10 minutes before and at the start of your Google Meet calls.
-                Reminder timing is managed centrally on the <a href="/reminders" className="text-brand underline hover:opacity-80">Reminders page</a>.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          {/* ── Google Calendar Integration ──────────────────────── */}
+          <SectionHeader
+            label="Google Calendar"
+            dot="brand"
+            counter="Meeting reminders"
+          />
+          <Card className="border-cream-200">
+            <CardContent className="space-y-4 p-6">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-md bg-brand-light text-brand flex items-center justify-center flex-shrink-0">
+                  <Video className="h-4 w-4" />
+                </div>
+                <p className="text-sm text-ink-warm-500">
+                  Connect your Google account to receive Telegram DMs 10 minutes before and at the start of your Google Meet calls.
+                  Reminder timing is managed centrally on the <a href="/reminders" className="text-brand hover:text-brand-dark underline">Reminders page</a>.
+                </p>
+              </div>
+
               {googleLoading ? (
-                <div className="flex items-center gap-2 text-gray-500">
+                <div className="flex items-center gap-2 text-ink-warm-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Checking Google connection...</span>
                 </div>
               ) : googleStatus?.connected ? (
                 <>
                   <div className="flex items-center justify-between py-2">
-                    <span className="text-sm text-gray-600">Status</span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                      <CheckCircle className="h-3 w-3" />
+                    <span className="text-sm text-ink-warm-500">Status</span>
+                    <StatusBadge tone="success" withDot>
                       Connected
-                    </span>
+                    </StatusBadge>
                   </div>
-                  <div className="flex items-center justify-between py-2 border-t">
-                    <span className="text-sm text-gray-600">Connected as</span>
-                    <span className="text-sm font-medium text-gray-900">{googleStatus.email}</span>
+                  <div className="flex items-center justify-between py-2 border-t border-cream-100">
+                    <span className="text-sm text-ink-warm-500">Connected as</span>
+                    <span className="text-sm font-medium text-ink-warm-900">{googleStatus.email}</span>
                   </div>
                   {googleStatus.connected_at && (
-                    <div className="flex items-center justify-between py-2 border-t">
-                      <span className="text-sm text-gray-600">Linked on</span>
-                      <span className="text-sm text-gray-900">
+                    <div className="flex items-center justify-between py-2 border-t border-cream-100">
+                      <span className="text-sm text-ink-warm-500">Linked on</span>
+                      <span className="text-sm text-ink-warm-900 tabular-nums">
                         {new Date(googleStatus.connected_at).toLocaleDateString('en-US', {
                           year: 'numeric', month: 'long', day: 'numeric',
                         })}
@@ -992,13 +996,13 @@ function SettingsContent() {
                     </div>
                   )}
                   {!userProfile?.telegram_id && (
-                    <div className="border-t pt-3">
-                      <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-md">
+                    <div className="border-t border-cream-100 pt-3">
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-md">
                         You haven&apos;t linked a Telegram account. Reminders need a Telegram chat to land in — set your <span className="font-medium">Telegram Username</span> above and have a super_admin link your DM on the Team page.
                       </p>
                     </div>
                   )}
-                  <div className="flex items-center gap-3 pt-4 border-t">
+                  <div className="flex items-center gap-3 pt-4 border-t border-cream-100">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1026,24 +1030,23 @@ function SettingsContent() {
               ) : (
                 <>
                   <div className="flex items-center justify-between py-2">
-                    <span className="text-sm text-gray-600">Status</span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                      <XCircle className="h-3 w-3" />
+                    <span className="text-sm text-ink-warm-500">Status</span>
+                    <StatusBadge tone="neutral" withDot>
                       Not Connected
-                    </span>
+                    </StatusBadge>
                   </div>
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 border-t border-cream-100">
                     <Button variant="brand" onClick={handleConnectGoogle} disabled={googleActionLoading}>
                       <Video className="h-4 w-4 mr-2" />
                       Connect Google Calendar
                     </Button>
                   </div>
-                  <div className="pt-4 border-t">
-                    <p className="text-xs text-gray-500">
-                      <strong>What we access:</strong> Read-only access to upcoming Calendar events on your primary calendar. We only act on events with a Google Meet link.
+                  <div className="pt-4 border-t border-cream-100">
+                    <p className="text-xs text-ink-warm-500">
+                      <strong className="text-ink-warm-700">What we access:</strong> Read-only access to upcoming Calendar events on your primary calendar. We only act on events with a Google Meet link.
                     </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      <strong>What we send:</strong> A Telegram DM 10 minutes before each Meet, and another at meeting start. You can disable the whole feature on the Reminders page.
+                    <p className="text-xs text-ink-warm-500 mt-2">
+                      <strong className="text-ink-warm-700">What we send:</strong> A Telegram DM 10 minutes before each Meet, and another at meeting start. You can disable the whole feature on the Reminders page.
                     </p>
                   </div>
                 </>
@@ -1051,135 +1054,138 @@ function SettingsContent() {
             </CardContent>
           </Card>
 
-          {/* Telegram Integration Card - Admin Only */}
+          {/* ── Telegram Integration ─ Admin Only ────────────────── */}
           {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  Telegram Integration
-                </CardTitle>
-                <CardDescription>
-                  Connect Telegram to automatically track message activity in CRM pipeline group chats
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {webhookLoading ? (
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Checking webhook status...</span>
-                  </div>
-                ) : (
-                  <>
-                    {/* Connection Status */}
-                    <div className="flex items-center justify-between py-2">
-                      <span className="text-sm text-gray-600">Webhook Status</span>
-                      {webhookStatus?.url ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          <CheckCircle className="h-3 w-3" />
-                          Connected
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          <XCircle className="h-3 w-3" />
-                          Not Connected
-                        </span>
-                      )}
+            <>
+              <SectionHeader
+                label="Telegram Integration"
+                dot="brand"
+                counter="CRM message tracking"
+              />
+              <Card className="border-cream-200">
+                <CardContent className="space-y-4 p-6">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-md bg-brand-light text-brand flex items-center justify-center flex-shrink-0">
+                      <MessageSquare className="h-4 w-4" />
                     </div>
+                    <p className="text-sm text-ink-warm-500">
+                      Connect Telegram to automatically track message activity in CRM pipeline group chats.
+                    </p>
+                  </div>
 
-                    {/* Webhook URL if connected */}
-                    {webhookStatus?.url && (
-                      <div className="py-2 border-t">
-                        <span className="text-sm text-gray-600 block mb-1">Webhook URL</span>
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all">
-                          {webhookStatus.url}
-                        </code>
+                  {webhookLoading ? (
+                    <div className="flex items-center gap-2 text-ink-warm-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Checking webhook status...</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Connection Status */}
+                      <div className="flex items-center justify-between py-2">
+                        <span className="text-sm text-ink-warm-500">Webhook Status</span>
+                        {webhookStatus?.url ? (
+                          <StatusBadge tone="success" withDot>
+                            Connected
+                          </StatusBadge>
+                        ) : (
+                          <StatusBadge tone="neutral" withDot>
+                            Not Connected
+                          </StatusBadge>
+                        )}
                       </div>
-                    )}
 
-                    {/* Pending Updates */}
-                    {webhookStatus?.url && webhookStatus.pending_update_count > 0 && (
-                      <div className="flex items-center justify-between py-2 border-t">
-                        <span className="text-sm text-gray-600">Pending Updates</span>
-                        <span className="text-sm font-medium text-amber-600">
-                          {webhookStatus.pending_update_count}
-                        </span>
-                      </div>
-                    )}
+                      {/* Webhook URL if connected */}
+                      {webhookStatus?.url && (
+                        <div className="py-2 border-t border-cream-100">
+                          <span className="text-sm text-ink-warm-500 block mb-1">Webhook URL</span>
+                          <code className="text-xs bg-cream-100 text-ink-warm-700 px-2 py-1 rounded break-all">
+                            {webhookStatus.url}
+                          </code>
+                        </div>
+                      )}
 
-                    {/* Last Error */}
-                    {webhookStatus?.last_error_message && (
-                      <div className="py-2 border-t">
-                        <span className="text-sm text-rose-600 block mb-1">Last Error</span>
-                        <p className="text-xs text-rose-500">
-                          {webhookStatus.last_error_message}
-                          {webhookStatus.last_error_date && (
-                            <span className="text-gray-400 ml-2">
-                              ({new Date(webhookStatus.last_error_date * 1000).toLocaleString()})
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    )}
+                      {/* Pending Updates */}
+                      {webhookStatus?.url && webhookStatus.pending_update_count > 0 && (
+                        <div className="flex items-center justify-between py-2 border-t border-cream-100">
+                          <span className="text-sm text-ink-warm-500">Pending Updates</span>
+                          <span className="text-sm font-medium text-amber-600 tabular-nums">
+                            {webhookStatus.pending_update_count}
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-3 pt-4 border-t">
-                      {webhookStatus?.url ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={fetchWebhookStatus}
-                            disabled={webhookLoading}
-                          >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${webhookLoading ? 'animate-spin' : ''}`} />
-                            Refresh Status
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={handleDeleteWebhook}
-                            disabled={webhookActionLoading}
-                          >
+                      {/* Last Error */}
+                      {webhookStatus?.last_error_message && (
+                        <div className="py-2 border-t border-cream-100">
+                          <span className="text-sm text-rose-600 block mb-1">Last Error</span>
+                          <p className="text-xs text-rose-500">
+                            {webhookStatus.last_error_message}
+                            {webhookStatus.last_error_date && (
+                              <span className="text-ink-warm-400 ml-2">
+                                ({new Date(webhookStatus.last_error_date * 1000).toLocaleString()})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-3 pt-4 border-t border-cream-100">
+                        {webhookStatus?.url ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={fetchWebhookStatus}
+                              disabled={webhookLoading}
+                            >
+                              <RefreshCw className={`h-4 w-4 mr-2 ${webhookLoading ? 'animate-spin' : ''}`} />
+                              Refresh Status
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={handleDeleteWebhook}
+                              disabled={webhookActionLoading}
+                            >
+                              {webhookActionLoading ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <XCircle className="h-4 w-4 mr-2" />
+                              )}
+                              Disconnect
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="brand" onClick={handleRegisterWebhook} disabled={webhookActionLoading}>
                             {webhookActionLoading ? (
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             ) : (
-                              <XCircle className="h-4 w-4 mr-2" />
+                              <MessageSquare className="h-4 w-4 mr-2" />
                             )}
-                            Disconnect
+                            Connect Telegram Webhook
                           </Button>
-                        </>
-                      ) : (
-                        <Button variant="brand" onClick={handleRegisterWebhook} disabled={webhookActionLoading}>
-                          {webhookActionLoading ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                          )}
-                          Connect Telegram Webhook
-                        </Button>
-                      )}
-                    </div>
+                        )}
+                      </div>
 
-                    {/* Help Text */}
-                    <div className="pt-4 border-t">
-                      <p className="text-xs text-gray-500">
-                        <strong>How it works:</strong> Once connected, your Telegram bot will notify this app whenever
-                        messages are sent in group chats. Add the chat ID to any CRM opportunity to automatically
-                        track message activity.
-                      </p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        <strong>Requirements:</strong> Your Telegram bot must be added to each group chat and have
-                        permission to see messages (disable privacy mode in BotFather or make it an admin).
-                      </p>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                      {/* Help Text */}
+                      <div className="pt-4 border-t border-cream-100">
+                        <p className="text-xs text-ink-warm-500">
+                          <strong className="text-ink-warm-700">How it works:</strong> Once connected, your Telegram bot will notify this app whenever
+                          messages are sent in group chats. Add the chat ID to any CRM opportunity to automatically
+                          track message activity.
+                        </p>
+                        <p className="text-xs text-ink-warm-500 mt-2">
+                          <strong className="text-ink-warm-700">Requirements:</strong> Your Telegram bot must be added to each group chat and have
+                          permission to see messages (disable privacy mode in BotFather or make it an admin).
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </>
           )}
-        </div>
-      </div>
     </div>
   );
 }

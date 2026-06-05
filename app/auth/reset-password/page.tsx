@@ -6,10 +6,15 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RequiredAsterisk } from '@/components/ui/required-asterisk'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { supabase } from '@/lib/supabase'
 import { Loader2, CheckCircle } from 'lucide-react'
+
+// [2026-06-05] Background simplified to `bg-cream-50` so the auth
+// surface matches the v11 app interior. See /app/auth/page.tsx
+// for the matching change.
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -176,29 +181,29 @@ export default function ResetPasswordPage() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f6feff' }}>
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderBottomColor: '#3e8692' }}></div>
+      <div className="min-h-screen flex items-center justify-center bg-cream-50">
+        <Loader2 className="h-12 w-12 animate-spin text-brand" />
       </div>
     )
   }
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#f6feff' }}>
+      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-cream-50">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="flex justify-center mb-8">
               <Image
                 src="/images/logo.png"
-                alt="KOL Campaign Manager Logo"
+                alt="HoloHive Portal Logo"
                 width={120}
                 height={120}
                 priority
               />
             </div>
           </div>
-          
-          <Card className="w-full max-w-md">
+
+          <Card className="w-full max-w-md border-cream-200 shadow-card">
             <CardHeader className="space-y-1">
               <div className="flex justify-center mb-4">
                 <div className="rounded-full p-3 bg-emerald-100">
@@ -207,13 +212,13 @@ export default function ResetPasswordPage() {
               </div>
               <CardTitle className="text-2xl text-center">Password Updated</CardTitle>
               <CardDescription className="text-center">
-                Your password has been successfully updated
+                Your password has been successfully updated.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Alert>
                 <AlertDescription>
-                  You will be redirected to the dashboard in a few seconds...
+                  You will be redirected to the dashboard in a few seconds…
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -225,33 +230,33 @@ export default function ResetPasswordPage() {
 
   if (!isValidSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#f6feff' }}>
+      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-cream-50">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="flex justify-center mb-8">
               <Image
                 src="/images/logo.png"
-                alt="KOL Campaign Manager Logo"
+                alt="HoloHive Portal Logo"
                 width={120}
                 height={120}
                 priority
               />
             </div>
           </div>
-          
-          <Card className="w-full max-w-md">
+
+          <Card className="w-full max-w-md border-cream-200 shadow-card">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl text-center">Invalid Link</CardTitle>
               <CardDescription className="text-center">
-                This password reset link is invalid or has expired
+                This password reset link is invalid or has expired.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
-              
-              <Button variant="brand" onClick={() => router.push('/auth')} className="w-full mt-4">
+
+              <Button variant="brand" onClick={() => router.push('/auth')} className="w-full">
                 Back to Sign In
               </Button>
             </CardContent>
@@ -262,25 +267,25 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#f6feff' }}>
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-cream-50">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-8">
             <Image
               src="/images/logo.png"
-              alt="KOL Campaign Manager Logo"
+              alt="HoloHive Portal Logo"
               width={120}
               height={120}
               priority
             />
           </div>
         </div>
-        
-        <Card className="w-full max-w-md">
+
+        <Card className="w-full max-w-md border-cream-200 shadow-card">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Set New Password</CardTitle>
             <CardDescription className="text-center">
-              Enter your new password below
+              Enter your new password below.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -290,9 +295,9 @@ export default function ResetPasswordPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-2">
-                <Label htmlFor="password">New Password</Label>
+                <Label htmlFor="password">New Password <RequiredAsterisk /></Label>
                 <Input
                   id="password"
                   type="password"
@@ -300,12 +305,12 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+                  className="focus-brand"
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">Confirm Password <RequiredAsterisk /></Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -313,13 +318,13 @@ export default function ResetPasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+                  className="focus-brand"
                 />
               </div>
-              
+
               <Button variant="brand" type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Password
+                {loading ? 'Updating…' : 'Update Password'}
               </Button>
             </form>
           </CardContent>

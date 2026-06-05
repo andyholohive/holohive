@@ -356,17 +356,27 @@ export default function LinksPage() {
     }
   };
 
-  const handleDelete = async (link: Link) => {
-    if (!confirm(`Are you sure you want to delete "${link.name}"?`)) return;
+  // [v11 destructive Dialog] confirm() replaced by deletePending state +
+  // confirmDelete below. 2026-06-05.
+  const [deletePending, setDeletePending] = useState<Link | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
+  const handleDelete = (link: Link) => {
+    setDeletePending(link);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletePending) return;
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from('links')
         .delete()
-        .eq('id', link.id);
+        .eq('id', deletePending.id);
 
       if (error) throw error;
       toast({ title: 'Link deleted' });
+      setDeletePending(null);
       fetchLinks();
     } catch (error) {
       console.error('Error deleting link:', error);
@@ -375,6 +385,8 @@ export default function LinksPage() {
         description: error instanceof Error ? error.message : 'Failed to delete link',
         variant: 'destructive',
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1052,6 +1064,31 @@ export default function LinksPage() {
             </Button>
             <Button variant="brand" onClick={handleSubmit} disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : editingLink ? 'Update' : 'Add Link'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete link confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in handleDelete. 2026-06-05. */}
+      <Dialog open={!!deletePending} onOpenChange={(open) => { if (!open) setDeletePending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Link?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deletePending?.name ?? ''}</strong> will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeletePending(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

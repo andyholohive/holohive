@@ -24,7 +24,7 @@ import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown,
   Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
-  XCircle, HelpCircle, ShieldAlert,
+  XCircle, HelpCircle, ShieldAlert, ArrowRight,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 
@@ -674,16 +674,30 @@ export default function MindsharePage() {
     }
   };
 
-  const deleteProject = async (p: MindshareProject) => {
-    if (!confirm(`Delete project "${p.name}"? This also deletes its mention history.`)) return;
+  // [v11 destructive Dialog] confirm() replaced by deletePending state +
+  // confirmDeleteProject below. Renders the Dialog block at the bottom
+  // of the component. 2026-06-05.
+  const [deleteProjectPending, setDeleteProjectPending] = useState<MindshareProject | null>(null);
+  const [deletingProject, setDeletingProject] = useState(false);
+
+  const deleteProject = (p: MindshareProject) => {
+    setDeleteProjectPending(p);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!deleteProjectPending) return;
+    setDeletingProject(true);
     try {
-      const res = await fetch(`/api/mindshare/projects?id=${p.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/mindshare/projects?id=${deleteProjectPending.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error((await res.json()).error);
       toast({ title: 'Project deleted' });
+      setDeleteProjectPending(null);
       await loadProjects();
       await loadLeaderboard();
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeletingProject(false);
     }
   };
 
@@ -746,10 +760,28 @@ export default function MindsharePage() {
     await supabase.from('tg_monitored_channels').update({ language }).eq('id', c.id);
   };
 
-  const deleteChannel = async (c: MonitoredChannel) => {
-    if (!confirm(`Delete channel "${c.channel_name}"?`)) return;
-    await supabase.from('tg_monitored_channels').delete().eq('id', c.id);
-    setChannels(prev => prev.filter(ch => ch.id !== c.id));
+  // [v11 destructive Dialog] confirm() replaced by deleteChannelPending
+  // state + confirmDeleteChannel below. 2026-06-05.
+  const [deleteChannelPending, setDeleteChannelPending] = useState<MonitoredChannel | null>(null);
+  const [deletingChannel, setDeletingChannel] = useState(false);
+
+  const deleteChannel = (c: MonitoredChannel) => {
+    setDeleteChannelPending(c);
+  };
+
+  const confirmDeleteChannel = async () => {
+    if (!deleteChannelPending) return;
+    setDeletingChannel(true);
+    try {
+      await supabase.from('tg_monitored_channels').delete().eq('id', deleteChannelPending.id);
+      setChannels(prev => prev.filter(ch => ch.id !== deleteChannelPending.id));
+      toast({ title: 'Channel deleted' });
+      setDeleteChannelPending(null);
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeletingChannel(false);
+    }
   };
 
   const handleBulkImport = async () => {
@@ -1327,23 +1359,16 @@ export default function MindsharePage() {
               and a sample of recent matching messages. */}
           <Dialog open={!!detailProjectId} onOpenChange={(open) => { if (!open) { setDetailProjectId(null); setDetailData(null); } }}>
             <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-              <div className="flex-1 overflow-y-auto px-1 py-2">
-              {detailLoading ? (
-                <div className="space-y-3 py-4">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-32 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              ) : !detailData ? (
-                <EmptyState
-                  icon={AlertCircle}
-                  title="Couldn't load detail"
-                  description="The detail request failed. Try closing the dialog and reopening it."
-                />
-              ) : (
-                <>
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
+              {/* DialogHeader sits OUTSIDE the scroll surface so the
+                  title + description stay pinned at the top while the
+                  body content scrolls. Was previously inside the
+                  scroll div, which meant the title scrolled away with
+                  the chart + channels list. */}
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-brand" />
+                  {detailLoading ? 'Loading project…' : !detailData ? 'Project Detail' : (
+                    <>
                       {detailData.project.name}
                       {detailData.project.client && (
                         <StatusBadge tone="brand" size="sm">Client: {detailData.project.client.name}</StatusBadge>
@@ -1361,23 +1386,46 @@ export default function MindsharePage() {
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       )}
-                      {/* [Storyteller v1] Link to the full per-project
-                          deep-dive page (richer than this dialog —
-                          ALL channels, trend deltas, NEW badges). */}
-                      <a
-                        href={`/mindshare/project/${detailData.project.id}`}
-                        className="ml-auto text-xs text-brand hover:underline inline-flex items-center gap-1"
-                        title="Open full Storyteller view (all channels + trend deltas)"
-                      >
-                        Storyteller view →
-                      </a>
-                    </DialogTitle>
-                    <DialogDescription>
-                      {detailData.total_mentions_in_window.toLocaleString()} mentions
-                      between {detailData.period.from} and {detailData.period.to}
-                      {detailData.project.category && <> · <span className="font-medium">{detailData.project.category}</span></>}
-                    </DialogDescription>
-                  </DialogHeader>
+                    </>
+                  )}
+                </DialogTitle>
+                {detailData && (
+                  <DialogDescription>
+                    {detailData.total_mentions_in_window.toLocaleString()} mentions
+                    between {detailData.period.from} and {detailData.period.to}
+                    {detailData.project.category && <> · <span className="font-medium">{detailData.project.category}</span></>}
+                  </DialogDescription>
+                )}
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
+              {detailLoading ? (
+                /* Structural skeleton mirrors the loaded layout: daily
+                   mentions bars (h-24 rounded), then top channels list
+                   rows (h-9 each), then sample mentions list (h-14
+                   each). Avoids the "everything jumps" feel when data
+                   arrives. */
+                <div className="space-y-4">
+                  <Skeleton className="h-24 rounded" />
+                  <div className="space-y-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className="h-9 rounded" />
+                    ))}
+                  </div>
+                  <div className="space-y-1.5">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-14 rounded" />
+                    ))}
+                  </div>
+                </div>
+              ) : !detailData ? (
+                <EmptyState
+                  icon={AlertCircle}
+                  title="Couldn't load detail"
+                  description="The detail request failed. Try closing the dialog and reopening it."
+                />
+              ) : (
+                <>
 
                   {/* Daily mention bars — simple inline SVG so no extra
                       dependency for one chart. Heights normalized to the
@@ -1494,6 +1542,27 @@ export default function MindsharePage() {
                 </>
               )}
               </div>
+
+              {/* v11 footer — Close (outline) + "Storyteller view"
+                  (brand) so the link to the full per-project page is
+                  a real CTA, not a tucked-away `ml-auto` link inside
+                  the title. */}
+              {detailData && (
+                <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+                  <Button variant="outline" onClick={() => { setDetailProjectId(null); setDetailData(null); }}>
+                    Close
+                  </Button>
+                  <Button asChild variant="brand">
+                    <a
+                      href={`/mindshare/project/${detailData.project.id}`}
+                      title="Open full Storyteller view (all channels + trend deltas)"
+                    >
+                      Storyteller View
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </a>
+                  </Button>
+                </DialogFooter>
+              )}
             </DialogContent>
           </Dialog>
         </TabsContent>
@@ -1593,12 +1662,15 @@ export default function MindsharePage() {
 
           {/* Project edit dialog */}
           <Dialog open={!!editingProject} onOpenChange={(open) => { if (!open) setEditingProject(null); }}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
               <DialogHeader>
-                <DialogTitle>{editingProject?.id ? 'Edit Project' : 'Add Project'}</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-brand" />
+                  {editingProject?.id ? 'Edit Project' : 'Add Project'}
+                </DialogTitle>
                 <DialogDescription>Tracked projects appear on the leaderboard ranked by Korean-channel mention share.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-3 py-2">
+              <div className="flex-1 overflow-y-auto px-1 py-2 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2 space-y-1.5">
                     <Label>Name <RequiredAsterisk /></Label>
@@ -1632,7 +1704,7 @@ export default function MindsharePage() {
               <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                 <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
                 <Button variant="brand" onClick={saveProject} disabled={savingProject}>
-                  {savingProject ? 'Saving...' : 'Save'}
+                  {savingProject ? 'Saving…' : (editingProject?.id ? 'Save Changes' : 'Add Project')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1966,6 +2038,56 @@ export default function MindsharePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete project confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in deleteProject. 2026-06-05. */}
+      <Dialog open={!!deleteProjectPending} onOpenChange={(open) => { if (!open) setDeleteProjectPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Project?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deleteProjectPending?.name ?? ''}</strong> and its mention history will be permanently deleted. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteProjectPending(null)} disabled={deletingProject}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteProject} disabled={deletingProject}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingProject ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete channel confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in deleteChannel. 2026-06-05. */}
+      <Dialog open={!!deleteChannelPending} onOpenChange={(open) => { if (!open) setDeleteChannelPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Channel?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deleteChannelPending?.channel_name ?? ''}</strong> will be removed from monitored channels.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteChannelPending(null)} disabled={deletingChannel}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteChannel} disabled={deletingChannel}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingChannel ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

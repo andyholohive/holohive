@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RequiredAsterisk } from '@/components/ui/required-asterisk'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { supabase } from '@/lib/supabase'
@@ -44,28 +45,28 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
 
   if (success) {
     return (
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md border-cream-200 shadow-card">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <div className="rounded-full p-3 bg-emerald-100">
               <Mail className="h-6 w-6 text-emerald-600" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Check your email</CardTitle>
+          <CardTitle className="text-2xl text-center">Check Your Email</CardTitle>
           <CardDescription className="text-center">
-            We've sent a password reset link to {email}
+            We&apos;ve sent a password reset link to {email}.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <Alert>
               <AlertDescription>
-                Please check your email and click the link to reset your password. 
+                Please check your email and click the link to reset your password.
                 The link will expire in 1 hour.
               </AlertDescription>
             </Alert>
-            
-            <Button 
+
+            <Button
               onClick={onBackToLogin}
               variant="outline"
               className="w-full"
@@ -80,11 +81,11 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md border-cream-200 shadow-card">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl text-center">Reset your password</CardTitle>
+        <CardTitle className="text-2xl text-center">Reset Your Password</CardTitle>
         <CardDescription className="text-center">
-          Enter your email address and we'll send you a link to reset your password
+          Enter your email address and we&apos;ll send you a link to reset your password.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -94,9 +95,9 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email <RequiredAsterisk /></Label>
             <Input
               id="email"
               type="email"
@@ -104,16 +105,16 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
+              className="focus-brand"
             />
           </div>
-          
+
           <Button variant="brand" type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Send Reset Link
+            {loading ? 'Sending…' : 'Send Reset Link'}
           </Button>
-          
-          <Button 
+
+          <Button
             type="button"
             onClick={onBackToLogin}
             variant="outline"

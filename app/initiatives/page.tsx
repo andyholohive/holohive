@@ -145,15 +145,28 @@ export default function InitiativesPage() {
     }
   };
 
-  const handleDelete = async (i: Initiative) => {
-    if (!confirm(`Delete "${i.name}"? This soft-deletes it (linked tasks are unaffected).`)) return;
+  // [v11 destructive Dialog] confirm() replaced by deletePending state +
+  // confirmDelete below. 2026-06-05.
+  const [deletePending, setDeletePending] = useState<Initiative | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = (i: Initiative) => {
+    setDeletePending(i);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletePending) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/initiatives/${i.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/initiatives/${deletePending.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast({ title: 'Initiative deleted', description: `"${i.name}" removed.` });
+      toast({ title: 'Initiative deleted', description: `"${deletePending.name}" removed.` });
+      setDeletePending(null);
       await fetchAll();
     } catch (err) {
       toast({ title: 'Delete failed', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -319,6 +332,32 @@ export default function InitiativesPage() {
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button variant="brand" onClick={handleSubmit} disabled={!form.name.trim() || submitting}>
               {submitting ? 'Saving…' : editing ? 'Save changes' : 'Create initiative'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete initiative confirm — v11 destructive Dialog replacing
+          the native confirm() that used to live in handleDelete.
+          Soft-deletes — linked tasks are unaffected. 2026-06-05. */}
+      <Dialog open={!!deletePending} onOpenChange={(open) => { if (!open) setDeletePending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Initiative?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deletePending?.name ?? ''}</strong> will be soft-deleted. Linked tasks are unaffected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeletePending(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

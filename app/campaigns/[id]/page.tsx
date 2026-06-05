@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,9 @@ import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionHeader } from "@/components/ui/section-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import {
@@ -151,6 +153,24 @@ const CURRENT_PHASE_OPTIONS = [
   'Activation Phase',
   'Reporting Phase',
 ] as const;
+
+/**
+ * v11 tone map for the campaign-level status pill rendered in the
+ * editorial hero. Centralizes the four `campaigns.status` enum values
+ * onto the shared `<StatusBadge>` palette so the hero and any future
+ * surface that needs a campaign-status chip stay in lockstep.
+ *
+ * - Active → brand teal (the featured / operationally-important state)
+ * - Planning → info sky (in-progress / setup)
+ * - Paused → warning amber (needs attention)
+ * - Completed → success emerald (good news)
+ */
+const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
+  Active: 'brand',
+  Planning: 'info',
+  Paused: 'warning',
+  Completed: 'success',
+};
 
 const CampaignDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -1169,28 +1189,13 @@ const CampaignDetailsPage = () => {
   // `formatDate` now imported from `@/lib/campaignHelpers` (aliased
   // from `formatDateLong` to keep the existing 8 callsites working
   // unchanged).
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Active":
-        return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500"><CheckCircle className="h-3 w-3 text-white" strokeWidth={2} /></span>Active</span>
-        );
-      case "Planning":
-        return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-500"><FileText className="h-3 w-3 text-white" strokeWidth={2} /></span>Planning</span>
-        );
-      case "Paused":
-        return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500"><PauseCircle className="h-3 w-3 text-white" strokeWidth={2} /></span>Paused</span>
-        );
-      case "Completed":
-        return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600"><BadgeCheck className="h-3 w-3 text-white" strokeWidth={2} /></span>Completed</span>
-        );
-      default:
-        return status;
-    }
-  };
+  //
+  // `getStatusBadge` removed 2026-06-05 — it returned a circle-icon
+  // span for the campaign Status Select, but nothing on the page
+  // actually called it. The hero status pill uses `<StatusBadge>`
+  // with `CAMPAIGN_STATUS_TONES` (top of file). The edit-mode status
+  // Select just renders plain "Planning / Active / Paused / Completed"
+  // labels; no helper needed.
   /**
    * Persist a resources array immediately — used by the view-mode
    * Resources card so users can add/edit/remove resource links
@@ -1479,37 +1484,13 @@ const CampaignDetailsPage = () => {
   // `handleUpdatePayment` moved into <EditPaymentDialog> on 2026-06-02.
 
 
-  // Add a getStatusColor helper:
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Curated': return 'bg-sky-100 text-sky-800';
-      case 'Contacted': return 'bg-purple-100 text-purple-800';
-      case 'Interested': return 'bg-amber-100 text-amber-800';
-      case 'Onboarded': return 'bg-amber-100 text-amber-800';
-      case 'Concluded': return 'bg-emerald-100 text-emerald-800';
-      default: return 'bg-cream-100 text-ink-warm-700';
-    }
-  };
-
-  // v11 tone map for `<StatusBadge>` — used by the KOL cards-view
-  // chrome (and any new surface that wants the centralized palette
-  // instead of the older hex-bg `getStatusColor` helper above).
-  const KOL_STATUS_TONES: Record<string, BadgeTone> = {
-    Curated:    'info',
-    Contacted:  'purple',
-    Interested: 'warning',
-    Onboarded:  'warning',
-    Concluded:  'success',
-  };
-
-  const getContentStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'bg-sky-100 text-sky-800';
-      case 'pending': return 'bg-amber-100 text-amber-800';
-      case 'posted': return 'bg-emerald-100 text-emerald-800';
-      default: return 'bg-cream-100 text-ink-warm-700';
-    }
-  };
+  // Status-color helpers (`getStatusColor`, `KOL_STATUS_TONES`,
+  // `getContentStatusColor`) removed 2026-06-05 — none were referenced
+  // anywhere on the outer page. The KOL Dashboard table and Content
+  // Dashboard each own their own tone maps internal to the extracted
+  // components (KolDashboardTableView, ContentDashboardTableView). The
+  // centralized `<StatusBadge>` palette in `@/components/ui/status-badge`
+  // is the single source of truth.
 
   // `selectedKOLs`/`bulkStatus`/`showKOLDeleteDialog`/`kolsToDelete`
   // moved into <KolDashboardTableView> on 2026-06-02 (Table-view-only).
@@ -1569,10 +1550,12 @@ const CampaignDetailsPage = () => {
     return copiedCell?.table === table && copiedCell?.rowId === rowId && copiedCell?.field === field;
   };
 
-  // Helper to get cell styling based on state
+  // Helper to get cell styling based on state.
+  // v11: selection uses the brand ring + soft brand wash (was
+  // `ring-blue-500 bg-sky-50`); copied stays emerald to differentiate.
   const getCellClassName = (baseClass: string, table: string, rowId: string, field: string) => {
     if (isCellSelected(table, rowId, field)) {
-      return `${baseClass} ring-2 ring-blue-500 bg-sky-50`;
+      return `${baseClass} ring-2 ring-brand bg-brand-soft`;
     } else if (isCellCopied(table, rowId, field)) {
       return `${baseClass} ring-2 ring-dashed ring-emerald-500 bg-emerald-50`;
     }
@@ -1864,7 +1847,53 @@ const CampaignDetailsPage = () => {
   }
 
   if (error || !campaign) {
-    return <div className="text-center py-8 text-rose-500">{error || "Campaign not found"}</div>;
+    // v11 error state — mirrors the loaded hero's breadcrumb +
+    // editorial header chrome so the not-found surface doesn't
+    // collapse to a bare rose line of text. Matches the pattern
+    // shipped on /intelligence/discovery/[id] (Card-wrapped
+    // EmptyState with a back affordance). Replaces the previous
+    // `<div className="text-center py-8 text-rose-500">…` one-liner.
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => router.push('/campaigns')}
+          className="text-ink-warm-500 hover:text-brand font-medium inline-flex items-center gap-1.5 transition text-xs"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to Campaigns
+        </button>
+        <div className="flex items-start gap-5">
+          <div
+            className="w-14 h-14 rounded-xl text-white flex items-center justify-center text-xl font-semibold shrink-0 bg-gradient-to-br from-brand to-brand-dark shadow-btn-brand"
+            aria-hidden
+          >
+            <Megaphone className="h-6 w-6" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand shrink-0" aria-hidden />
+              <span>Talent · Campaign</span>
+            </div>
+            <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
+              Campaign{' '}
+              <span className="display-serif-italic text-brand">Not Found.</span>
+            </h1>
+          </div>
+        </div>
+        <Card className="border-cream-200">
+          <EmptyState
+            icon={FileQuestion}
+            title="Campaign Not Found"
+            description={error || "It may have been deleted, or the link is wrong. Head back to Campaigns to pick another."}
+          >
+            <Button variant="outline" onClick={() => router.push('/campaigns')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Campaigns
+            </Button>
+          </EmptyState>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -1991,25 +2020,20 @@ const CampaignDetailsPage = () => {
                     </h1>
                   );
                 })()}
-                {/* Inline status pill + metrics row */}
+                {/* Inline status pill + metrics row.
+                    Uses centralized `<StatusBadge>` with a tone map
+                    (CAMPAIGN_STATUS_TONES near the top of this file)
+                    so the palette stays in lockstep with the rest of
+                    the app. `withDot` gives the colored dot prefix
+                    that the v11 mockup uses for hero status. */}
                 {campaign && (
                   <div className="flex items-center gap-2.5 mt-4 text-xs flex-wrap">
-                    <span className={`inline-flex items-center gap-1.5 font-medium px-2 py-0.5 rounded-md ${
-                      campaign.status === 'Active' ? 'bg-brand-soft text-brand-deep'
-                      : campaign.status === 'Planning' ? 'bg-sky-50 text-sky-700'
-                      : campaign.status === 'Paused' ? 'bg-amber-50 text-amber-700'
-                      : campaign.status === 'Completed' ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-cream-100 text-ink-warm-700'
-                    }`}>
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                        campaign.status === 'Active' ? 'bg-brand'
-                        : campaign.status === 'Planning' ? 'bg-sky-500'
-                        : campaign.status === 'Paused' ? 'bg-amber-500'
-                        : campaign.status === 'Completed' ? 'bg-emerald-500'
-                        : 'bg-ink-warm-400'
-                      }`} aria-hidden />
+                    <StatusBadge
+                      tone={CAMPAIGN_STATUS_TONES[campaign.status] ?? 'neutral'}
+                      withDot
+                    >
                       {campaign.status}
-                    </span>
+                    </StatusBadge>
                     {campaign.current_phase && (
                       <>
                         <span className="text-ink-warm-300">·</span>
@@ -2071,13 +2095,15 @@ const CampaignDetailsPage = () => {
           </div>
 
           {/* Section-head — chapter divider between hero and tabs.
-              Matches the mockup's "01 — …" counter format. */}
-          <div className="section-head first flex items-center gap-3">
-            <span className="dot bg-brand" aria-hidden />
-            <span className="label">Workspace</span>
-            <span className="flex-1" />
-            <span className="counter">01 — Info · KOLs · Content · Budget</span>
-          </div>
+              Uses the shared <SectionHeader> primitive so the v11
+              chapter pattern stays consistent with /dashboard,
+              /clients, /intelligence/discovery/[id], etc. */}
+          <SectionHeader
+            label="Workspace"
+            dot="brand"
+            counter="01 — Info · KOLs · Content · Budget"
+            first
+          />
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* v11 underline tabs — matches the mockup's detail-page
@@ -2290,7 +2316,14 @@ const CampaignDetailsPage = () => {
                   </Button>
                   <AddKOLsDialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen} />
               </div>
-              <CardContent className="pt-0 px-0">
+              {/* Tab body — was `<CardContent className="pt-0 px-0">`
+                  back when each tab sat inside a Card. The outer Card
+                  was removed during the v11 underline-tabs migration
+                  but the CardContent left behind was a structural
+                  leftover (CardContent has no semantic meaning without
+                  a parent Card). Converted to a plain wrapper div
+                  2026-06-05 — same visual result, clearer intent. */}
+              <div>
                 {/* View toggle moved to the toolbar row above. */}
                 {/* Overview view extracted to
                     `components/campaign/KolDashboardOverview.tsx` on
@@ -2331,7 +2364,7 @@ const CampaignDetailsPage = () => {
                     setKolFilters={setKolFilters}
                   />
                 )}
-              </CardContent>
+              </div>
           </TabsContent>
 
           <TabsContent value="contents" className="mt-4">
@@ -2359,7 +2392,15 @@ const CampaignDetailsPage = () => {
                       `<DialogTrigger asChild>` with ~340 lines of
                       unreachable modal markup beneath; both were removed
                       on 2026-06-02 since the modal was never rendered.
-                      The inline flow lives in the onClick below. */}
+                      The inline flow lives in the onClick below.
+                      ─────────────────────────────────────────────────
+                      [2026-06-05] HIDDEN per Andy. Content rows are
+                      surfaced from the campaign_kols + posted-content
+                      pipeline rather than added manually here. To
+                      revive: flip the `false && (...)` gate. The
+                      onClick + state plumbing is preserved so the
+                      revive is one-line. */}
+                      {false && (
                       <Button variant="brand" size="sm" onClick={async (e) => {
                           e.preventDefault();
                           const newId = `new-${Date.now()}`;
@@ -2392,8 +2433,10 @@ const CampaignDetailsPage = () => {
                         <Plus className="h-4 w-4 mr-2" />
                         Add Content
                       </Button>
+                      )}
               </div>
-              <CardContent className="pt-0 px-0">
+              {/* See KOL tab above for the CardContent → div rationale. */}
+              <div>
                 {/* View toggle moved to the toolbar row above. */}
                 {/* Overview View extracted to
                     `components/campaign/ContentDashboardOverview.tsx`
@@ -2406,7 +2449,7 @@ const CampaignDetailsPage = () => {
                     on 2026-06-02. Owns its own sort + filter +
                     selection + inline-edit + bulk-actions state. */}
                 {contentsViewMode === 'table' && <ContentDashboardTableView />}
-              </CardContent>
+              </div>
           </TabsContent>
 
           {/* Budget Tab */}
@@ -2445,7 +2488,8 @@ const CampaignDetailsPage = () => {
                   <RecordPaymentDialog ref={recordPaymentDialogRef} open={isAddingPayment} onOpenChange={setIsAddingPayment} />
                   </div>
               </div>
-              <CardContent className="pt-0 px-0">
+              {/* See KOL tab above for the CardContent → div rationale. */}
+              <div>
                 {/* View toggle moved to the toolbar row above. */}
 
                 {/* Table View — extracted to
@@ -2459,7 +2503,7 @@ const CampaignDetailsPage = () => {
                     2026-06-02. Read-only: 3-KPI hero + Regional
                     Budget Summary grid + 4 recharts panels. */}
                 {paymentViewMode === 'graph' && <BudgetOverview />}
-              </CardContent>
+              </div>
           </TabsContent>
 
           {/* Report Tab */}
