@@ -263,9 +263,12 @@ export default function MessagesTab() {
         </TabsList>
 
         <TabsContent value="templates" className="space-y-6 mt-4">
-          {/* Info card — v11 brand-soft tint instead of the old
-              bg-blue-50 / border-blue-200 (which read as a different
-              design system than the rest of /templates). */}
+          {/* [2026-06-05] "How to use templates with AI" info card
+              hidden per Andy — the AI-generated-messages flow it
+              describes isn't in active use anymore. Card markup
+              preserved behind `{false && (...)}` so reviving it is
+              a one-line flip (vs. re-typing the copy from scratch). */}
+          {false && (
           <Card className="bg-brand-soft border-brand-light">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
@@ -277,12 +280,13 @@ export default function MessagesTab() {
                   <p className="text-sm text-ink-warm-700">
                     Use the AI chat to generate messages: <code className="bg-white border border-brand-light px-2 py-0.5 rounded">Generate an initial outreach for Jdot</code>
                     <br />
-                    The AI will use these templates and learn from messages you mark as "Sent".
+                    The AI will use these templates and learn from messages you mark as &quot;Sent&quot;.
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Templates Grid — or EmptyState if the library is empty
               (shouldn't usually happen since templates are seeded, but

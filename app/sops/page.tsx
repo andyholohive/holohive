@@ -866,7 +866,7 @@ export default function SOPsPage() {
                       {formatDate(sop.updated_at)}
                     </span>
                   </div>
-                  <div className="mt-auto flex flex-wrap gap-2">
+                  <div className="mt-auto flex flex-wrap items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleView(sop)}>
                       View
                     </Button>
@@ -881,6 +881,25 @@ export default function SOPsPage() {
                     >
                       <History className="h-3 w-3 mr-1" />
                       History
+                    </Button>
+                    {/* [2026-06-05] Delete affordance — the delete
+                        confirm Dialog + `handleConfirmDelete` handler
+                        + `handleDelete` opener all existed in the
+                        codebase, but no UI button was wired to call
+                        `handleDelete(sop)`. Users couldn't delete
+                        SOPs because there was nothing to click. Ghost
+                        rose-tint icon button at the end of the row
+                        matches the action-cluster pattern on
+                        /admin/changelog + /clients/templates. */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto h-8 w-8 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                      onClick={() => handleDelete(sop)}
+                      title="Delete SOP"
+                      aria-label={`Delete SOP "${sop.name}"`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </CardContent>
@@ -1443,13 +1462,20 @@ export default function SOPsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Confirmation Dialog — v11 destructive Dialog pattern:
+            icon-prefixed Title Case header, bolded subject in
+            description, Trash2 icon on the primary button. Matches
+            the delete confirms on /clients/templates, /admin/changelog,
+            and the rest of the recently-migrated surfaces. */}
         <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <DialogContent className="sm:max-w-sm">
+          <DialogContent className="sm:max-w-[420px]">
             <DialogHeader>
-              <DialogTitle>Delete SOP</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete "{deletingSOP?.name}"? This action cannot be undone.
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Trash2 className="h-4 w-4 text-rose-500" />
+                Delete SOP?
+              </DialogTitle>
+              <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+                <strong>{deletingSOP?.name ?? ''}</strong> will be permanently deleted, along with its version history. SOPs already in use by deliverables are not affected. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
@@ -1457,6 +1483,7 @@ export default function SOPsPage() {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleConfirmDelete}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                 Delete
               </Button>
             </DialogFooter>
