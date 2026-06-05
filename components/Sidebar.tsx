@@ -374,10 +374,21 @@ export default function Sidebar({ children }: SidebarProps) {
    *  starts-with (for "/tasks/admin" etc.) — so the parent /tasks
    *  doesn't stay highlighted when the user is on a deeper sub-route.
    *
-   *  Note: a sub-nav item never sets data-nav-active because the
-   *  parent NavItem already does (its prefix match catches the sub-
-   *  route too). Otherwise we'd scroll twice and the nav would land
-   *  on the sub-item, which buries the parent.
+   *  Marks active sub-items with `data-nav-active` for the scroll-
+   *  to-active effect.
+   *
+   *  [2026-06-05] Used to skip this attribute under the assumption
+   *  that "the parent NavItem already sets it via prefix match." That
+   *  assumption broke for /templates and /sops — they're sub-items
+   *  under the HQ NavItem (`/tasks`) but don't share the `/tasks`
+   *  prefix, so the parent's `pathname.startsWith('/tasks')` check
+   *  is false when the user is on them. Neither the parent NavItem
+   *  nor this SubNavItem had the marker, so `scrollIntoView` had no
+   *  target and the sidebar stayed wherever it was. Setting the
+   *  attribute here makes /templates + /sops work; for sub-routes
+   *  the parent DOES match (e.g. `/tasks/deliverables`), the parent
+   *  NavItem still renders first in the DOM so `querySelector` picks
+   *  it up — no regression on the normal case.
    *
    *  Pre-v11 the active state used shadcn's `secondary` variant
    *  (cream-ish fill, gray text) and the inactive used `ghost` — both
@@ -406,7 +417,7 @@ export default function Sidebar({ children }: SidebarProps) {
           variant="ghost"
           className={`w-full justify-start h-7 px-2.5 text-[12px] font-medium transition-colors ${activeClass}`}
         >
-          <span>
+          <span data-nav-active={isActive ? 'true' : undefined}>
             <Icon className="h-[13px] w-[13px] mr-2" />
             {label}
           </span>
