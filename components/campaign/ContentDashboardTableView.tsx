@@ -428,7 +428,13 @@ export function ContentDashboardTableView() {
    *  - text/number → double-click → Input. */
   const renderEditableContentCell = (value: any, field: string, content: any) => {
     const isEditing = editingContentCell?.contentId === content.id && editingContentCell?.field === field;
-    const textFields = ['content_link'];
+    // [2026-06-05] `notes` added to textFields — it was rendered with
+    // the double-click affordance in the JSX (cursor-pointer +
+    // onDoubleClick wired to setEditingContentCell), but the cell
+    // never entered edit mode because the `textFields.includes(field)`
+    // check below excluded it. Result: double-click was a no-op and
+    // the notes column was effectively read-only.
+    const textFields = ['content_link', 'notes'];
     const numberFields = ['impressions', 'likes', 'retweets', 'comments', 'bookmarks'];
 
     // KOL select

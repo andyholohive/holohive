@@ -1387,7 +1387,22 @@ const CampaignDetailsPage = () => {
     date: Date;
   }) => {
     setPendingPaymentNotification(opts);
-    setPaymentNotificationMessage(`$${opts.amount.toLocaleString()} has been deposited to ${opts.wallet}!\n\nThanks for being part of the Holo Hive network 🙌`);
+    // [2026-06-05] Message format updated per Andy:
+    //   1) prepend `[Client Name] - Post (DD MMM YYYY)` header line
+    //   2) drop the `!` after the wallet
+    //   3) "Thanks for" → "Thank you for"
+    // Date formatted in the campaign's locale-default short form
+    // (e.g. "5 Jun 2026"); falls back to "Date TBD" if the picker
+    // somehow handed us an invalid date.
+    const clientName = campaign?.client_name?.trim() || 'Holo Hive';
+    const dateStr = opts.date && !isNaN(opts.date.getTime())
+      ? opts.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'Date TBD';
+    setPaymentNotificationMessage(
+      `${clientName} - Post (${dateStr})\n\n` +
+      `$${opts.amount.toLocaleString()} has been deposited to ${opts.wallet}\n\n` +
+      `Thank you for being part of the Holo Hive network 🙌`
+    );
     setIsEditingPaymentMessage(false);
     setPaymentNotifyDialogOpen(true);
   };

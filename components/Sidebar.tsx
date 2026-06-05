@@ -253,8 +253,8 @@ export default function Sidebar({ children }: SidebarProps) {
     const SECTION_PREFIXES: Record<string, string[]> = {
       people:    ['/team', '/clients'],
       kols:      ['/kols', '/lists', '/campaigns'],
-      crm:       ['/crm/', '/intelligence', '/analytics'],
       workspace: ['/tasks', '/templates', '/sops', '/reminders', '/daily-standup'],
+      crm:       ['/crm/', '/intelligence', '/analytics'],
       documents: ['/delivery-logs', '/mindshare', '/wallets', '/forms', '/expenses', '/links'],
       admin:     ['/admin'],
     };
@@ -473,8 +473,8 @@ export default function Sidebar({ children }: SidebarProps) {
     bookmarks: 'Bookmarks',
     people: 'People',
     kols: 'KOLs',
-    crm: 'CRM',
     workspace: 'Workspace',
+    crm: 'CRM',
     communication: 'Communication',
     documents: 'Documents',
     admin: 'Admin',
@@ -484,8 +484,8 @@ export default function Sidebar({ children }: SidebarProps) {
     bookmarks: 'bg-amber-500',
     people: 'bg-sky-500',
     kols: 'bg-violet-500',
-    crm: 'bg-violet-500',
     workspace: 'bg-amber-500',
+    crm: 'bg-violet-500',
     communication: 'bg-emerald-500',
     documents: 'bg-sky-500',
     admin: 'bg-rose-500',
@@ -689,24 +689,10 @@ export default function Sidebar({ children }: SidebarProps) {
                 </CollapsibleSection>
               )}
 
-              {/* CRM Section */}
-              {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && (
-                <CollapsibleSection id="crm" icon={DollarSign}>
-                  {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
-                  {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
-                  {/* Analytics — team dashboard with KPIs, pipeline funnel,
-                      owner workload, recent activity, health alerts.
-                      Reads /api/analytics/dashboard in one call. */}
-                  {!guestHide('/analytics') && <NavItem href="/analytics" icon={BarChart3} label="Analytics" />}
-                  {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
-                  {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
-                  {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
-                  {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
-                </CollapsibleSection>
-              )}
-
-              {/* Workspace Section */}
+              {/* Workspace Section — [2026-06-05] moved above CRM
+                  per Andy. Task-management surfaces (HQ / Templates /
+                  SOPs / Reminders) get higher priority in the sidebar
+                  than CRM since the team lives in HQ day-to-day. */}
               {!guestHideSection(['/daily-standup', '/tasks']) && (
                 <CollapsibleSection id="workspace" icon={Briefcase}>
                   {/* Daily Stand-Up hidden from the sidebar 2026-05-13 —
@@ -757,6 +743,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     </div>
                   )}
                   <NavItem href="/reminders" icon={Bell} label="Reminders" />
+                </CollapsibleSection>
+              )}
+
+              {/* CRM Section */}
+              {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && (
+                <CollapsibleSection id="crm" icon={DollarSign}>
+                  {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
+                  {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
+                  {/* Analytics — team dashboard with KPIs, pipeline funnel,
+                      owner workload, recent activity, health alerts.
+                      Reads /api/analytics/dashboard in one call. */}
+                  {!guestHide('/analytics') && <NavItem href="/analytics" icon={BarChart3} label="Analytics" />}
+                  {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
+                  {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
+                  {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
+                  {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
+                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
                 </CollapsibleSection>
               )}
 

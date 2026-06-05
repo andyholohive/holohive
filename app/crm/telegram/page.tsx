@@ -43,7 +43,10 @@ import {
   Megaphone,
   MoreHorizontal,
   EyeOff,
+  Eye,
   Briefcase,
+  MessageCircle,
+  Bot,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -583,6 +586,49 @@ export default function TelegramChatsPage() {
   const [deleteChatPending, setDeleteChatPending] = useState<TelegramChat | null>(null);
   const [deletingChat, setDeletingChat] = useState(false);
 
+  // [2026-06-05] View Chat dialog — chatroom-style read-only view of
+  // every message stored for a chat (the page's in-memory `messages`
+  // cache only keeps 5/chat for the inline preview; this fetches the
+  // full history on demand, capped at 500 to stay snappy). Auto-scrolls
+  // to the bottom on open.
+  const [viewingChat, setViewingChat] = useState<TelegramChat | null>(null);
+  const [viewingChatMessages, setViewingChatMessages] = useState<TelegramMessage[]>([]);
+  const [viewingChatLoading, setViewingChatLoading] = useState(false);
+
+  const handleViewChat = async (chat: TelegramChat) => {
+    setViewingChat(chat);
+    setViewingChatMessages([]);
+    setViewingChatLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('telegram_messages')
+        .select('*')
+        .eq('chat_id', chat.chat_id)
+        .order('message_date', { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      setViewingChatMessages((data || []) as TelegramMessage[]);
+    } catch (err: any) {
+      toast({
+        title: 'Load failed',
+        description: err?.message ?? 'Failed to load chat messages',
+        variant: 'destructive',
+      });
+    } finally {
+      setViewingChatLoading(false);
+    }
+  };
+
+  // Auto-scroll the chat body to the bottom when messages arrive so the
+  // newest message is in view on open. The ref is attached to the body
+  // wrapper in the Dialog JSX below.
+  const chatBodyRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!viewingChatLoading && viewingChatMessages.length > 0 && chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [viewingChatLoading, viewingChatMessages]);
+
   const handleDeleteChat = (chat: TelegramChat) => {
     setDeleteChatPending(chat);
   };
@@ -621,6 +667,10 @@ export default function TelegramChatsPage() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={() => handleViewChat(chat)}>
+          <Eye className="h-4 w-4 mr-2" />
+          View Chat
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => copyToClipboard(chat.chat_id)}>
           <Copy className="h-4 w-4 mr-2" />
           Copy chat ID
@@ -3154,6 +3204,208 @@ export default function TelegramChatsPage() {
               {sendingMessage ? 'Sending...' : 'Send Message'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Chat dialog — chatroom-style read-only view of all
+          messages stored for a chat. Team messages sit right with
+          brand-soft bubbles; external messages sit left with cream
+          bubbles; bot messages use a slim outlined bubble. Auto-
+          scrolls to bottom on open via the chatBodyRef effect above.
+          Capped at 500 messages (LIMIT in handleViewChat). 2026-06-05. */}
+      <Dialog
+        open={!!viewingChat}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingChat(null);
+            setViewingChatMessages([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-brand" />
+              {viewingChat?.title || 'Untitled Chat'}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingChat ? (
+                <>
+                  {viewingChat.chat_type === 'private'
+                    ? 'Direct message'
+                    : viewingChat.chat_type === 'supergroup'
+                      ? 'Supergroup'
+                      : 'Group chat'}
+                  {' · '}
+                  {viewingChatLoading
+                    ? 'Loading messages…'
+                    : `${viewingChatMessages.length} message${viewingChatMessages.length === 1 ? '' : 's'}`}
+                  {viewingChatMessages.length >= 500 && ' (showing newest 500)'}
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            ref={chatBodyRef}
+            className="flex-1 overflow-y-auto px-1 py-3 space-y-2 bg-cream-50/40 rounded-md"
+          >
+            {viewingChatLoading ? (
+              <div className="space-y-4 py-4 px-3">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const right = i % 3 === 0;
+                  return (
+                    <div key={i} className={`flex items-end gap-2 ${right ? 'flex-row-reverse' : ''}`}>
+                      <Skeleton className="h-7 w-7 rounded-full shrink-0" />
+                      <div className={`flex flex-col gap-1 ${right ? 'items-end' : 'items-start'}`}>
+                        <Skeleton className="h-2.5 w-20" />
+                        <Skeleton className={`h-9 rounded-2xl ${i % 2 === 0 ? 'w-56' : 'w-40'}`} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : viewingChatMessages.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-cream-100 mb-3">
+                  <MessageCircle className="h-5 w-5 text-ink-warm-400" />
+                </div>
+                <p className="text-sm font-medium text-ink-warm-700">No messages yet</p>
+                <p className="text-xs text-ink-warm-500 mt-1 max-w-xs mx-auto">
+                  The bot only records messages it can see. Make sure it&apos;s a member of this chat.
+                </p>
+              </div>
+            ) : (() => {
+              // ─── Refined chat renderer ─────────────────────────────
+              // - Date separators (Today / Yesterday / Mon, Jun 2) when
+              //   the day changes between consecutive messages
+              // - Sender blocks: avatar + name + timestamp on the first
+              //   message of a block; subsequent messages tuck under
+              //   with no header so consecutive messages from the same
+              //   person read as one thought
+              // - Bubble palette: brand-soft for team (right), white +
+              //   cream border for external (left), amber-tint for bot
+              // - Asymmetric corner rounding on the bubble facing the
+              //   speaker (iMessage / Telegram convention)
+              const initialsOf = (name: string | null | undefined): string => {
+                if (!name) return '?';
+                const parts = name.trim().split(/\s+/).filter(Boolean);
+                if (parts.length === 0) return '?';
+                if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+              };
+              const isSameDay = (a: Date, b: Date) =>
+                a.getFullYear() === b.getFullYear() &&
+                a.getMonth() === b.getMonth() &&
+                a.getDate() === b.getDate();
+              const formatDateSeparator = (date: Date): string => {
+                const now = new Date();
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                if (isSameDay(date, now)) return 'Today';
+                if (isSameDay(date, yesterday)) return 'Yesterday';
+                return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              };
+              const formatTime = (date: Date): string =>
+                date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+              const rendered: React.ReactNode[] = [];
+              let lastDateKey: string | null = null;
+              viewingChatMessages.forEach((msg, idx) => {
+                const isBot = msg.from_username === 'holo_hive_bot' || msg.from_user_name === 'Holo Hive Bot';
+                const fromId = msg.from_user_id;
+                const isTeam = !isBot && !!fromId && teamTelegramIds.has(fromId);
+                const isRight = isTeam || isBot;
+
+                const ts = msg.message_date ? new Date(msg.message_date) : null;
+                const validTs = ts && !isNaN(ts.getTime()) ? ts : null;
+
+                // Day separator — emit when the date changes vs. the
+                // previous rendered message (or always for the first).
+                if (validTs) {
+                  const dateKey = validTs.toDateString();
+                  if (dateKey !== lastDateKey) {
+                    rendered.push(
+                      <div key={`sep-${msg.id}`} className="flex items-center gap-3 my-4">
+                        <div className="flex-1 h-px bg-cream-200" />
+                        <span className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500">
+                          {formatDateSeparator(validTs)}
+                        </span>
+                        <div className="flex-1 h-px bg-cream-200" />
+                      </div>
+                    );
+                    lastDateKey = dateKey;
+                  }
+                }
+
+                // Sender block detection — first message of a run
+                // when the previous message was from a different person
+                // (or 30+ minutes earlier, so a long pause re-shows the
+                // header to anchor context).
+                const prev = idx > 0 ? viewingChatMessages[idx - 1] : null;
+                const prevTs = prev?.message_date ? new Date(prev.message_date) : null;
+                const sameAuthor = prev && prev.from_user_id === msg.from_user_id && prev.from_username === msg.from_username;
+                const longGap = prevTs && validTs && (validTs.getTime() - prevTs.getTime() > 30 * 60 * 1000);
+                const isFirstOfBlock = !sameAuthor || !!longGap;
+
+                const senderName = msg.from_user_name || msg.from_username || 'Unknown';
+                const initials = initialsOf(senderName);
+
+                rendered.push(
+                  <div key={msg.id} className={`flex items-end gap-2 ${isRight ? 'flex-row-reverse' : ''} ${isFirstOfBlock ? 'mt-3' : 'mt-0.5'}`}>
+                    {/* Avatar — shown only on first message of a block.
+                        Subsequent messages get a transparent placeholder
+                        to keep horizontal alignment. */}
+                    {isFirstOfBlock ? (
+                      isBot ? (
+                        <div className="w-7 h-7 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+                          <Bot className="h-3.5 w-3.5 text-amber-700" />
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                            isTeam
+                              ? 'bg-brand text-white'
+                              : 'bg-cream-200 text-ink-warm-700'
+                          }`}
+                          title={senderName}
+                        >
+                          {initials}
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-7 shrink-0" aria-hidden />
+                    )}
+                    <div className={`flex flex-col ${isRight ? 'items-end' : 'items-start'} max-w-[78%]`}>
+                      {isFirstOfBlock && (
+                        <div className={`flex items-center gap-1.5 mb-0.5 px-0.5 text-[11px] ${isRight ? 'flex-row-reverse' : ''}`}>
+                          <span className="font-semibold text-ink-warm-900">{senderName}</span>
+                          {validTs && (
+                            <span className="text-ink-warm-400">· {formatTime(validTs)}</span>
+                          )}
+                        </div>
+                      )}
+                      <div
+                        className={`px-3.5 py-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
+                          isBot
+                            ? `bg-amber-50 border border-amber-200 text-amber-900 ${isFirstOfBlock ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'}`
+                            : isRight
+                              ? `bg-brand-soft text-brand-deep ${isFirstOfBlock ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'}`
+                              : `bg-white border border-cream-200 text-ink-warm-900 ${isFirstOfBlock ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl'}`
+                        }`}
+                        // Hover shows the exact timestamp for any
+                        // message — useful for buried mid-block messages
+                        // that don't have an inline label.
+                        title={validTs ? validTs.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : undefined}
+                      >
+                        {msg.text || <span className="italic text-ink-warm-400">(empty message)</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+              return rendered;
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
 

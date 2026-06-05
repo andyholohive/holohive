@@ -323,34 +323,32 @@ async function paymentReminder(
 
   if (filtered.length === 0) return { items: [], isEmpty: true };
 
-  // Get KOL names via campaign_kols
-  const ckIds = Array.from(new Set(filtered.map((p) => p.campaign_kol_id).filter(Boolean))) as string[];
-  let ckToKol = new Map<string, string>();
-  if (ckIds.length > 0) {
-    const { data: ckData } = await supabase
-      .from('campaign_kols')
-      .select('id, master_kol_id')
-      .in('id', ckIds);
-    const kolIds = Array.from(new Set((ckData || []).map((ck) => ck.master_kol_id)));
-    if (kolIds.length > 0) {
-      const { data: kols } = await supabase
-        .from('master_kols')
-        .select('id, name')
-        .in('id', kolIds);
-      const kolMap = new Map<string, string>();
-      for (const k of kols || []) kolMap.set(k.id, k.name);
-      for (const ck of ckData || []) ckToKol.set(ck.id, kolMap.get(ck.master_kol_id) || 'Unknown');
-    }
+  // [2026-06-05] Per-campaign rollup. Previously emitted one bullet
+  // per unpaid payment ("KOL — Campaign — $amount (method)") which
+  // produced 20+ lines for any active week. Andy wanted a
+  // "X content pending payment for {campaign}" summary so the team
+  // can see at a glance which campaigns are blocking the most
+  // payment work. Sort alphabetical by campaign name for stable
+  // ordering across Saturday runs.
+  const byCampaign = new Map<string, { campName: string; count: number; totalAmount: number }>();
+  for (const p of filtered) {
+    const campName = campMap.get(p.campaign_id) || 'Unknown Campaign';
+    const existing = byCampaign.get(p.campaign_id) || { campName, count: 0, totalAmount: 0 };
+    existing.count++;
+    existing.totalAmount += Number(p.amount) || 0;
+    byCampaign.set(p.campaign_id, existing);
   }
 
-  const items: ReminderItem[] = filtered.map((p) => {
-    const kolName = p.campaign_kol_id ? ckToKol.get(p.campaign_kol_id) || p.recipient_name || 'Unknown' : p.recipient_name || 'Unknown';
-    const campName = campMap.get(p.campaign_id) || 'Unknown Campaign';
-    return {
-      label: `${kolName} — ${campName}`,
-      detail: `$${p.amount} (${p.payment_method})`,
-    };
-  });
+  const items: ReminderItem[] = Array.from(byCampaign.values())
+    .sort((a, b) => a.campName.localeCompare(b.campName))
+    .map((c) => ({
+      label: `${c.count} content pending payment for ${c.campName}`,
+      // detail kept empty — the reminder engine strips a trailing
+      // " — " from the item template when detail is blank, so the
+      // rendered line is just "• N content pending payment for X"
+      // with no orphan em-dash.
+      detail: '',
+    }));
 
   return { items, isEmpty: items.length === 0 };
 }

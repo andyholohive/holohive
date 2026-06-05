@@ -87,7 +87,11 @@ export const DEFAULT_TEMPLATES: Record<string, { header: string; item: string; f
     footer: '',
   },
   payment_reminder: {
-    header: '<b>{{emoji}} {{name}}</b>\n<i>{{count}} unpaid payment(s) for published content</i>\n',
+    // [2026-06-05] Switched from per-payment to per-campaign rollup —
+    // {{count}} is now the number of campaigns with unpaid content
+    // (not the number of payments). See paymentReminder() in
+    // reminderEvaluators.ts for the grouping logic.
+    header: '<b>{{emoji}} {{name}}</b>\n<i>{{count}} campaign(s) with pending payments</i>\n',
     item: '\u2022 {{label}} — {{detail}}',
     footer: '',
   },
