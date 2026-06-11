@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { StatusBadge, toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
+import { DeliverableService } from '@/lib/deliverableService';
 import dynamic from 'next/dynamic';
 
 // Dynamically import ReactQuill to avoid SSR issues
@@ -263,6 +264,23 @@ export default function SOPsPage() {
   const [wizardInitialTitle, setWizardInitialTitle] = useState<string>('');
   const [wizardClients, setWizardClients] = useState<Array<{ id: string; name: string }>>([]);
 
+  // [2026-06-11] Multi-Template SOP v2 — Run All / Run Next state.
+  // Run All: open client picker → write recurring_deliverables for every
+  // 'recurring' entry → spawn the first on_sop_start template via wizard.
+  // Run Next: show a picker of un-spawned manual/after_previous entries →
+  // open the wizard for the chosen template.
+  const [runAllPickerOpen, setRunAllPickerOpen] = useState(false);
+  const [runAllPickerClientId, setRunAllPickerClientId] = useState<string>('');
+  const [runAllBusy, setRunAllBusy] = useState(false);
+  const [runNextPickerOpen, setRunNextPickerOpen] = useState(false);
+  const [runNextOptions, setRunNextOptions] = useState<Array<{
+    template_id: string;
+    sort_order: number;
+    trigger_type: 'after_previous' | 'manual';
+    timing_offset_label: string | null;
+    template_name: string | null;
+  }>>([]);
+
   useEffect(() => {
     fetchSOPs();
     fetchTeamMembers();
@@ -438,6 +456,113 @@ export default function SOPsPage() {
       }];
     }
     return [];
+  };
+
+  /**
+   * [2026-06-11] Multi-Template SOP v2 — Run All flow.
+   *
+   * Spec § "Run this SOP" — Run All "spawns Template 1 immediately and
+   * queues the rest by trigger type." We split that into two phases so
+   * each does one honest thing:
+   *   1. Open a client picker dialog. User picks the client this SOP runs
+   *      against (which is the same client all recurring rows bind to).
+   *   2. On confirm: write a `recurring_deliverables` row for every
+   *      `recurring` sequence entry (the cron picks them up), THEN open
+   *      the wizard for the first `on_sop_start` (or sequence[0])
+   *      template with the client + title pre-filled.
+   *
+   * The wizard handles per-step assignments + actual task spawn for the
+   * first template; the cron handles the rest from Monday morning on.
+   */
+  const handleRunAll = (sop: SOP) => {
+    setViewingSOP(sop);
+    setRunAllPickerClientId('');
+    setRunAllPickerOpen(true);
+  };
+
+  const handleRunAllConfirm = async () => {
+    if (!viewingSOP || !runAllPickerClientId) return;
+    const seq = sequenceFromSop(viewingSOP);
+    if (seq.length === 0) {
+      toast({ title: 'No templates linked to this SOP', variant: 'destructive' });
+      return;
+    }
+    setRunAllBusy(true);
+    try {
+      // 1. Queue recurring bindings via the service helper.
+      const recurringResult = await DeliverableService.applyRecurringEntriesForSop({
+        sequence: seq.map(e => ({
+          template_id: e.template_id,
+          trigger_type: e.trigger_type,
+          recurrence_cadence: e.recurrence_cadence,
+        })),
+        clientId: runAllPickerClientId,
+        createdBy: user?.id ?? null,
+      });
+
+      // 2. Open wizard for the first on_sop_start (or sequence[0]) template.
+      const first = seq.find(e => e.trigger_type === 'on_sop_start') ?? seq[0];
+      const tpl = deliverableTemplates.find(t => t.id === first.template_id);
+      const clientName = wizardClients.find(c => c.id === runAllPickerClientId)?.name || 'Client';
+
+      // Close picker, switch to wizard. The wizard mounts globally below
+      // and reads its open state from `wizardOpen`.
+      setRunAllPickerOpen(false);
+      setIsViewOpen(false);
+      setWizardTemplateId(first.template_id);
+      setWizardInitialTitle(`${viewingSOP.name} — ${tpl?.name ?? 'Template'} — ${clientName}`);
+      setWizardOpen(true);
+
+      // Toast describes what just happened — recurring counts are honest
+      // even when they're 0 (so the user knows nothing happened silently).
+      const recurringMsg = recurringResult.created > 0
+        ? ` ${recurringResult.created} recurring binding${recurringResult.created === 1 ? '' : 's'} created.`
+        : recurringResult.skipped > 0
+          ? ' Recurring bindings already in place.'
+          : '';
+      toast({
+        title: `Run All — ${viewingSOP.name}`,
+        description: `Spawning first template via wizard.${recurringMsg}`,
+      });
+    } catch (err) {
+      console.error('[Run All] failed:', err);
+      toast({
+        title: 'Run All failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setRunAllBusy(false);
+    }
+  };
+
+  /**
+   * [2026-06-11] Multi-Template SOP v2 — Run Next flow.
+   *
+   * Spec § "Run this SOP" — Run Next "spawns just the next template in
+   * sequence." For v2 MVP we show the user a picker of all eligible
+   * templates (manual + after_previous) and let them choose. Auto-progression
+   * on parent task complete is a v2.1 polish — flagged in the spec tracker.
+   *
+   * Skips `recurring` (the cron handles those) and `on_sop_start` (that's
+   * what Run All spawned).
+   */
+  const handleRunNext = async (sop: SOP) => {
+    setViewingSOP(sop);
+    const seq = sequenceFromSop(sop);
+    const options = await DeliverableService.listRunNextOptionsForSop(seq);
+    setRunNextOptions(options);
+    setRunNextPickerOpen(true);
+  };
+
+  const handleRunNextPick = (templateId: string) => {
+    if (!viewingSOP) return;
+    const tpl = deliverableTemplates.find(t => t.id === templateId);
+    setRunNextPickerOpen(false);
+    setIsViewOpen(false);
+    setWizardTemplateId(templateId);
+    setWizardInitialTitle(`${viewingSOP.name} — ${tpl?.name ?? 'Template'}`);
+    setWizardOpen(true);
   };
 
   const handleEdit = (sop: SOP) => {
@@ -1419,29 +1544,34 @@ export default function SOPsPage() {
                 DialogDescription so the footer is just actions. */}
             {viewingSOP && (
               <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-                {/* Run First — spawns the first `on_sop_start`
-                    template immediately. The rest of the sequence sits
-                    in the timeline above with per-template Run buttons
-                    until the auto-trigger / cron infra lands. For SOPs
-                    with no `on_sop_start` entry, falls back to
-                    sequence[0]. 2026-06-05. */}
+                {/* [2026-06-11] Multi-Template SOP v2 — Run All + Run Next
+                    buttons. Replaces the "Run First" button:
+                      - Run All: prompts for client → queues recurring entries →
+                        opens wizard for the first on_sop_start template
+                      - Run Next: shows a picker of un-spawned manual/
+                        after_previous templates
+                    Single-template SOPs collapse to a single "Run this SOP"
+                    button (no Run Next when there's nothing to pick from). */}
                 {(() => {
                   const seq = sequenceFromSop(viewingSOP);
                   if (seq.length === 0) return null;
-                  const first = seq.find(e => e.trigger_type === 'on_sop_start') ?? seq[0];
-                  const tpl = deliverableTemplates.find(t => t.id === first.template_id);
-                  if (!tpl) return null;
+                  const eligibleForRunNext = seq.filter(
+                    e => e.trigger_type === 'after_previous' || e.trigger_type === 'manual',
+                  );
+                  const isMulti = seq.length > 1;
                   return (
-                    <Button variant="brand" size="sm" onClick={() => {
-                        setWizardTemplateId(first.template_id);
-                        setWizardInitialTitle(`${viewingSOP.name} — ${tpl.name}`);
-                        setIsViewOpen(false);
-                        setWizardOpen(true);
-                      }}
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      {seq.length > 1 ? 'Run First' : 'Run this SOP'}
-                    </Button>
+                    <>
+                      <Button variant="brand" size="sm" onClick={() => handleRunAll(viewingSOP)}>
+                        <Play className="h-3 w-3 mr-1" />
+                        {isMulti ? 'Run All' : 'Run this SOP'}
+                      </Button>
+                      {isMulti && eligibleForRunNext.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => handleRunNext(viewingSOP)}>
+                          <Play className="h-3 w-3 mr-1" />
+                          Run Next
+                        </Button>
+                      )}
+                    </>
                   );
                 })()}
                 {/* Request Automation Review button removed
@@ -1542,6 +1672,101 @@ export default function SOPsPage() {
             template + seeds the title with the SOP name. The wizard's
             existing per-step assignment table handles multi-person
             assignment (fixed 2026-05-07 in the deliverables flow). */}
+        {/* [2026-06-11] Run All client picker. Spec § Run All — pick the
+            client this SOP runs against so the recurring entries bind to
+            the right client before the wizard fires. */}
+        <Dialog open={runAllPickerOpen} onOpenChange={(open) => { if (!open && !runAllBusy) setRunAllPickerOpen(false); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Play className="h-4 w-4 text-brand" />
+                Run All — {viewingSOP?.name}
+              </DialogTitle>
+              <DialogDescription>
+                Pick a client. The first template spawns via the wizard; any recurring entries auto-fire Mondays via the cron.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <Label htmlFor="run-all-client">Client</Label>
+              <Select value={runAllPickerClientId} onValueChange={setRunAllPickerClientId}>
+                <SelectTrigger id="run-all-client" className="focus-brand">
+                  <SelectValue placeholder="Pick a client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {wizardClients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {viewingSOP && (() => {
+                const seq = sequenceFromSop(viewingSOP);
+                const recurringCount = seq.filter(e => e.trigger_type === 'recurring').length;
+                return recurringCount > 0 ? (
+                  <p className="text-xs text-ink-warm-500 pt-1">
+                    {recurringCount} recurring template{recurringCount === 1 ? '' : 's'} will bind to this client and fire on the configured day each week.
+                  </p>
+                ) : null;
+              })()}
+            </div>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" size="sm" onClick={() => setRunAllPickerOpen(false)} disabled={runAllBusy}>
+                Cancel
+              </Button>
+              <Button variant="brand" size="sm" onClick={handleRunAllConfirm} disabled={runAllBusy || !runAllPickerClientId}>
+                <Play className="h-3 w-3 mr-1" />
+                {runAllBusy ? 'Running…' : 'Run All'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* [2026-06-11] Run Next picker. Shows all eligible templates
+            (manual + after_previous) for the SOP — recurring entries are
+            excluded (cron handles them) and on_sop_start is excluded
+            (Run All handled it). User picks one, wizard fires for it. */}
+        <Dialog open={runNextPickerOpen} onOpenChange={setRunNextPickerOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Play className="h-4 w-4 text-brand" />
+                Run Next — {viewingSOP?.name}
+              </DialogTitle>
+              <DialogDescription>
+                Pick the next template to spawn in this sequence.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2 max-h-[400px] overflow-y-auto">
+              {runNextOptions.length === 0 ? (
+                <p className="text-xs text-ink-warm-500 italic py-4 text-center">
+                  No eligible templates. Recurring entries auto-fire from the cron; on_sop_start fires via Run All.
+                </p>
+              ) : (
+                runNextOptions.map(opt => (
+                  <button
+                    key={`${opt.template_id}-${opt.sort_order}`}
+                    type="button"
+                    onClick={() => handleRunNextPick(opt.template_id)}
+                    className="w-full text-left px-3 py-2 border border-cream-200 rounded-md hover:border-brand/40 hover:bg-cream-50/60 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-ink-warm-900">
+                      {opt.template_name || 'Template'}
+                    </p>
+                    <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                      {opt.trigger_type === 'after_previous' ? 'After previous completes' : 'Manual'}
+                      {opt.timing_offset_label && ` · ${opt.timing_offset_label}`}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" size="sm" onClick={() => setRunNextPickerOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <DeliverableWizard
           open={wizardOpen}
           onOpenChange={setWizardOpen}

@@ -378,6 +378,107 @@ export class DeliverableService {
     return { deliverable: deliverable as Deliverable, parentTask, subtasks };
   }
 
+  // ---- Multi-Template SOP (v2) — Run All / Run Next helpers ----
+
+  /**
+   * [2026-06-11] Apply an SOP's recurring-trigger entries to the given client
+   * by inserting rows into `recurring_deliverables`. Used by the SOP Run All
+   * flow: when the user runs an SOP for a client, the on_sop_start entry
+   * spawns immediately via the wizard, and this helper queues every
+   * `recurring` entry so the cron picks them up Mondays.
+   *
+   * Idempotency: the partial unique index `uniq_recurring_deliverable_active`
+   * on `(client_id, template_id) WHERE active = true` makes re-runs a no-op
+   * for already-bound rows. Returns the count of newly-created bindings.
+   *
+   * Why service-role: this is called from a client component (/sops page)
+   * via the regular supabase client; the helper relies on that auth path
+   * being authenticated. The recurring_deliverables RLS policy allows
+   * authenticated insert.
+   */
+  static async applyRecurringEntriesForSop(opts: {
+    sequence: Array<{
+      template_id: string;
+      trigger_type: 'on_sop_start' | 'after_previous' | 'recurring' | 'manual';
+      recurrence_cadence: 'weekly' | 'biweekly' | 'monthly' | null;
+    }>;
+    clientId: string;
+    createdBy: string | null;
+  }): Promise<{ created: number; skipped: number }> {
+    const recurringEntries = opts.sequence.filter(e => e.trigger_type === 'recurring');
+    if (recurringEntries.length === 0) return { created: 0, skipped: 0 };
+
+    let created = 0;
+    let skipped = 0;
+    for (const entry of recurringEntries) {
+      const { error } = await (supabase as any)
+        .from('recurring_deliverables')
+        .insert({
+          client_id: opts.clientId,
+          template_id: entry.template_id,
+          cadence: entry.recurrence_cadence || 'weekly',
+          day_of_week: 1, // Monday default. Spec § Template 2 Notes is weekly Mondays
+          active: true,
+          created_by: opts.createdBy,
+        });
+      if (error) {
+        // 23505 = unique_violation — already a row for this (client, template).
+        // Treat as a benign skip; user re-ran the SOP for the same client.
+        if ((error as any).code === '23505') {
+          skipped++;
+          continue;
+        }
+        // Anything else is unexpected — log + continue so one failure doesn't
+        // blow up the whole batch.
+        console.error('[applyRecurringEntriesForSop] insert failed:', error);
+      } else {
+        created++;
+      }
+    }
+    return { created, skipped };
+  }
+
+  /**
+   * Build the list of templates that a Run Next flow should offer for a
+   * given SOP. Excludes `recurring` entries (those auto-fire via cron) and
+   * `on_sop_start` (that's what Run All handled). Returns entries in
+   * sequence order with their template names hydrated.
+   */
+  static async listRunNextOptionsForSop(
+    sequence: Array<{
+      template_id: string;
+      sort_order: number;
+      trigger_type: 'on_sop_start' | 'after_previous' | 'recurring' | 'manual';
+      timing_offset_label: string | null;
+    }>,
+  ): Promise<Array<{
+    template_id: string;
+    sort_order: number;
+    trigger_type: 'after_previous' | 'manual';
+    timing_offset_label: string | null;
+    template_name: string | null;
+  }>> {
+    const eligible = sequence
+      .filter(e => e.trigger_type === 'after_previous' || e.trigger_type === 'manual')
+      .sort((a, b) => a.sort_order - b.sort_order);
+    if (eligible.length === 0) return [];
+
+    const templateIds = Array.from(new Set(eligible.map(e => e.template_id)));
+    const { data: templates } = await supabase
+      .from('deliverable_templates')
+      .select('id, name')
+      .in('id', templateIds);
+    const nameById = new Map((templates ?? []).map(t => [(t as any).id as string, (t as any).name as string]));
+
+    return eligible.map(e => ({
+      template_id: e.template_id,
+      sort_order: e.sort_order,
+      trigger_type: e.trigger_type as 'after_previous' | 'manual',
+      timing_offset_label: e.timing_offset_label,
+      template_name: nameById.get(e.template_id) ?? null,
+    }));
+  }
+
   // ---- Query Deliverables ----
 
   static async getDeliverableByTaskId(parentTaskId: string): Promise<(Deliverable & { template: DeliverableTemplate; steps: DeliverableTemplateStep[] }) | null> {

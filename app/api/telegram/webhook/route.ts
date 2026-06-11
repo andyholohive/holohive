@@ -401,6 +401,15 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // [2026-06-11] /submit <link> — KOL content submission per Andy's spec
+  // decisions: use existing campaign_kols, master_kols.telegram_id mapping,
+  // 👍 reaction on approval. KOL-only command (the only KOL command in the
+  // bot today). See handleSubmitCommand for the flow + edge cases.
+  if (cmd === 'submit') {
+    await handleSubmitCommand(chatId, args, message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -853,6 +862,61 @@ async function resolveTeamMember(message: any): Promise<{ id: string; name: stri
   return { id: (data as any).id, name: (data as any).name };
 }
 
+/**
+ * [2026-06-11] resolveCaller — the auth seam for the TG bot. The original
+ * `resolveTeamMember` only checked `users.telegram_id`; KOLs are stored in
+ * `master_kols` (data objects, not auth users), so the bot needs to check
+ * both tables to figure out who's typing.
+ *
+ * Returns:
+ *   { kind: 'team', id, name, tgUserId }  — sender is on the HoloHive team
+ *   { kind: 'kol',  id, name, tgUserId }  — sender is a KOL we know about
+ *   { kind: 'unknown', tgUserId }         — random Telegram user, reject
+ *
+ * Every handler explicitly declares which kinds it accepts. Existing
+ * team-only commands (`/done`, `/task`, `/tasks`, `/bulk`, `/bug`, `/req`)
+ * keep using `resolveTeamMember` (no behavior change). The new `/submit`
+ * uses `resolveCaller` and accepts `kind === 'kol'` only.
+ *
+ * Why not consolidate: every existing call site is fine. Refactoring 6
+ * handlers to use the new helper just to enforce a contract they already
+ * satisfy is churn for churn's sake.
+ */
+type ResolvedCaller =
+  | { kind: 'team'; id: string; name: string; tgUserId: string }
+  | { kind: 'kol';  id: string; name: string; tgUserId: string }
+  | { kind: 'unknown'; tgUserId: string | null };
+
+async function resolveCaller(message: any): Promise<ResolvedCaller> {
+  const tgUserId = message?.from?.id?.toString() ?? null;
+  if (!tgUserId) return { kind: 'unknown', tgUserId: null };
+
+  // Team first — most callers will be team members and the users index is
+  // smaller than master_kols.
+  const { data: teamRow } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', tgUserId)
+    .maybeSingle();
+  if (teamRow) {
+    return { kind: 'team', id: (teamRow as any).id, name: (teamRow as any).name, tgUserId };
+  }
+
+  // KOL fallback. master_kols.telegram_id added in the same session as this
+  // helper; rows without it can't be resolved as KOLs and fall through to
+  // unknown (the spec's exact expectation).
+  const { data: kolRow } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('id, name')
+    .eq('telegram_id', tgUserId)
+    .maybeSingle();
+  if (kolRow) {
+    return { kind: 'kol', id: kolRow.id, name: kolRow.name, tgUserId };
+  }
+
+  return { kind: 'unknown', tgUserId };
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -1209,6 +1273,14 @@ async function handleCallbackQuery(cq: any) {
   // /done can tap; 10-min expiry per spec.
   if (data.startsWith('psg:')) {
     await handlePsgCallback(cq);
+    return;
+  }
+
+  // [2026-06-11] `subm:pick:<pending_id>:<campaign_id>` — multi-campaign
+  // picker on /submit. `subm:approve:<submission_id>` /
+  // `subm:reject:<submission_id>` — team review queue buttons.
+  if (data.startsWith('subm:')) {
+    await handleSubmCallback(cq);
     return;
   }
 
@@ -1946,6 +2018,535 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string) {
  *      → upload to Supabase Storage → insert backlog_attachments row
  *   5. Reply in-thread with the item's HHP link
  */
+// ─── /submit — KOL Content Submission ──────────────────────────────
+// Per the HQ TG Bot Content Submission spec (June 2026 v1). Andy's
+// 2026-06-11 build decisions:
+//   • Use existing campaign_kols (skip new kol_campaigns table)
+//   • Add master_kols.telegram_id (one nullable text column)
+//   • 👍 reaction on approval (light feedback, not silent)
+//   • Defer bonus features (deliverable counts, dead-link checker) to v2
+
+const CONTENT_TYPE_BY_PLATFORM: Record<string, { platform: string; content_type: string }> = {
+  'x.com':       { platform: 'X (Twitter)', content_type: 'tweet' },
+  'twitter.com': { platform: 'X (Twitter)', content_type: 'tweet' },
+  'youtube.com': { platform: 'YouTube',     content_type: 'video' },
+  'youtu.be':    { platform: 'YouTube',     content_type: 'video' },
+  't.me':        { platform: 'Telegram',    content_type: 'tg_post' },
+};
+
+/** Extract the hostname from a URL string, with a tolerant parse. */
+function urlHost(input: string): string | null {
+  try {
+    const u = new URL(input.trim());
+    return u.hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Auto-detect (platform, content_type) from a submitted link. */
+function detectFromLink(link: string): { platform: string; content_type: string } {
+  const host = urlHost(link);
+  if (!host) return { platform: 'unknown', content_type: 'other' };
+  const direct = CONTENT_TYPE_BY_PLATFORM[host];
+  if (direct) return direct;
+  // Fallback for hosts we don't have a direct entry for (e.g. m.youtube.com)
+  if (host.endsWith('youtube.com')) return CONTENT_TYPE_BY_PLATFORM['youtube.com'];
+  if (host.endsWith('twitter.com') || host.endsWith('x.com')) return CONTENT_TYPE_BY_PLATFORM['x.com'];
+  if (host.endsWith('t.me')) return CONTENT_TYPE_BY_PLATFORM['t.me'];
+  return { platform: 'unknown', content_type: 'other' };
+}
+
+/**
+ * `/submit <link>` — entry for KOL content submission. Single-shot when
+ * KOL is on one active campaign; picker buttons when on 2+.
+ *
+ * Flow:
+ *   1. Resolve caller; must be a KOL (master_kols row)
+ *   2. Validate the link is a URL
+ *   3. Find the KOL's active-campaign assignments via campaign_kols
+ *   4. 0 campaigns → reject with hint
+ *   5. 1 campaign → insert content_submissions immediately + confirm
+ *   6. 2+ campaigns → stash in pending_submissions + send picker
+ *
+ * Validation (per spec):
+ *   - URL must parse
+ *   - No duplicate link for the same campaign (UNIQUE index enforces)
+ *   - Campaign must not be in the future (start_date <= today)
+ *   - KOL must be on the campaign (enforced by the campaign list above)
+ *
+ * Content type / platform auto-detected from the URL host. Spec edge case
+ * about "this looks like a YouTube link but you selected Tweet" doesn't
+ * apply here because the user doesn't select a type — the bot infers it.
+ */
+async function handleSubmitCommand(chatId: string, args: string[], message: any) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
+  const caller = await resolveCaller(message);
+
+  if (caller.kind !== 'kol') {
+    // Soft reject — team members shouldn't be calling /submit on behalf
+    // of KOLs, and unknown users shouldn't get a useful error.
+    await sendTelegramMessage(
+      chatId,
+      caller.kind === 'team'
+        ? '⚠️ <code>/submit</code> is for KOLs — log content through the dashboards.'
+        : "I don't have you in the KOL system. Ask your HoloHive contact to link your Telegram account.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  const link = args.join(' ').trim();
+  if (!link) {
+    await sendTelegramMessage(
+      chatId,
+      'Usage: <code>/submit https://x.com/you/status/123…</code>',
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+  if (!urlHost(link)) {
+    await sendTelegramMessage(
+      chatId,
+      "That doesn't look like a valid URL. Paste the full link including <code>https://</code>.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Pull the KOL's active-campaign list via campaign_kols + campaigns.
+  // Active = campaign.status = 'Active' AND not archived AND start_date <= today.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const { data: assignments } = await (supabaseAdmin as any)
+    .from('campaign_kols')
+    .select('id, campaign:campaigns!inner(id, name, status, start_date, archived_at)')
+    .eq('master_kol_id', caller.id)
+    .is('deleted_at', null);
+
+  const activeCampaigns = ((assignments ?? []) as Array<{
+    id: string;
+    campaign: { id: string; name: string; status: string; start_date: string | null; archived_at: string | null };
+  }>)
+    .map(a => a.campaign)
+    .filter(c => c && c.status === 'Active' && !c.archived_at && (!c.start_date || c.start_date <= todayIso));
+
+  if (activeCampaigns.length === 0) {
+    await sendTelegramMessage(
+      chatId,
+      "🤷 You're not on any active campaigns right now. If you think this is wrong, ping your HoloHive contact.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Auto-detect platform + content_type from the URL.
+  const detected = detectFromLink(link);
+
+  if (activeCampaigns.length === 1) {
+    // Single campaign — skip the picker per spec.
+    await finalizeSubmission({
+      chatId,
+      threadId,
+      kolTgId: caller.tgUserId,
+      kolId: caller.id,
+      kolName: caller.name,
+      campaignId: activeCampaigns[0].id,
+      campaignName: activeCampaigns[0].name,
+      link,
+      platform: detected.platform,
+      contentType: detected.content_type,
+    });
+    return;
+  }
+
+  // Multi-campaign — stash and ask. Telegram callback_data caps at 64 bytes
+  // so we use a pending_submissions row to hold the link.
+  const { data: pending, error: pErr } = await (supabaseAdmin as any)
+    .from('pending_submissions')
+    .insert({
+      kol_telegram_id: caller.tgUserId,
+      kol_id: caller.id,
+      link,
+    })
+    .select('id')
+    .single();
+  if (pErr || !pending?.id) {
+    console.error('[/submit] pending_submissions insert failed:', pErr);
+    await sendTelegramMessage(chatId, '⚠️ Bot hiccup. Try again in a moment.', 'HTML', threadId);
+    return;
+  }
+
+  const buttons = activeCampaigns.map(c => [{
+    text: c.name,
+    callback_data: `subm:pick:${pending.id}:${c.id}`,
+  }]);
+  buttons.push([{ text: '❌ Cancel', callback_data: `subm:cancel:${pending.id}:_` }]);
+  await sendTelegramMessageWithButtons(
+    chatId,
+    `Which campaign is this for?\n<i>Link:</i> ${escapeHtml(link)}`,
+    buttons,
+    threadId,
+  );
+}
+
+/**
+ * Insert a content_submissions row + send confirmation to KOL + forward to
+ * the team review channel with Approve/Reject buttons.
+ *
+ * Returns the new submission id or null if the insert was rejected (e.g.
+ * duplicate link via the unique partial index — UNIQUE on
+ * (campaign_id, link) WHERE status != 'rejected').
+ */
+async function finalizeSubmission(opts: {
+  chatId: string;
+  threadId: number | undefined;
+  kolTgId: string;
+  kolId: string;
+  kolName: string;
+  campaignId: string;
+  campaignName: string;
+  link: string;
+  platform: string;
+  contentType: string;
+}): Promise<string | null> {
+  // Insert. The UNIQUE partial index handles dup-link rejection in the DB.
+  const { data: row, error } = await (supabaseAdmin as any)
+    .from('content_submissions')
+    .insert({
+      kol_telegram_id: opts.kolTgId,
+      kol_id: opts.kolId,
+      kol_name: opts.kolName,
+      campaign_id: opts.campaignId,
+      campaign_name: opts.campaignName,
+      link: opts.link,
+      platform: opts.platform,
+      content_type: opts.contentType,
+      status: 'pending_review',
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    // 23505 = unique_violation — duplicate link for this campaign.
+    if ((error as any).code === '23505') {
+      // Look up the existing submission's date for a friendly message.
+      const { data: dup } = await (supabaseAdmin as any)
+        .from('content_submissions')
+        .select('submitted_at, status')
+        .eq('campaign_id', opts.campaignId)
+        .eq('link', opts.link)
+        .neq('status', 'rejected')
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const when = dup?.submitted_at
+        ? new Date(dup.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : 'earlier';
+      await sendTelegramMessage(
+        opts.chatId,
+        `⚠️ This link was already submitted on ${escapeHtml(when)}. No action needed.`,
+        'HTML',
+        opts.threadId,
+      );
+      return null;
+    }
+    console.error('[/submit] content_submissions insert failed:', error);
+    await sendTelegramMessage(opts.chatId, '⚠️ Bot hiccup. Try again in a moment.', 'HTML', opts.threadId);
+    return null;
+  }
+
+  const submissionId = (row as { id: string }).id;
+  const submittedAt = new Date();
+  const submittedLabel = submittedAt.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+
+  // Send KOL confirmation receipt per spec verbatim.
+  await sendTelegramMessage(
+    opts.chatId,
+    [
+      '✅ <b>Submission received</b>',
+      `Campaign: <b>${escapeHtml(opts.campaignName)}</b>`,
+      `Type: ${escapeHtml(opts.contentType)}`,
+      `Date: ${escapeHtml(submittedLabel)}`,
+      `Link: ${escapeHtml(opts.link)}`,
+    ].join('\n'),
+    'HTML',
+    opts.threadId,
+  );
+
+  // Forward to the team review channel.
+  await forwardSubmissionToReviewChannel({
+    submissionId,
+    kolName: opts.kolName,
+    campaignName: opts.campaignName,
+    contentType: opts.contentType,
+    platform: opts.platform,
+    link: opts.link,
+    submittedAt: submittedLabel,
+  });
+
+  return submissionId;
+}
+
+/**
+ * Send a submission to the configured internal review channel with
+ * Approve / Reject inline buttons. Channel ID lives in app_settings
+ * (key: content_submissions_channel_id) so ops can change it without
+ * a Vercel redeploy. Skips silently if no channel is set (logs).
+ */
+async function forwardSubmissionToReviewChannel(opts: {
+  submissionId: string;
+  kolName: string;
+  campaignName: string;
+  contentType: string;
+  platform: string;
+  link: string;
+  submittedAt: string;
+}): Promise<void> {
+  const { data: chanRow } = await (supabaseAdmin as any)
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'content_submissions_channel_id')
+    .maybeSingle();
+  const channelId = (chanRow as any)?.value;
+  if (!channelId) {
+    console.log('[/submit] content_submissions_channel_id not configured; skipping review forward');
+    return;
+  }
+  const { data: threadRow } = await (supabaseAdmin as any)
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'content_submissions_channel_thread_id')
+    .maybeSingle();
+  const threadIdRaw = (threadRow as any)?.value;
+  const threadId = threadIdRaw ? parseInt(threadIdRaw, 10) : undefined;
+
+  const body = [
+    '📥 <b>New content submission</b>',
+    `KOL: <b>${escapeHtml(opts.kolName)}</b>`,
+    `Campaign: ${escapeHtml(opts.campaignName)}`,
+    `Type: ${escapeHtml(opts.contentType)} · ${escapeHtml(opts.platform)}`,
+    `Link: ${escapeHtml(opts.link)}`,
+    `Submitted: ${escapeHtml(opts.submittedAt)}`,
+  ].join('\n');
+
+  const buttons = [[
+    { text: '✅ Approve', callback_data: `subm:approve:${opts.submissionId}` },
+    { text: '❌ Reject',  callback_data: `subm:reject:${opts.submissionId}` },
+  ]];
+
+  // The button-send helper returns boolean; we don't capture the resulting
+  // message_id because the review callback handler already has it via
+  // cq.message.message_id at tap time. v2 could swap this for a richer
+  // helper that returns the full sendMessage response if needed (e.g. to
+  // build an external admin queue surface that needs the message ref).
+  await sendTelegramMessageWithButtons(channelId, body, buttons, threadId);
+}
+
+/**
+ * Handle subm:* button callbacks.
+ *   subm:pick:<pending_id>:<campaign_id>    — KOL chose a campaign
+ *   subm:cancel:<pending_id>:_              — KOL cancelled the picker
+ *   subm:approve:<submission_id>            — team approved
+ *   subm:reject:<submission_id>             — team rejected (generic reason)
+ */
+async function handleSubmCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const data: string = cq.data || '';
+  const parts = data.split(':');
+  const action = parts[1];
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  if (action === 'pick' || action === 'cancel') {
+    const pendingId = parts[2];
+    const campaignId = parts[3];
+    await handleSubmPickerCallback(cq, action, pendingId, campaignId);
+    return;
+  }
+  if (action === 'approve' || action === 'reject') {
+    const submissionId = parts[2];
+    await handleSubmReviewCallback(cq, action, submissionId);
+    return;
+  }
+  await answerCallbackQuery(callbackId, 'Unknown action.');
+  void messageChatId; void messageId; // touched in sub-handlers
+}
+
+async function handleSubmPickerCallback(
+  cq: any,
+  action: 'pick' | 'cancel',
+  pendingId: string,
+  campaignId: string,
+) {
+  const callbackId: string = cq.id;
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  // Permission: only the KOL who started /submit can tap. We don't bake the
+  // TG id into callback_data because the pending row already knows.
+  const tapperTgUserId = cq.from?.id?.toString();
+  const { data: pending } = await (supabaseAdmin as any)
+    .from('pending_submissions')
+    .select('id, kol_telegram_id, kol_id, link')
+    .eq('id', pendingId)
+    .maybeSingle();
+  if (!pending) {
+    await answerCallbackQuery(callbackId, 'Picker expired. Send /submit again.');
+    return;
+  }
+  if (pending.kol_telegram_id !== tapperTgUserId) {
+    await answerCallbackQuery(callbackId, 'Only the KOL who started /submit can tap these.');
+    return;
+  }
+
+  if (action === 'cancel') {
+    await (supabaseAdmin as any).from('pending_submissions').delete().eq('id', pendingId);
+    if (messageChatId && messageId) {
+      await editMessageText(messageChatId, messageId, '↩ <i>Submission cancelled.</i>');
+    }
+    await answerCallbackQuery(callbackId, 'Cancelled.');
+    return;
+  }
+
+  // Look up the chosen campaign for the friendly name
+  const { data: campaign } = await (supabaseAdmin as any)
+    .from('campaigns')
+    .select('id, name')
+    .eq('id', campaignId)
+    .maybeSingle();
+  if (!campaign) {
+    await answerCallbackQuery(callbackId, 'Campaign not found.');
+    return;
+  }
+
+  // Look up the KOL's display name
+  const { data: kol } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('name')
+    .eq('id', pending.kol_id)
+    .maybeSingle();
+  const kolName = (kol as any)?.name || 'KOL';
+
+  const detected = detectFromLink(pending.link);
+
+  // Insert + confirm + forward. Same path as the single-campaign auto-pick.
+  const submissionId = await finalizeSubmission({
+    chatId: messageChatId,
+    threadId: undefined,
+    kolTgId: pending.kol_telegram_id,
+    kolId: pending.kol_id,
+    kolName,
+    campaignId: campaign.id,
+    campaignName: campaign.name,
+    link: pending.link,
+    platform: detected.platform,
+    contentType: detected.content_type,
+  });
+
+  await (supabaseAdmin as any).from('pending_submissions').delete().eq('id', pendingId);
+  if (messageChatId && messageId) {
+    await editMessageText(
+      messageChatId,
+      messageId,
+      submissionId
+        ? `✅ Saved for <b>${escapeHtml(campaign.name)}</b>.`
+        : '↩ Submission not saved — see message above.',
+    );
+  }
+  await answerCallbackQuery(callbackId);
+}
+
+async function handleSubmReviewCallback(
+  cq: any,
+  action: 'approve' | 'reject',
+  submissionId: string,
+) {
+  const callbackId: string = cq.id;
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  const teamMember = await resolveTeamMember(cq);
+  if (!teamMember) {
+    await answerCallbackQuery(callbackId, 'Team-only.');
+    return;
+  }
+
+  const { data: sub } = await (supabaseAdmin as any)
+    .from('content_submissions')
+    .select('id, kol_telegram_id, kol_name, campaign_name, link, status')
+    .eq('id', submissionId)
+    .maybeSingle();
+  if (!sub) {
+    await answerCallbackQuery(callbackId, 'Submission not found.');
+    return;
+  }
+  if (sub.status === 'approved' || sub.status === 'rejected') {
+    await answerCallbackQuery(callbackId, `Already ${sub.status}.`);
+    return;
+  }
+
+  const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+  const { error: updErr } = await (supabaseAdmin as any)
+    .from('content_submissions')
+    .update({
+      status: nextStatus,
+      reviewed_by: teamMember.id,
+      reviewed_by_name: teamMember.name,
+      reviewed_at: new Date().toISOString(),
+      // v1 generic rejection reason. v2 will prompt the reviewer for a
+      // specific reason via a force_reply prompt (see spec).
+      rejection_reason: action === 'reject'
+        ? 'Did not meet criteria. Contact your HoloHive lead for details.'
+        : null,
+    })
+    .eq('id', submissionId);
+  if (updErr) {
+    console.error('[/submit] review update failed:', updErr);
+    await answerCallbackQuery(callbackId, 'Update failed.');
+    return;
+  }
+
+  // Edit the review-channel message to reflect the decision (replaces the
+  // buttons so it can't be tapped again).
+  if (messageChatId && messageId) {
+    const tag = action === 'approve'
+      ? `✅ <b>Approved</b> by ${escapeHtml(teamMember.name)}`
+      : `❌ <b>Rejected</b> by ${escapeHtml(teamMember.name)}`;
+    await editMessageText(
+      messageChatId,
+      messageId,
+      [
+        tag,
+        `KOL: ${escapeHtml(sub.kol_name)}`,
+        `Campaign: ${escapeHtml(sub.campaign_name)}`,
+        `Link: ${escapeHtml(sub.link)}`,
+      ].join('\n'),
+    );
+  }
+
+  // Notify the KOL per Andy's Q3 answer (option b: 👍 reaction on approval,
+  // text DM on rejection).
+  if (sub.kol_telegram_id) {
+    if (action === 'approve') {
+      await sendTelegramMessage(sub.kol_telegram_id, '👍', 'HTML');
+    } else {
+      await sendTelegramMessage(
+        sub.kol_telegram_id,
+        `Submission issue: <i>Did not meet criteria.</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`,
+        'HTML',
+      );
+    }
+  }
+
+  await answerCallbackQuery(callbackId, action === 'approve' ? 'Approved.' : 'Rejected.');
+}
+
 async function handleBacklogCommand(
   chatId: string,
   type: 'bug' | 'request',

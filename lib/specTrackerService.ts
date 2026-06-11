@@ -39,6 +39,14 @@ export type SpecFeature = {
   last_tested_at: string | null;
   last_tested_by: string | null;
   notes: string | null;
+  /**
+   * [2026-06-11] "Where to test this" pointer. Free-form text — typically
+   * an in-app URL (`/dashboard?tab=internal`), a TG command
+   * (`/submit https://x.com/...`), or a written instruction.
+   * SpecsTab renders this as a clickable Link when it starts with `/` or
+   * `http`, plain text otherwise.
+   */
+  test_reference: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -34,8 +34,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
+  Popover, PopoverContent, PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Upload, CheckCircle2,
-  AlertTriangle, XCircle, Circle, FileText, ExternalLink, History,
+  AlertTriangle, XCircle, Circle, FileText, ExternalLink, History, MapPin, Database, Loader2,
   Sparkles, Search, Edit2, Trash2, ArrowLeft, FileCheck2,
 } from 'lucide-react';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -108,9 +111,42 @@ export default function SpecsTab() {
   const [newSpecSummary, setNewSpecSummary] = useState('');
   const [creatingSpec, setCreatingSpec] = useState(false);
 
+  // [2026-06-11] Picker data for test_reference placeholders like
+  // {campaign_id} and {client_id}. Lazy-loaded once when the tab mounts.
+  // Used by TestReferenceChip when a feature's reference contains a
+  // placeholder — renders a Select inline so the validator can navigate
+  // directly to a specific record instead of guessing.
+  const [pickerOptions, setPickerOptions] = useState<Record<string, Array<{ id: string; name: string }>>>({});
+
   useEffect(() => {
     refresh();
+    loadPickerOptions();
   }, []);
+
+  async function loadPickerOptions() {
+    try {
+      const [campaignsRes, clientsRes] = await Promise.all([
+        (supabase as any)
+          .from('campaigns')
+          .select('id, name')
+          .eq('status', 'Active')
+          .is('archived_at', null)
+          .order('name'),
+        (supabase as any)
+          .from('clients')
+          .select('id, name')
+          .eq('is_active', true)
+          .is('archived_at', null)
+          .order('name'),
+      ]);
+      setPickerOptions({
+        campaign_id: campaignsRes.data || [],
+        client_id: clientsRes.data || [],
+      });
+    } catch (err) {
+      console.error('[SpecsTab] loadPickerOptions failed:', err);
+    }
+  }
 
   async function refresh() {
     setLoading(true);
@@ -140,6 +176,7 @@ export default function SpecsTab() {
         currentUserId={currentUserId ?? null}
         service={service}
         onBack={() => { setSelectedSpecId(null); refresh(); }}
+        pickerOptions={pickerOptions}
       />
     );
   }
@@ -405,12 +442,13 @@ function StatusChip({
 // ─── Detail view ──────────────────────────────────────────────────
 
 function SpecDetailView({
-  specId, currentUserId, service, onBack,
+  specId, currentUserId, service, onBack, pickerOptions,
 }: {
   specId: string;
   currentUserId: string | null;
   service: SpecTrackerService;
   onBack: () => void;
+  pickerOptions: Record<string, Array<{ id: string; name: string }>>;
 }) {
   const { toast } = useToast();
   const [spec, setSpec] = useState<SpecFull | null>(null);
@@ -595,6 +633,7 @@ function SpecDetailView({
                 <FeatureRow
                   key={feature.id}
                   feature={feature}
+                  pickerOptions={pickerOptions}
                   onMarkWorking={() => setTestStatus(feature, 'working')}
                   onReport={() => setReportDialogFor(feature)}
                   onShowHistory={() => setHistoryFor(feature)}
@@ -761,6 +800,7 @@ function SpecDetailView({
 function FeatureRow({
   feature,
   onMarkWorking, onReport, onShowHistory, onUpdateNotes, onUpdateBuildStatus, onDelete,
+  pickerOptions,
 }: {
   feature: SpecFeature & { children?: SpecFeature[] };
   onMarkWorking: () => void;
@@ -769,6 +809,7 @@ function FeatureRow({
   onUpdateNotes: (notes: string) => void;
   onUpdateBuildStatus: (s: BuildStatus) => void;
   onDelete: () => void;
+  pickerOptions: Record<string, Array<{ id: string; name: string }>>;
 }) {
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState(feature.notes || '');
@@ -787,6 +828,9 @@ function FeatureRow({
           </div>
           {feature.description && (
             <p className="text-[11px] text-ink-warm-500 mb-1">{feature.description}</p>
+          )}
+          {feature.test_reference && (
+            <TestReferenceChip reference={feature.test_reference} pickerOptions={pickerOptions} />
           )}
           {feature.notes && !notesOpen && (
             <p className="text-[11px] text-ink-warm-600 italic">📝 {feature.notes}</p>
@@ -1098,4 +1142,260 @@ function DocUploadDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * "Where to test this" chip on each feature row. Four render modes:
+ *
+ *   1. `TABLE: <table_name>` → click → Popover with the first 50 rows
+ *      of the table, rendered as a compact table. Lets the validator
+ *      verify schema features (`pre_ship_gate_log`, `content_submissions`)
+ *      without leaving HQ.
+ *   2. Reference contains a `{placeholder}` token (e.g. `{campaign_id}`)
+ *      → Popover-based picker (searchable list). Pick → resolve token →
+ *      open in new tab. Switched from SelectTrigger because that primitive
+ *      forces a `w-full` width that overflowed inline.
+ *   3. Reference looks like a URL (starts with `/` or `http`)
+ *      → clickable link, opens in new tab.
+ *   4. Anything else (TG commands, written prose, intentional non-builds)
+ *      → plain monospace text with the 📍 icon.
+ */
+function TestReferenceChip({
+  reference,
+  pickerOptions,
+}: {
+  reference: string;
+  pickerOptions: Record<string, Array<{ id: string; name: string }>>;
+}) {
+  const trimmed = reference.trim();
+
+  // ── Mode 1: TABLE preview ──────────────────────────────────────────
+  if (trimmed.toUpperCase().startsWith('TABLE:')) {
+    const tableName = trimmed.slice(6).trim();
+    return <TablePreviewChip tableName={tableName} />;
+  }
+
+  // ── Mode 2: {placeholder} → searchable picker ──────────────────────
+  const placeholderMatch = trimmed.match(/\{(\w+)\}/);
+  if (placeholderMatch) {
+    const placeholder = placeholderMatch[1];
+    const options = pickerOptions[placeholder] || [];
+    const label = placeholder.replace(/_id$/, '').replace(/_/g, ' ');
+    return <PlaceholderPickerChip template={trimmed} placeholder={placeholder} options={options} label={label} />;
+  }
+
+  // ── Mode 3: plain URL ──────────────────────────────────────────────
+  const isUrl = trimmed.startsWith('/') || trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  if (isUrl) {
+    return (
+      <a
+        href={trimmed}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-brand-light text-brand border border-brand/20 font-medium hover:bg-brand/15 transition-colors mb-1 max-w-full"
+        title="Open where to test this feature"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <MapPin className="h-2.5 w-2.5 flex-shrink-0" />
+        <span className="font-mono truncate">{trimmed}</span>
+        <ExternalLink className="h-2.5 w-2.5 opacity-60 flex-shrink-0" />
+      </a>
+    );
+  }
+
+  // ── Mode 4: plain text ─────────────────────────────────────────────
+  return (
+    <p className="inline-flex items-center gap-1 text-[10px] text-ink-warm-600 mb-1 max-w-full">
+      <MapPin className="h-2.5 w-2.5 text-brand flex-shrink-0" />
+      <span className="font-mono break-all">{trimmed}</span>
+    </p>
+  );
+}
+
+/**
+ * Popover picker for `{placeholder}` references. Search input filters the
+ * list; clicking an option resolves the URL and opens it in a new tab.
+ *
+ * Why a Popover instead of Select: SelectTrigger is a w-full button by
+ * default + forces a chevron, which overflowed the inline chip slot.
+ * Popover lets us drive the trigger size from a plain button.
+ */
+function PlaceholderPickerChip({
+  template,
+  placeholder,
+  options,
+  label,
+}: {
+  template: string;
+  placeholder: string;
+  options: Array<{ id: string; name: string }>;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const filtered = search
+    ? options.filter(o => o.name.toLowerCase().includes(search.toLowerCase()))
+    : options;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-brand-light text-brand border border-brand/20 font-medium hover:bg-brand/15 transition-colors mb-1 max-w-full"
+        >
+          <MapPin className="h-2.5 w-2.5 flex-shrink-0" />
+          <span className="font-mono truncate">{template}</span>
+          <span className="opacity-60 flex-shrink-0">· pick {label}</span>
+          <ChevronDown className="h-2.5 w-2.5 opacity-60 flex-shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="p-2 border-b border-cream-100">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${label}…`}
+            className="h-7 text-xs focus-brand"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto py-1">
+          {options.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-ink-warm-500 italic">No options loaded yet.</p>
+          ) : filtered.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-ink-warm-500 italic">No matches.</p>
+          ) : (
+            filtered.map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => {
+                  const resolved = template.replace(`{${placeholder}}`, opt.id);
+                  setOpen(false);
+                  window.open(resolved, '_blank', 'noopener,noreferrer');
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-cream-100 transition-colors text-ink-warm-900"
+              >
+                {opt.name}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Popover preview for `TABLE: <name>` references. Fetches up to 50 rows
+ * lazily on first open and renders a compact column-by-row table so the
+ * validator can confirm schema features actually contain data.
+ *
+ * Uses the regular supabase client (not service-role) — RLS applies.
+ * Andy is super_admin so the policies don't block him; other validators
+ * see only what their role lets them.
+ */
+function TablePreviewChip({ tableName }: { tableName: string }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadRows() {
+    if (rows !== null || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: e } = await (supabase as any)
+        .from(tableName)
+        .select('*')
+        .limit(50);
+      if (e) {
+        setError(e.message);
+      } else {
+        setRows(data || []);
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) loadRows(); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-brand-light text-brand border border-brand/20 font-medium hover:bg-brand/15 transition-colors mb-1 max-w-full"
+        >
+          <Database className="h-2.5 w-2.5 flex-shrink-0" />
+          <span className="font-mono truncate">{tableName}</span>
+          <span className="opacity-60 flex-shrink-0">· preview</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[640px] max-w-[90vw] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="px-3 py-2 border-b border-cream-100 flex items-center justify-between">
+          <p className="text-xs font-semibold text-ink-warm-900">
+            <Database className="h-3 w-3 inline mr-1 text-brand" />
+            <span className="font-mono">{tableName}</span>
+            {rows && <span className="ml-2 text-ink-warm-500 font-normal">· {rows.length} {rows.length === 1 ? 'row' : 'rows'}</span>}
+          </p>
+          <span className="text-[10px] text-ink-warm-500">first 50</span>
+        </div>
+        <div className="max-h-[400px] overflow-auto">
+          {loading ? (
+            <div className="px-3 py-6 text-center text-xs text-ink-warm-500">
+              <Loader2 className="h-3 w-3 inline animate-spin mr-1" />
+              Loading…
+            </div>
+          ) : error ? (
+            <p className="px-3 py-3 text-xs text-rose-600 italic font-mono">Error: {error}</p>
+          ) : !rows || rows.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-ink-warm-500 italic">No rows.</p>
+          ) : (
+            <table className="text-[10px] w-full">
+              <thead className="bg-cream-50 sticky top-0">
+                <tr>
+                  {Object.keys(rows[0]).map(k => (
+                    <th key={k} className="text-left px-2 py-1 font-mono text-ink-warm-600 border-b border-cream-100 whitespace-nowrap">{k}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="hover:bg-cream-50/40 border-b border-cream-50">
+                    {Object.keys(rows[0]).map(k => (
+                      <td key={k} className="px-2 py-1 align-top font-mono text-ink-warm-900 whitespace-nowrap max-w-[160px] truncate" title={String(r[k] ?? '')}>
+                        {formatPreviewCell(r[k])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Render a single DB cell value into the preview table. Compact + null-safe;
+ * timestamps shortened to date+HH:MM; objects stringified; booleans labeled.
+ */
+function formatPreviewCell(v: any): string {
+  if (v === null || v === undefined) return '∅';
+  if (typeof v === 'boolean') return v ? '✓' : '·';
+  if (typeof v === 'object') return JSON.stringify(v);
+  const str = String(v);
+  // Detect ISO timestamps and shorten to "MMM D HH:MM"
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(str)) {
+    return new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+  return str;
 }
