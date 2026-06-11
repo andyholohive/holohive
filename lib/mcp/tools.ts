@@ -236,6 +236,15 @@ export const searchKolsSchema = {
     .describe('Search by name (case-insensitive substring match).'),
   region: z.string().optional()
     .describe('Optional region filter (e.g. "Korea", "Global").'),
+  // [2026-06-10] HHP Creator Taxonomy Spec — both fields are TEXT[]
+  // on master_kols. Partial-match (case-insensitive includes) so
+  // callers don't have to know the exact casing. Pass a single
+  // string; the row matches if ANY element in the array contains
+  // the query as a substring. Mirrors how list_top_kols works.
+  creator_type: z.string().optional()
+    .describe('Optional creator_type filter — partial case-insensitive match against the multi-value array (e.g. "Analyst", "Native"). See HHP Creator Taxonomy Spec for the 8 spec types.'),
+  niche: z.string().optional()
+    .describe('Optional niche filter — partial case-insensitive match against the multi-value array (e.g. "DeFi", "AI", "Solana"). See HHP Creator Taxonomy Spec for the 13 spec niches.'),
   // `tier` filter removed — column dropped in migration 071. Will be
   // replaced by a Score-based filter once Phase 3 ships scoring.
   limit: z.number().int().min(1).max(50).default(20),
@@ -243,23 +252,52 @@ export const searchKolsSchema = {
 
 export async function searchKols(
   supabase: SupabaseClient,
-  args: { query: string; region?: string; limit: number },
+  args: { query: string; region?: string; creator_type?: string; niche?: string; limit: number },
 ): Promise<string> {
+  // Over-fetch when array filters are in play so post-filtering can
+  // still surface `limit` results. Same pattern list_top_kols uses.
+  const hasArrayFilter = !!(args.creator_type || args.niche);
   let q = (supabase as any)
     .from('master_kols')
-    .select('id, name, region, followers, niche, platform, link, in_house, archived_at')
+    .select('id, name, region, followers, niche, creator_type, platform, link, in_house, archived_at')
     .is('archived_at', null)
     .ilike('name', `%${args.query}%`)
     .order('followers', { ascending: false, nullsFirst: false })
-    .limit(args.limit);
+    .limit(hasArrayFilter ? args.limit * 3 : args.limit);
 
   if (args.region) q = q.ilike('region', args.region);
   // tier filter removed (migration 071).
 
   const { data, error } = await q;
   if (error) return `Error: ${error.message}`;
-  const rows = (data || []) as any[];
-  if (rows.length === 0) return `No KOLs match "${args.query}"${args.region ? ` (region=${args.region})` : ''}.`;
+  let rows = (data || []) as any[];
+
+  // ─── Array filters (client-side) ───
+  // Both columns are TEXT[]; Supabase REST .contains() requires
+  // exact-match elements, which doesn't fit our case-insensitive
+  // partial-match contract. Filter in memory after the fetch.
+  if (args.creator_type) {
+    const t = args.creator_type.toLowerCase();
+    rows = rows.filter(r => Array.isArray(r.creator_type)
+      && r.creator_type.some((ct: string) => ct.toLowerCase().includes(t)));
+  }
+  if (args.niche) {
+    const t = args.niche.toLowerCase();
+    rows = rows.filter(r => Array.isArray(r.niche)
+      && r.niche.some((n: string) => n.toLowerCase().includes(t)));
+  }
+
+  rows = rows.slice(0, args.limit);
+
+  if (rows.length === 0) {
+    const filters = [
+      args.region && `region=${args.region}`,
+      args.creator_type && `creator_type~"${args.creator_type}"`,
+      args.niche && `niche~"${args.niche}"`,
+    ].filter(Boolean);
+    const suffix = filters.length ? ` (${filters.join(', ')})` : '';
+    return `No KOLs match "${args.query}"${suffix}.`;
+  }
 
   const fmtFollowers = (n: number | null) => {
     if (n == null) return '—';
@@ -270,12 +308,17 @@ export async function searchKols(
 
   const lines = rows.map(k => {
     const niches = Array.isArray(k.niche) && k.niche.length ? ` · ${k.niche.slice(0, 3).join('/')}` : '';
+    // Surface creator_type alongside niches so the caller sees both
+    // taxonomy fields without a follow-up get_kol_detail call.
+    const cts = Array.isArray(k.creator_type) && k.creator_type.length
+      ? ` · type:${k.creator_type.slice(0, 2).join('+')}`
+      : '';
     const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
     // Emit the UUID so the caller can pivot to get_kol_detail without
     // a second search. Without this, the schema description for
     // get_kol_detail ("from list_top_kols or search_kols") is a lie —
     // the UUID isn't anywhere in the response.
-    return `• [${k.id}] ${k.name} — ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${k.in_house ? ` · in-house: ${k.in_house}` : ''}`;
+    return `• [${k.id}] ${k.name} — ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${cts}${niches}${plats}${k.in_house ? ` · in-house: ${k.in_house}` : ''}`;
   });
 
   return `${rows.length} KOL(s) matching "${args.query}":\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info (link, wallet, pricing, etc.).`;

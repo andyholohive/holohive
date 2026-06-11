@@ -6,6 +6,10 @@
  * surface. Layer is universally accessible.
  *
  * Returns:
+ *   - retention: spec § 5.1 — client_retention_pct, avg_engagement_weeks,
+ *     total_content_delivered. Counts ad-hoc clients in retention denom
+ *     when they have a Churned status (the array filter is is_ad_hoc
+ *     dropping live ones, NOT historical churned ones).
  *   - renewals: standard clients in the renewal window, sorted by
  *     days-left ascending (red first, then amber).
  *   - upcomingMonths: a 90-day forward-look grouped by month.
@@ -33,9 +37,24 @@ export async function GET() {
     const sb = adminSupabase();
     const cfg = await getDashboardConfig();
 
-    const [clients, pipeline] = await Promise.all([
+    const [clients, pipeline, retentionRaw, contentTotalRaw] = await Promise.all([
       getStandardClients(sb),
       getPipelineSnapshot(),
+      // [2026-06-11] Retention metrics — spec § 5.1.
+      // Count active vs churned across ALL clients (including ad-hoc
+      // and whitelisted). Churned status is the manual signal — when
+      // an engagement ends without renewal, ops flips it to 'churned'
+      // on the Clients page.
+      (sb as any)
+        .from('clients')
+        .select('id, engagement_status, engagement_start_date')
+        .in('engagement_status', ['active', 'churned']),
+      // All-time content posted count across all clients. Just a count,
+      // not per-client — fed into the "Total Content Delivered" card.
+      (sb as any)
+        .from('contents')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'posted'),
     ]);
 
     // Build renewal entries — only those with an end_date set (ad-hoc
@@ -79,9 +98,46 @@ export async function GET() {
     const activeCount = activeStages.reduce((sum, s) => sum + s.count, 0);
     const activeValue = activeStages.reduce((sum, s) => sum + s.totalValue, 0);
 
+    // [2026-06-11] Retention block — spec § 5.1.
+    const retentionRows = (retentionRaw.data ?? []) as Array<{
+      id: string;
+      engagement_status: string | null;
+      engagement_start_date: string | null;
+    }>;
+    const activeCountRet = retentionRows.filter(c => c.engagement_status === 'active').length;
+    const churnedCountRet = retentionRows.filter(c => c.engagement_status === 'churned').length;
+    const denomRet = activeCountRet + churnedCountRet;
+    const clientRetentionPct = denomRet > 0 ? Math.round((activeCountRet / denomRet) * 100) : 100;
+
+    // Avg engagement weeks — across CURRENT active clients only. If
+    // there's no start date, skip the row from the average.
+    const weekSpans = retentionRows
+      .filter(c => c.engagement_status === 'active' && c.engagement_start_date)
+      .map(c => {
+        const start = new Date(
+          c.engagement_start_date + (c.engagement_start_date!.includes('T') ? '' : 'T00:00:00Z'),
+        );
+        const ms = Date.now() - start.getTime();
+        return ms > 0 ? Math.floor(ms / (7 * 86_400_000)) : 0;
+      });
+    const avgEngagementWeeks = weekSpans.length > 0
+      ? Math.round((weekSpans.reduce((s, w) => s + w, 0) / weekSpans.length) * 10) / 10
+      : 0;
+
+    const totalContentDelivered = (contentTotalRaw as any).count ?? 0;
+
+    const retention = {
+      clientRetentionPct,
+      activeClients: activeCountRet,
+      churnedClients: churnedCountRet,
+      avgEngagementWeeks,
+      totalContentDelivered,
+    };
+
     const payload = {
       asOf: new Date().toISOString(),
       thresholds: cfg,
+      retention,
       renewals: {
         all: renewals,
         countsByTone: {

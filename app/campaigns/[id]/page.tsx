@@ -15,7 +15,7 @@ import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion, Tag } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -77,6 +77,11 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { FileUploadComponent } from '@/components/campaign/FileUploadComponent';
 import { ReportTabContent } from '@/components/campaign/ReportTabContent';
+import ShowcaseSettingsDialog from './_components/ShowcaseSettingsDialog';
+import ContentTagDialog from './_components/ContentTagDialog';
+import ActivationSettingsDialog from './_components/ActivationSettingsDialog';
+import LineupsTab from '@/components/campaign/LineupsTab';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Columns the user can sort the KOL Dashboard table by. Adding a new
@@ -175,6 +180,9 @@ const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
 const CampaignDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  // Current logged-in user — needed to attribute Lineup Manager
+  // actions (proposed_by / confirmed_by / actor on the audit log).
+  const { userProfile } = useAuth();
   // Extend CampaignWithDetails inline for local use
   type CampaignDetails = CampaignWithDetails;
   const [campaign, setCampaign] = useState<CampaignDetails | null>(null);
@@ -230,6 +238,16 @@ const CampaignDetailsPage = () => {
   // a campaign to look at. "information" was the legacy default but
   // less useful as a starting point for day-to-day work.
   const [activeTab, setActiveTab] = useState("kols");
+  // Deep-link support: opening with ?tab=lineups (e.g. from the
+  // Lineup Manager bot notification's review link) lands directly
+  // on the Lineups tab. Runs once on mount.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    if (tabParam && ['information', 'kols', 'contents', 'lineups', 'payments'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []);
 
   // Master KOL edit dialog (opened by clicking the edit pencil next to
   // a KOL name in the table view). Edits the underlying master_kols row,
@@ -1520,6 +1538,15 @@ const CampaignDetailsPage = () => {
   // controlled was dead code (`<Dialog open={false}>`). The Add
   // Content button kicks off an inline-row creation flow instead.
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
+  // Section 9 — Showcase Settings dialog. Standalone in
+  // _components/ShowcaseSettingsDialog so this page doesn't grow.
+  const [isShowcaseOpen, setIsShowcaseOpen] = useState(false);
+  // Section 7.5 — Content tag assignment dialog. Standalone for the
+  // same reason; the content table view is already large.
+  const [isContentTagOpen, setIsContentTagOpen] = useState(false);
+  // Section 4 / 11.1 — Activation Settings: API URL + sync + manual
+  // snapshot. Standalone like the others.
+  const [isActivationOpen, setIsActivationOpen] = useState(false);
   const [isWarningsOpen, setIsWarningsOpen] = useState(false);
   const { toast } = useToast();
 
@@ -2100,6 +2127,33 @@ const CampaignDetailsPage = () => {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setIsShowcaseOpen(true)}
+                title="Generate a sales-safe public link with masking"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Showcase
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsContentTagOpen(true)}
+                title="Apply tags to content rows"
+              >
+                <Tag className="h-4 w-4 mr-2" />
+                Tag Content
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsActivationOpen(true)}
+                title="Configure the activation portal API or edit the snapshot manually"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Activation
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleShowEmailViews}
                 title="View emails that accessed this campaign"
               >
@@ -2150,6 +2204,15 @@ const CampaignDetailsPage = () => {
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
               >
                 Content Dashboard
+              </TabsTrigger>
+              {/* HHP Lineup Manager Spec § 4 — Lineups tab. Per-week
+                  KOL selection + approval flow. Sits between Content
+                  Dashboard (results) and Budget (money). */}
+              <TabsTrigger
+                value="lineups"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
+              >
+                Lineups
               </TabsTrigger>
               <TabsTrigger
                 value="payments"
@@ -2467,6 +2530,21 @@ const CampaignDetailsPage = () => {
               </div>
           </TabsContent>
 
+          {/* HHP Lineup Manager Spec § 4 — Lineups tab. Self-contained
+              component to keep this page lean. */}
+          <TabsContent value="lineups" className="mt-4">
+            {campaign && (
+              <LineupsTab
+                campaignId={campaign.id}
+                campaignStartDate={campaign.start_date as any}
+                campaignEndDate={campaign.end_date as any}
+                campaignName={campaign.name}
+                currentUserId={(userProfile as any)?.id ?? null}
+                currentUserName={(userProfile as any)?.name ?? (userProfile as any)?.email ?? 'User'}
+              />
+            )}
+          </TabsContent>
+
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-4">
               {/* Toolbar row: view-mode toggle on the left, Export +
@@ -2610,6 +2688,28 @@ const CampaignDetailsPage = () => {
       {/* Share Campaign Dialog moved into
           `components/campaign/ShareCampaignDialog.tsx` on 2026-06-02. */}
       <ShareCampaignDialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen} />
+      {campaign && (
+        <ShowcaseSettingsDialog
+          open={isShowcaseOpen}
+          onClose={() => setIsShowcaseOpen(false)}
+          campaignId={campaign.id}
+          campaignSlug={(campaign as any).slug || null}
+        />
+      )}
+      {campaign && (
+        <ContentTagDialog
+          open={isContentTagOpen}
+          onClose={() => setIsContentTagOpen(false)}
+          campaignId={campaign.id}
+        />
+      )}
+      {campaign && (
+        <ActivationSettingsDialog
+          open={isActivationOpen}
+          onClose={() => setIsActivationOpen(false)}
+          campaignId={campaign.id}
+        />
+      )}
 
       {/* Warnings / Email Views / Payment Notify / Pricing Suggestion
           dialogs all moved into separate files under

@@ -33,6 +33,7 @@ import MyWorkTab from './_tabs/MyWorkTab';
 import InternalTab from './_tabs/InternalTab';
 import ClientTab from './_tabs/ClientTab';
 import RenewalsPipelineTab from './_tabs/RenewalsPipelineTab';
+import { MondayFormChip } from '@/components/dashboard/MondayFormChip';
 
 type Layer = 'my-work' | 'internal' | 'client' | 'renewals-pipeline';
 const VALID_LAYERS: readonly Layer[] = ['my-work', 'internal', 'client', 'renewals-pipeline'] as const;
@@ -89,10 +90,11 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         icon={Activity}
-        title="Priority Dashboard"
+        title="Team Dashboard"
         subtitle="Real-time view of what's happening, what's at risk, and what's next."
         kicker="Operations · Live"
         kickerDot="brand"
+        actions={<MondayFormChip />}
       />
 
       <Tabs value={layer} onValueChange={handleLayerChange} className="space-y-4">

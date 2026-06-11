@@ -259,12 +259,31 @@ export class KOLService {
       platforms: ['X', 'Telegram', 'YouTube', 'Facebook', 'TikTok'],
       regions: ['Vietnam', 'Turkey', 'SEA', 'Philippines', 'Korea', 'Global', 'China', 'Brazil'],
       deliverables: ['Post', 'Video', 'Article', 'AMA', 'Ambassadorship', 'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter'],
-      niches: ['General', 'Gaming', 'Crypto', 'Memecoin', 'NFT', 'Trading', 'AI', 'Research', 'Airdrop', 'Art'],
+      // [2026-06-10] HHP Creator Taxonomy Spec — fully migrated. All
+      // legacy values cleared from data via SQL passes (Research →
+      // Analyst, Crypto → niche Trading, 6 topic words → niche moves,
+      // Native (Meme/Culture) → Native + niche Meme/Degen, General +
+      // 12 unmappable values cleared from creator_type entirely).
+      //
+      // Now options expose ONLY the 13 spec niche tags. Old-data chips
+      // that survived migration (none, after the cleanup) would still
+      // render via the color-map fallback to gray.
+      niches: [
+        'AI', 'DeFi', 'L1/L2', 'Trading', 'Airdrop', 'NFT/Gaming',
+        'RWA', 'Regulation', 'Macro', 'Meme/Degen',
+        'Base', 'Solana', 'Ethereum',
+      ],
       pricingTiers: ['<$200', '$200-500', '$500-1K', '$1K-2K', '$2K-3K', '>$3K'],
       // `tiers` was removed alongside the `tier` column (migration 071).
       // The new tier badge is auto-derived from the composite Score in
       // Phase 3 — no manual tier picker anymore.
-      creatorTypes: ['General', 'Gaming', 'Crypto', 'Memecoin', 'NFT', 'Trading', 'AI', 'Research', 'Airdrop', 'Art', 'Native (Meme/Culture)', 'Drama-Forward', 'Skeptic', 'Educator', 'Bridge Builder', 'Visionary', 'Onboarder'],
+      //
+      // [2026-06-10] Spec-clean: only the 8 HHP Creator Types remain.
+      // Max-2 enforced in the UI (see app/kols/page.tsx).
+      creatorTypes: [
+        'Native', 'Scout', 'Tracker', 'Analyst',
+        'Educator', 'Visionary', 'Onboarder', 'Curator',
+      ],
       contentTypes: ['Meme', 'News', 'Trading', 'Deep Dive', 'Meme/Cultural Narrative', 'Drama Queen', 'Sceptics', 'Technical Educator', 'Bridge Builders', 'Visionaries']
     };
   }

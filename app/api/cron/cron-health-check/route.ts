@@ -47,6 +47,9 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   DISCOVERY: 2,                // daily (sometimes 2x if runs_per_day=2)
   TELEGRAM_METRICS: 1,         // daily
   EXPENSE_RECURRENCE: 1,       // daily
+  BACKLOG_WEEKLY_SUMMARY: 1,   // weekly (Monday) — Phase 5 of HHP Backlog spec
+  LINEUP_COMPLETION: 1,        // daily — HHP Lineup Manager Spec § 4.1 auto-completion
+  DELIVERABLE_RECURRENCE: 1,   // daily — HHP Deliverable Templates spec Template 2 Notes
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

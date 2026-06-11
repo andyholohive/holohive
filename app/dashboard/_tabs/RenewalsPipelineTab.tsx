@@ -25,7 +25,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Calendar, TrendingUp, AlertCircle, Building2, DollarSign } from 'lucide-react';
+import { Calendar, TrendingUp, AlertCircle, Building2, DollarSign, Heart, Clock, FileText } from 'lucide-react';
 
 type RenewalTone = 'red' | 'amber' | 'green';
 
@@ -39,9 +39,18 @@ type Renewal = {
   daysLeft: number | null;
 };
 
+type Retention = {
+  clientRetentionPct: number;
+  activeClients: number;
+  churnedClients: number;
+  avgEngagementWeeks: number;
+  totalContentDelivered: number;
+};
+
 type RenewalsPipelinePayload = {
   asOf: string;
   thresholds: { renewal_red_days: number; renewal_amber_days: number };
+  retention: Retention;
   renewals: {
     all: Renewal[];
     countsByTone: { red: number; amber: number; green: number };
@@ -117,11 +126,46 @@ export default function RenewalsPipelineTab() {
 
   return (
     <div className="space-y-8">
-      {/* ── 01 Snapshot ─────────────────────────────────────────────── */}
+      {/* ── 01 Retention ────────────────────────────────────────────── */}
+      {/* [2026-06-11] Per spec § 5.1 — top of Layer 3 is RETENTION metrics
+          (the answer to "are we keeping clients?"), not the renewal/pipeline
+          snapshot. That snapshot moved to section 02 below. */}
       <div className="space-y-4">
-        <SectionHeader label="Snapshot" dot="brand" counter="01 — Renewals · Pipeline" first />
+        <SectionHeader label="Retention" dot="emerald" counter="01 — Are we retaining and growing?" first />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <KpiCard
+            icon={Heart}
+            label="Client Retention"
+            value={`${data.retention.clientRetentionPct}%`}
+            sub={`${data.retention.activeClients} active / ${data.retention.churnedClients} churned`}
+            accent="emerald"
+            topAccent
+          />
+          <KpiCard
+            icon={Clock}
+            label="Avg Engagement"
+            value={`${data.retention.avgEngagementWeeks} wk`}
+            sub={`across ${data.retention.activeClients} active client${data.retention.activeClients === 1 ? '' : 's'}`}
+            accent="brand"
+            topAccent
+          />
+          <KpiCard
+            icon={FileText}
+            label="Total Content Delivered"
+            value={data.retention.totalContentDelivered}
+            sub="all-time across active clients"
+            accent="sky"
+            topAccent
+          />
+        </div>
+      </div>
 
-      {/* KPI strip — v11: top accent stripes */}
+      {/* ── 02 Snapshot ─────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <SectionHeader label="Snapshot" dot="brand" counter="02 — Renewal counts · Pipeline value" />
+
+      {/* Secondary snapshot KPIs — the renewal & pipeline ops counters.
+          Lower-priority than retention but still useful at a glance. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard
           icon={AlertCircle}
@@ -158,9 +202,9 @@ export default function RenewalsPipelineTab() {
       </div>
       </div>
 
-      {/* ── 02 Renewals ─────────────────────────────────────────────── */}
+      {/* ── 03 Renewals ─────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionHeader label="Renewals" dot="rose" counter="02 — Queue · 90-day forward look" />
+        <SectionHeader label="Renewals" dot="rose" counter="03 — Queue · 90-day forward look" />
 
       {/* Renewals queue */}
       <Card className="border-cream-200 overflow-hidden">
@@ -279,7 +323,7 @@ export default function RenewalsPipelineTab() {
 
       {/* ── 03 Pipeline ─────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionHeader label="Pipeline" dot="violet" counter="03 — Open opps by stage" />
+        <SectionHeader label="Pipeline" dot="violet" counter="04 — Open opps by stage" />
 
       {/* Pipeline snapshot */}
       <Card className="border-cream-200 overflow-hidden">

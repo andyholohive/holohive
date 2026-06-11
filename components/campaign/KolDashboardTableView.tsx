@@ -245,6 +245,30 @@ export function KolDashboardTableView({
   const [editingCell, setEditingCell] = useState<{ row: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState<any>(null);
 
+  // Section 5 of HHP Campaign Dashboard Spec — Profile note edit.
+  // Mirrors the notes editor pattern below but writes to
+  // campaign_kols.profile_note so it appears on the public KOL
+  // Dashboard's Profile subtitle.
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState<{ [key: string]: string }>({});
+  const handleProfileChange = (kolId: string, value: string) => {
+    setEditingProfile(prev => ({ ...prev, [kolId]: value }));
+  };
+  const handleProfileSave = async (kolId: string) => {
+    const next = editingProfile[kolId];
+    if (next === undefined) {
+      setEditingProfileId(null);
+      return;
+    }
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { profile_note: next || null } as any);
+      setCampaignKOLs(prev => prev.map(k => k.id === kolId ? { ...k, profile_note: next || null } : k));
+    } catch (err) {
+      console.error('Error saving profile_note:', err);
+    }
+    setEditingProfileId(null);
+  };
+
   // Notes edit — uses a separate state slice because notes are
   // multi-line and have their own debounced save behaviour.
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
@@ -1062,6 +1086,11 @@ export function KolDashboardTableView({
                             </div>
                           </TableHead>
                           */}
+                          {/* Section 5 — Profile column. Client-facing
+                              one-line bio per KOL per campaign. Double-
+                              click to edit, same UX as Notes. Self-hides
+                              on the public page until populated. */}
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Profile</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Notes</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Add Content</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Content</TableHead>
@@ -1367,6 +1396,34 @@ export function KolDashboardTableView({
                                     </div>
                                   </TableCell>
                                   */}
+                                  {/* Section 5 — Profile note cell.
+                                      Mirrors Notes UX exactly so muscle
+                                      memory carries over (double-click
+                                      to edit, blur or Enter to save). */}
+                                  <TableCell
+                                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 align-middle overflow-hidden cursor-pointer`}
+                                    style={{ width: '20%' }}
+                                    onDoubleClick={() => {
+                                      setEditingProfileId(campaignKOL.id);
+                                      setEditingProfile((prev) => ({ ...prev, [campaignKOL.id]: (campaignKOL as any).profile_note ?? '' }));
+                                    }}
+                                  >
+                                    {editingProfileId === campaignKOL.id ? (
+                                      <Input
+                                        value={editingProfile[campaignKOL.id] ?? (campaignKOL as any).profile_note ?? ''}
+                                        onChange={e => handleProfileChange(campaignKOL.id, e.target.value)}
+                                        onBlur={() => handleProfileSave(campaignKOL.id)}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleProfileSave(campaignKOL.id); }}}
+                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none min-h-[32px]"
+                                        style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={(campaignKOL as any).profile_note || ''}>
+                                        {(campaignKOL as any).profile_note || <span className="text-ink-warm-400 italic">Double-click to add profile</span>}
+                                      </div>
+                                    )}
+                                  </TableCell>
                                   <TableCell
                                     className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'notes')}
                                     style={{ width: '20%' }}

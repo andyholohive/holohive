@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2 } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
 import { computeRosterScores, tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
 import type { KolDeliverable } from "@/lib/kolDeliverableService";
@@ -28,12 +28,33 @@ import { FieldOptionsService } from "@/lib/fieldOptionsService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
+import KolActivationsDialog from './_components/KolActivationsDialog';
+
+/**
+ * Treat an empty / null / missing `creator_type` as the implicit
+ * "General" bucket — a KOL without a more specific creator type is a
+ * generalist, not an unclassified data hole. Centralizing the coalesce
+ * here so display, search, and filter all agree on the same fallback,
+ * and we don't need a DB backfill to migrate existing nulls. Brand-new
+ * KOLs created via `handleAddNew` save with `['General']` explicitly so
+ * the data eventually catches up on its own.
+ */
+const effectiveCreatorTypes = (raw: string[] | null | undefined): string[] =>
+  Array.isArray(raw) && raw.length > 0 ? raw : ['General'];
 
 export default function KOLsPage() {
   const { user, userProfile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [kols, setKols] = useState<MasterKOL[]>([]);
+  // HHP Campaign Dashboard Spec § 4.3 (Tier 1) — per-KOL activation
+  // aggregates pulled from the kol_activation_participation view.
+  // Keyed by kol_id (UUID) → { activations, totalEntries }. Used
+  // to render the Activations column + open the detail dialog.
+  // Fetched separately from KOLs so a slow snapshot table doesn't
+  // delay the main list render.
+  const [kolActivations, setKolActivations] = useState<Map<string, { activations: number; totalEntries: number }>>(new Map());
+  const [activationsDialogKolId, setActivationsDialogKolId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<{kolId: string, field: string} | null>(null);
@@ -91,7 +112,11 @@ export default function KOLsPage() {
     in_house: true,
     description: false,
     wallet: false,
-    telegram: false
+    telegram: false,
+    // HHP Campaign Dashboard Spec § 4.3 (Tier 1) — per-KOL activation
+    // participation aggregate column. On by default since activation
+    // data is one of the few signals visible without a profile click.
+    activations: true,
   };
 
   // Initialize visible columns from URL params
@@ -204,7 +229,13 @@ export default function KOLsPage() {
     className = "",
     triggerContent = null,
     isOpen = false,
-    onOpenChange
+    onOpenChange,
+    // HHP Creator Taxonomy Spec — cap creator_type at 2. Generic prop
+    // so any other field needing a hard ceiling can opt in. ONLY
+    // applies to *assignment* surfaces (inline cell edit, bulk edit,
+    // detail modal). Filter surfaces don't pass it because filtering
+    // by 5+ types is a legit use case.
+    maxSelected,
   }: {
     options: string[];
     selected: string[];
@@ -215,6 +246,7 @@ export default function KOLsPage() {
     triggerContent?: React.ReactNode;
     isOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
+    maxSelected?: number;
   }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -326,30 +358,45 @@ export default function KOLsPage() {
                   {filteredOptions.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground">No options found.</div>
                   ) : (
-                    filteredOptions.map((option) => (
-                      <div
-                        key={option}
-                        className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-cream-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const newSelected = safeSelected.includes(option)
-                            ? safeSelected.filter(item => item !== option)
-                            : [...safeSelected, option];
-                          onSelectedChange(newSelected);
-                        }}
-                      >
-                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                          {safeSelected.includes(option) && (
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 5 5L20 7" />
-                            </svg>
-                          )}
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          {renderOption(option)}
+                    filteredOptions.map((option) => {
+                      const isSelected = safeSelected.includes(option);
+                      // Cap-aware disabled state — when maxSelected is
+                      // set and the user is already at the limit, new
+                      // selections (but not deselections) are blocked.
+                      const atCap = typeof maxSelected === 'number'
+                        && safeSelected.length >= maxSelected;
+                      const disabled = atCap && !isSelected;
+                      return (
+                        <div
+                          key={option}
+                          className={`relative flex w-full select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none ${
+                            disabled
+                              ? 'cursor-not-allowed opacity-40'
+                              : 'cursor-pointer hover:bg-cream-100'
+                          }`}
+                          title={disabled ? `Max ${maxSelected} selected — deselect one to swap.` : undefined}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (disabled) return;
+                            const newSelected = isSelected
+                              ? safeSelected.filter(item => item !== option)
+                              : [...safeSelected, option];
+                            onSelectedChange(newSelected);
+                          }}
+                        >
+                          <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                            {isSelected && (
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 5 5L20 7" />
+                              </svg>
+                            )}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            {renderOption(option)}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -440,6 +487,10 @@ export default function KOLsPage() {
 
   useEffect(() => {
     fetchKOLs();
+    // Activation aggregates fire in parallel — not awaited so the
+    // table renders as fast as before; column updates when data
+    // lands. Soft-fails silently if the view is unreachable.
+    fetchKolActivations();
     loadDynamicFieldOptions();
     fetchTelegramChats();
     fetchLatestCosts();
@@ -572,6 +623,36 @@ export default function KOLsPage() {
     }
   };
 
+  /**
+   * HHP Campaign Dashboard Spec § 4.3 (Tier 1) — load per-KOL
+   * activation aggregates. Single query against the
+   * kol_activation_participation view → reduced client-side into a
+   * Map for O(1) row lookup. Soft-fails to empty Map so the table
+   * still renders if the view is unavailable.
+   */
+  const fetchKolActivations = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('kol_activation_participation')
+        .select('kol_id, entries');
+      if (error) {
+        console.warn('Failed to load KOL activation aggregates:', error.message);
+        return;
+      }
+      const next = new Map<string, { activations: number; totalEntries: number }>();
+      for (const row of (data || []) as Array<{ kol_id: string; entries: number }>) {
+        const prev = next.get(row.kol_id) || { activations: 0, totalEntries: 0 };
+        next.set(row.kol_id, {
+          activations: prev.activations + 1,
+          totalEntries: prev.totalEntries + (row.entries || 0),
+        });
+      }
+      setKolActivations(next);
+    } catch (err) {
+      console.warn('KOL activation aggregates fetch failed:', err);
+    }
+  };
+
   const fetchTelegramChats = async () => {
     try {
       const { data, error } = await supabase
@@ -603,7 +684,8 @@ export default function KOLsPage() {
       const matchesSearch = !debouncedSearchTerm ||
         kol.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
         kol.region?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        kol.creator_type?.some(ct => ct.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
+        // Empty creator_type → 'General' (matches search for "general")
+        effectiveCreatorTypes(kol.creator_type).some(ct => ct.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
         kol.content_type?.some(ct => ct.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
         kol.deliverables?.some(d => d.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
         kol.platform?.some(p => p.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
@@ -622,7 +704,9 @@ export default function KOLsPage() {
           return true;
         })()) &&
         (!filters.region.length || filters.region.some(r => kol.region === r)) &&
-        (!filters.creator_type.length || filters.creator_type.some(ct => kol.creator_type?.includes(ct))) &&
+        // Empty creator_type matches the "General" filter chip so the
+        // filter bucket actually contains every implicitly-General KOL.
+        (!filters.creator_type.length || filters.creator_type.some(ct => effectiveCreatorTypes(kol.creator_type).includes(ct))) &&
         (!filters.content_type.length || filters.content_type.some(ct => kol.content_type?.includes(ct))) &&
         (!filters.deliverables.length || filters.deliverables.some(d => kol.deliverables?.includes(d))) &&
         (!filters.pricing.length || filters.pricing.some(p => kol.pricing === p)) &&
@@ -859,6 +943,12 @@ export default function KOLsPage() {
         community_link: null,
         content_type: [],
         niche: [],
+        // [2026-06-08] New KOLs default to ['General'] creator_type —
+        // the catch-all bucket. Without this, new rows landed with an
+        // empty array and silently fell through every creator-type
+        // filter. The display-side coalesce in effectiveCreatorTypes
+        // handles existing empties; this stops creating new ones.
+        creator_type: ['General'],
         pricing: null,
         group_chat: false,
         in_house: null,
@@ -941,16 +1031,28 @@ export default function KOLsPage() {
 
   const getNicheColor = (niche: string) => {
     const colorMap: { [key: string]: string } = {
-      'General': 'bg-cream-100 text-ink-warm-700',
-      'Gaming': 'bg-indigo-100 text-indigo-800',
-      'Crypto': 'bg-emerald-100 text-emerald-800',
+      // ─── Spec niches (HHP Creator Taxonomy Spec) ───
+      'AI':          'bg-slate-100 text-slate-800',
+      'DeFi':        'bg-emerald-100 text-emerald-800',
+      'L1/L2':       'bg-indigo-100 text-indigo-800',
+      'Trading':     'bg-cyan-100 text-cyan-800',
+      'Airdrop':     'bg-lime-100 text-lime-800',
+      'NFT/Gaming':  'bg-violet-100 text-violet-800',
+      'RWA':         'bg-amber-100 text-amber-800',
+      'Regulation':  'bg-zinc-100 text-zinc-800',
+      'Macro':       'bg-blue-100 text-blue-800',
+      'Meme/Degen':  'bg-pink-100 text-pink-800',
+      'Base':        'bg-sky-100 text-sky-800',
+      'Solana':      'bg-purple-100 text-purple-800',
+      'Ethereum':    'bg-teal-100 text-teal-800',
+      // ─── Legacy values (kept for backward-compat) ───
+      'General':  'bg-cream-100 text-ink-warm-700',
+      'Gaming':   'bg-indigo-100 text-indigo-800',
+      'Crypto':   'bg-emerald-100 text-emerald-800',
       'Memecoin': 'bg-pink-100 text-pink-800',
-      'NFT': 'bg-violet-100 text-violet-800',
-      'Trading': 'bg-cyan-100 text-cyan-800',
-      'AI': 'bg-slate-100 text-slate-800',
+      'NFT':      'bg-violet-100 text-violet-800',
       'Research': 'bg-amber-100 text-amber-800',
-      'Airdrop': 'bg-lime-100 text-lime-800',
-      'Art': 'bg-rose-100 text-rose-800'
+      'Art':      'bg-rose-100 text-rose-800',
     };
     return colorMap[niche] || 'bg-cream-100 text-ink-warm-700';
   };
@@ -980,23 +1082,30 @@ export default function KOLsPage() {
 
   const getCreatorTypeColor = (creatorType: string) => {
     const colorMap: { [key: string]: string } = {
-      'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-      'Drama-Forward': 'bg-rose-100 text-rose-800',
-      'Skeptic': 'bg-orange-100 text-orange-800',
-      'Educator': 'bg-blue-100 text-blue-800',
-      'Bridge Builder': 'bg-emerald-100 text-emerald-800',
+      // ─── Spec types (8, HHP Creator Taxonomy Spec) ───
+      'Native':    'bg-orange-100 text-orange-800',
+      'Scout':     'bg-sky-100 text-sky-800',
+      'Tracker':   'bg-slate-100 text-slate-800',
+      'Analyst':   'bg-cyan-100 text-cyan-800',
+      'Educator':  'bg-blue-100 text-blue-800',
       'Visionary': 'bg-indigo-100 text-indigo-800',
       'Onboarder': 'bg-teal-100 text-teal-800',
-      'General': 'bg-cream-100 text-ink-warm-700',
-      'Gaming': 'bg-pink-100 text-pink-800',
-      'Crypto': 'bg-yellow-100 text-yellow-800',
-      'Memecoin': 'bg-orange-100 text-orange-800',
-      'NFT': 'bg-purple-100 text-purple-800',
-      'Trading': 'bg-emerald-100 text-emerald-800',
-      'AI': 'bg-blue-100 text-blue-800',
-      'Research': 'bg-indigo-100 text-indigo-800',
-      'Airdrop': 'bg-teal-100 text-teal-800',
-      'Art': 'bg-pink-100 text-pink-800'
+      'Curator':   'bg-lime-100 text-lime-800',
+      // ─── Legacy values (kept for backward-compat) ───
+      'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+      'Drama-Forward':  'bg-rose-100 text-rose-800',
+      'Skeptic':        'bg-orange-100 text-orange-800',
+      'Bridge Builder': 'bg-emerald-100 text-emerald-800',
+      'General':   'bg-cream-100 text-ink-warm-700',
+      'Gaming':    'bg-pink-100 text-pink-800',
+      'Crypto':    'bg-yellow-100 text-yellow-800',
+      'Memecoin':  'bg-orange-100 text-orange-800',
+      'NFT':       'bg-purple-100 text-purple-800',
+      'Trading':   'bg-emerald-100 text-emerald-800',
+      'AI':        'bg-blue-100 text-blue-800',
+      'Research':  'bg-indigo-100 text-indigo-800',
+      'Airdrop':   'bg-teal-100 text-teal-800',
+      'Art':       'bg-pink-100 text-pink-800',
     };
     return colorMap[creatorType] || 'bg-cream-100 text-ink-warm-700';
   };
@@ -1372,6 +1481,10 @@ export default function KOLsPage() {
               <MultiSelect
                 options={multiOptions}
                 selected={currentValues}
+                // HHP Creator Taxonomy Spec — Creator Type capped at
+                // 2. Only applies to that field; other multi-selects
+                // (niche, platform, etc.) stay uncapped.
+                maxSelected={field === 'creator_type' ? 2 : undefined}
                 onSelectedChange={async (newValues) => {
                   const kolToUpdate = kols.find(k => k.id === kolId);
                   if (kolToUpdate) {
@@ -1401,13 +1514,22 @@ export default function KOLsPage() {
                 }}
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
-                    {currentValues.length > 0 ? (
+                    {/* For creator_type, coalesce empty to ['General'] so
+                        the cell never shows a "Select" placeholder for
+                        a category every KOL implicitly belongs to. The
+                        underlying value (and dropdown checks) stay empty
+                        until the user actively picks one. */}
+                    {(() => {
+                      const displayValues = field === 'creator_type'
+                        ? effectiveCreatorTypes(currentValues)
+                        : currentValues;
+                      return displayValues.length > 0 ? (
                       <>
-                        {currentValues.map((item, idx) => (
+                        {displayValues.map((item, idx) => (
                         <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${
                             field === 'platform' ? '' :
                             field === 'deliverables' ? getNewContentTypeColor(item) :
-                          field === 'niche' ? getNicheColor(item) : 
+                          field === 'niche' ? getNicheColor(item) :
                             field === 'creator_type' ? getCreatorTypeColor(item) :
                             field === 'content_type' ? getNewContentTypeColor(item) : 'bg-cream-100 text-ink-warm-700'
                           } ${field === 'creator_type' || field === 'niche' || field === 'deliverables' || field === 'content_type' ? 'mr-1' : ''}`}>
@@ -1417,7 +1539,8 @@ export default function KOLsPage() {
                       </>
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                    )}
+                    );
+                    })()}
                     <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
@@ -1707,7 +1830,7 @@ export default function KOLsPage() {
           </div>
           {/* Creator Type */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Creator Type</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Creator Type <span className="font-normal text-ink-warm-400">· max 2</span></span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.creatorTypes || []}
@@ -1715,6 +1838,8 @@ export default function KOLsPage() {
                 onSelectedChange={creator_type => setBulkEdit(prev => ({ ...prev, creator_type }))}
                 placeholder="Creator Type"
                 className="w-full"
+                // HHP Creator Taxonomy Spec — max 2.
+                maxSelected={2}
                 isOpen={bulkEditDropdown === 'creator_type'}
                 onOpenChange={(open) => setBulkEditDropdown(open ? 'creator_type' : null)}
                 triggerContent={
@@ -2934,6 +3059,10 @@ export default function KOLsPage() {
               {visibleColumns.description && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Notes</TableHead>}
               {visibleColumns.wallet && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Wallet</TableHead>}
               {visibleColumns.telegram && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Telegram</TableHead>}
+              {/* HHP Campaign Dashboard Spec § 4.3 (Tier 1) — Activations
+                  column. Click any row's cell to open the per-KOL
+                  participation breakdown. */}
+              {visibleColumns.activations && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none whitespace-nowrap">Activations</TableHead>}
               <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap text-right w-16">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -3187,6 +3316,34 @@ export default function KOLsPage() {
                       )}
                   </TableCell>
                   )}
+                  {/* HHP Campaign Dashboard Spec § 4.3 (Tier 1) — Activations
+                      cell. Renders a brand chip "N · Xk" when this KOL has
+                      participated, dash otherwise. Click opens the detail
+                      dialog with per-activation breakdown. */}
+                  {visibleColumns.activations && (() => {
+                    const agg = kolActivations.get(kol.id);
+                    return (
+                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                        {agg && agg.activations > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setActivationsDialogKolId(kol.id)}
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+                            title="View activation participation"
+                          >
+                            <Activity className="h-3 w-3" />
+                            <span className="tabular-nums">
+                              {agg.activations} · {agg.totalEntries >= 1000
+                                ? `${(agg.totalEntries / 1000).toFixed(1).replace(/\.0$/, '')}K`
+                                : agg.totalEntries.toLocaleString()}
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="text-ink-warm-400 text-xs">-</span>
+                        )}
+                      </TableCell>
+                    );
+                  })()}
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-right w-16`}>
                     <div className="flex space-x-1 justify-end">
                       <Button size="sm" variant="outline" onClick={() => handleDelete(kol.id)}>
@@ -3292,6 +3449,15 @@ export default function KOLsPage() {
         // When a deliverable or snapshot changes inside the modal,
         // bump the nonce so the parent refetches + recomputes scores.
         onMetricsChanged={() => setScoreRefreshNonce((n) => n + 1)}
+      />
+
+      {/* HHP Campaign Dashboard Spec § 4.3 (Tier 1) — activation participation
+          detail dialog. Opens when any Activations chip is clicked. */}
+      <KolActivationsDialog
+        open={activationsDialogKolId !== null}
+        onClose={() => setActivationsDialogKolId(null)}
+        kolId={activationsDialogKolId}
+        kolName={kols.find(k => k.id === activationsDialogKolId)?.name}
       />
 
       {/* 4. Add Dialog for single delete at the bottom of the component */}
@@ -3450,6 +3616,8 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.description && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Notes</TableHead>}
             {visibleColumns.wallet && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Wallet</TableHead>}
             {visibleColumns.telegram && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Telegram</TableHead>}
+            {/* Skeleton header — matches the live table column. */}
+            {visibleColumns.activations && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none whitespace-nowrap">Activations</TableHead>}
             <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap text-right w-16">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -3475,6 +3643,8 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
               {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {/* Skeleton chip placeholder — matches the live "N · X.X K" pill width. */}
+              {visibleColumns.activations && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><Skeleton className="h-5 w-16 rounded" /></TableCell>}
               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden w-16 text-right`}><div className="flex space-x-1 w-full justify-end"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
             </TableRow>
           ))}

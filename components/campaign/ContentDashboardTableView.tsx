@@ -15,7 +15,9 @@
  * ContentDashboardOverview.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import ContentTagCell, { type ContentTag } from './ContentTagCell';
+import { supabase as supabaseClient } from '@/lib/supabase';
 import {
   ArrowDown,
   ArrowUp,
@@ -84,6 +86,26 @@ const contentStatusOptions = [
 ];
 
 export function ContentDashboardTableView() {
+  // Section 7.5 — fetch the global active-tags list once at the
+  // table level and pass to every TagCell. Skips N per-row
+  // round-trips to content_tags (which is a tiny table, ~5 rows,
+  // but avoiding 50 duplicate queries on a busy campaign is free
+  // perf). Per-row assignments still fetch per-cell because they
+  // diverge per row.
+  const [globalTags, setGlobalTags] = useState<ContentTag[]>([]);
+  useEffect(() => {
+    let alive = true;
+    (supabaseClient as any)
+      .from('content_tags')
+      .select('id, name, visibility, color')
+      .is('archived_at', null)
+      .order('name')
+      .then(({ data }: any) => {
+        if (alive) setGlobalTags((data || []) as ContentTag[]);
+      });
+    return () => { alive = false; };
+  }, []);
+
   const {
     campaign,
     setCampaign,
@@ -1468,6 +1490,12 @@ export function ContentDashboardTableView() {
                               )}
                             </div>
                           </TableHead>
+                          {/* Section 7.5 — Tags column. Chips render
+                              inline; click + Add to assign more from
+                              the popover. Client-facing tags appear
+                              on the public page; internal tags stay
+                              admin-only. */}
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none" style={{ minWidth: '180px' }}>Tags</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">Actions</TableHead>
                         </TableRow>
@@ -1475,7 +1503,7 @@ export function ContentDashboardTableView() {
                       <TableBody className="bg-white">
                         {filteredContents.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={14} className="text-center py-12">
+                            <TableCell colSpan={15} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center text-ink-warm-500">
                                 <FileText className="h-12 w-12 mb-4 text-ink-warm-300" />
                                 <p className="text-lg font-medium mb-2">No content matches your filters</p>
@@ -1623,6 +1651,12 @@ export function ContentDashboardTableView() {
                                 }}
                               >
                                 {renderEditableContentCell(content.bookmarks, 'bookmarks', content)}
+                              </TableCell>
+                              {/* Section 7.5 — Tags cell. Self-contained
+                                  in ContentTagCell so the assignment +
+                                  picker logic doesn't bloat this file. */}
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
+                                <ContentTagCell contentId={content.id} tags={globalTags} />
                               </TableCell>
                               <TableCell
                                 className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'notes')}

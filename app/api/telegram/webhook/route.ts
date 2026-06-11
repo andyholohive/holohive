@@ -391,6 +391,16 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // Built-in /bug + /req commands — HHP Backlog Tab capture.
+  // Per the Backlog Tab spec (Jdot, 2026-06-08), report a bug or
+  // request from any chat. Captures sender as reporter, message link
+  // as source_ref, and any attached/replied screenshot as an
+  // attachment. Replies in-thread with a link to the new item.
+  if (cmd === 'bug' || cmd === 'req') {
+    await handleBacklogCommand(chatId, cmd === 'bug' ? 'bug' : 'request', message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -579,9 +589,12 @@ async function closeByDbIdAndReply(
   teamMember: { id: string; name: string },
   threadId?: number,
 ) {
+  // [2026-06-11] Pull client_id too so we can route client-linked tasks
+  // through the Pre-Ship Gate. Non-client tasks fall through to the
+  // straight close like before.
   const { data: task, error: fetchErr } = await (supabaseAdmin as any)
     .from('tasks')
-    .select('id, short_id, task_name, status')
+    .select('id, short_id, task_name, status, client_id')
     .eq('id', taskDbId)
     .maybeSingle();
   if (fetchErr || !task) {
@@ -597,6 +610,17 @@ async function closeByDbIdAndReply(
     );
     return;
   }
+
+  // [2026-06-11] Pre-Ship Gate intercept per Jdot's spec — when the
+  // task has a client linked, send the 5-item checklist + Confirm/Go
+  // Back inline buttons instead of closing. Internal tasks complete
+  // normally (no gate). See sendPreShipGatePrompt for the message
+  // shape and callback contract.
+  if (task.client_id) {
+    await sendPreShipGatePrompt(chatId, task, teamMember, threadId);
+    return;
+  }
+
   const nowIso = new Date().toISOString();
   const { error: updErr } = await (supabaseAdmin as any)
     .from('tasks')
@@ -616,6 +640,200 @@ async function closeByDbIdAndReply(
     threadId,
   );
   console.log('[Telegram Webhook] /done closed task:', { taskDbId, shortId: task.short_id, by: teamMember.name });
+}
+
+/**
+ * [2026-06-11] Pre-Ship Gate prompt — sent when /done resolves a
+ * client-linked task. Spec: "the bot lists all 5 items, then shows
+ * [Confirm & Complete] and [Go Back] as inline buttons."
+ *
+ * Why a single Confirm (not 5 individual checkboxes): TG inline
+ * buttons don't support stateful checkbox UI. The chat-side version
+ * is necessarily simpler — the user reads + attests via one tap, and
+ * the gate log stores all 5 as true (the attestation IS the gate
+ * pass).
+ *
+ * Permission: callback_data includes the triggering user's Telegram
+ * id so only they can tap (per spec). Expiry: callbacks check the
+ * message_date (10-min cap).
+ */
+async function sendPreShipGatePrompt(
+  chatId: string,
+  task: { id: string; short_id: string | null; task_name: string },
+  teamMember: { id: string; name: string },
+  threadId?: number,
+) {
+  // We need the triggering user's TG ID for the per-user button gate.
+  // teamMember is the resolved internal user; the TG id is on the
+  // /done caller's `message.from.id`. We get it via resolveTeamMember
+  // again — same source as the caller's. Cheap second lookup.
+  const { data: user } = await (supabaseAdmin as any)
+    .from('users')
+    .select('telegram_id')
+    .eq('id', teamMember.id)
+    .maybeSingle();
+  const tgUserId = (user as any)?.telegram_id || '';
+
+  // The 5 items, verbatim from the spec doc. Kept in sync with the
+  // HQ modal's PRE_SHIP_GATE_CHECKBOXES — if those change in the spec,
+  // change both.
+  const items = [
+    '1. I read the request, not skimmed it.',
+    '2. If the client saw this right now, it would work + make sense.',
+    "3. I can point to one campaign-specific insight, not just the client's name.",
+    '4. Execution is clean — spelling, links, data, formatting.',
+    '5. The client could NOT get this from AI in 5 minutes.',
+  ];
+  const headerLine = `🛡 <b>Pre-Ship Gate</b> — <code>${escapeHtml(task.short_id || '')}</code> ${escapeHtml(task.task_name || '')}`;
+  const body = [
+    headerLine,
+    '',
+    'Before closing this client-linked task, confirm all 5:',
+    '',
+    ...items,
+    '',
+    '<i>Tap Confirm only if all 5 are true. Buttons expire in 10 min.</i>',
+  ].join('\n');
+
+  const buttons = [
+    [
+      { text: '✅ Confirm & Complete', callback_data: `psg:confirm:${task.id}:${tgUserId}` },
+      { text: '↩ Go Back', callback_data: `psg:cancel:${task.id}:${tgUserId}` },
+    ],
+  ];
+
+  await sendTelegramMessageWithButtons(chatId, body, buttons, threadId);
+}
+
+/**
+ * Handle a `psg:<action>:<task_id>:<user_id>` button click.
+ *
+ * Action = 'confirm' → write gate log row (all 5 true, via_source='tg'),
+ *   flip status to complete, edit the prompt message to "Done · {task}".
+ * Action = 'cancel'  → edit the prompt message to "Cancelled" and don't
+ *   touch the task status.
+ *
+ * Permission per spec: only the user who triggered /done can tap.
+ * Expiry per spec: 10 minutes after the prompt was sent.
+ */
+async function handlePsgCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const data: string = cq.data || '';
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+  const messageDate: number | undefined = cq.message?.date; // Unix seconds
+  const threadId: number | undefined = cq.message?.message_thread_id || undefined;
+
+  const parts = data.split(':');
+  if (parts.length < 4 || !messageChatId || !messageId) {
+    await answerCallbackQuery(callbackId, 'Invalid button.');
+    return;
+  }
+  const action = parts[1]; // 'confirm' | 'cancel'
+  const taskDbId = parts[2];
+  const triggeringTgUserId = parts[3];
+
+  // Permission: only the user who triggered /done can tap.
+  const tapperTgUserId = cq.from?.id?.toString();
+  if (!tapperTgUserId || tapperTgUserId !== triggeringTgUserId) {
+    await answerCallbackQuery(callbackId, 'Only the user who triggered /done can tap these.');
+    return;
+  }
+
+  // Expiry: 10 minutes from when the message was sent.
+  const TEN_MIN_SEC = 10 * 60;
+  if (messageDate && Date.now() / 1000 - messageDate > TEN_MIN_SEC) {
+    await answerCallbackQuery(callbackId, 'Expired. Send /done again.');
+    await editMessageText(
+      messageChatId,
+      messageId,
+      '⌛ <i>Pre-Ship Gate expired. Send <code>/done</code> again to retry.</i>',
+    );
+    return;
+  }
+
+  const teamMember = await resolveTeamMember(cq);
+  if (!teamMember) {
+    await answerCallbackQuery(callbackId, 'Team-only.');
+    return;
+  }
+
+  if (action === 'cancel') {
+    await editMessageText(
+      messageChatId,
+      messageId,
+      '↩ <i>Pre-Ship Gate cancelled. Task stays open.</i>',
+    );
+    await answerCallbackQuery(callbackId, 'Cancelled.');
+    return;
+  }
+
+  if (action !== 'confirm') {
+    await answerCallbackQuery(callbackId, 'Unknown action.');
+    return;
+  }
+
+  // Confirm path — fetch task, write log, flip status, edit message.
+  const { data: task } = await (supabaseAdmin as any)
+    .from('tasks')
+    .select('id, short_id, task_name, status')
+    .eq('id', taskDbId)
+    .maybeSingle();
+  if (!task) {
+    await answerCallbackQuery(callbackId, 'Task not found.');
+    return;
+  }
+  if (task.status === 'complete') {
+    await editMessageText(
+      messageChatId,
+      messageId,
+      `✅ <i>${escapeHtml(task.short_id || taskDbId)} was already complete.</i>`,
+    );
+    await answerCallbackQuery(callbackId, 'Already complete.');
+    return;
+  }
+
+  // Write the gate log row (all 5 true via TG attestation).
+  const { error: logErr } = await (supabaseAdmin as any)
+    .from('pre_ship_gate_log')
+    .insert({
+      task_id: taskDbId,
+      completed_by: teamMember.id,
+      completed_by_name: teamMember.name,
+      via_source: 'tg',
+      check_1_read_not_skimmed: true,
+      check_2_makes_sense_to_client: true,
+      check_3_campaign_specific_insight: true,
+      check_4_clean_execution: true,
+      check_5_not_ai_replaceable: true,
+    });
+  if (logErr) {
+    console.error('[Telegram PSG] log insert failed:', logErr);
+    await answerCallbackQuery(callbackId, 'Log failed. Try again.');
+    return;
+  }
+
+  // Flip status.
+  const nowIso = new Date().toISOString();
+  const { error: updErr } = await (supabaseAdmin as any)
+    .from('tasks')
+    .update({ status: 'complete', completed_at: nowIso, updated_at: nowIso })
+    .eq('id', taskDbId);
+  if (updErr) {
+    console.error('[Telegram PSG] update failed after log write:', updErr);
+    await answerCallbackQuery(callbackId, 'Update failed.');
+    return;
+  }
+
+  const safeName = escapeHtml(task.task_name || '(untitled task)');
+  const closer = escapeHtml(teamMember.name || 'team');
+  await editMessageText(
+    messageChatId,
+    messageId,
+    `✅ <b>${escapeHtml(task.short_id || '')}</b> ${safeName}\n<i>closed by ${closer} · gate passed</i>`,
+  );
+  await answerCallbackQuery(callbackId);
+  console.log('[Telegram Webhook] PSG passed + task closed:', { taskDbId, by: teamMember.name });
 }
 
 /**
@@ -983,6 +1201,14 @@ async function handleCallbackQuery(cq: any) {
   // tasks. Both flows route through the same close-and-refresh path.
   if (data.startsWith('done:')) {
     await handleDoneCallback(cq);
+    return;
+  }
+
+  // `psg:confirm:<task_id>:<user_id>` / `psg:cancel:<task_id>:<user_id>` —
+  // Pre-Ship Gate inline-button responses. Only the user who triggered
+  // /done can tap; 10-min expiry per spec.
+  if (data.startsWith('psg:')) {
+    await handlePsgCallback(cq);
     return;
   }
 
@@ -1704,6 +1930,243 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string) {
   }
 }
 
+/* ────────────────────── /bug + /req commands ─────────────────────── */
+
+/**
+ * Handle the /bug + /req commands — HHP Backlog Tab capture from
+ * any chat the bot can see. Per the spec, this is the headline path
+ * because it captures visual proof (screenshots) at the moment they
+ * happen, before the reporter has switched contexts.
+ *
+ * Flow:
+ *   1. Auth (team-only via users.telegram_id)
+ *   2. Parse body via lib/backlogTelegramParser
+ *   3. Insert backlog_items row, source = 'telegram_bug' / 'telegram_req'
+ *   4. If a photo is attached (or replied to), download from Telegram
+ *      → upload to Supabase Storage → insert backlog_attachments row
+ *   5. Reply in-thread with the item's HHP link
+ */
+async function handleBacklogCommand(
+  chatId: string,
+  type: 'bug' | 'request',
+  message: any,
+) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
+  const cmdName = type === 'bug' ? 'bug' : 'req';
+
+  const teamMember = await resolveTeamMember(message);
+  if (!teamMember) {
+    await sendTelegramMessage(
+      chatId,
+      `⚠️ /${cmdName} is only available to team members. Ask Andy to map your Telegram ID.`,
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Body lives in either `text` (plain command) or `caption` (when
+  // attached to a photo). The parser handles both via the same path.
+  const text = (message.text || message.caption || '').trim();
+  const { parseBacklogCommand } = await import('@/lib/backlogTelegramParser');
+  const parsed = parseBacklogCommand(text);
+
+  if (parsed.description === '(no description)') {
+    await sendTelegramMessage(
+      chatId,
+      `Usage: <code>/${cmdName} #area description</code>\n` +
+      `Example: <code>/${cmdName} #content-dashboard table headers are misaligned</code>\n` +
+      `Areas: content-dashboard · kol-mastersheet · budget-dashboard · priority-dashboard · kol-cards · client-success · other`,
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Source ref — a link back to the originating TG message. The format
+  // works for supergroups (chat IDs starting with -100). For private
+  // chats or non-supergroups we leave it null; the reporter chat is
+  // still findable via the team's bot logs.
+  const sourceRef = buildTelegramMessageLink(chatId, message.message_id, threadId);
+
+  // Insert the backlog row. RLS allows authenticated inserts; we use
+  // the service-role client here (same auth context as every other
+  // bot command).
+  // Default assignee → Andy (spec section 3). Resolved at insert time
+  // via the shared helper so this and the HHP modal path stay in
+  // lock-step on who-gets-it.
+  const { lookupDefaultAssigneeId } = await import('@/lib/backlogService');
+  const defaultAssigneeId = await lookupDefaultAssigneeId(supabaseAdmin);
+
+  const { data: item, error: insertErr } = await (supabaseAdmin as any)
+    .from('backlog_items')
+    .insert({
+      type,
+      area: parsed.area,
+      title: parsed.title,
+      description: parsed.description,
+      reporter_id: teamMember.id,
+      assignee_id: defaultAssigneeId,
+      source: type === 'bug' ? 'telegram_bug' : 'telegram_req',
+      source_ref: sourceRef,
+    })
+    .select('id, type, area')
+    .single();
+
+  if (insertErr || !item) {
+    console.error('[Telegram /bug] insert failed:', insertErr);
+    await sendTelegramMessage(
+      chatId,
+      '⚠️ Failed to log. Check server logs.',
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Photo capture. Two paths:
+  //   • Direct: /bug + image in one message → message.photo is set
+  //   • Reply-to: /bug as a reply to a previous photo → message.reply_to_message.photo
+  // Both flows pull just the largest size (Telegram returns multiple
+  // resolutions; the last is the highest-quality JPEG).
+  const photoFileIds: string[] = [];
+  if (Array.isArray(message.photo) && message.photo.length > 0) {
+    photoFileIds.push(message.photo[message.photo.length - 1].file_id);
+  } else if (
+    message.reply_to_message?.photo
+    && Array.isArray(message.reply_to_message.photo)
+    && message.reply_to_message.photo.length > 0
+  ) {
+    const replyPhoto = message.reply_to_message.photo;
+    photoFileIds.push(replyPhoto[replyPhoto.length - 1].file_id);
+  }
+
+  let photoCount = 0;
+  for (const fileId of photoFileIds) {
+    try {
+      await uploadTelegramPhotoToBacklog(item.id, teamMember.id, fileId);
+      photoCount++;
+    } catch (err) {
+      console.error('[Telegram /bug] photo upload failed:', err);
+      // Non-fatal — the item is already created; user can manually
+      // attach a screenshot from the modal later.
+    }
+  }
+
+  // Confirmation reply — links back to HHP so the reporter can verify
+  // the item landed and edit if needed. Pretty area label so it reads
+  // like the modal does.
+  const AREA_LABELS: Record<string, string> = {
+    content_dashboard: 'Content Dashboard',
+    kol_mastersheet: 'KOL Mastersheet',
+    budget_dashboard: 'Budget Dashboard',
+    priority_dashboard: 'Priority Dashboard',
+    kol_cards: 'KOL Cards',
+    client_success: 'Client Success',
+    other: 'Other',
+  };
+  const typeLabel = type === 'bug' ? 'Bug' : 'Request';
+  const areaLabel = AREA_LABELS[item.area] || item.area;
+  const appBase = process.env.NEXT_PUBLIC_APP_URL
+    || process.env.NEXT_PUBLIC_APP_BASE_URL
+    || 'https://app.holohive.io';
+  const portalUrl = `${appBase}/initiatives?tab=backlog&id=${item.id}`;
+
+  const lines: string[] = [];
+  lines.push(`✅ <b>${typeLabel} logged</b> · <i>${escapeHtml(areaLabel)}</i>`);
+  lines.push(escapeHtml(parsed.title));
+  if (photoCount > 0) {
+    lines.push(`📎 ${photoCount} screenshot attached`);
+  } else if (type === 'bug') {
+    // Soft prompt — visual evidence is the headline value for bugs.
+    lines.push(`<i>Tip: attach a screenshot next time for faster triage.</i>`);
+  }
+  lines.push(`<a href="${portalUrl}">View in HHP</a>`);
+
+  await sendTelegramMessage(chatId, lines.join('\n'), 'HTML', threadId);
+}
+
+/**
+ * Telegram supergroup chat IDs start with -100. The web link format
+ * for jumping to a message in such a chat is:
+ *   https://t.me/c/<id-without-the-100->/<message_id>
+ * If the chat is inside a forum topic, the thread id slots in between:
+ *   https://t.me/c/<id>/<thread_id>/<message_id>
+ * For non-supergroups (private DMs, plain groups) there's no public
+ * link format we can build server-side — those return ''.
+ */
+function buildTelegramMessageLink(
+  chatId: string,
+  messageId: number | undefined,
+  threadId: number | undefined,
+): string {
+  if (!chatId.startsWith('-100') || !messageId) return '';
+  const sansPrefix = chatId.slice(4);
+  return threadId
+    ? `https://t.me/c/${sansPrefix}/${threadId}/${messageId}`
+    : `https://t.me/c/${sansPrefix}/${messageId}`;
+}
+
+/**
+ * Download a single photo from Telegram by file_id and upload it to
+ * the backlog-attachments Storage bucket. Inserts the backlog_attachments
+ * metadata row pointing at the new path.
+ *
+ * Two-step pattern per Telegram's bot API:
+ *   1. getFile(file_id) → returns a file_path
+ *   2. GET https://api.telegram.org/file/bot<token>/<file_path>
+ */
+async function uploadTelegramPhotoToBacklog(
+  itemId: string,
+  uploaderId: string,
+  fileId: string,
+): Promise<void> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) throw new Error('TELEGRAM_BOT_TOKEN not configured');
+
+  // 1. getFile — resolves the file_id to a file_path on Telegram's CDN.
+  const fileInfoRes = await fetch(
+    `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`,
+  );
+  const fileInfoJson = await fileInfoRes.json();
+  if (!fileInfoJson.ok || !fileInfoJson.result?.file_path) {
+    throw new Error(`getFile failed: ${JSON.stringify(fileInfoJson).slice(0, 200)}`);
+  }
+  const filePath: string = fileInfoJson.result.file_path;
+
+  // 2. Download the raw bytes.
+  const photoRes = await fetch(
+    `https://api.telegram.org/file/bot${botToken}/${filePath}`,
+  );
+  if (!photoRes.ok) {
+    throw new Error(`Photo download failed: HTTP ${photoRes.status}`);
+  }
+  const arrayBuffer = await photoRes.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  // Telegram photos arrive as JPEGs in practice; trust the
+  // file_path extension as the source of truth.
+  const ext = (filePath.split('.').pop() || 'jpg').toLowerCase();
+  const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+  const storagePath = `${itemId}/tg-${Date.now()}-${fileId.slice(0, 12)}.${ext}`;
+
+  const { error: uploadErr } = await supabaseAdmin.storage
+    .from('backlog-attachments')
+    .upload(storagePath, buffer, { contentType, upsert: false });
+  if (uploadErr) throw uploadErr;
+
+  const { error: rowErr } = await (supabaseAdmin as any)
+    .from('backlog_attachments')
+    .insert({
+      item_id: itemId,
+      storage_path: storagePath,
+      content_type: contentType,
+      size_bytes: buffer.length,
+      uploaded_by: uploaderId,
+    });
+  if (rowErr) throw rowErr;
+}
+
 /**
  * Handle incoming message from Telegram
  */
@@ -1743,7 +2206,25 @@ async function handleMessage(message: any) {
 
   // Store the message for chat identification
   const fromName = [fromFirstName, fromLastName].filter(Boolean).join(' ') || 'Unknown';
-  await storeMessage(chatId, messageId, fromId, fromName, fromUsername, messageText, messageDate);
+  const messageThreadId: number | undefined = message.message_thread_id;
+  await storeMessage(chatId, messageId, fromId, fromName, fromUsername, messageText, messageDate, messageThreadId);
+
+  // [Forum-topic capture, 2026-06-09] Threads in supergroups need
+  // metadata so the BacklogSettingsDialog picker can list them
+  // alongside their parent chat. Two events do this:
+  //   1. Any message with message_thread_id → upsert a stub row in
+  //      telegram_threads (we know it exists, name pending).
+  //   2. forum_topic_created / forum_topic_edited → set the name.
+  // Service-role write so RLS doesn't block.
+  if (messageThreadId) {
+    await trackThread(chatId, messageThreadId, messageDate);
+  }
+  if (message.forum_topic_created?.name && messageThreadId) {
+    await upsertThreadName(chatId, messageThreadId, message.forum_topic_created.name);
+  }
+  if (message.forum_topic_edited?.name && messageThreadId) {
+    await upsertThreadName(chatId, messageThreadId, message.forum_topic_edited.name);
+  }
 
   // Check for Telegram/X links in KOL chats and forward to Content thread
   await forwardKolSocialLinks(chatId, chatTitle, fromName, messageText, messageDate);
@@ -1961,7 +2442,8 @@ async function storeMessage(
   fromUserName: string,
   fromUsername: string | null,
   text: string,
-  messageDate: Date
+  messageDate: Date,
+  messageThreadId?: number,
 ) {
   try {
     // Truncate long messages
@@ -1976,8 +2458,11 @@ async function storeMessage(
         from_user_name: fromUserName,
         from_username: fromUsername,
         text: truncatedText,
-        message_date: messageDate.toISOString()
-      }, {
+        message_date: messageDate.toISOString(),
+        // Added 2026-06-09 — forum-topic thread for supergroups.
+        // NULL = General / no topic.
+        message_thread_id: messageThreadId ?? null,
+      } as any, {
         onConflict: 'chat_id,message_id'
       });
 
@@ -1985,6 +2470,60 @@ async function storeMessage(
   } catch (error) {
     console.error('[Telegram Webhook] Error storing message:', error);
     // Don't throw - message storage is non-critical
+  }
+}
+
+/**
+ * Upsert a stub thread row when we see activity in a topic but don't
+ * know its name yet. Bumps last_seen_at so the picker can sort
+ * recently-active topics first.
+ */
+async function trackThread(
+  chatId: string,
+  messageThreadId: number,
+  messageDate: Date,
+) {
+  try {
+    await (supabaseAdmin as any)
+      .from('telegram_threads')
+      .upsert(
+        {
+          chat_id: chatId,
+          message_thread_id: messageThreadId,
+          last_seen_at: messageDate.toISOString(),
+        },
+        { onConflict: 'chat_id,message_thread_id' },
+      );
+  } catch (err) {
+    console.error('[Telegram Webhook] trackThread failed:', err);
+    // Non-critical — picker will still work, just won't list this
+    // thread until next message lands.
+  }
+}
+
+/**
+ * Upsert a known thread name. Used when forum_topic_created or
+ * forum_topic_edited events come through. Doesn't touch last_seen_at
+ * because the name event might fire long after the topic was active.
+ */
+async function upsertThreadName(
+  chatId: string,
+  messageThreadId: number,
+  name: string,
+) {
+  try {
+    await (supabaseAdmin as any)
+      .from('telegram_threads')
+      .upsert(
+        {
+          chat_id: chatId,
+          message_thread_id: messageThreadId,
+          name,
+        },
+        { onConflict: 'chat_id,message_thread_id' },
+      );
+  } catch (err) {
+    console.error('[Telegram Webhook] upsertThreadName failed:', err);
   }
 }
 

@@ -127,23 +127,30 @@ const getPlatformIcon = (platform: string) => {
 
 const getCreatorTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
-    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-    'Drama-Forward': 'bg-rose-100 text-rose-800',
-    'Skeptic': 'bg-orange-100 text-orange-800',
-    'Educator': 'bg-blue-100 text-blue-800',
-    'Bridge Builder': 'bg-emerald-100 text-emerald-800',
+    // ─── Spec types (HHP Creator Taxonomy Spec, 2026-05) ───
+    'Native':    'bg-orange-100 text-orange-800',
+    'Scout':     'bg-sky-100 text-sky-800',
+    'Tracker':   'bg-slate-100 text-slate-800',
+    'Analyst':   'bg-cyan-100 text-cyan-800',
+    'Educator':  'bg-blue-100 text-blue-800',
     'Visionary': 'bg-indigo-100 text-indigo-800',
     'Onboarder': 'bg-teal-100 text-teal-800',
-    'General': 'bg-gray-100 text-gray-800',
-    'Gaming': 'bg-pink-100 text-pink-800',
-    'Crypto': 'bg-yellow-100 text-yellow-800',
+    'Curator':   'bg-lime-100 text-lime-800',
+    // ─── Legacy values (kept for backward-compat) ───
+    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+    'Drama-Forward':  'bg-rose-100 text-rose-800',
+    'Skeptic':        'bg-orange-100 text-orange-800',
+    'Bridge Builder': 'bg-emerald-100 text-emerald-800',
+    'General':  'bg-gray-100 text-gray-800',
+    'Gaming':   'bg-pink-100 text-pink-800',
+    'Crypto':   'bg-yellow-100 text-yellow-800',
     'Memecoin': 'bg-orange-100 text-orange-800',
-    'NFT': 'bg-purple-100 text-purple-800',
-    'Trading': 'bg-emerald-100 text-emerald-800',
-    'AI': 'bg-blue-100 text-blue-800',
+    'NFT':      'bg-purple-100 text-purple-800',
+    'Trading':  'bg-emerald-100 text-emerald-800',
+    'AI':       'bg-blue-100 text-blue-800',
     'Research': 'bg-indigo-100 text-indigo-800',
-    'Airdrop': 'bg-teal-100 text-teal-800',
-    'Art': 'bg-pink-100 text-pink-800'
+    'Airdrop':  'bg-teal-100 text-teal-800',
+    'Art':      'bg-pink-100 text-pink-800',
   };
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 };

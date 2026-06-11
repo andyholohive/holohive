@@ -53,11 +53,16 @@ function DialogMultiSelect({
   options,
   onChange,
   placeholder = 'Select...',
+  // HHP Creator Taxonomy Spec — Creator Type capped at 2. Generic
+  // prop so any other field needing a hard ceiling can opt in. Only
+  // applies to assignment surfaces (this dialog), not filters.
+  maxSelected,
 }: {
   selected: string[];
   options: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
+  maxSelected?: number;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -90,14 +95,26 @@ function DialogMultiSelect({
           ) : (
             options.map((opt) => {
               const isSelected = selected.includes(opt);
+              // Cap-aware: when maxSelected is set and the user is at
+              // the limit, new picks are blocked but deselections
+              // stay allowed so the user can swap.
+              const atCap = typeof maxSelected === 'number' && selected.length >= maxSelected;
+              const disabled = atCap && !isSelected;
               return (
                 <label
                   key={opt}
-                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-cream-50 cursor-pointer text-sm"
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm ${
+                    disabled
+                      ? 'opacity-40 cursor-not-allowed'
+                      : 'hover:bg-cream-50 cursor-pointer'
+                  }`}
+                  title={disabled ? `Max ${maxSelected} selected — deselect one to swap.` : undefined}
                 >
                   <Checkbox
                     checked={isSelected}
+                    disabled={disabled}
                     onCheckedChange={() => {
+                      if (disabled) return;
                       onChange(
                         isSelected
                           ? selected.filter((s) => s !== opt)
@@ -285,12 +302,14 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label>Creator Type</Label>
+                <Label>Creator Type <span className="text-xs font-normal text-ink-warm-400">· max 2</span></Label>
                 <DialogMultiSelect
                   selected={masterKolForm.creator_type || []}
                   options={fieldOptions?.creatorTypes || []}
                   onChange={(next) => setMasterKolForm(f => ({ ...f, creator_type: next }))}
                   placeholder="Select creator types..."
+                  // HHP Creator Taxonomy Spec — max 2.
+                  maxSelected={2}
                 />
               </div>
 

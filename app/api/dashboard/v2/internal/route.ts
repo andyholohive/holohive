@@ -49,6 +49,7 @@ export async function GET() {
       tasksRes,
       adHocTasksRes,
       initiativesRes,
+      initiativeLinkedTasksRes,
       usersRes,
       mondayFormStatus,
     ] = await Promise.all([
@@ -69,6 +70,13 @@ export async function GET() {
         .eq('status', 'active')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false }),
+      // [2026-06-11] All tasks linked to ANY initiative. We aggregate
+      // counts in JS rather than running N count queries — typical
+      // active-initiative list is 5-20 entries so the join is cheap.
+      (sb as any)
+        .from('tasks')
+        .select('id, linked_initiative')
+        .not('linked_initiative', 'is', null),
       (sb as any)
         .from('users')
         .select('id, name, role, profile_photo_url'),
@@ -129,7 +137,20 @@ export async function GET() {
     const workload = Array.from(perUser.values()).sort((a, b) => b.overdue - a.overdue || b.open - a.open);
     const escalations = workload.filter(w => w.overdue >= cfg.person_escalation_threshold);
 
-    // Initiative stale tones
+    // [2026-06-11] Per-initiative linked task counts. Pre-aggregate
+    // once for the whole map below.
+    const linkedTaskCountByInitiative = new Map<string, number>();
+    for (const t of (initiativeLinkedTasksRes.data ?? []) as any[]) {
+      if (!t.linked_initiative) continue;
+      linkedTaskCountByInitiative.set(
+        t.linked_initiative,
+        (linkedTaskCountByInitiative.get(t.linked_initiative) ?? 0) + 1,
+      );
+    }
+
+    // Initiative stale tones + denormalized owner name + linked tasks +
+    // updated_at exposed so the dashboard card grid can render the
+    // mockup's "Updated Nd ago" line without a follow-up join.
     const initiatives = ((initiativesRes.data ?? []) as any[]).map(i => {
       const daysIdle = i.updated_at
         ? Math.floor((Date.now() - new Date(i.updated_at).getTime()) / 86_400_000)
@@ -138,12 +159,16 @@ export async function GET() {
         daysIdle >= cfg.initiative_stale_red_days ? 'red'
         : daysIdle >= cfg.initiative_stale_amber_days ? 'amber'
         : 'fresh';
+      const owner = i.owner_user_id ? usersById.get(i.owner_user_id) : null;
       return {
         id: i.id,
         name: i.name,
         owner_user_id: i.owner_user_id,
+        owner_name: owner?.name ?? null,
         category_tags: i.category_tags ?? [],
         daysIdle,
+        updated_at: i.updated_at,
+        linkedTaskCount: linkedTaskCountByInitiative.get(i.id) ?? 0,
         tone,
       };
     });

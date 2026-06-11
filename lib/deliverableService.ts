@@ -251,6 +251,133 @@ export class DeliverableService {
     };
   }
 
+  // ---- Spawn from Template (cron-friendly, unassigned) ----
+
+  /**
+   * [2026-06-11] Spawn a deliverable from a template with all tasks
+   * UNASSIGNED. Used by /api/cron/spawn-recurring-deliverables to
+   * auto-generate weekly deliverables per active client per
+   * HQ Deliverable Templates spec § Template 2 Notes:
+   *   "should auto-generate as a recurring deliverable per active
+   *    client, every week."
+   *
+   * Differs from `createDeliverable` in two deliberate ways:
+   *   1. assigned_to is NULL (not falling back to createdBy). CMs claim
+   *      tasks from the unassigned bucket Monday morning during normal
+   *      triage. Better than the manual wizard because there's no
+   *      "remember to run this" risk.
+   *   2. role_assignments is empty {} — the cron has no UX surface to
+   *      pick assignees, and per-step assignment is a CM judgment call
+   *      that should happen at claim time, not spawn time.
+   *
+   * Idempotency: the caller (cron) checks last_fired_at on the
+   * recurring_deliverables row before calling. This method does NOT
+   * defend against duplicates — calling twice in a day creates two
+   * task trees.
+   */
+  static async spawnFromTemplateUnassigned(opts: {
+    templateId: string;
+    clientId: string;
+    title: string;
+    startDate: string;        // YYYY-MM-DD
+    createdBy: string | null; // System user (Andy/Bolt) for audit trail
+    createdByName: string | null;
+    priority?: string;
+  }): Promise<{ deliverable: Deliverable; parentTask: Task; subtasks: Task[] }> {
+    const templateData = await this.getTemplateWithSteps(opts.templateId);
+    if (!templateData) throw new Error('Template not found');
+    const { template, steps } = templateData;
+
+    const priority = opts.priority || 'medium';
+
+    // 1. Parent task — unassigned, in_progress.
+    const parentTask = await TaskService.createTask({
+      task_name: opts.title,
+      task_type: template.category === 'bd' ? 'Marketing & Sales' : 'Client Delivery',
+      frequency: 'one-time',
+      status: 'in_progress',
+      priority,
+      client_id: opts.clientId,
+      assigned_to: null,
+      assigned_to_name: null,
+      created_by: opts.createdBy,
+      created_by_name: opts.createdByName,
+      due_date: opts.startDate,
+      description: `<p>Deliverable: ${template.name}</p><p>${template.description || ''}</p><p><em>Auto-spawned by recurring cron.</em></p>`,
+    });
+
+    // 2. Compute target completion from cumulative step durations
+    const totalDays = steps.reduce((sum, s) => sum + s.estimated_duration_days, 0);
+    const target = new Date(opts.startDate);
+    target.setDate(target.getDate() + totalDays);
+    const targetCompletion = target.toISOString().slice(0, 10);
+
+    // 3. Deliverable row
+    const { data: deliverable, error: dErr } = await supabase
+      .from('deliverables')
+      .insert({
+        template_id: opts.templateId,
+        parent_task_id: parentTask.id,
+        client_id: opts.clientId,
+        title: opts.title,
+        status: 'active',
+        role_assignments: {},
+        start_date: opts.startDate,
+        target_completion: targetCompletion,
+        metadata: {
+          template_name: template.name,
+          template_slug: template.slug,
+          source: 'recurring_cron',
+          auto_spawned_at: new Date().toISOString(),
+        },
+        created_by: opts.createdBy,
+      })
+      .select()
+      .single();
+    if (dErr) throw dErr;
+
+    // Sync parent task due_date to target completion
+    await TaskService.updateTask(parentTask.id, { due_date: targetCompletion });
+
+    // 4. Subtask per step — all unassigned
+    const subtasks: Task[] = [];
+    let cumulativeDays = 0;
+    for (const step of steps) {
+      cumulativeDays += step.estimated_duration_days;
+      const due = new Date(opts.startDate);
+      due.setDate(due.getDate() + cumulativeDays);
+      const dueDate = due.toISOString().slice(0, 10);
+
+      const subtask = await TaskService.createTask({
+        task_name: `${step.step_order}. ${step.step_name}`,
+        parent_task_id: parentTask.id,
+        task_type: step.task_type,
+        frequency: 'one-time',
+        status: 'to_do',
+        priority,
+        client_id: opts.clientId,
+        assigned_to: null,
+        assigned_to_name: null,
+        created_by: opts.createdBy,
+        created_by_name: opts.createdByName,
+        due_date: dueDate,
+        description: step.description || '',
+        sort_order: step.step_order,
+      });
+
+      // Carry checklist items forward exactly like createDeliverable does
+      const checklistItems = Array.isArray(step.checklist_items) ? step.checklist_items : [];
+      for (let i = 0; i < checklistItems.length; i++) {
+        const text = typeof checklistItems[i] === 'string' ? checklistItems[i] : String(checklistItems[i]);
+        await TaskService.addChecklistItem(subtask.id, text, i);
+      }
+
+      subtasks.push(subtask);
+    }
+
+    return { deliverable: deliverable as Deliverable, parentTask, subtasks };
+  }
+
   // ---- Query Deliverables ----
 
   static async getDeliverableByTaskId(parentTaskId: string): Promise<(Deliverable & { template: DeliverableTemplate; steps: DeliverableTemplateStep[] }) | null> {

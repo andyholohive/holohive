@@ -51,6 +51,10 @@ type DeliveryLogEntry = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Phase 3: auto-drafts from Weekly Update Zone B done-flips.
+  pending_review?: boolean;
+  source?: string | null;
+  source_ref?: string | null;
 };
 
 type Client = {
@@ -95,6 +99,10 @@ export default function DeliveryLogsPage() {
   const [entries, setEntries] = useState<DeliveryLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
+  // Phase 3: per-client pending-review draft count (used by the
+  // amber pill on each client tab). Populated alongside the clients
+  // list so we don't fan out an extra round-trip per tab.
+  const [pendingDraftCounts, setPendingDraftCounts] = useState<Record<string, number>>({});
   // [2026-06-04 v2] Active / Inactive view. Both views EXCLUDE
   // archived clients (archived_at IS NOT NULL) — archived clients
   // never surface here. Inactive = is_active=false but NOT archived,
@@ -176,24 +184,44 @@ export default function DeliveryLogsPage() {
         .eq('is_active', viewMode === 'active')
         .is('archived_at', null);
 
-      const [{ data: clientData }, { data: logData }] = await Promise.all([
+      // Phase 3: pull pending-review draft counts in the same
+      // round-trip so the per-client tabs can show a "draft" badge
+      // without an N+1 fetch. Filtered by the partial index added
+      // in the pending_review migration so this stays cheap.
+      const [{ data: clientData }, { data: logData }, { data: draftRows }] = await Promise.all([
         clientsQuery,
         supabase
           .from('client_delivery_log')
           .select('client_id, updated_at')
           .order('updated_at', { ascending: false }),
+        supabase
+          .from('client_delivery_log')
+          .select('client_id')
+          .eq('pending_review', true),
       ]);
 
       // Build a map of client_id -> latest activity timestamp
       const latestActivity = new Map<string, string>();
       for (const log of (logData || [])) {
-        if (!latestActivity.has(log.client_id)) {
+        if (!latestActivity.has(log.client_id) && log.updated_at) {
           latestActivity.set(log.client_id, log.updated_at);
         }
       }
 
-      // Sort: clients with recent activity first, then alphabetically
+      // Build a map of client_id -> pending-review draft count.
+      const draftCounts = new Map<string, number>();
+      for (const r of (draftRows || []) as Array<{ client_id: string }>) {
+        draftCounts.set(r.client_id, (draftCounts.get(r.client_id) || 0) + 1);
+      }
+      setPendingDraftCounts(Object.fromEntries(draftCounts));
+
+      // Sort: clients with pending drafts first, then by activity,
+      // then alphabetical. Drafts-first puts CMs' attention where
+      // it's needed when they open the page.
       const sorted = (clientData || []).sort((a, b) => {
+        const aDrafts = draftCounts.get(a.id) || 0;
+        const bDrafts = draftCounts.get(b.id) || 0;
+        if (aDrafts !== bDrafts) return bDrafts - aDrafts;
         const aTime = latestActivity.get(a.id) || '';
         const bTime = latestActivity.get(b.id) || '';
         if (aTime && bTime) return bTime.localeCompare(aTime);
@@ -475,7 +503,13 @@ export default function DeliveryLogsPage() {
     }
   };
 
+  // Phase 3: split drafts off the main table same way the per-client
+  // page does. The amber section above the table holds drafts; the
+  // main table is for confirmed entries only.
+  const pendingReviewEntries = entries.filter(e => e.pending_review === true).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+
   const filtered = entries.filter((e) => {
+    if (e.pending_review === true) return false;
     const matchesSearch = !searchTerm ||
       e.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (e.who && e.who.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -489,6 +523,61 @@ export default function DeliveryLogsPage() {
     if (dateDiff !== 0) return sortAsc ? dateDiff : -dateDiff;
     return a.sort_order - b.sort_order;
   });
+
+  /** Phase 3 — Confirm: flip pending_review to false. Refreshes the
+   *  per-client tab counts so the amber pill on the picker also
+   *  updates without a full page reload. */
+  const confirmDraft = async (id: string) => {
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, pending_review: false } : e));
+    const { error } = await supabase
+      .from('client_delivery_log')
+      .update({ pending_review: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      console.error('Confirm draft failed:', error);
+      await fetchEntries();
+      return;
+    }
+    setPendingDraftCounts(prev => {
+      const next = { ...prev };
+      if (next[selectedClientId]) next[selectedClientId] = Math.max(0, next[selectedClientId] - 1);
+      return next;
+    });
+  };
+
+  const dismissDraft = async (id: string) => {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    const { error } = await supabase
+      .from('client_delivery_log')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.error('Dismiss draft failed:', error);
+      await fetchEntries();
+      return;
+    }
+    setPendingDraftCounts(prev => {
+      const next = { ...prev };
+      if (next[selectedClientId]) next[selectedClientId] = Math.max(0, next[selectedClientId] - 1);
+      return next;
+    });
+  };
+
+  const confirmAllDrafts = async () => {
+    if (pendingReviewEntries.length === 0) return;
+    const ids = pendingReviewEntries.map(e => e.id);
+    setEntries(prev => prev.map(e => ids.includes(e.id) ? { ...e, pending_review: false } : e));
+    const { error } = await supabase
+      .from('client_delivery_log')
+      .update({ pending_review: false, updated_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) {
+      console.error('Confirm all drafts failed:', error);
+      await fetchEntries();
+      return;
+    }
+    setPendingDraftCounts(prev => ({ ...prev, [selectedClientId]: 0 }));
+  };
 
   // Render an editable cell
   const renderEditableCell = (entry: DeliveryLogEntry, field: string, type: 'text' | 'textarea' | 'select-type' | 'select-trigger' | 'who' = 'text') => {
@@ -770,24 +859,133 @@ export default function DeliveryLogsPage() {
         ) : (
           <Tabs value={selectedClientId} onValueChange={setSelectedClientId}>
             <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
-              {clients.map((client) => (
-                <TabsTrigger
-                  key={client.id}
-                  value={client.id}
-                  className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
-                >
-                  {client.logo_url ? (
-                    <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded mr-2 inline-block" />
-                  ) : (
-                    <Building2 className="h-3.5 w-3.5 mr-2 inline-block" />
-                  )}
-                  {client.name}
-                </TabsTrigger>
-              ))}
+              {clients.map((client) => {
+                const draftCount = pendingDraftCounts[client.id] || 0;
+                return (
+                  <TabsTrigger
+                    key={client.id}
+                    value={client.id}
+                    className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+                  >
+                    {client.logo_url ? (
+                      <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded mr-2 inline-block" />
+                    ) : (
+                      <Building2 className="h-3.5 w-3.5 mr-2 inline-block" />
+                    )}
+                    {client.name}
+                    {draftCount > 0 && (
+                      // Phase 3: amber pulse pill — surfaces drafts
+                      // before the CM clicks into the client. Pulse
+                      // animation kept subtle (text only, no full bg
+                      // pulse) so a roster of 20 clients with drafts
+                      // doesn't strobe.
+                      <span
+                        className="ml-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-full pointer-events-none"
+                        title={`${draftCount} pending review draft${draftCount === 1 ? '' : 's'}`}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        {draftCount}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
           </Tabs>
         )}
       </div>
+
+            {/* ─── Phase 3 — Pending Review section ───────────────
+                Same structure as the per-client `/clients/[id]/delivery-log`
+                page: amber Card with pre-filled rows + Confirm /
+                Dismiss / Confirm All. Renders above the main table
+                when the selected client has any drafts. */}
+            {selectedClientId && pendingReviewEntries.length > 0 && (
+              <div className="mt-5">
+                <Card className="border-amber-200 bg-amber-50/40 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-amber-200 bg-amber-50 flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">Pending Review</p>
+                      <p className="text-xs text-amber-800/80">
+                        {pendingReviewEntries.length} draft{pendingReviewEntries.length === 1 ? '' : 's'} from the Weekly Update feed · fill in details, then Confirm
+                      </p>
+                    </div>
+                    {pendingReviewEntries.every(e => !!e.who) && pendingReviewEntries.length > 1 && (
+                      <Button size="sm" variant="brand" className="h-8 text-xs" onClick={confirmAllDrafts}>
+                        Confirm All ({pendingReviewEntries.length})
+                      </Button>
+                    )}
+                  </div>
+                  <div className="divide-y divide-amber-200">
+                    {pendingReviewEntries.map(draft => (
+                      <div key={draft.id} className="px-4 py-3 space-y-2 hover:bg-amber-50/60">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-xs text-ink-warm-500 mb-0.5">
+                              <CalendarIcon className="h-3 w-3" />
+                              {new Date(draft.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              <span className="text-amber-700/70">·</span>
+                              <span className="text-[10px] uppercase tracking-wider text-ink-warm-600">{draft.work_type}</span>
+                              <span className="text-amber-700/70">·</span>
+                              <span className="text-[10px] text-amber-700 italic">from This Week feed</span>
+                            </div>
+                            <p className="text-sm font-medium text-ink-warm-900">{draft.action}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="brand"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => confirmDraft(draft.id)}
+                              disabled={!draft.who}
+                              title={!draft.who ? 'Add a Who before confirming' : 'Move this draft to the main log'}
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs border-rose-300 text-rose-600 hover:bg-rose-50"
+                              onClick={() => dismissDraft(draft.id)}
+                            >
+                              Dismiss
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                          {(() => {
+                            const setDraftField = async (field: keyof DeliveryLogEntry, value: string) => {
+                              const next = value.trim() || null;
+                              setEntries(prev => prev.map(e => e.id === draft.id ? { ...e, [field]: next, updated_at: new Date().toISOString() } : e));
+                              await supabase
+                                .from('client_delivery_log')
+                                .update({ [field]: next, updated_at: new Date().toISOString() } as any)
+                                .eq('id', draft.id);
+                            };
+                            return (
+                              <>
+                                <Input defaultValue={draft.who || ''} placeholder="Who" className="h-8 text-xs focus-brand bg-white" onBlur={(e) => setDraftField('who', e.target.value)} />
+                                <Input defaultValue={draft.method || ''} placeholder="How (method)" className="h-8 text-xs focus-brand bg-white" onBlur={(e) => setDraftField('method', e.target.value)} />
+                                <Input defaultValue={draft.location || ''} placeholder="Where" className="h-8 text-xs focus-brand bg-white" onBlur={(e) => setDraftField('location', e.target.value)} />
+                                <Select value={draft.trigger || ''} onValueChange={(v) => setDraftField('trigger', v)}>
+                                  <SelectTrigger className="h-8 text-xs focus-brand bg-white">
+                                    <SelectValue placeholder="Trigger" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TRIGGERS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                <Input defaultValue={draft.notes || ''} placeholder="Notes (optional)" className="h-8 text-xs focus-brand bg-white" onBlur={(e) => setDraftField('notes', e.target.value)} />
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            )}
 
             {/* Table — used to have `-mx-6 -mb-6` negative margins
                 that pushed it beyond the page's horizontal padding,

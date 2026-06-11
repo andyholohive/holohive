@@ -86,6 +86,9 @@ type ClientContext = {
   telegram_url: string | null;
   shared_drive_url: string | null;
   gtm_sync_url: string | null;
+  // 4th Resources card on the portal — KOL Content Brief link.
+  // Set via Client Context modal → Resource Links. NULL = card hidden.
+  kol_content_brief_url: string | null;
   onboarding_phase: string | null;
 };
 
@@ -194,13 +197,16 @@ type StatsTrends = {
 // [Campaign Live v1] An item in the "This Week" feed.
 //   status='done'     → green dot, recent achievement
 //   status='pending'  → orange dot, in flight
-//   status='upcoming' → gray dot, planned
 // `dateLabel` is a pre-formatted display string ("Today", "Yesterday",
 // "May 28", "Due Fri", etc.). Pre-formatted so the renderer stays dumb.
+//
+// [2026-06-09] The 'upcoming' status was removed per the v2 spec
+// (no "Coming Up" section). Kept as a string-literal type union of
+// just done/pending so consumers can't accidentally re-introduce it.
 type ThisWeekItem = {
   text: string;
   dateLabel: string | null;
-  status: 'done' | 'pending' | 'upcoming';
+  status: 'done' | 'pending';
 };
 
 type Campaign = {
@@ -770,7 +776,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     try {
       const { data } = await supabasePublic
         .from('client_context')
-        .select('id, engagement_type, scope, start_date, milestones, client_contacts, holohive_contacts, telegram_url, shared_drive_url, gtm_sync_url, onboarding_phase')
+        .select('id, engagement_type, scope, start_date, milestones, client_contacts, holohive_contacts, telegram_url, shared_drive_url, gtm_sync_url, kol_content_brief_url, onboarding_phase')
         .eq('client_id', clientId)
         .single();
       setClientContext(data || null);
@@ -812,10 +818,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     try {
       const { data } = await supabasePublic
         .from('client_weekly_updates')
-        .select('id, week_of, current_focus, active_initiatives, next_checkin, open_questions')
+        // v2: also pull this_week_feed + top_post_override so the
+        // portal renders the new structured shape. Old columns stay
+        // selected so weeks saved before the migration still work.
+        .select('id, week_of, current_focus, active_initiatives, next_checkin, open_questions, this_week_feed, top_post_override')
         .eq('client_id', clientId)
         .order('week_of', { ascending: false });
-      setWeeklyUpdates(data || []);
+      setWeeklyUpdates((data || []) as any);
     } catch (err) {
       console.error('Error fetching weekly updates:', err);
     }
@@ -871,7 +880,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   //
   // Status filter ('posted') everywhere — drafts/scheduled rows don't
   // count toward "live" stats and shouldn't promote to top post either.
-  async function fetchTopPost(campaignId: string) {
+  // Phase 2 / Zone C: when a CM has pinned a specific post via the
+  // Weekly Update Top Post override, pass that content_id here so the
+  // portal renders the pinned post instead of the auto-pick. NULL =
+  // use the default highest-engagement selection. If the pinned id
+  // isn't found in the current rows (post archived or wrong campaign),
+  // we fall back to the auto-pick silently.
+  async function fetchTopPost(campaignId: string, overrideContentId?: string | null) {
     try {
       const { data } = await supabasePublic
         .from('contents')
@@ -980,6 +995,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         setStatsTrends(null);
       }
 
+      // Apply Top Post override if the CM pinned one for the latest
+      // week. If the override id matches a row in the current
+      // campaign's posted content, swap it in for topRow. Falls back
+      // to the auto-pick if not found (e.g. post was archived or the
+      // pinned content belongs to a different campaign).
+      if (overrideContentId) {
+        const pinned = rows.find(r => r.id === overrideContentId);
+        if (pinned) topRow = pinned;
+      }
+
       if (!topRow) {
         setTopPost(null);
         return;
@@ -1032,21 +1057,38 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   async function fetchRecentActivities(limit = 5) {
     if (!clientId) return;
     try {
+      // HHP Onboarding Overhaul Spec § 8.5 — filter to the 4
+      // client-visible activity categories. Hides milestone_setup
+      // (admin backtracks + setup churn). Without this, the bell
+      // shows 19 setup-noise entries per Venice's audit § 2.3 #17.
+      // All three reads + count queries use the same filter so the
+      // badge number matches what's actually rendered.
+      const VISIBLE_CATEGORIES = [
+        'milestone_completed',
+        'milestone_activated',
+        'campaign_status_changed',
+        'resource_updated',
+        'client_task_added',
+      ];
+
       const [{ data }, { count }, { count: unreadCount }] = await Promise.all([
         supabasePublic
           .from('client_activity_log')
-          .select('id, activity_type, title, description, created_by_name, created_at, is_read')
+          .select('id, activity_type, activity_category, title, description, created_by_name, created_at, is_read')
           .eq('client_id', clientId)
+          .in('activity_category', VISIBLE_CATEGORIES)
           .order('created_at', { ascending: false })
           .limit(limit),
         supabasePublic
           .from('client_activity_log')
           .select('*', { count: 'exact', head: true })
-          .eq('client_id', clientId),
+          .eq('client_id', clientId)
+          .in('activity_category', VISIBLE_CATEGORIES),
         supabasePublic
           .from('client_activity_log')
           .select('*', { count: 'exact', head: true })
           .eq('client_id', clientId)
+          .in('activity_category', VISIBLE_CATEGORIES)
           .eq('is_read', false),
       ]);
       setRecentActivities(data || []);
@@ -1419,14 +1461,20 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // because activeCampaign is declared above this hook.
   useEffect(() => {
     if (isAuthenticated && activeCampaign?.id) {
-      fetchTopPost(activeCampaign.id);
+      // Read the latest weekly update's top_post_override (if any) and
+      // pass its content_id so the portal renders the pinned post.
+      // The dep array includes weeklyUpdates[0]?.top_post_override so
+      // a CM saving an override in the admin tab re-fires this fetch
+      // when the user reloads the portal.
+      const overrideId = (weeklyUpdates[0] as any)?.top_post_override?.content_id || null;
+      fetchTopPost(activeCampaign.id, overrideId);
     } else {
       setTopPost(null);
       setActiveStats(null);
       setStatsTrends(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, activeCampaign?.id]);
+  }, [isAuthenticated, activeCampaign?.id, (weeklyUpdates[0] as any)?.top_post_override?.content_id]);
 
   // [Campaign Live v1] Build the "This Week" feed by merging:
   //   - Auto-derived "done" items from tracker data (posts went live, etc.)
@@ -1450,11 +1498,36 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       });
     }
 
-    // 2) Manual pending items from the latest weekly update.
-    //    active_initiatives is newline-separated; strip bullet prefix.
-    const latest = weeklyUpdates[0];
-    if (latest?.active_initiatives) {
-      const lines = latest.active_initiatives
+    const latest = weeklyUpdates[0] as any;
+
+    // 2) Prefer the v2 structured this_week_feed JSONB if present.
+    //    Each item already has {text, date, status: pending|done}, so
+    //    we map directly. Falls back to the old active_initiatives
+    //    newline-split below when the v2 column is empty/missing.
+    //    Status flips on the admin side render here in real-time
+    //    because the portal re-fetches on auth + every reload.
+    const v2Feed: Array<{ id: string; text: string; date: string | null; status: 'pending' | 'done' }> | null =
+      Array.isArray(latest?.this_week_feed) ? latest.this_week_feed : null;
+    if (v2Feed && v2Feed.length > 0) {
+      // [2026-06-11] Sort: pending first (what's still happening), then
+      // done (what already shipped). Within each group, items keep
+      // their authored order — admin curates ordering in the Weekly
+      // Update tab and the portal respects it. Cap at 5 AFTER sorting
+      // so a long list doesn't push pending items below the fold.
+      const sortedV2 = [...v2Feed].sort((a, b) => {
+        if (a.status === b.status) return 0;
+        return a.status === 'pending' ? -1 : 1;
+      });
+      for (const it of sortedV2.slice(0, 5)) {
+        const dateLabel = it.date
+          ? new Date(it.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : null;
+        items.push({ text: it.text, dateLabel, status: it.status });
+      }
+    } else if (latest?.active_initiatives) {
+      // Legacy shape — newline-separated string, strip bullet prefix.
+      // Kept so weeks saved before the v2 migration still render.
+      const lines = (latest.active_initiatives as string)
         .split('\n')
         .map(l => l.replace(/^[-•\s]+/, '').trim())
         .filter(Boolean);
@@ -1463,15 +1536,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       }
     }
 
-    // 3) Manual upcoming — next check-in
-    if (latest?.next_checkin) {
-      const d = new Date(latest.next_checkin + 'T00:00:00');
-      items.push({
-        text: 'Next check-in',
-        dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        status: 'upcoming',
-      });
-    }
+    // 3) Manual upcoming — next check-in — REMOVED 2026-06-09.
+    //    The v2 spec is explicit: "No 'Coming Up' section. Only this
+    //    week." Legacy next_checkin only fires for old rows that have
+    //    no v2 this_week_feed AND active_initiatives is missing —
+    //    increasingly rare. Drop it to match spec exactly. Data
+    //    column kept in case the team wants to bring this back as a
+    //    separate hero element later.
 
     return items;
   }, [isCampaignLiveMode, activeStats, weeklyUpdates]);
@@ -1937,7 +2008,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             current_phase label (mig 078 — drafted, not yet applied).
             No manual maintenance. */}
         {isCampaignLiveMode && activeCampaign && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                 Active Campaign
@@ -2028,7 +2099,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           return (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
               {/* 1. KOLs Activated — raw delta ("↑ 3 this week") */}
-              <Card className="border-0 shadow-md rounded-xl overflow-hidden">
+              <Card className="border border-gray-200 shadow-lg rounded-xl overflow-hidden">
                 <CardContent className="p-5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                     KOLs Activated
@@ -2038,7 +2109,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </CardContent>
               </Card>
               {/* 2. Content Live — raw delta */}
-              <Card className="border-0 shadow-md rounded-xl overflow-hidden">
+              <Card className="border border-gray-200 shadow-lg rounded-xl overflow-hidden">
                 <CardContent className="p-5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                     Content Live
@@ -2048,7 +2119,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </CardContent>
               </Card>
               {/* 3. Impressions — % delta ("↑ 18%") */}
-              <Card className="border-0 shadow-md rounded-xl overflow-hidden">
+              <Card className="border border-gray-200 shadow-lg rounded-xl overflow-hidden">
                 <CardContent className="p-5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                     Impressions
@@ -2058,7 +2129,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </CardContent>
               </Card>
               {/* 4. Engagements — % delta */}
-              <Card className="border-0 shadow-md rounded-xl overflow-hidden">
+              <Card className="border border-gray-200 shadow-lg rounded-xl overflow-hidden">
                 <CardContent className="p-5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                     Engagements
@@ -2087,7 +2158,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
             {/* ── This Week — left column (~60%) ── */}
             {thisWeekItems.length > 0 && (
-              <Card className="flex-1 lg:basis-3/5 border-0 shadow-lg rounded-xl overflow-hidden">
+              <Card className="flex-1 lg:basis-3/5 border border-gray-200 shadow-xl rounded-xl overflow-hidden">
                 <CardContent className="p-6 sm:p-8">
                   <div className="flex items-center gap-3 mb-5">
                     <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2098,7 +2169,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
                   <ul className="space-y-3">
                     {thisWeekItems
-                      .filter(it => it.status !== 'upcoming')
                       .map((it, i) => (
                         <li key={`now-${i}`} className="flex items-center gap-3">
                           <span
@@ -2107,7 +2177,21 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             }`}
                           />
                           <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                            <p className="text-sm text-gray-900 leading-none">{it.text}</p>
+                            {/* [2026-06-11] Done items get strikethrough +
+                                muted color so the eye can scan past them
+                                to the still-pending work. Clients screen-
+                                shot this card; the visual contrast also
+                                makes the "progress this week" story read
+                                in a single glance. */}
+                            <p
+                              className={`text-sm leading-none ${
+                                it.status === 'done'
+                                  ? 'text-gray-400 line-through'
+                                  : 'text-gray-900'
+                              }`}
+                            >
+                              {it.text}
+                            </p>
                             {it.dateLabel && (
                               <p className="text-xs text-gray-400 flex-shrink-0 leading-none">{it.dateLabel}</p>
                             )}
@@ -2116,29 +2200,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       ))}
                   </ul>
 
-                  {thisWeekItems.some(it => it.status === 'upcoming') && (
-                    <>
-                      <div className="border-t border-gray-100 my-5" />
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                        Coming Up
-                      </p>
-                      <ul className="space-y-3">
-                        {thisWeekItems
-                          .filter(it => it.status === 'upcoming')
-                          .map((it, i) => (
-                            <li key={`up-${i}`} className="flex items-center gap-3">
-                              <span className="w-2 h-2 rounded-full flex-shrink-0 bg-gray-300" />
-                              <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                                <p className="text-sm text-gray-500 leading-none">{it.text}</p>
-                                {it.dateLabel && (
-                                  <p className="text-xs text-gray-400 flex-shrink-0 leading-none">{it.dateLabel}</p>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                      </ul>
-                    </>
-                  )}
+                  {/* "Coming Up" block removed 2026-06-09 to match
+                      the v2 spec: "No 'Coming Up' section. Only this
+                      week." The thisWeekItems builder no longer
+                      produces 'upcoming' status items either, so the
+                      old conditional was dead code. */}
                 </CardContent>
               </Card>
             )}
@@ -2148,7 +2214,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 persuasive element on the page — clients screenshot it."
                 Compact layout to fit in the narrower column. */}
             {topPost && (
-              <Card className="flex-1 lg:basis-2/5 border-0 shadow-lg rounded-xl overflow-hidden">
+              <Card className="flex-1 lg:basis-2/5 border border-gray-200 shadow-xl rounded-xl overflow-hidden">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2209,7 +2275,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             form, which silently hid the banner. The form-prompt has
             to override anything else when not filled. */}
         {hasOnboardingResponse === false && onboardingFormSlug && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-brand/10 to-brand/5">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-brand/10 to-brand/5">
             <CardContent className="flex items-center justify-between py-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2244,11 +2310,69 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             initial check. checkOnboardingStatus() defaults to true on
             "no form configured" or transient errors, so the gate fails
             open in those cases. */}
+        {/* HHP Onboarding Overhaul Spec § 8 critical #3 — "YOUR TASKS"
+            hero card. Single most-valuable thing the portal can show:
+            the client's outstanding to-dos from the active milestone
+            surfaced as a prominent card above the milestone section.
+            Renders only when there's an active milestone with at least
+            one un-done client task. */}
+        {(() => {
+          if (!activeMilestone || isCampaignLiveMode || hasOnboardingResponse !== true) return null;
+          const items = actionItems.filter(i =>
+            i.milestone_id === activeMilestone.id
+            && i.court === 'yours'
+            && !i.is_done
+          ).sort((a, b) => a.display_order - b.display_order);
+          if (items.length === 0) return null;
+          return (
+            <Card id="section-your-tasks" className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white shadow-xl rounded-xl overflow-hidden mb-6">
+              <CardContent className="p-6 sm:p-7">
+                <div className="flex items-start gap-4">
+                  <div className="p-2.5 bg-orange-500 rounded-xl shadow-md flex-shrink-0">
+                    <Activity className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-bold text-gray-900">What we need from you</h3>
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                        {items.length} task{items.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-4">
+                      To unlock the next step in <span className="font-medium">{activeMilestone.name}</span>.
+                    </p>
+                    <ul className="space-y-2.5">
+                      {items.map(item => (
+                        <li key={item.id} className="flex items-start gap-2.5">
+                          <div className="w-4 h-4 rounded border-2 border-orange-400 bg-white flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-800 leading-5">{item.text}</p>
+                            {item.attachment_url && (
+                              <a
+                                href={item.attachment_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-brand hover:underline mt-0.5 inline-block"
+                              >
+                                {item.attachment_label || 'Open link'} ↗
+                              </a>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* [Campaign Live v1] Hide the top-positioned milestone tracker
             once we're in Campaign Live mode. It re-appears at the bottom
             of the page as a collapsed row that can be expanded. */}
         {milestones.length > 0 && hasOnboardingResponse === true && !isCampaignLiveMode && (
-          <Card id="section-milestones" className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+          <Card id="section-milestones" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -2291,8 +2415,23 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </div>
               </div>
 
-              {/* Milestone cards */}
-              <div className="space-y-3">
+              {/* Milestone cards. HHP Onboarding Overhaul Spec § 8
+                  critical #2 — vertical timeline. The relative
+                  wrapper + absolute-positioned line creates a
+                  connector running through the milestone icon column,
+                  turning the stacked cards into a true timeline. The
+                  line sits z-0 behind the icons; cards sit at z-10. */}
+              <div className="relative space-y-3">
+                {/* Vertical connector line — anchored where the icons
+                    render (icon center = px-5 left padding (20px) +
+                    half of w-8 (16px) = 36px from container edge).
+                    Bottom inset prevents the line from poking past
+                    the last milestone's icon. */}
+                <div
+                  className="absolute top-8 bottom-8 w-0.5 bg-gray-200 z-0"
+                  style={{ left: '36px' }}
+                  aria-hidden="true"
+                />
                 {milestones.map((ms) => {
                   const msItems = actionItems.filter(i => i.milestone_id === ms.id);
                   const yoursItems = msItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
@@ -2305,7 +2444,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   return (
                     <div
                       key={ms.id}
-                      className={`rounded-xl border transition-all ${isActive ? 'border-gray-300 bg-white shadow-md' : isComplete ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}
+                      className={`relative z-10 rounded-xl border transition-all ${isActive ? 'border-gray-300 bg-white shadow-md' : isComplete ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}
                     >
                       {/* Header */}
                       <div
@@ -2338,24 +2477,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       {/* Expanded content */}
                       {isExpanded && !isUpcoming && (
                         <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
-                          {/* Two-column action items */}
-                          {(oursItems.length > 0 || yoursItems.length > 0) && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-2 h-2 rounded-full bg-brand" />
-                                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Holo Hive</p>
-                                </div>
-                                <div className="space-y-2">
-                                  {oursItems.map(item => (
-                                    <div key={item.id} className="flex items-start gap-2.5">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0 mt-[7px]" />
-                                      <span className={`text-sm leading-5 ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
-                                    </div>
-                                  ))}
-                                  {oursItems.length === 0 && <p className="text-xs text-gray-400">No items</p>}
-                                </div>
-                              </div>
+                          {/* HHP Onboarding Overhaul Spec § 4 — "Never
+                              client-visible: HOLO HIVE internal tasks."
+                              Was previously a two-column layout showing
+                              HH tasks (oursItems) alongside the client's
+                              tasks. Now shows only the client column;
+                              internal tracking moved fully to the admin
+                              /clients modal. */}
+                          {yoursItems.length > 0 && (
+                            <div className="pt-4">
+                              {/* Removed HH column intentionally — see comment above */}
                               <div>
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-2 h-2 rounded-full bg-orange-500" />
@@ -2404,7 +2535,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Korean Mindshare Tracker */}
         {mindshareEnabled && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2550,7 +2681,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             client info and has nothing to do with the mindshare
             tracker block below. */}
         {(clientContext || linkedCRMAccount) && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2618,7 +2749,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Stats Cards — discovery & tracker only */}
         {showAdvancedSections && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
-          <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+          <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
               <div className="flex items-center justify-between">
@@ -2633,7 +2764,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             </CardContent>
           </Card>
 
-          <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+          <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
             {/* [Portal v1] Stat card icons unified to brand (was: per-stat
                 rainbow). Stats are still distinguishable via labels +
                 numbers; the icon palette doesn't need to do that work. */}
@@ -2651,7 +2782,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             </CardContent>
           </Card>
 
-          <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+          <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
               <div className="flex items-center justify-between">
@@ -2666,7 +2797,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             </CardContent>
           </Card>
 
-          <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+          <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
               <div className="flex items-center justify-between">
@@ -2684,7 +2815,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           {/* Live KOL Status Metrics — shown in discovery/tracker when KOLs exist */}
           {showAdvancedSections && kolRoster.length > 0 && (
             <>
-              <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+              <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                 <CardContent className="pt-6 pb-5 relative">
                   <div className="flex items-center justify-between">
@@ -2699,7 +2830,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </CardContent>
               </Card>
 
-              <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+              <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                 <CardContent className="pt-6 pb-5 relative">
                   <div className="flex items-center justify-between">
@@ -2723,7 +2854,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             spec). The data backing both is the same client_weekly_updates
             row — only the rendering differs. */}
         {showAdvancedSections && weeklyUpdates.length > 0 && !isCampaignLiveMode && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 border-l-4 border-l-brand">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10 border-l-4 border-l-brand">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2799,11 +2930,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Form Submissions & Resources Row — discovery & tracker only */}
-        {showAdvancedSections && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
+        {showAdvancedSections && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
             {/* Form Submissions */}
             {formSubmissions.length > 0 && (
-              <Card className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
+              <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden h-full">
                 <CardHeader className="bg-white border-b border-gray-100 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2844,8 +2975,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             )}
 
             {/* Resources */}
-            {((clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
-              <Card id="section-resources" className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
+            {((clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
+              <Card id="section-resources" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden h-full">
                 <CardHeader className="bg-white border-b border-gray-100 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -2855,7 +2986,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url) && (
+                  {clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url) && (
                     <div className="space-y-3">
                       {clientContext.telegram_url && (
                         <a
@@ -2908,10 +3039,32 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
                       )}
+                      {/* [2026-06-08] KOL Content Brief — 4th Resources
+                          card per Post-Onboarding Campaign View spec
+                          v2 (Phase 1). Amber icon tile to differentiate
+                          from the three existing cards (blue / emerald
+                          / purple). Same chrome / hover pattern. */}
+                      {clientContext.kol_content_brief_url && (
+                        <a
+                          href={clientContext.kol_content_brief_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
+                        >
+                          <div className="p-2 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
+                            <FileText className="h-5 w-5 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">KOL Content Brief</p>
+                            <p className="text-xs text-gray-500">Open brief</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
+                        </a>
+                      )}
                     </div>
                   )}
                   {clientLinks.length > 0 && (
-                    <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url) ? 'mt-4 space-y-3' : 'space-y-3'}>
+                    <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url) ? 'mt-4 space-y-3' : 'space-y-3'}>
                       {clientLinks.map(link => (
                         <a
                           key={link.id}
@@ -2933,7 +3086,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     </div>
                   )}
                   {formAttachments.length > 0 && (
-                    <div className={(clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
+                    <div className={(clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url)) || clientLinks.length > 0 ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Uploaded Files</h4>
                       <div className="space-y-3">
                         {formAttachments.map((att, i) => {
@@ -3092,7 +3245,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Deliverables Progress — visible when client has deliverables */}
         {clientDeliverables.length > 0 && (
-          <Card id="section-deliverables" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+          <Card id="section-deliverables" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -3147,7 +3300,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Campaigns Section — discovery & tracker only */}
-        {showAdvancedSections && <Card id="section-campaigns" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+        {showAdvancedSections && <Card id="section-campaigns" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
           <CardHeader className="bg-white border-b border-gray-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-lg font-bold text-gray-900">Your Campaigns</CardTitle>
@@ -3307,7 +3460,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* KOL Roster — tracker only */}
         {portalPhase === 'tracker' && onboardingComplete && kolRoster.length > 0 && (
-          <Card id="section-kol-roster" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+          <Card id="section-kol-roster" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -3400,7 +3553,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Meeting Notes Section — discovery & tracker only */}
         {showAdvancedSections && meetingNotes.length > 0 && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -3492,7 +3645,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Decision Log Section — discovery & tracker only */}
         {showAdvancedSections && decisionLog.length > 0 && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -3533,7 +3686,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             Default state: collapsed. Reads existing milestone data —
             zero maintenance. */}
         {isCampaignLiveMode && milestones.length > 0 && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
             <button
               type="button"
               onClick={() => setOnboardingExpandedInLiveMode(prev => !prev)}

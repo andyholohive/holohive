@@ -20,10 +20,11 @@ import { TaskComments } from './TaskComments';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { SubtaskList } from './SubtaskList';
+import { PreShipGateModal, logPreShipGate, type PreShipGateState } from './PreShipGateModal';
+import { supabase } from '@/lib/supabase';
 import { RecurringConfigEditor } from './RecurringConfig';
 import { DeliverableProgressTracker } from './DeliverableProgressTracker';
 import { DeliverableService } from '@/lib/deliverableService';
-import { supabase } from '@/lib/supabase';
 import {
   Calendar as CalendarIcon,
   Circle,
@@ -113,6 +114,13 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  // [2026-06-11] Pre-Ship Gate intercept. When user tries to save with
+  // status='complete' AND task has client_id AND task wasn't already
+  // complete, open the gate modal instead of saving. On Confirm, the
+  // gate writes a log row, then we resume the save. Per Jdot's spec —
+  // forcing function on client-linked completion.
+  const [gateOpen, setGateOpen] = useState(false);
+  const [gateSubmitting, setGateSubmitting] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState('details');
   const [hasDeliverable, setHasDeliverable] = useState(false);
 
@@ -245,66 +253,134 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionItems]);
 
+  /**
+   * [2026-06-11] Build the payload the save call will use. Extracted so
+   * the Pre-Ship Gate confirm path can call the same shape after writing
+   * the gate log row — keeps the gate-pass and the non-gate save aligned.
+   */
+  const buildSavePayload = () => {
+    const assignedMember = teamMembers.find(m => m.id === form.assigned_to);
+    const canEditClient = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+    const derivedFrequency = form.recurring_config ? 'recurring' : 'one-time';
+    const payload: Record<string, any> = {
+      task_name: form.task_name.trim(),
+      assigned_to: form.assigned_to || null,
+      assigned_to_name: assignedMember?.name || null,
+      due_date: form.due_date ? toLocalDateString(form.due_date) : null,
+      frequency: derivedFrequency,
+      task_type: form.task_type,
+      link: form.link.trim() || null,
+      latest_comment: form.latest_comment.trim() || null,
+      description: form.description.trim() || null,
+      status: form.status,
+      priority: getComputedPriority(form.due_date, form.status),
+      recurring_config: form.recurring_config || null,
+      is_ad_hoc: form.is_ad_hoc,
+      linked_initiative: form.linked_initiative || null,
+    };
+    if (canEditClient) {
+      payload.client_id = form.client_id || null;
+      payload.client_action_item_id = form.client_id ? (form.client_action_item_id || null) : null;
+    }
+    return payload;
+  };
+
+  /**
+   * Persists the form, closes the modal, and refreshes parents. Used by
+   * both the normal Save path AND the Pre-Ship Gate confirm path. Caller
+   * is responsible for any pre-write side-effects (like writing the
+   * gate log row before this runs).
+   */
+  const performSave = async () => {
+    const payload = buildSavePayload();
+    if (task) {
+      await TaskService.updateTask(task.id, payload);
+      toast({ title: 'Task updated' });
+    } else {
+      await TaskService.createTask({
+        ...payload,
+        created_by: user!.id,
+        created_by_name: userProfile!.name || userProfile!.email || 'Unknown',
+      });
+      toast({ title: 'Task created' });
+    }
+    onOpenChange(false);
+    onSaved();
+  };
+
   const handleSubmit = async () => {
     // [Frequency consolidation] frequency is no longer required from
     // the user — it's auto-derived from recurring_config below.
     if (!form.task_name.trim() || !form.task_type) return;
     if (!user?.id || !userProfile) return;
 
+    // [2026-06-11] Pre-Ship Gate intercept. Conditions per Jdot's spec:
+    //   • task has a client linked (client_id IS NOT NULL)
+    //   • status is transitioning TO 'complete' (was something else)
+    //   • this is an edit of an existing task (not a brand-new create)
+    // Reopen → recomplete also triggers (the modal fires every time the
+    // task's status crosses INTO complete). Internal tasks (no client)
+    // complete normally — zero new friction per spec.
+    const clientId = form.client_id || (task as any)?.client_id;
+    const enteringComplete = form.status === 'complete' && task?.status !== 'complete';
+    if (task && clientId && enteringComplete) {
+      setGateOpen(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const assignedMember = teamMembers.find(m => m.id === form.assigned_to);
-      const canEditClient = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
-      // [Frequency consolidation] Auto-derive the legacy `frequency`
-      // field from `recurring_config` so the DB stays consistent for
-      // any reader still on the old column (cron cloner fallback,
-      // MCP tools, etc.). The user no longer picks this.
-      const derivedFrequency = form.recurring_config ? 'recurring' : 'one-time';
-      const payload: Record<string, any> = {
-        task_name: form.task_name.trim(),
-        assigned_to: form.assigned_to || null,
-        assigned_to_name: assignedMember?.name || null,
-        due_date: form.due_date ? toLocalDateString(form.due_date) : null,
-        frequency: derivedFrequency,
-        task_type: form.task_type,
-        link: form.link.trim() || null,
-        latest_comment: form.latest_comment.trim() || null,
-        description: form.description.trim() || null,
-        status: form.status,
-        priority: getComputedPriority(form.due_date, form.status),
-        recurring_config: form.recurring_config || null,
-        is_ad_hoc: form.is_ad_hoc,
-        linked_initiative: form.linked_initiative || null,
-      };
-      // Only admins can change client assignment
-      if (canEditClient) {
-        payload.client_id = form.client_id || null;
-        // [Action Board link] Action item link rides along with client
-        // changes — it's scoped per client. If no client is set, force
-        // null. Non-admins keep the existing link unchanged (the form
-        // also disables the dropdown for them).
-        payload.client_action_item_id = form.client_id ? (form.client_action_item_id || null) : null;
-      }
-
-      if (task) {
-        await TaskService.updateTask(task.id, payload);
-        toast({ title: 'Task updated' });
-      } else {
-        await TaskService.createTask({
-          ...payload,
-          created_by: user.id,
-          created_by_name: userProfile.name || userProfile.email || 'Unknown',
-        });
-        toast({ title: 'Task created' });
-      }
-
-      onOpenChange(false);
-      onSaved();
+      // [2026-06-11] payload build + save extracted to buildSavePayload /
+      // performSave above so the Pre-Ship Gate confirm path can reuse them.
+      await performSave();
     } catch (err) {
       console.error('Error saving task:', err);
       toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Failed to save task', variant: 'destructive' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  /**
+   * [2026-06-11] Pre-Ship Gate confirm — user checked all 5 boxes and
+   * clicked Complete Task. Order matters:
+   *   1. Write the append-only log row first (via_source='hq')
+   *   2. Only on log success: flip status to complete via performSave
+   * If the log write fails, surface a toast and DON'T flip status —
+   * better to leave the task open than have a status flip with no
+   * audit trail.
+   */
+  const handleGateConfirm = async (state: PreShipGateState) => {
+    if (!task || !user?.id) return;
+    setGateSubmitting(true);
+    try {
+      const logged = await logPreShipGate(supabase, {
+        taskId: task.id,
+        state,
+        completedBy: user.id,
+        completedByName: userProfile?.name || userProfile?.email || null,
+        viaSource: 'hq',
+      });
+      if (!logged) {
+        toast({
+          title: 'Gate log failed',
+          description: "Task wasn't completed. Try again — if it keeps failing, ping the engineering channel.",
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Gate passed + logged. Now flip status.
+      await performSave();
+      setGateOpen(false);
+    } catch (err) {
+      console.error('[PreShipGate] confirm failed:', err);
+      toast({
+        title: 'Complete failed',
+        description: err instanceof Error ? err.message : 'Failed to complete task',
+        variant: 'destructive',
+      });
+    } finally {
+      setGateSubmitting(false);
     }
   };
 
@@ -353,6 +429,11 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
 
             <TabsContent value="details" className="flex-1 overflow-y-auto mt-3 px-1 pb-4">
               {renderFormFields()}
+              {/* [2026-06-11] Pre-Ship Gate history. Collapsed by default
+                  per Jdot spec; expanding lazy-fetches the log rows for
+                  this task. Reverse-chrono so the most recent gate pass
+                  is at the top. Survives reopen/recomplete cycles. */}
+              {task && <PreShipGateHistory taskId={task.id} />}
             </TabsContent>
 
             {hasDeliverable && (
@@ -404,6 +485,18 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* [2026-06-11] Pre-Ship Gate — forcing function on client-linked
+          task completion. Mounted as a sibling Dialog so it overlays on
+          top of the TaskDetailModal. Hidden when not entering 'complete'
+          status on a client task. See handleSubmit + handleGateConfirm. */}
+      <PreShipGateModal
+        open={gateOpen}
+        taskName={form.task_name || (task as any)?.task_name || null}
+        onConfirm={handleGateConfirm}
+        onCancel={() => setGateOpen(false)}
+        submitting={gateSubmitting}
+      />
     </Dialog>
   );
 
@@ -708,4 +801,114 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
       </div>
     );
   }
+}
+
+// ─── Pre-Ship Gate history block ───────────────────────────────────
+
+type PreShipGateRow = {
+  id: string;
+  completed_at: string;
+  completed_by_name: string | null;
+  via_source: 'hq' | 'tg';
+  check_1_read_not_skimmed: boolean;
+  check_2_makes_sense_to_client: boolean;
+  check_3_campaign_specific_insight: boolean;
+  check_4_clean_execution: boolean;
+  check_5_not_ai_replaceable: boolean;
+};
+
+/**
+ * Collapsed-by-default block at the bottom of the Details tab. Lazy-fetches
+ * gate-pass log rows when expanded. Each row renders the actor + timestamp
+ * + HQ/TG pill + a row of 5 tiny boxes showing the checkbox state (all
+ * green because the gate only passes when all 5 are true — but rendered
+ * explicitly so the audit story is unambiguous).
+ */
+function PreShipGateHistory({ taskId }: { taskId: string }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<PreShipGateRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || rows !== null) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await (supabase as any)
+          .from('pre_ship_gate_log')
+          .select('id, completed_at, completed_by_name, via_source, check_1_read_not_skimmed, check_2_makes_sense_to_client, check_3_campaign_specific_insight, check_4_clean_execution, check_5_not_ai_replaceable')
+          .eq('task_id', taskId)
+          .order('completed_at', { ascending: false })
+          .limit(50);
+        if (!cancelled) setRows((data || []) as PreShipGateRow[]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, rows, taskId]);
+
+  // Hide entirely until the user expands. Once they expand, show the
+  // header in the same row + the list. Pattern matches the "strategic
+  // notes history" disclosure on /clients.
+  return (
+    <div className="mt-6 border-t border-cream-200 pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(prev => !prev)}
+        className="inline-flex items-center gap-1.5 text-xs text-ink-warm-500 hover:text-brand transition-colors"
+      >
+        <span className={`transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
+        <span>Pre-Ship Gate history{rows && rows.length > 0 ? ` · ${rows.length} pass${rows.length === 1 ? '' : 'es'}` : ''}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {loading ? (
+            <p className="text-xs text-ink-warm-500 italic">Loading…</p>
+          ) : !rows || rows.length === 0 ? (
+            <p className="text-xs text-ink-warm-500 italic">No Pre-Ship Gate passes recorded for this task.</p>
+          ) : (
+            rows.map(r => {
+              const states = [
+                r.check_1_read_not_skimmed,
+                r.check_2_makes_sense_to_client,
+                r.check_3_campaign_specific_insight,
+                r.check_4_clean_execution,
+                r.check_5_not_ai_replaceable,
+              ];
+              return (
+                <div key={r.id} className="text-xs flex items-center gap-2 flex-wrap py-1.5 px-2 border border-cream-200 rounded bg-cream-50/40">
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                    r.via_source === 'hq'
+                      ? 'bg-sky-100 text-sky-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {r.via_source}
+                  </span>
+                  <span className="font-medium text-ink-warm-900">
+                    {r.completed_by_name || 'Unknown'}
+                  </span>
+                  <span className="text-ink-warm-500 tabular-nums">
+                    {new Date(r.completed_at).toLocaleString('en-US', {
+                      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                    })}
+                  </span>
+                  <div className="flex items-center gap-0.5 ml-auto">
+                    {states.map((s, i) => (
+                      <span
+                        key={i}
+                        className={`w-3 h-3 rounded-sm border ${s ? 'bg-emerald-500 border-emerald-500' : 'bg-rose-100 border-rose-300'}`}
+                        title={`Checkbox ${i + 1}: ${s ? 'passed' : 'failed'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

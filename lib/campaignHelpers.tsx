@@ -157,13 +157,24 @@ export function getContentTypeColor(type: string): string {
 
 export function getCreatorTypeColor(creatorType: string): string {
   const colorMap: { [key: string]: string } = {
+    // ─── Spec types (HHP Creator Taxonomy Spec, 2026-05) ───
+    // Note: Educator and AI both kept sky here because this helper
+    // pre-dates the /kols + /lists colorways. Slightly different
+    // palette than the page-local maps; harmless — these display
+    // surfaces don't share screens with the kols list.
+    Native:    'bg-orange-100 text-orange-800',
+    Scout:     'bg-sky-100 text-sky-800',
+    Tracker:   'bg-slate-100 text-slate-800',
+    Analyst:   'bg-cyan-100 text-cyan-800',
+    Educator:  'bg-sky-100 text-sky-800',
+    Visionary: 'bg-indigo-100 text-indigo-800',
+    Onboarder: 'bg-teal-100 text-teal-800',
+    Curator:   'bg-lime-100 text-lime-800',
+    // ─── Legacy values (kept for backward-compat) ───
     'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
     'Drama-Forward':         'bg-rose-100 text-rose-800',
     Skeptic:                 'bg-amber-100 text-amber-800',
-    Educator:                'bg-sky-100 text-sky-800',
     'Bridge Builder':        'bg-emerald-100 text-emerald-800',
-    Visionary:               'bg-indigo-100 text-indigo-800',
-    Onboarder:               'bg-teal-100 text-teal-800',
     General:                 'bg-cream-100 text-ink-warm-700',
     Gaming:                  'bg-pink-100 text-pink-800',
     Crypto:                  'bg-amber-100 text-amber-800',

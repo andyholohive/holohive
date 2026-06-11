@@ -107,12 +107,17 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/templates', label: 'Templates', icon: MessageSquare, section: 'Workspace', notForGuest: true },
   { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Workspace', requiredRole: 'admin' },
 
-  // Admin Tools — combines Field Options + Claude MCP + Archive into one
-  // tabbed page at /admin. Original routes (/admin/field-options, /mcp,
-  // /archive) still work for direct links + bookmarks but are no longer
-  // surfaced separately in the sidebar.
+  // Admin Tools — combines Field Options + Claude MCP into one tabbed
+  // page at /admin. Original routes (/admin/field-options, /mcp) still
+  // work for direct links + bookmarks but are no longer surfaced
+  // separately in the sidebar.
   { href: '/admin', label: 'Admin Tools', icon: Sliders, section: 'Admin', notForGuest: true },
   { href: '/admin/changelog', label: 'Changelog', icon: Sparkles, section: 'Admin', requiredRole: 'super_admin' },
+  // [2026-06-08] Archive promoted out of the Admin Tools tabs to its
+  // own sidebar entry — see Sidebar.tsx for the rationale. Registered
+  // as the last Admin entry so bookmarks + customize show it in the
+  // same position it renders in the sidebar.
+  { href: '/archive', label: 'Archive', icon: Archive, section: 'Admin', notForGuest: true },
 ];
 
 /** O(1) lookup by href, used when rendering the Bookmarks section. */

@@ -23,6 +23,8 @@ import { TaskService, Task } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
+import { ThisWeekFeedWidget } from '@/components/tasks/ThisWeekFeedWidget';
+import { PreShipGateModal, logPreShipGate, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
 import { RecurringConfigEditor } from '@/components/tasks/RecurringConfig';
 import { DeliverableService } from '@/lib/deliverableService';
 import { supabase } from '@/lib/supabase';
@@ -270,6 +272,17 @@ export default function TasksPage() {
   const actionItemFilterId = searchParams.get('actionItem');
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  // [2026-06-11] Pre-Ship Gate state. When saveSelectField detects a
+  // client-linked task transitioning to 'complete', it stashes the
+  // pending updates here and opens the modal. On confirm, the gate
+  // log row is written + the updates are applied. On cancel, the
+  // local optimistic update is rolled back from the tasks list.
+  const [gateTarget, setGateTarget] = useState<{
+    taskId: string;
+    taskName: string;
+    pendingUpdates: Record<string, string | null>;
+  } | null>(null);
+  const [gateSubmitting, setGateSubmitting] = useState(false);
   // [Subtasks v1] Tracks which parent tasks are expanded to show their
   // subtasks inline. Default: all collapsed. State lives in-memory only
   // (resets on page reload) — matches the deliverables page pattern.
@@ -767,6 +780,20 @@ export default function TasksPage() {
         if (current?.status !== 'complete') {
           updates.completed_at = new Date().toISOString();
         }
+
+        // [2026-06-11] Pre-Ship Gate intercept. If the task has a client
+        // linked AND it's transitioning INTO 'complete' (not idempotent),
+        // open the gate modal instead of writing. The modal's confirm
+        // path will replay this update — see handleGateConfirm below.
+        // Internal tasks (no client_id) bypass the gate per spec.
+        if (current?.client_id && current.status !== 'complete') {
+          setGateTarget({
+            taskId,
+            taskName: current.task_name || 'this task',
+            pendingUpdates: updates,
+          });
+          return;
+        }
       } else {
         // Status moved away from complete — clear the timestamp so the
         // task isn't surfaced in "completed" views with a stale date.
@@ -780,6 +807,55 @@ export default function TasksPage() {
     } catch (error) {
       console.error('Error saving:', error);
       await fetchTasks();
+    }
+  };
+
+  /**
+   * [2026-06-11] Pre-Ship Gate confirm handler. Writes the append-only
+   * log row first, then applies the pending updates (which already have
+   * status='complete' baked in via saveSelectField's intercept). On log
+   * write failure, surface a toast and DON'T flip status — better to
+   * leave the task open than have a status flip with no audit row.
+   */
+  const handleGateConfirm = async (state: PreShipGateState) => {
+    if (!gateTarget) return;
+    setGateSubmitting(true);
+    try {
+      const logged = await logPreShipGate(supabase, {
+        taskId: gateTarget.taskId,
+        state,
+        completedBy: user?.id || null,
+        completedByName: userProfile?.name || userProfile?.email || null,
+        viaSource: 'hq',
+      });
+      if (!logged) {
+        toast({
+          title: 'Gate log failed',
+          description: "Task wasn't completed. Try again — if it keeps failing, ping the engineering channel.",
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Apply optimistic UI + persist
+      const updates = gateTarget.pendingUpdates;
+      setTasks(prev => prev.map(t => t.id === gateTarget.taskId
+        ? { ...t, ...updates, updated_at: new Date().toISOString() }
+        : t));
+      try {
+        await TaskService.updateTask(gateTarget.taskId, updates);
+        toast({ title: 'Task complete', description: 'Pre-Ship Gate passed.' });
+      } catch (err) {
+        console.error('[PSG] update failed after gate pass:', err);
+        await fetchTasks();
+        toast({
+          title: 'Save failed after gate pass',
+          description: 'Gate row was logged but status update failed. Refreshing tasks.',
+          variant: 'destructive',
+        });
+      }
+      setGateTarget(null);
+    } finally {
+      setGateSubmitting(false);
     }
   };
 
@@ -1771,6 +1847,17 @@ export default function TasksPage() {
         actions={headerActions}
       />
 
+      {/* [2026-06-11] Post-Onboarding spec Q4 — Jdot picked "widget is
+          good." Surfaces every pending Zone B feed item across the
+          current week so a CM can flip items Done without leaving HQ.
+          Hides itself when nothing's pending; mounts above the
+          SectionHeader so the chapter divider stays correct for the
+          task list below. */}
+      <ThisWeekFeedWidget
+        currentUserId={user?.id ?? null}
+        currentUserName={userProfile?.name ?? user?.email ?? null}
+      />
+
       {/* v11 chapter divider — counter shows the live narrowing so
           users can see at a glance how aggressive their filters are
           ("12 of 47 tasks · one-time · search:foo"). */}
@@ -2066,6 +2153,18 @@ export default function TasksPage() {
         teamMembers={teamMembers}
         clients={clients}
         onCreated={fetchTasks}
+      />
+
+      {/* [2026-06-11] Pre-Ship Gate — opens when saveSelectField detects
+          a client-linked task transitioning to 'complete' (status dropdown,
+          kanban drag, bulk update — all funnel through saveSelectField).
+          See handleGateConfirm for the post-pass flow. */}
+      <PreShipGateModal
+        open={!!gateTarget}
+        taskName={gateTarget?.taskName ?? null}
+        onConfirm={handleGateConfirm}
+        onCancel={() => setGateTarget(null)}
+        submitting={gateSubmitting}
       />
     </div>
   );

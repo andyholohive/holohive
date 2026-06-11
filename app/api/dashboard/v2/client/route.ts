@@ -2,15 +2,26 @@
  * GET /api/dashboard/v2/client — Layer 2: Client Success
  *
  * Answers "are clients getting results?" Returns:
- *   - clientHealth: per-standard-client row with engagement context,
- *     open/overdue task counts, content posted this week, and the
- *     renewal tone (red < 14d / amber < 30d / green).
+ *   - outputSignals: 4 KPIs above the Health table per spec § 4.1
+ *     (Content posted 7d, Active campaigns, Activations live + names,
+ *      Total ext. visits 7d). Aggregated across standard clients only.
+ *   - clientHealth: per-standard-client row with week number, engagement
+ *     context, content posted this week (and all-time), open/overdue
+ *     task counts, ext. visits 7d, the renewal tone (red < 14d / amber
+ *     < 30d / green), and the computed health tone (0 overdue=green,
+ *     1-2=amber, 3+=red).
  *   - callNotes: recent client_meeting_notes (last 10 across all
  *     standard clients) with open action_items count.
  *   - adHocClients: side-list of ad-hoc clients so they're visible
  *     but explicitly NOT in the rollups above.
  *
  * Ad-hoc clients (Impossible, Robonet) are EXCLUDED from clientHealth.
+ *
+ * Ext. visits caveat (2026-06-11): the portal analytics table doesn't
+ * exist yet (no `page_views` / `portal_visits`). Both the KPI and the
+ * per-client column return 0 with a sub-note flagging "TBD" until the
+ * analytics layer ships. The structure matches Jdot's spec so wiring
+ * the real data is a one-query swap when the table lands.
  */
 
 import { NextResponse } from 'next/server';
@@ -51,6 +62,12 @@ export async function GET() {
       const empty = {
         asOf: new Date().toISOString(),
         thresholds: cfg,
+        outputSignals: {
+          contentPostedLast7d: 0,
+          activeCampaigns: 0,
+          activationsLive: { count: 0, names: [] as string[] },
+          totalExtVisitsLast7d: 0,
+        },
         clientHealth: [],
         callNotes: [],
         adHocClients,
@@ -59,7 +76,7 @@ export async function GET() {
       return NextResponse.json(empty);
     }
 
-    const [tasksRes, contentsRes, meetingNotesRes, actionItemsRes] = await Promise.all([
+    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes, actionItemsRes] = await Promise.all([
       // Open tasks linked to standard clients
       (sb as any)
         .from('tasks')
@@ -72,22 +89,44 @@ export async function GET() {
         .in('client_id', standardClientIds)
         .eq('status', 'posted')
         .gte('activation_date', weekStartIso.slice(0, 10)),
-      // Recent meeting notes across standard clients
+      // [2026-06-11] All-time content posted per client — drives spec § 4.2's
+      // "Content Posted" column (total count, not just this week).
+      (sb as any)
+        .from('contents')
+        .select('id, client_id')
+        .in('client_id', standardClientIds)
+        .eq('status', 'posted'),
+      // [2026-06-11] Active campaigns for the Output Signals KPI row — spec
+      // § 4.1. status is TitleCase ("Active") not lowercase per a sample query.
+      (sb as any)
+        .from('campaigns')
+        .select('id, client_id, status')
+        .in('client_id', standardClientIds)
+        .eq('status', 'Active')
+        .is('archived_at', null),
+      // Recent meeting notes across standard clients. content is pulled
+      // so the dashboard card can render bullet takeaways per mockup
+      // (no full-page navigate required). sent_to_client_tg_at drives
+      // the "Sent to client TG" badge.
       (sb as any)
         .from('client_meeting_notes')
-        .select('id, client_id, title, meeting_date, attendees, created_at')
+        .select('id, client_id, title, content, meeting_date, attendees, created_at, sent_to_client_tg_at')
         .in('client_id', standardClientIds)
         .order('meeting_date', { ascending: false })
         .limit(10),
-      // Open action items per client (Layer 1 also touches; here we want per-client count)
+      // All action items for the recent notes — includes done state so
+      // the card can render strikethrough'd entries inline. owner_name
+      // is resolved via the users join below; the column itself is
+      // `text` not `action_text` per the schema.
       (sb as any)
         .from('meeting_action_items')
-        .select('id, meeting_note_id, owner_client_side, is_done')
-        .eq('is_done', false),
+        .select('id, meeting_note_id, text, owner_user_id, owner_client_side, is_done'),
     ]);
 
     const tasks = (tasksRes.data ?? []) as any[];
-    const contents = (contentsRes.data ?? []) as any[];
+    const contentsThisWeek = (contentsThisWeekRes.data ?? []) as any[];
+    const contentsAllTime = (contentsAllTimeRes.data ?? []) as any[];
+    const activeCampaigns = (campaignsRes.data ?? []) as any[];
     const notes = (meetingNotesRes.data ?? []) as any[];
     const actionItems = (actionItemsRes.data ?? []) as any[];
 
@@ -106,18 +145,116 @@ export async function GET() {
       taskAgg.set(t.client_id, cur);
     }
 
-    // Per-client content posted-this-week count
-    const contentByClient = new Map<string, number>();
-    for (const c of contents) {
-      contentByClient.set(c.client_id, (contentByClient.get(c.client_id) ?? 0) + 1);
+    // Per-client content posted-this-week + all-time counts
+    const contentThisWeekByClient = new Map<string, number>();
+    for (const c of contentsThisWeek) {
+      contentThisWeekByClient.set(c.client_id, (contentThisWeekByClient.get(c.client_id) ?? 0) + 1);
+    }
+    const contentAllTimeByClient = new Map<string, number>();
+    for (const c of contentsAllTime) {
+      contentAllTimeByClient.set(c.client_id, (contentAllTimeByClient.get(c.client_id) ?? 0) + 1);
     }
 
-    // Per-meeting open action item count (will roll up below)
-    const actionItemsByMeeting = new Map<string, number>();
-    for (const ai of actionItems) {
-      if (ai.owner_client_side) continue; // HH-side only here
-      actionItemsByMeeting.set(ai.meeting_note_id, (actionItemsByMeeting.get(ai.meeting_note_id) ?? 0) + 1);
+    // [2026-06-11] Output Signals row — spec § 4.1.
+    // Activations live: count of standard clients with non-empty
+    // activations[] array. Subtitle lists the names. The array column
+    // already exists per dashboard_v2_clients_lifecycle_columns
+    // migration; ops populates it from /clients UI.
+    const activationNames: string[] = [];
+    for (const c of standardClients) {
+      const acts = (c as any).activations as string[] | null | undefined;
+      if (Array.isArray(acts) && acts.length > 0) activationNames.push(...acts);
     }
+    const outputSignals = {
+      contentPostedLast7d: contentsThisWeek.length,
+      activeCampaigns: activeCampaigns.length,
+      activationsLive: {
+        count: activationNames.length,
+        names: activationNames,
+      },
+      // Ext. visits placeholder — see route header comment. Returns 0
+      // until the portal analytics table ships. Subtitle in the UI
+      // surfaces this as "TBD" so users don't read 0 as healthy.
+      totalExtVisitsLast7d: 0,
+    };
+
+    // [2026-06-11] Group action items per meeting note so the dashboard
+    // card can render them inline (was: just a count).
+    // Owner resolution: HH-side rows look up the user's display name;
+    // client-side rows show "Client" so the card visually attributes
+    // the work.
+    const userIdsForActionItems = new Set<string>();
+    for (const ai of actionItems) {
+      if (ai.owner_user_id && !ai.owner_client_side) userIdsForActionItems.add(ai.owner_user_id);
+    }
+    const ownerNameLookup = new Map<string, string>();
+    if (userIdsForActionItems.size > 0) {
+      const { data: ownerUsers } = await (sb as any)
+        .from('users')
+        .select('id, name')
+        .in('id', Array.from(userIdsForActionItems));
+      for (const u of (ownerUsers ?? []) as Array<{ id: string; name: string }>) {
+        ownerNameLookup.set(u.id, u.name);
+      }
+    }
+
+    type ActionItemDto = {
+      id: string;
+      text: string;
+      owner: string;
+      ownerSide: 'hh' | 'client';
+      done: boolean;
+    };
+
+    const actionItemsByMeeting = new Map<string, ActionItemDto[]>();
+    for (const ai of actionItems) {
+      const ownerSide: 'hh' | 'client' = ai.owner_client_side ? 'client' : 'hh';
+      const owner = ownerSide === 'client'
+        ? 'Client'
+        : (ai.owner_user_id ? ownerNameLookup.get(ai.owner_user_id) ?? 'Holo Hive' : 'Holo Hive');
+      const cur = actionItemsByMeeting.get(ai.meeting_note_id) ?? [];
+      cur.push({
+        id: ai.id,
+        text: ai.text,
+        owner,
+        ownerSide,
+        done: !!ai.is_done,
+      });
+      actionItemsByMeeting.set(ai.meeting_note_id, cur);
+    }
+    // Per-meeting open HH-side count (kept for legacy callers / sub-line).
+    const openHhCountByMeeting = new Map<string, number>();
+    for (const [noteId, items] of actionItemsByMeeting.entries()) {
+      openHhCountByMeeting.set(
+        noteId,
+        items.filter(i => i.ownerSide === 'hh' && !i.done).length,
+      );
+    }
+
+    // Client name lookup so the call note card can render the client
+    // header without a per-row join in the UI.
+    const clientNameById = new Map<string, string>();
+    for (const c of standardClients) clientNameById.set(c.id, c.name);
+
+    // [2026-06-11] Compute week-number per spec § 4.2:
+    // FLOOR((NOW - started_date) / 7) + 1 — week 1 is the week the
+    // engagement started. Returns null for clients with no start date.
+    const weekNumberFor = (startedDate: string | null | undefined): number | null => {
+      if (!startedDate) return null;
+      const start = new Date(startedDate + (startedDate.includes('T') ? '' : 'T00:00:00Z'));
+      const ms = Date.now() - start.getTime();
+      if (ms < 0) return null;
+      return Math.floor(ms / (7 * 86_400_000)) + 1;
+    };
+
+    // [2026-06-11] Health tone per spec § 4.2:
+    // 0 overdue = green/healthy, 1-2 = amber/needs attention, 3+ = red/at risk.
+    // No subjective weighting per spec § 12 locked decisions.
+    const healthToneFor = (overdueCount: number): 'green' | 'amber' | 'red' => {
+      if (overdueCount === 0) return 'green';
+      if (overdueCount <= 2) return 'amber';
+      return 'red';
+    };
 
     // Build client health rows
     const clientHealth = standardClients.map(c => {
@@ -130,12 +267,17 @@ export async function GET() {
         logo_url: c.logo_url,
         engagement_start_date: c.engagement_start_date,
         engagement_end_date: c.engagement_end_date,
+        weekNumber: weekNumberFor(c.engagement_start_date),
         renewal_tone: renewal.tone,
         renewal_days_left: renewal.daysLeft,
         openTasks: t.open,
         overdueTasks: t.overdue,
         completedThisWeek: t.doneThisWeek,
-        contentPostedThisWeek: contentByClient.get(c.id) ?? 0,
+        contentPostedThisWeek: contentThisWeekByClient.get(c.id) ?? 0,
+        totalContentPosted: contentAllTimeByClient.get(c.id) ?? 0,
+        // Ext. visits placeholder — wired when portal analytics ships.
+        extVisitsLast7d: 0,
+        healthTone: healthToneFor(t.overdue),
         is_whitelisted: c.is_whitelisted ?? false,
       };
     });
@@ -143,15 +285,20 @@ export async function GET() {
     const callNotes = notes.map(n => ({
       id: n.id,
       client_id: n.client_id,
+      client_name: clientNameById.get(n.client_id) ?? null,
       title: n.title,
+      content: n.content,
       meeting_date: n.meeting_date,
       attendees: n.attendees,
-      openHhActionItems: actionItemsByMeeting.get(n.id) ?? 0,
+      sent_to_client_tg_at: n.sent_to_client_tg_at,
+      openHhActionItems: openHhCountByMeeting.get(n.id) ?? 0,
+      actionItems: actionItemsByMeeting.get(n.id) ?? [],
     }));
 
     const payload = {
       asOf: new Date().toISOString(),
       thresholds: cfg,
+      outputSignals,
       clientHealth,
       callNotes,
       adHocClients,

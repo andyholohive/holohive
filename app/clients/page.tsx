@@ -29,7 +29,7 @@ import MeetingActionItems from '@/components/clients/MeetingActionItems';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, CheckCircle2, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users, Star, Save, History } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -44,6 +44,153 @@ import dynamic from 'next/dynamic';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 import 'react-quill/dist/quill.snow.css';
+
+/**
+ * Format a Date as YYYY-MM-DD using LOCAL components (not UTC).
+ *
+ * The previous pattern (`d.toISOString().split('T')[0]`) silently shifted
+ * dates back one day in any positive-UTC timezone — e.g. KST (UTC+9):
+ *   new Date(2026, 5, 8) // June 8 local midnight (Seoul)
+ *     .toISOString()      // → "2026-06-07T15:00:00.000Z" (still June 7 UTC)
+ *     .split('T')[0]      // → "2026-06-07"  ← BUG: saved as June 7
+ *
+ * For calendar-picked dates we want "the day the user clicked", which is a
+ * local Y-M-D, so we read the local components directly.
+ */
+const formatLocalYMD = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// ─── Weekly Update audit-log helpers ───────────────────────────────
+// Power the History popover in the Weekly Update tab. The audit table
+// stores raw before/after JSON; these helpers turn that into a humane
+// "Bolt added a row to the execution plan" sentence, plus a colored
+// tone for the status chip so the popover scans quickly.
+
+type WeeklyAuditKind =
+  | 'strategic_notes'
+  | 'execution_plan'
+  | 'this_week_feed'
+  | 'top_post_override'
+  | 'submitted';
+
+const WEEKLY_AUDIT_KIND_LABELS: Record<WeeklyAuditKind, string> = {
+  strategic_notes:   'Strategic Notes',
+  execution_plan:    'Execution Plan',
+  this_week_feed:    'This Week Feed',
+  top_post_override: 'Top Post',
+  submitted:         'Submitted',
+};
+
+const WEEKLY_AUDIT_KIND_TONES: Record<WeeklyAuditKind, BadgeTone> = {
+  strategic_notes:   'warning',   // amber, matches the Stage-1 section
+  execution_plan:    'warning',   // yellow, matches Zone A
+  this_week_feed:    'success',   // green, matches Zone B
+  top_post_override: 'info',      // sky, matches Zone C
+  submitted:         'brand',     // teal — the locking transition
+};
+
+function weeklyAuditKindLabel(k: WeeklyAuditKind): string {
+  return WEEKLY_AUDIT_KIND_LABELS[k] ?? k;
+}
+
+function weeklyAuditKindTone(k: WeeklyAuditKind): BadgeTone {
+  return WEEKLY_AUDIT_KIND_TONES[k] ?? 'neutral';
+}
+
+/**
+ * Turn a raw audit row's before/after into a humane summary like
+ * "added 2 rows" or "edited 3 fields". The popover renders this under
+ * the chip + actor line so users see what changed without expanding
+ * a JSON diff. Best-effort — falls back to "edited" for shapes we
+ * can't introspect.
+ */
+function summarizeWeeklyAudit(r: {
+  edit_kind: WeeklyAuditKind;
+  before_json: any;
+  after_json: any;
+}): string {
+  const { edit_kind, before_json, after_json } = r;
+
+  if (edit_kind === 'strategic_notes') {
+    const before = typeof before_json === 'string' ? before_json : (before_json?.strategic_notes ?? '');
+    const after  = typeof after_json  === 'string' ? after_json  : (after_json?.strategic_notes  ?? '');
+    if (!before && after) return `Wrote new strategic notes (${after.length} chars).`;
+    if (before && !after) return 'Cleared strategic notes.';
+    return `Edited strategic notes (${before.length} → ${after.length} chars).`;
+  }
+
+  if (edit_kind === 'execution_plan') {
+    const beforeArr = Array.isArray(before_json) ? before_json : [];
+    const afterArr  = Array.isArray(after_json)  ? after_json  : [];
+    const diff = afterArr.length - beforeArr.length;
+    if (diff > 0) return `Added ${diff} task row${diff === 1 ? '' : 's'} (now ${afterArr.length} total).`;
+    if (diff < 0) return `Removed ${-diff} task row${-diff === 1 ? '' : 's'} (now ${afterArr.length} total).`;
+    return `Edited ${afterArr.length} task row${afterArr.length === 1 ? '' : 's'} in place.`;
+  }
+
+  if (edit_kind === 'this_week_feed') {
+    const beforeArr = Array.isArray(before_json) ? before_json : [];
+    const afterArr  = Array.isArray(after_json)  ? after_json  : [];
+    const diff = afterArr.length - beforeArr.length;
+    const beforeDone = beforeArr.filter((i: any) => i?.status === 'done').length;
+    const afterDone  = afterArr.filter((i: any)  => i?.status === 'done').length;
+    if (diff > 0) return `Added ${diff} feed item${diff === 1 ? '' : 's'} (now ${afterArr.length} total).`;
+    if (diff < 0) return `Removed ${-diff} feed item${-diff === 1 ? '' : 's'} (now ${afterArr.length} total).`;
+    if (afterDone > beforeDone) return `Marked ${afterDone - beforeDone} item${afterDone - beforeDone === 1 ? '' : 's'} done.`;
+    if (afterDone < beforeDone) return `Reopened ${beforeDone - afterDone} item${beforeDone - afterDone === 1 ? '' : 's'}.`;
+    return `Edited ${afterArr.length} feed item${afterArr.length === 1 ? '' : 's'} in place.`;
+  }
+
+  if (edit_kind === 'top_post_override') {
+    if (!after_json && before_json) return 'Cleared top-post override (back to auto-selected).';
+    if (after_json && !before_json) return 'Set a top-post override.';
+    return 'Changed the top-post override.';
+  }
+
+  if (edit_kind === 'submitted') {
+    const created = (after_json as any)?.tasksCreated;
+    if (typeof created === 'number') {
+      return `Submitted execution plan — created ${created} HQ task${created === 1 ? '' : 's'}.`;
+    }
+    return 'Submitted execution plan.';
+  }
+
+  return 'Edited.';
+}
+
+/**
+ * Snap a Date to the Monday of its ISO week (Mon = start of week).
+ * Used as the canonical `week_of` value for client_weekly_updates rows
+ * so two CMs editing "this week's update" land on the same row even if
+ * they open the modal on different weekdays.
+ */
+const getMondayOf = (d: Date): Date => {
+  const out = new Date(d);
+  // JS getDay(): Sun=0, Mon=1, …, Sat=6. We want Mon=0, Sun=6 offset.
+  const dow = (out.getDay() + 6) % 7;
+  out.setDate(out.getDate() - dow);
+  out.setHours(0, 0, 0, 0);
+  return out;
+};
+
+/**
+ * Tiny RFC-4122-shaped uuid for client-side stable React keys on rows
+ * the user adds before the row is persisted (Zone A / Zone B). Not
+ * cryptographically secure — we never use these as auth tokens, just
+ * as identity markers for rows in JSONB arrays. crypto.randomUUID is
+ * available in modern browsers; fallback for older Safari uses
+ * Math.random which is plenty for this use case.
+ */
+const localId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return (crypto as any).randomUUID();
+  }
+  return 'r-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+};
 
 type MeetingNote = {
   id: string;
@@ -91,6 +238,46 @@ type WeeklyUpdate = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // v2 columns — Phase 2 of the Post-Onboarding Campaign View spec.
+  // Nullable for backward-compat with rows saved before the migration.
+  strategic_notes?: string | null;
+  strategic_notes_updated_at?: string | null;
+  strategic_notes_by?: string | null;
+  execution_plan?: ExecutionPlanRow[] | null;
+  execution_plan_submitted_at?: string | null;
+  execution_plan_submitted_by?: string | null;
+  this_week_feed?: ThisWeekFeedItem[] | null;
+  top_post_override?: { content_id: string } | null;
+};
+
+/** Zone A — internal-only task row. On submit, batch-creates HQ tasks. */
+type ExecutionPlanRow = {
+  id: string;             // client-side uuid for stable React keys
+  description: string;
+  assignee_id: string | null;
+  due_date: string | null;        // YYYY-MM-DD (local)
+  deliverable_type: DeliverableType | null;
+};
+
+/** Zone B — client-facing item rendered on the portal's "This Week" card. */
+type ThisWeekFeedItem = {
+  id: string;
+  text: string;
+  date: string | null;            // YYYY-MM-DD (local)
+  status: 'pending' | 'done';
+  done_at?: string | null;
+  done_by?: string | null;
+};
+
+type DeliverableType = 'brief' | 'report' | 'translation' | 'content_review' | 'client_update' | 'other';
+
+const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
+  brief: 'Brief',
+  report: 'Report',
+  translation: 'Translation',
+  content_review: 'Content Review',
+  client_update: 'Client Update',
+  other: 'Other',
 };
 
 type ActionItem = {
@@ -191,7 +378,7 @@ export default function ClientsPage() {
   // Client context state
   const [clientContexts, setClientContexts] = useState<Record<string, ClientContext>>({});
   const [contextModalClient, setContextModalClient] = useState<ClientWithAccess | null>(null);
-  const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; shared_drive_url: string; gtm_sync_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', shared_drive_url: '', gtm_sync_url: '', onboarding_phase: '' });
+  const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; telegram_chat_id: string; shared_drive_url: string; gtm_sync_url: string; kol_content_brief_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', telegram_chat_id: '', shared_drive_url: '', gtm_sync_url: '', kol_content_brief_url: '', onboarding_phase: '' });
   // [Phase edit in popup] The latest in-window campaign for the client
   // whose Context popup is currently open. Fetched lazily when the
   // popup opens — picker logic mirrors the client portal hero
@@ -216,13 +403,71 @@ export default function ClientsPage() {
   const [isDecisionFormOpen, setIsDecisionFormOpen] = useState(false);
   const [deletingDecisionId, setDeletingDecisionId] = useState<string | null>(null);
   const [meetingNotesTab, setMeetingNotesTab] = useState<string>('notes');
-  // Weekly updates state
-  const [clientWeeklyUpdates, setClientWeeklyUpdates] = useState<Record<string, WeeklyUpdate[]>>({});
-  const [weeklyModalClient, setWeeklyModalClient] = useState<ClientWithAccess | null>(null);
-  const [weeklyForm, setWeeklyForm] = useState<{ week_of: Date | undefined; current_focus: string; active_initiatives: string; next_checkin: Date | undefined; open_questions: string }>({ week_of: undefined, current_focus: '', active_initiatives: '', next_checkin: undefined, open_questions: '' });
-  const [editingWeeklyId, setEditingWeeklyId] = useState<string | null>(null);
-  const [isWeeklyFormOpen, setIsWeeklyFormOpen] = useState(false);
-  const [deletingWeeklyId, setDeletingWeeklyId] = useState<string | null>(null);
+  // [2026-06-08] Legacy weekly-updates state removed. The Weekly Update
+  // tab in the Client Context modal (Phase 2 of the Post-Onboarding
+  // Campaign View v2 spec) is now the single way to edit weekly data.
+  // It loads / saves the same client_weekly_updates rows directly via
+  // weeklyV2Row + loadWeeklyV2Row / saveWeeklyV2.
+  // ─── Weekly Update v2 — Phase 2 spec ──────────────────────────────
+  // State scoped to the new "Weekly Update" tab inside the Client
+  // Context modal. Operates on ONE week at a time (selected via
+  // `weeklyV2Week`); the underlying row is the
+  // client_weekly_updates row matching (client_id, week_of). The
+  // form persists changes to the v2 columns added in the migration —
+  // strategic_notes, execution_plan, this_week_feed, top_post_override.
+  // [2026-06-08] The legacy weekly modal was removed; this tab is now
+  // the only entry point. Old columns (current_focus, active_initiatives,
+  // next_checkin, open_questions) still exist on rows saved before the
+  // tab shipped; the portal falls back to them when this_week_feed is
+  // empty, and a one-shot migration backfills them when convenient.
+  const [weeklyV2Week, setWeeklyV2Week] = useState<Date>(() => getMondayOf(new Date()));
+  const [weeklyV2Row, setWeeklyV2Row] = useState<WeeklyUpdate | null>(null);
+  const [weeklyV2Loading, setWeeklyV2Loading] = useState(false);
+  // Local-only edits before they're committed to DB. We keep these
+  // separate so the UI feels snappy (typing into the strategic notes
+  // textarea, toggling Zone B status) without waiting for a round-
+  // trip. Auto-saved on blur / next-tick via the helpers below.
+  const [weeklyV2StrategicNotes, setWeeklyV2StrategicNotes] = useState<string>('');
+  const [weeklyV2ExecPlan, setWeeklyV2ExecPlan] = useState<ExecutionPlanRow[]>([]);
+  const [weeklyV2ThisWeekFeed, setWeeklyV2ThisWeekFeed] = useState<ThisWeekFeedItem[]>([]);
+  // Inline save indicator — flashes briefly after a successful save so
+  // the user knows their change landed even though there's no explicit
+  // Save button on most fields. Cleared by a debounced timeout.
+  const [weeklyV2SaveStatus, setWeeklyV2SaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // Zone C — Top Post override picker. Modal-style picker over the
+  // client's posted content. Candidate list is fetched lazily on
+  // open. Engagement is the same metric the portal's auto-pick uses
+  // so the CM can quickly see "why did it auto-pick THIS one" and
+  // override if needed.
+  const [topPostPickerOpen, setTopPostPickerOpen] = useState(false);
+  const [topPostCandidates, setTopPostCandidates] = useState<Array<{
+    id: string; kol_name: string; platform: string | null; content_link: string | null;
+    impressions: number; likes: number; comments: number; retweets: number; engagements: number;
+    notes: string | null;
+  }>>([]);
+  const [topPostCandidatesLoading, setTopPostCandidatesLoading] = useState(false);
+  // Strategic-notes history — the spec calls for a "by-week" view so
+  // Bolt can scroll back through Jdot's prior weeks of guidance
+  // without having to flip the week picker. Lazy-fetched on disclose.
+  const [strategicHistoryOpen, setStrategicHistoryOpen] = useState(false);
+  const [strategicHistoryRows, setStrategicHistoryRows] = useState<Array<{ id: string; week_of: string; strategic_notes: string; strategic_notes_updated_at: string | null }>>([]);
+  const [strategicHistoryLoading, setStrategicHistoryLoading] = useState(false);
+  // [2026-06-11] Weekly update audit-log viewer state. Powers the
+  // History popover next to the week selector — reverse-chrono list
+  // of who/what/when for every save on the active weekly update row.
+  // Lazy-loaded; refetched each time the popover opens.
+  const [weeklyAuditOpen, setWeeklyAuditOpen] = useState(false);
+  const [weeklyAuditRows, setWeeklyAuditRows] = useState<Array<{
+    id: string;
+    weekly_update_id: string;
+    edit_kind: 'strategic_notes' | 'execution_plan' | 'this_week_feed' | 'top_post_override' | 'submitted';
+    before_json: any;
+    after_json: any;
+    edited_by: string | null;
+    edited_by_name: string | null;
+    edited_at: string;
+  }>>([]);
+  const [weeklyAuditLoading, setWeeklyAuditLoading] = useState(false);
   // Mindshare config state
   const [clientMindshareEnabled, setClientMindshareEnabled] = useState<Record<string, boolean>>({});
   // Action items & milestones state
@@ -246,8 +491,9 @@ export default function ClientsPage() {
   const [showTemplatePickerFor, setShowTemplatePickerFor] = useState<string | null>(null);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState('');
-  const [clientApprovedDomains, setClientApprovedDomains] = useState<string[]>([]);
-  const [contextDomainInput, setContextDomainInput] = useState('');
+  // [2026-06-08] clientApprovedDomains / contextDomainInput removed —
+  // Approved Domains now lives only on the Edit Client dialog
+  // (newClient.approved_domains + domainInput).
   // Portal access tracking state. portalAccessSummary is a per-client
   // count of visits in the last 30d (used to drive the badge on the
   // "Visits" tile); the modal lazy-loads the full list on open.
@@ -264,6 +510,12 @@ export default function ClientsPage() {
     Array<{ id: string; email: string; authorized_via: string; accessed_at: string; user_agent: string | null; ip_address: string | null }>
   >([]);
   const [accessLogLoading, setAccessLogLoading] = useState(false);
+  // [2026-06-08] Audience filter for the portal-visits modal. Defaults
+  // to 'external' so it matches the per-card "Visit log" badge (which
+  // already excludes @holohive.io / @holohive.agency). User can flip
+  // to 'all' to see the full audit log, or 'internal' to QA team
+  // traffic specifically.
+  const [accessLogAudience, setAccessLogAudience] = useState<'external' | 'internal' | 'all'>('external');
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -280,6 +532,12 @@ export default function ClientsPage() {
     // Dashboard v2: specialized engagement models (Impossible, Robonet, …)
     // EXCLUDED from priority dashboard rollups so they don't skew KPIs.
     is_ad_hoc: false,
+    // [2026-06-08] Moved here from the Client Context popup — start date
+    // is a core engagement attribute (renewal math, dashboard tone), so
+    // it belongs on the same form as Status / Whitelist. Stored on the
+    // `client_context` row, not on `clients`, so the save path upserts
+    // client_context after the clients update completes.
+    start_date: undefined as Date | undefined,
   });
   const [domainInput, setDomainInput] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -378,6 +636,7 @@ export default function ClientsPage() {
     setAccessLogModalClient(client);
     setAccessLogRows([]);
     setAccessLogLoading(true);
+    setAccessLogAudience('external'); // matches the on-card badge
     try {
       const { data, error } = await (supabase as any)
         .from('portal_access_log')
@@ -489,7 +748,6 @@ export default function ClientsPage() {
         notesRes,
         ctxRes,
         decRes,
-        weekRes,
         actionRes,
         milestoneRes,
         templateRes,
@@ -502,14 +760,32 @@ export default function ClientsPage() {
         supabase.from('client_meeting_notes').select('*').order('meeting_date', { ascending: false }),
         supabase.from('client_context').select('*'),
         supabase.from('client_decision_log').select('*').order('decision_date', { ascending: false }),
-        supabase.from('client_weekly_updates').select('*').order('week_of', { ascending: false }),
+        // Legacy `client_weekly_updates` bulk-fetch dropped 2026-06-08
+        // along with the legacy modal. The Weekly Update tab fetches
+        // its row scoped to (client, week) on tab-open instead, which
+        // avoids loading every weekly row for every client at page load.
         supabase.from('client_action_items').select('*').order('display_order', { ascending: true }),
         supabase.from('client_milestones').select('*').order('display_order', { ascending: true }),
         supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name'),
         supabase.from('client_mindshare_config').select('client_id, is_enabled'),
+        // [2026-06-08] Internal-team visits filtered out per Andy.
+        // The team logs into client portals all day to QA / preview,
+        // which inflated "last visited" and the 30-day count to the
+        // point where the indicator no longer told you anything
+        // about whether THE CLIENT is engaging.
+        //
+        // Exclusion is by email-domain match: anything ending in
+        // `@holohive.io` (everyone today: andy/jdot/quazo/jaymz/bolt)
+        // or `@holohive.agency` (the portal subdomain, kept as a
+        // defensive match in case a team member ever signs up there).
+        // Null / empty emails fall through — those are presumably
+        // real visitors whose email wasn't captured for whatever
+        // reason, safer to count them than to hide them.
         (supabase as any).from('portal_access_log')
           .select('client_id, accessed_at')
           .gte('accessed_at', thirtyDaysAgo)
+          .not('email', 'ilike', '%@holohive.io')
+          .not('email', 'ilike', '%@holohive.agency')
           .order('accessed_at', { ascending: false }),
         // Open HQ tasks per client. We pull just client_id + status
         // because we only need the count — no display fields. The
@@ -572,14 +848,6 @@ export default function ClientsPage() {
         decMap[d.client_id].push(d);
       }
       setClientDecisionLogs(decMap);
-
-      // Weekly updates
-      const weekMap: Record<string, WeeklyUpdate[]> = {};
-      for (const w of (weekRes.data || []) as unknown as WeeklyUpdate[]) {
-        if (!weekMap[w.client_id]) weekMap[w.client_id] = [];
-        weekMap[w.client_id].push(w);
-      }
-      setClientWeeklyUpdates(weekMap);
 
       // Action items
       const actionMap: Record<string, ActionItem[]> = {};
@@ -689,17 +957,6 @@ export default function ClientsPage() {
       map[d.client_id].push(d);
     }
     setClientDecisionLogs(map);
-  };
-
-  // Fetch weekly updates
-  const refreshWeeklyUpdates = async () => {
-    const { data } = await supabase.from('client_weekly_updates').select('*').order('week_of', { ascending: false });
-    const map: Record<string, WeeklyUpdate[]> = {};
-    for (const w of (data || []) as unknown as WeeklyUpdate[]) {
-      if (!map[w.client_id]) map[w.client_id] = [];
-      map[w.client_id].push(w);
-    }
-    setClientWeeklyUpdates(map);
   };
 
   // Action items & milestones
@@ -887,6 +1144,8 @@ export default function ClientsPage() {
             'task_added',
             'New task for you',
             actionItemForm.text.trim(),
+            undefined,
+            'client_task_added',
           );
         }
       }
@@ -928,17 +1187,59 @@ export default function ClientsPage() {
     }
   };
 
-  const logActivity = async (clientId: string, activityType: string, title: string, description?: string, metadata?: Record<string, any>) => {
+  /**
+   * Log an event to the client's activity feed.
+   *
+   * HHP Onboarding Overhaul Spec § 8.5 — every call MUST pass an
+   * `activityCategory` so the portal feed filter can decide whether
+   * to surface it. Allowed values per the schema CHECK constraint:
+   *
+   *   Client-visible (appears on portal):
+   *     • milestone_completed
+   *     • milestone_activated
+   *     • campaign_status_changed
+   *     • resource_updated
+   *     • client_task_added
+   *
+   *   Internal-only (hidden from portal, kept for admin audit):
+   *     • milestone_setup
+   *
+   * If category is omitted, the column defaults to 'milestone_setup'
+   * — safe-by-default (hidden) until someone explicitly categorizes.
+   *
+   * The legacy `activityType` argument is preserved for backward
+   * compat. New callers should rely on `activityCategory` as the
+   * source of truth for portal visibility.
+   */
+  const logActivity = async (
+    clientId: string,
+    activityType: string,
+    title: string,
+    description?: string,
+    metadata?: Record<string, any>,
+    activityCategory?:
+      | 'milestone_completed' | 'milestone_activated'
+      | 'campaign_status_changed' | 'resource_updated'
+      | 'client_task_added' | 'milestone_setup',
+  ) => {
     try {
+      // [2026-06-11] Draft mode suppression removed. The bell that this
+      // mode existed to silence was deleted in the same pass — see
+      // /lib/notificationService.ts removal + Sidebar.tsx comment.
+      // activity_category still gets recorded so the future "This Week"
+      // snapshot can filter setup churn (milestone_setup) out of the
+      // client-facing card. No real-time stream means no need for a
+      // separate draft-mode flag.
       await supabase.from('client_activity_log').insert({
         client_id: clientId,
         activity_type: activityType,
+        activity_category: activityCategory ?? 'milestone_setup',
         title,
         description: description || null,
         metadata: metadata || {},
         created_by: userProfile?.id || null,
         created_by_name: userProfile?.name || userProfile?.email || null,
-      });
+      } as any);
     } catch (err) {
       console.error('Error logging activity:', err);
     }
@@ -955,7 +1256,18 @@ export default function ClientsPage() {
     // user ask: only milestone completions, new client tasks, and
     // resource updates should notify.
     if (ms && status === 'complete') {
-      await logActivity(ms.client_id, 'milestone_status', 'Milestone completed', ms.name);
+      await logActivity(ms.client_id, 'milestone_status', 'Milestone completed', ms.name, undefined, 'milestone_completed');
+    } else if (ms && status === 'active') {
+      // Per Onboarding Overhaul § 8.5 audit (2026-06-11) — activated
+      // events are useful client-visible signal ("your next milestone
+      // is now in progress"), distinct from setup churn. Hidden
+      // before this pass; surfacing them now.
+      await logActivity(ms.client_id, 'milestone_status', 'Milestone activated', ms.name, undefined, 'milestone_activated');
+    } else if (ms && status === 'upcoming') {
+      // Backtrack — admin marked a previously-active milestone as
+      // upcoming. Always setup churn (the Altura 2026-05-20 incident).
+      // Logged for audit but hidden from portal feed.
+      await logActivity(ms.client_id, 'milestone_status', 'Milestone set to upcoming', ms.name, undefined, 'milestone_setup');
     }
   };
 
@@ -1000,7 +1312,7 @@ export default function ClientsPage() {
         if (allDone && currentMs?.status !== 'complete') {
           await supabase.from('client_milestones').update({ status: 'complete' }).eq('id', item.milestone_id);
           await refreshMilestones();
-          await logActivity(item.client_id, 'milestone_status', 'Milestone completed', currentMs?.name || '');
+          await logActivity(item.client_id, 'milestone_status', 'Milestone completed', currentMs?.name || '', undefined, 'milestone_completed');
         } else if (!allDone && currentMs?.status === 'complete') {
           await supabase.from('client_milestones').update({ status: 'active' }).eq('id', item.milestone_id);
           await refreshMilestones();
@@ -1186,7 +1498,7 @@ export default function ClientsPage() {
     const payload = {
       title: meetingNoteForm.title.trim(),
       content: meetingNoteForm.content.trim(),
-      meeting_date: meetingNoteForm.meeting_date.toISOString().split('T')[0],
+      meeting_date: formatLocalYMD(meetingNoteForm.meeting_date),
       attendees: meetingNoteForm.attendees.trim(),
       action_items: meetingNoteForm.action_items.trim(),
     };
@@ -1248,13 +1560,12 @@ export default function ClientsPage() {
       client_contacts: ctx?.client_contacts || '',
       holohive_contacts: ctx?.holohive_contacts || '',
       telegram_url: (ctx as any)?.telegram_url || '',
+      telegram_chat_id: (ctx as any)?.telegram_chat_id || '',
       shared_drive_url: (ctx as any)?.shared_drive_url || '',
       gtm_sync_url: (ctx as any)?.gtm_sync_url || '',
+      kol_content_brief_url: (ctx as any)?.kol_content_brief_url || '',
       onboarding_phase: (ctx as any)?.onboarding_phase || '',
     });
-    // Load client approved domains
-    setClientApprovedDomains((client as any).approved_domains || []);
-    setContextDomainInput('');
 
     // [Phase edit in popup] Find the latest active campaign for this
     // client so the phase dropdown at the top of the Context tab has
@@ -1331,13 +1642,15 @@ export default function ClientsPage() {
       client_id: contextModalClient.id,
       engagement_type: contextForm.engagement_type || null,
       scope: contextForm.scope || null,
-      start_date: contextForm.start_date ? contextForm.start_date.toISOString().split('T')[0] : null,
+      start_date: contextForm.start_date ? formatLocalYMD(contextForm.start_date) : null,
       milestones: contextForm.milestones || null,
       client_contacts: contextForm.client_contacts || null,
       holohive_contacts: contextForm.holohive_contacts || null,
       telegram_url: contextForm.telegram_url || null,
+      telegram_chat_id: contextForm.telegram_chat_id?.trim() || null,
       shared_drive_url: contextForm.shared_drive_url || null,
       gtm_sync_url: contextForm.gtm_sync_url || null,
+      kol_content_brief_url: contextForm.kol_content_brief_url || null,
       onboarding_phase: contextForm.onboarding_phase || null,
       updated_at: new Date().toISOString(),
     };
@@ -1348,16 +1661,18 @@ export default function ClientsPage() {
         await supabase.from('client_context').insert(payload);
       }
       await refreshClientContexts();
-      // Save approved domains on client
-      await supabase.from('clients').update({ approved_domains: clientApprovedDomains.length > 0 ? clientApprovedDomains : null }).eq('id', contextModalClient.id);
+      // [2026-06-08] approved_domains save removed — that column is now
+      // edited only via the Edit Client dialog.
       // Log resource changes
       const oldCtx = existing as any;
       const changes: string[] = [];
       if ((payload.telegram_url || '') !== (oldCtx?.telegram_url || '')) changes.push('Telegram group');
+      if ((payload.telegram_chat_id || '') !== (oldCtx?.telegram_chat_id || '')) changes.push('Telegram chat ID');
       if ((payload.shared_drive_url || '') !== (oldCtx?.shared_drive_url || '')) changes.push('Shared drive');
-      if ((payload.gtm_sync_url || '') !== (oldCtx?.gtm_sync_url || '')) changes.push('GTM tracker');
+      if ((payload.gtm_sync_url || '') !== (oldCtx?.gtm_sync_url || '')) changes.push('GTM Overview');
+      if ((payload.kol_content_brief_url || '') !== (oldCtx?.kol_content_brief_url || '')) changes.push('KOL Content Brief');
       if (changes.length > 0) {
-        await logActivity(contextModalClient.id, 'resource_updated', 'Resources updated', changes.join(', '));
+        await logActivity(contextModalClient.id, 'resource_updated', 'Resources updated', changes.join(', '), undefined, 'resource_updated');
       }
       setContextModalClient(null);
     } catch (err) {
@@ -1368,7 +1683,7 @@ export default function ClientsPage() {
   // Decision log CRUD
   const handleDecisionSubmit = async () => {
     if (!meetingNotesModalClient || !decisionForm.summary.trim() || !decisionForm.decision_date) return;
-    const decDateStr = decisionForm.decision_date.toISOString().split('T')[0];
+    const decDateStr = formatLocalYMD(decisionForm.decision_date);
     try {
       if (editingDecisionId) {
         await supabase.from('client_decision_log').update({
@@ -1398,57 +1713,484 @@ export default function ClientsPage() {
     setDeletingDecisionId(null);
   };
 
-  // Weekly update CRUD
-  const openWeeklyModal = (client: ClientWithAccess) => {
-    setWeeklyModalClient(client);
-    setIsWeeklyFormOpen(false);
-    setEditingWeeklyId(null);
-  };
+  // [2026-06-08] Legacy weekly handlers (openWeeklyModal, openWeeklyForm,
+  // handleWeeklySubmit, deleteWeeklyUpdate) removed. The Weekly Update
+  // v2 tab below is the single source of truth for editing
+  // client_weekly_updates rows.
 
-  const openWeeklyForm = (update?: WeeklyUpdate) => {
-    if (update) {
-      setEditingWeeklyId(update.id);
-      setWeeklyForm({ week_of: new Date(update.week_of + 'T00:00:00'), current_focus: update.current_focus, active_initiatives: update.active_initiatives || '', next_checkin: update.next_checkin ? new Date(update.next_checkin + 'T00:00:00') : undefined, open_questions: update.open_questions || '' });
-    } else {
-      setEditingWeeklyId(null);
-      const today = new Date();
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-      setWeeklyForm({ week_of: monday, current_focus: '', active_initiatives: '', next_checkin: undefined, open_questions: '' });
-    }
-    setIsWeeklyFormOpen(true);
-  };
+  // ─── Weekly Update v2 — load / autosave / submit ──────────────────
+  //
+  // Lifecycle:
+  //   1. User opens the Context modal → switches to Weekly Update tab
+  //      → loadWeeklyV2Row() runs for (client, current week).
+  //   2. As the user edits, local state is updated immediately for
+  //      snappy UX. Auto-save fires on blur for textareas / on change
+  //      for structured rows (debounced where appropriate).
+  //   3. On Execution Plan "Submit & create tasks", we batch-create
+  //      HQ tasks then stamp execution_plan_submitted_at to lock the
+  //      plan for the week.
+  //
+  // Why we operate on ONE row at a time:
+  //   The (client_id, week_of) tuple is the canonical key. Two CMs
+  //   editing the same week land on the same row; week_of is snapped
+  //   to Monday so weekday-of-open doesn't matter.
 
-  const handleWeeklySubmit = async () => {
-    if (!weeklyModalClient || !weeklyForm.current_focus.trim() || !weeklyForm.week_of) return;
+  const loadWeeklyV2Row = async (clientId: string, week: Date) => {
+    setWeeklyV2Loading(true);
+    setWeeklyV2SaveStatus('idle');
     try {
-      const payload = {
-        client_id: weeklyModalClient.id,
-        week_of: weeklyForm.week_of.toISOString().split('T')[0],
-        current_focus: weeklyForm.current_focus.trim(),
-        active_initiatives: weeklyForm.active_initiatives.trim() || null,
-        next_checkin: weeklyForm.next_checkin ? weeklyForm.next_checkin.toISOString().split('T')[0] : null,
-        open_questions: weeklyForm.open_questions.trim() || null,
-        updated_at: new Date().toISOString(),
-      };
-      if (editingWeeklyId) {
-        await supabase.from('client_weekly_updates').update(payload).eq('id', editingWeeklyId);
-      } else {
-        await supabase.from('client_weekly_updates').insert({ ...payload, created_by: user?.id });
-      }
-      await refreshWeeklyUpdates();
-      setIsWeeklyFormOpen(false);
-      setEditingWeeklyId(null);
-      setWeeklyForm({ week_of: undefined, current_focus: '', active_initiatives: '', next_checkin: undefined, open_questions: '' });
+      const weekStr = formatLocalYMD(week);
+      const { data, error } = await (supabase as any)
+        .from('client_weekly_updates')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('week_of', weekStr)
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+      const row: WeeklyUpdate | null = data || null;
+      setWeeklyV2Row(row);
+      setWeeklyV2StrategicNotes(row?.strategic_notes || '');
+      setWeeklyV2ExecPlan(Array.isArray(row?.execution_plan) ? (row!.execution_plan as ExecutionPlanRow[]) : []);
+      setWeeklyV2ThisWeekFeed(Array.isArray(row?.this_week_feed) ? (row!.this_week_feed as ThisWeekFeedItem[]) : []);
     } catch (err) {
-      console.error('Error saving weekly update:', err);
+      console.error('Failed to load weekly update v2 row:', err);
+      toast({ title: 'Failed to load weekly update', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setWeeklyV2Loading(false);
     }
   };
 
-  const deleteWeeklyUpdate = async (id: string) => {
-    await supabase.from('client_weekly_updates').delete().eq('id', id);
-    await refreshWeeklyUpdates();
-    setDeletingWeeklyId(null);
+  /**
+   * Upsert a partial set of v2 fields onto the (client_id, week_of)
+   * row, creating it if it doesn't exist yet. Returns the resulting
+   * row so callers can keep their `weeklyV2Row` reference fresh
+   * (especially to track the new `id` after first insert).
+   *
+   * Patch shape mirrors the DB columns — pass only the keys you want
+   * to change.
+   */
+  const saveWeeklyV2 = async (
+    clientId: string,
+    week: Date,
+    patch: Partial<{
+      strategic_notes: string | null;
+      execution_plan: ExecutionPlanRow[] | null;
+      execution_plan_submitted_at: string | null;
+      execution_plan_submitted_by: string | null;
+      this_week_feed: ThisWeekFeedItem[] | null;
+      top_post_override: { content_id: string } | null;
+    }>,
+  ): Promise<WeeklyUpdate | null> => {
+    setWeeklyV2SaveStatus('saving');
+    try {
+      const weekStr = formatLocalYMD(week);
+      const existing = weeklyV2Row;
+      // Stamp metadata when the strategic_notes value is part of the
+      // patch — the spec asks for a "who/when" trail so Bolt knows
+      // when Jdot last touched the notes.
+      const enrichedPatch: Record<string, any> = { ...patch, updated_at: new Date().toISOString() };
+      if ('strategic_notes' in patch) {
+        enrichedPatch.strategic_notes_updated_at = new Date().toISOString();
+        enrichedPatch.strategic_notes_by = user?.id || null;
+      }
+      // [2026-06-11] Q5 audit-log capture. Snapshot the fields about to
+      // change BEFORE we write so we can record before/after in
+      // client_weekly_update_audit. Phase-2 spec § Q5 allows mid-week
+      // text/date edits; this is how we stay accountable without
+      // tight-locking the form.
+      const auditBefore: Record<string, any> = {};
+      if (existing) {
+        for (const key of Object.keys(patch) as Array<keyof typeof patch>) {
+          auditBefore[key as string] = (existing as any)[key] ?? null;
+        }
+      }
+      let row: WeeklyUpdate | null = null;
+      if (existing) {
+        const { data, error } = await (supabase as any)
+          .from('client_weekly_updates')
+          .update(enrichedPatch)
+          .eq('id', existing.id)
+          .select('*')
+          .single();
+        if (error) throw error;
+        row = data;
+      } else {
+        // First-time write for this week — minimal NOT-NULL fields so
+        // the insert succeeds. current_focus is NOT NULL in the legacy
+        // schema; we seed an empty placeholder. Old modal continues
+        // to overwrite this when used.
+        const insertPayload: Record<string, any> = {
+          client_id: clientId,
+          week_of: weekStr,
+          current_focus: '',
+          created_by: user?.id || null,
+          ...enrichedPatch,
+        };
+        const { data, error } = await (supabase as any)
+          .from('client_weekly_updates')
+          .insert(insertPayload)
+          .select('*')
+          .single();
+        if (error) throw error;
+        row = data;
+      }
+      setWeeklyV2Row(row);
+      setWeeklyV2SaveStatus('saved');
+      // [2026-06-11] Q5 audit-log write. One row per logical edit_kind.
+      // The audit table's CHECK constraint allows only 5 kinds:
+      // strategic_notes, execution_plan, this_week_feed, top_post_override,
+      // submitted. Map raw patch keys onto that vocabulary and dedupe
+      // (Zone A's submit lock writes 3 keys — execution_plan +
+      // execution_plan_submitted_at + execution_plan_submitted_by —
+      // which collapse to one 'submitted' audit row). Fire-and-forget;
+      // audit failures must never block the user-facing save.
+      if (row?.id) {
+        const KIND_MAP: Record<string, 'strategic_notes' | 'execution_plan' | 'this_week_feed' | 'top_post_override' | 'submitted'> = {
+          strategic_notes:                'strategic_notes',
+          execution_plan:                 'execution_plan',
+          this_week_feed:                 'this_week_feed',
+          top_post_override:              'top_post_override',
+          execution_plan_submitted_at:    'submitted',
+          execution_plan_submitted_by:    'submitted',
+        };
+        const kindsSeen = new Set<string>();
+        const auditRows: any[] = [];
+        for (const key of Object.keys(patch)) {
+          const kind = KIND_MAP[key];
+          if (!kind || kindsSeen.has(kind)) continue;
+          kindsSeen.add(kind);
+          auditRows.push({
+            weekly_update_id: row.id,
+            edit_kind: kind,
+            before_json: auditBefore[key] ?? null,
+            after_json: (patch as any)[key] ?? null,
+            edited_by: user?.id || null,
+            edited_by_name: userProfile?.name || user?.email || null,
+          });
+        }
+        if (auditRows.length > 0) {
+          (supabase as any)
+            .from('client_weekly_update_audit')
+            .insert(auditRows)
+            .then((res: any) => {
+              if (res?.error) console.error('[weeklyV2.audit] insert failed:', res.error);
+            });
+        }
+      }
+      // Clear the "Saved" pill after 1.5s so it doesn't linger.
+      window.setTimeout(() => {
+        setWeeklyV2SaveStatus(prev => prev === 'saved' ? 'idle' : prev);
+      }, 1500);
+      return row;
+    } catch (err) {
+      console.error('Failed to save weekly update v2:', err);
+      setWeeklyV2SaveStatus('error');
+      toast({ title: 'Save failed', description: (err as Error).message, variant: 'destructive' });
+      return null;
+    }
+  };
+
+  /**
+   * Zone A submit — batch-create HQ tasks from the execution plan,
+   * then stamp execution_plan_submitted_at to lock the rows for the
+   * week. Each row becomes one task in the `tasks` table with:
+   *   - title = description
+   *   - assigned_to = assignee_id
+   *   - client_id = current client
+   *   - due_date = row.due_date
+   *   - deliverable_type = row.deliverable_type
+   *
+   * Skips rows with no description or no assignee — they're treated
+   * as incomplete drafts.
+   */
+  const submitExecutionPlan = async (clientId: string) => {
+    const ready = weeklyV2ExecPlan.filter(r => r.description.trim() && r.assignee_id);
+    if (ready.length === 0) {
+      toast({ title: 'Nothing to submit', description: 'Fill in description + assignee for at least one row.', variant: 'destructive' });
+      return;
+    }
+    setWeeklyV2SaveStatus('saving');
+    try {
+      // Persist the latest exec_plan state first so what we batch-
+      // create matches what's saved. Avoids a race where the user
+      // edits a row and clicks submit before autosave lands.
+      await saveWeeklyV2(clientId, weeklyV2Week, { execution_plan: weeklyV2ExecPlan });
+      // Look up team-member names so we can populate assigned_to_name
+      // (the tasks schema stores both id and name — joined data leaks
+      // are fine, but querying by name is faster for the /tasks page).
+      const memberNameById = new Map<string, string>();
+      for (const u of allUsers as any[]) {
+        if (u.id) memberNameById.set(u.id, u.name || u.email || 'Unknown');
+      }
+      const inserts = ready.map(r => ({
+        task_name: r.description.trim(),
+        assigned_to: r.assignee_id,
+        assigned_to_name: r.assignee_id ? memberNameById.get(r.assignee_id) || null : null,
+        client_id: clientId,
+        due_date: r.due_date,
+        // Spec: "Type = 'Client Delivery'". The /tasks page has
+        // 'Client Delivery' as an explicit task_type value (L100).
+        // deliverable_type carries the row-level sub-type (brief /
+        // report / translation / content_review / client_update).
+        task_type: 'Client Delivery',
+        deliverable_type: r.deliverable_type,
+        frequency: 'one-time',
+        priority: 'medium',
+        status: 'to_do',
+        created_by: user?.id || null,
+        created_by_name: userProfile?.name || userProfile?.email || null,
+        // Tag the source so /tasks views can group "Created from
+        // Weekly Update" if useful later. Free-text column is fine.
+        source: 'weekly_update',
+      }));
+      const { error } = await (supabase as any).from('tasks').insert(inserts);
+      if (error) throw error;
+      await saveWeeklyV2(clientId, weeklyV2Week, {
+        execution_plan_submitted_at: new Date().toISOString(),
+        execution_plan_submitted_by: user?.id || null,
+      });
+      // Spec: "The 'X HQ tasks' count on the client card updates
+      // automatically." Refresh the per-client HQ task counts so the
+      // card behind the modal reflects the new tasks immediately.
+      try {
+        const { data: hqRows } = await (supabase as any)
+          .from('tasks')
+          .select('client_id')
+          .neq('status', 'complete')
+          .is('parent_task_id', null)
+          .not('client_id', 'is', null);
+        const counts: Record<string, number> = {};
+        for (const t of (hqRows || []) as Array<{ client_id: string | null }>) {
+          if (!t.client_id) continue;
+          counts[t.client_id] = (counts[t.client_id] || 0) + 1;
+        }
+        setHqTaskCounts(counts);
+      } catch (refreshErr) {
+        // Non-fatal: if the refresh fails the count is stale until
+        // next fetchClients(). Don't surface to the user — the task
+        // creation succeeded.
+        console.error('Failed to refresh hq task counts after Zone A submit:', refreshErr);
+      }
+      toast({ title: 'Execution plan submitted', description: `Created ${inserts.length} HQ task${inserts.length === 1 ? '' : 's'}.` });
+    } catch (err) {
+      console.error('Execution plan submit failed:', err);
+      setWeeklyV2SaveStatus('error');
+      toast({ title: 'Submit failed', description: (err as Error).message, variant: 'destructive' });
+    }
+  };
+
+  // Helper for Zone B status toggle — flips an item's pending/done
+  // status, stamps done_at/done_by, and auto-saves. Mutates a copy
+  // so React state replacement triggers a re-render.
+  //
+  // SIDE EFFECT (Phase 3): when an item flips pending → done we also
+  // upsert a Delivery Log draft with pending_review = true. The draft
+  // pre-fills:
+  //   - action      = item.text (the client-facing item)
+  //   - log_date    = item.date or today (local YMD)
+  //   - audience    = 'client'                  (default per spec)
+  //   - pending_review = true
+  //   - source      = 'weekly_update_feed'
+  //   - source_ref  = item.id   (dedupes re-toggles — see findExistingDraft)
+  //
+  // When the same item flips done → pending we DON'T delete the draft.
+  // The CM may have already started filling Who/How/Where on it; we
+  // let them explicitly Dismiss in the Delivery Logs view if they
+  // want it gone. The draft just stays parked; the next done-flip
+  // looks it up by source_ref and re-uses the same row.
+  const toggleThisWeekItemStatus = async (clientId: string, itemId: string) => {
+    const previousItem = weeklyV2ThisWeekFeed.find(it => it.id === itemId);
+    const updated = weeklyV2ThisWeekFeed.map(it => {
+      if (it.id !== itemId) return it;
+      const nextStatus: 'pending' | 'done' = it.status === 'done' ? 'pending' : 'done';
+      return {
+        ...it,
+        status: nextStatus,
+        done_at: nextStatus === 'done' ? new Date().toISOString() : null,
+        done_by: nextStatus === 'done' ? (user?.id || null) : null,
+      };
+    });
+    setWeeklyV2ThisWeekFeed(updated);
+    await saveWeeklyV2(clientId, weeklyV2Week, { this_week_feed: updated });
+
+    // Only create / refresh the draft when the flip was pending → done.
+    const flippedItem = updated.find(it => it.id === itemId);
+    if (flippedItem && flippedItem.status === 'done' && previousItem?.status !== 'done') {
+      try {
+        await createOrRefreshDeliveryDraft(clientId, flippedItem);
+      } catch (err) {
+        // Don't fail the toggle — the v2 feed save already succeeded.
+        // Surface the failure as a toast so the CM knows the draft
+        // wasn't created and can add it manually.
+        console.error('Failed to create delivery log draft:', err);
+        toast({
+          title: 'Draft not created',
+          description: (err as Error).message,
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  /**
+   * Zone C — Top Post override picker.
+   *
+   * Fetches all posted content for the client's campaigns, sorted by
+   * total engagement (likes + retweets + comments + bookmarks +
+   * impressions/100 as a tiebreaker). Returns the top ~30 — Andy
+   * shouldn't need to scroll further than that to find the post
+   * they want to pin.
+   */
+  const fetchTopPostCandidates = async (clientId: string) => {
+    setTopPostCandidatesLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('contents')
+        .select(`
+          id, platform, content_link, impressions, likes, comments, retweets, bookmarks, notes, activation_date,
+          campaign_kols!inner ( master_kols!inner ( name ) ),
+          campaigns!inner ( client_id )
+        `)
+        .eq('campaigns.client_id', clientId)
+        .eq('status', 'posted')
+        .order('activation_date', { ascending: false })
+        .limit(60);
+      if (error) throw error;
+      const rows = ((data || []) as any[]).map(r => ({
+        id: r.id,
+        kol_name: r.campaign_kols?.master_kols?.name || 'Unknown KOL',
+        platform: r.platform,
+        content_link: r.content_link,
+        impressions: r.impressions || 0,
+        likes: r.likes || 0,
+        comments: r.comments || 0,
+        retweets: r.retweets || 0,
+        engagements: (r.likes || 0) + (r.retweets || 0) + (r.comments || 0) + (r.bookmarks || 0),
+        notes: r.notes,
+      }));
+      rows.sort((a, b) => (b.engagements - a.engagements) || (b.impressions - a.impressions));
+      setTopPostCandidates(rows.slice(0, 30));
+    } catch (err) {
+      console.error('Failed to fetch top post candidates:', err);
+      toast({ title: 'Failed to load posts', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setTopPostCandidatesLoading(false);
+    }
+  };
+
+  const pinTopPost = async (clientId: string, contentId: string) => {
+    await saveWeeklyV2(clientId, weeklyV2Week, { top_post_override: { content_id: contentId } });
+    setTopPostPickerOpen(false);
+  };
+
+  const clearTopPostOverride = async (clientId: string) => {
+    await saveWeeklyV2(clientId, weeklyV2Week, { top_post_override: null });
+  };
+
+  /** Fetch the last ~8 weeks of strategic notes for the current
+   *  client. Older weeks may exist in the DB but the user almost
+   *  never needs more than 2 months of context. */
+  const fetchStrategicHistory = async (clientId: string) => {
+    setStrategicHistoryLoading(true);
+    try {
+      const currentWeekStr = formatLocalYMD(weeklyV2Week);
+      const { data, error } = await (supabase as any)
+        .from('client_weekly_updates')
+        .select('id, week_of, strategic_notes, strategic_notes_updated_at')
+        .eq('client_id', clientId)
+        .neq('week_of', currentWeekStr) // skip the row the form is editing
+        .not('strategic_notes', 'is', null)
+        .order('week_of', { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      const rows = ((data || []) as Array<{ id: string; week_of: string; strategic_notes: string | null; strategic_notes_updated_at: string | null }>)
+        // Filter empty strings — `not is null` accepts empty TEXT.
+        .filter(r => (r.strategic_notes || '').trim().length > 0) as Array<{ id: string; week_of: string; strategic_notes: string; strategic_notes_updated_at: string | null }>;
+      setStrategicHistoryRows(rows);
+    } catch (err) {
+      console.error('Failed to fetch strategic notes history:', err);
+    } finally {
+      setStrategicHistoryLoading(false);
+    }
+  };
+
+  /**
+   * [2026-06-11] Fetch the audit log for the currently loaded weekly
+   * update row. Q5 spec — every edit logs to client_weekly_update_audit;
+   * this popover surfaces "Bolt edited this_week_feed at Tue 3:42pm" so
+   * the team stays accountable without tight-locking the form.
+   * Limited to the latest 100 entries — a weekly update accumulates
+   * ~5-20 audit rows in a normal week.
+   */
+  const fetchWeeklyAuditLog = async (weeklyUpdateId: string) => {
+    setWeeklyAuditLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('client_weekly_update_audit')
+        .select('*')
+        .eq('weekly_update_id', weeklyUpdateId)
+        .order('edited_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setWeeklyAuditRows((data || []) as any);
+    } catch (err) {
+      console.error('Failed to fetch weekly audit log:', err);
+      setWeeklyAuditRows([]);
+    } finally {
+      setWeeklyAuditLoading(false);
+    }
+  };
+
+  /**
+   * Phase 3 — Delivery Log draft creation.
+   *
+   * Idempotent: looks up an existing draft by source_ref = item.id
+   * before inserting. This keeps re-toggling (done → pending → done)
+   * from creating duplicate rows, and lets the CM's in-progress edits
+   * on the draft survive the round-trip.
+   */
+  const createOrRefreshDeliveryDraft = async (clientId: string, item: ThisWeekFeedItem) => {
+    // Check for an existing draft for this exact Zone B item.
+    const { data: existing } = await (supabase as any)
+      .from('client_delivery_log')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('source', 'weekly_update_feed')
+      .eq('source_ref', item.id)
+      .maybeSingle();
+
+    const loggedAt = item.date || formatLocalYMD(new Date());
+
+    if (existing?.id) {
+      // Touch updated_at so the draft moves to the top of the
+      // pending-review list, but don't overwrite any CM edits.
+      await (supabase as any)
+        .from('client_delivery_log')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      return;
+    }
+
+    await (supabase as any)
+      .from('client_delivery_log')
+      .insert({
+        client_id: clientId,
+        // Zone B items are client-facing by definition (they're the
+        // bullet list the client sees on their portal). Default the
+        // work_type accordingly; the CM can flip to Internal during
+        // review if it turns out to be misclassified.
+        work_type: 'Client-Facing',
+        action: item.text,
+        logged_at: loggedAt,
+        pending_review: true,
+        source: 'weekly_update_feed',
+        source_ref: item.id,
+        created_by: user?.id || null,
+        // sort_order is NOT NULL — use a sentinel high value so drafts
+        // don't compete for position with real entries; the Pending
+        // Review section renders them in a separate block anyway.
+        sort_order: 0,
+      });
   };
 
   const filteredClients = clientsWithStatus.filter(client => {
@@ -1486,6 +2228,11 @@ export default function ClientsPage() {
   };
   const handleEditClient = (client: ClientWithAccess) => {
     setEditingClient(client);
+    // Pull start_date from client_context (the table that actually stores
+    // it). Parse with the noon-local trick to avoid a YYYY-MM-DD string
+    // landing in UTC and then drifting in toLocaleDateString.
+    const ctx = clientContexts[client.id];
+    const ctxStartDate = ctx?.start_date ? new Date(ctx.start_date + 'T00:00:00') : undefined;
     setNewClient({
       name: client.name,
       email: client.email,
@@ -1499,6 +2246,7 @@ export default function ClientsPage() {
       logo_url: (client as any).logo_url || null,
       approved_domains: (client as any).approved_domains || [],
       is_ad_hoc: (client as any).is_ad_hoc || false,
+      start_date: ctxStartDate,
     });
     setDomainInput('');
     setLogoPreview((client as any).logo_url || null);
@@ -1525,6 +2273,7 @@ export default function ClientsPage() {
       logo_url: null,
       approved_domains: [],
       is_ad_hoc: false,
+      start_date: undefined,
     });
     setDomainInput('');
   };
@@ -1624,6 +2373,12 @@ export default function ClientsPage() {
     if (!newClient.name.trim() || !newClient.email.trim()) return;
     try {
       setIsSubmitting(true);
+      // [2026-06-08] start_date lives on `client_context`, not `clients`,
+      // so the save path upserts that row separately after the clients
+      // row is created / updated. formatLocalYMD avoids the toISOString
+      // off-by-one bug in UTC+X timezones.
+      const startDateStr = newClient.start_date ? formatLocalYMD(newClient.start_date) : null;
+      let savedClientId: string | null = null;
       if (isEditMode && editingClient) {
         // Upload logo first if there's a new file
         let logoUrl = newClient.logo_url;
@@ -1642,6 +2397,7 @@ export default function ClientsPage() {
           approved_domains: newClient.approved_domains.length > 0 ? newClient.approved_domains : null,
           is_ad_hoc: newClient.is_ad_hoc,
         } as any);
+        savedClientId = editingClient.id;
       } else {
         const client = await ClientService.createClient(
           newClient.name.trim(),
@@ -1649,7 +2405,7 @@ export default function ClientsPage() {
           newClient.location.trim() || undefined,
           newClient.source,
           newClient.onboarding_call_held,
-          newClient.onboarding_call_date ? newClient.onboarding_call_date.toISOString().split('T')[0] : null,
+          newClient.onboarding_call_date ? formatLocalYMD(newClient.onboarding_call_date) : null,
           newClient.is_whitelisted,
           newClient.whitelist_partner_id
         );
@@ -1676,7 +2432,30 @@ export default function ClientsPage() {
         if (client) {
           await seedMilestones(client.id);
         }
+        savedClientId = client?.id || null;
       }
+
+      // Upsert start_date onto client_context. Only writes if the user
+      // actually set/cleared it — if a CRM-linked client had it auto-
+      // populated from the pipeline, we still respect the user's manual
+      // override here (single source of truth = the form).
+      if (savedClientId) {
+        const existingCtx = clientContexts[savedClientId];
+        if (existingCtx) {
+          await supabase
+            .from('client_context')
+            .update({ start_date: startDateStr, updated_at: new Date().toISOString() })
+            .eq('id', existingCtx.id);
+        } else if (startDateStr) {
+          // Only create a context row if there's a value to save —
+          // avoids an empty row for clients without a start date.
+          await supabase
+            .from('client_context')
+            .insert({ client_id: savedClientId, start_date: startDateStr, updated_at: new Date().toISOString() });
+        }
+        await refreshClientContexts();
+      }
+
       handleCloseClientModal();
       await fetchClients();
     } catch (err) {
@@ -1713,11 +2492,11 @@ export default function ClientsPage() {
         name: startClientForm.campaignName.trim(),
         total_budget: parseFloat(startClientForm.totalBudget),
         status: 'Planning',
-        start_date: startClientForm.startDate?.toISOString().split('T')[0] || '',
-        end_date: startClientForm.endDate?.toISOString().split('T')[0] || '',
+        start_date: startClientForm.startDate ? formatLocalYMD(startClientForm.startDate) : '',
+        end_date: startClientForm.endDate ? formatLocalYMD(startClientForm.endDate) : '',
         description: undefined,
         intro_call: startClientForm.intro_call,
-        intro_call_date: startClientForm.intro_call_date ? startClientForm.intro_call_date.toISOString().split('T')[0] : null,
+        intro_call_date: startClientForm.intro_call_date ? formatLocalYMD(startClientForm.intro_call_date) : null,
         manager: startClientForm.campaignManager || null,
         call_support: startClientForm.callSupport,
         client_choosing_kols: startClientForm.clientChoosingKols,
@@ -2567,7 +3346,7 @@ export default function ClientsPage() {
                     Add Client
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
+                <DialogContent className="sm:max-w-[640px] max-h-[85vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit Client' : 'Add New Client'}</DialogTitle>
                     <DialogDescription>
@@ -2650,6 +3429,49 @@ export default function ClientsPage() {
                             <SelectItem value="inactive">Inactive</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      {/* [2026-06-08] Start Date moved here from the
+                          Client Context popup — engagement start is a
+                          core attribute (renewal math, dashboard tone)
+                          and belongs next to Status. Saves to
+                          client_context, not clients, via the upsert in
+                          handleCreateClient. */}
+                      <div className="grid gap-2">
+                        <Label>Engagement Start Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="focus-brand justify-start text-left font-normal"
+                              style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: newClient.start_date ? '#111827' : '#9ca3af' }}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newClient.start_date
+                                ? newClient.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : 'Select start date'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={newClient.start_date}
+                              onSelect={(date) => setNewClient({ ...newClient, start_date: date || undefined })}
+                              initialFocus
+                              classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {newClient.start_date && (
+                          <button
+                            type="button"
+                            onClick={() => setNewClient({ ...newClient, start_date: undefined })}
+                            className="text-xs text-ink-warm-500 hover:text-rose-600 transition-colors w-fit"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label>Engagement Model</Label>
@@ -2799,25 +3621,28 @@ export default function ClientsPage() {
                   Active
                   <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.active}</span>
                 </TabsTrigger>
-                <TabsTrigger
-                  value="inactive"
-                  className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-700 data-[state=active]:shadow-card px-4 py-2"
-                >
-                  Inactive
-                  <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.inactive}</span>
-                </TabsTrigger>
                 {/* Ad-hoc — cross-cutting bucket of clients flagged
                     `is_ad_hoc` (specialized / one-off engagements that
                     sit outside the standard active/inactive rollup,
                     e.g. Impossible, Robonet). Purple accent matches the
                     Ad-hoc StatusBadge tone used on the dashboard so the
-                    color always reads as "this is the ad-hoc bucket." */}
+                    color always reads as "this is the ad-hoc bucket."
+                    [2026-06-08] Moved next to Active per Andy — Ad-hoc
+                    is a peer engagement type that's checked alongside
+                    Active in day-to-day use, not a deactivated bucket. */}
                 <TabsTrigger
                   value="adhoc"
                   className="data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-card px-4 py-2"
                 >
                   Ad-hoc
                   <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.adhoc}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="inactive"
+                  className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-700 data-[state=active]:shadow-card px-4 py-2"
+                >
+                  Inactive
+                  <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.inactive}</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -3032,11 +3857,17 @@ export default function ClientsPage() {
                             </div>
                           )}
 
-                          {/* Activity row: HQ tasks only.
-                              "Waiting on client" badge + "Last visit" span
-                              hidden per 2026-06-02 product decision —
-                              kept their state intact for easy restore. */}
-                          <div className="flex items-center gap-3 flex-wrap text-xs">
+                          {/* Activity row.
+                              HHP Onboarding Overhaul Spec § 5 changes 2 + 3:
+                                • Pending client tasks badge — "what's stuck"
+                                  on the client's side at a glance
+                                • Last portal visit — surfaces stale
+                                  engagements that hide in plain sight
+                              Both were temporarily hidden 2026-06-02 but
+                              restored by the Onboarding Overhaul spec
+                              which specifically calls them out as the
+                              info the team scans for. */}
+                          <div className="flex items-center gap-2 flex-wrap text-xs">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); router.push(`/tasks?client=${client.id}`); }}
@@ -3046,6 +3877,30 @@ export default function ClientsPage() {
                               <ListTodo className="h-3 w-3" />
                               {openHqTasks} HQ task{openHqTasks === 1 ? '' : 's'}
                             </button>
+                            {/* Pending client task badge — only renders when
+                                there are pending items, so it stays out of
+                                the way when the client isn't blocking. */}
+                            {pendingClientTasks > 0 && (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-medium"
+                                title={`${pendingClientTasks} unfinished client task${pendingClientTasks === 1 ? '' : 's'} on the active milestone`}
+                              >
+                                <Activity className="h-3 w-3" />
+                                {pendingClientTasks} on client
+                              </span>
+                            )}
+                            {/* Last visit — visual signal for stale portals.
+                                Rendered as muted ink-warm so it doesn't
+                                compete with the action chips above. */}
+                            <span
+                              className={`inline-flex items-center gap-1 ml-auto ${
+                                lastVisit ? 'text-ink-warm-500' : 'text-rose-600 font-medium'
+                              }`}
+                              title={lastVisit ? `Last portal visit: ${new Date(lastVisit).toLocaleString()}` : 'Client has never opened the portal'}
+                            >
+                              <Eye className="h-3 w-3" />
+                              {lastVisitLabel}
+                            </span>
                           </div>
                         </div>
                       );
@@ -3097,6 +3952,32 @@ export default function ClientsPage() {
                         - px-2 (was default) shaves horizontal padding
                           so all three usually still fit at lg */}
                     <div className="mt-auto pt-3 border-t border-cream-100">
+                      {/* [2026-06-08] External-visit meta line sits ABOVE
+                          the button row (not inside the Visits column) so
+                          all three buttons share a single baseline — the
+                          previous in-column placement pushed the Visits
+                          button below Open / Edit. Always rendered with
+                          fixed height so cards line up vertically across
+                          the grid regardless of visit state. */}
+                      {(() => {
+                        const lastVisitAt = portalAccessSummary[client.id]?.last_at;
+                        const lastVisitRel = lastVisitAt ? relativeTimeFromNow(lastVisitAt) : null;
+                        const visits30d = portalAccessSummary[client.id]?.count_30d || 0;
+                        return (
+                          <div className="mb-2 flex items-center justify-between gap-2 text-[10px] leading-none tracking-wide uppercase">
+                            <span className="text-ink-warm-400 truncate">
+                              <span className="text-ink-warm-500">Last visited:</span>{' '}
+                              <span className={lastVisitAt ? 'text-ink-warm-700 font-semibold normal-case tracking-normal' : 'text-ink-warm-400 normal-case tracking-normal'}>
+                                {lastVisitAt ? lastVisitRel : '—'}
+                              </span>
+                            </span>
+                            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand/10 text-brand font-semibold normal-case tracking-normal">
+                              <Eye className="h-3 w-3" />
+                              <span>{visits30d} <span className="font-normal opacity-70">/ 30d</span></span>
+                            </span>
+                          </div>
+                        );
+                      })()}
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button
                           variant="outline"
@@ -3120,21 +4001,27 @@ export default function ClientsPage() {
                             <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Set up" />
                           )}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 min-w-[110px] px-2"
-                          onClick={() => openAccessLogModal(client)}
-                          title="Portal visit history"
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                          <span className="truncate">Visits</span>
-                          {(portalAccessSummary[client.id]?.count_30d || 0) > 0 && (
-                            <span className="ml-1.5 text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded flex-shrink-0">
-                              {portalAccessSummary[client.id]!.count_30d}
-                            </span>
-                          )}
-                        </Button>
+                        {(() => {
+                          const lastVisitAt = portalAccessSummary[client.id]?.last_at;
+                          const lastVisitRel = lastVisitAt ? relativeTimeFromNow(lastVisitAt) : null;
+                          const visits30d = portalAccessSummary[client.id]?.count_30d || 0;
+                          return (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 min-w-[110px] px-2"
+                              onClick={() => openAccessLogModal(client)}
+                              title={
+                                lastVisitAt
+                                  ? `Last external visit ${lastVisitRel} · ${visits30d} in last 30 days`
+                                  : 'No external visits in the last 30 days · click for full log (incl. internal)'
+                              }
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                              <span className="truncate">Visit log</span>
+                            </Button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </CardContent>
@@ -3168,6 +4055,95 @@ export default function ClientsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Zone C — Top Post Override Picker.
+            Opened from the Weekly Update tab's "Pin a different post"
+            button. Shows the client's posted content sorted by
+            engagement; user picks one and it's saved on the v2 row's
+            top_post_override. */}
+        <Dialog open={topPostPickerOpen} onOpenChange={setTopPostPickerOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-500" />
+                Pin Top Post — {contextModalClient?.name}
+              </DialogTitle>
+              <DialogDescription>
+                Pick the post you want to feature on the portal this week. Sorted by total engagement.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-1">
+              {topPostCandidatesLoading ? (
+                <div className="space-y-2 py-4">
+                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-md" />)}
+                </div>
+              ) : topPostCandidates.length === 0 ? (
+                <div className="py-8 text-center text-sm text-ink-warm-500">
+                  No posted content yet for this client.
+                </div>
+              ) : (
+                <div className="space-y-2 py-2">
+                  {topPostCandidates.map((c, idx) => {
+                    const isPinned = weeklyV2Row?.top_post_override?.content_id === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => contextModalClient && pinTopPost(contextModalClient.id, c.id)}
+                        className={`w-full text-left p-3 rounded-md border transition-colors ${
+                          isPinned
+                            ? 'bg-amber-50 border-amber-300'
+                            : 'bg-white border-cream-200 hover:bg-cream-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-ink-warm-900">{c.kol_name}</span>
+                              {c.platform && (
+                                <span className="text-[10px] uppercase tracking-wider text-ink-warm-500">{c.platform}</span>
+                              )}
+                              {idx === 0 && !isPinned && (
+                                <StatusBadge tone="brand" size="sm" bordered>Auto-pick</StatusBadge>
+                              )}
+                              {isPinned && (
+                                <StatusBadge tone="warning" size="sm" bordered withDot>Pinned</StatusBadge>
+                              )}
+                            </div>
+                            {c.notes && (
+                              <p className="text-xs text-ink-warm-700 line-clamp-2 italic">{c.notes}</p>
+                            )}
+                            <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
+                              <span>{c.impressions.toLocaleString()} views</span>
+                              <span>{c.likes.toLocaleString()} likes</span>
+                              <span>{c.retweets.toLocaleString()} RT</span>
+                              <span>{c.comments.toLocaleString()} cmt</span>
+                            </div>
+                          </div>
+                          {c.content_link && (
+                            <a
+                              href={c.content_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs text-brand hover:text-brand-dark shrink-0"
+                              title="Open post"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+              <Button variant="outline" onClick={() => setTopPostPickerOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Access Log Dialog — read-only audit of who has visited the
             public portal. Sourced from portal_access_log; admin-only
             via RLS (see migration 064). Cap at 200 most-recent rows
@@ -3184,66 +4160,132 @@ export default function ClientsPage() {
                 Who has accessed this client&apos;s public portal, when, and which allowlist rule let them in.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto px-1">
-            {accessLogLoading ? (
-              <div className="space-y-2 py-4">
-                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-              </div>
-            ) : accessLogRows.length === 0 ? (
-              <div className="py-8 text-center text-sm text-ink-warm-500">
-                No portal visits recorded yet.
-                <p className="text-xs text-ink-warm-400 mt-1">
-                  Share the portal link via the <Share2 className="inline h-3 w-3" /> icon to start tracking.
-                </p>
-              </div>
-            ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-cream-50 hover:bg-cream-50">
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">When</TableHead>
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Email</TableHead>
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Via</TableHead>
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">IP</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {accessLogRows.map(row => {
-                      // Pretty labels for the authorization-rule enum.
-                      // 'cache' = returning visitor on a still-valid
-                      // 24h localStorage token, distinct from a fresh
-                      // login.
-                      const viaLabel =
-                        row.authorized_via === 'exact' ? 'Primary email'
-                        : row.authorized_via === 'approved_email' ? 'Approved email'
-                        : row.authorized_via === 'same_domain' ? 'Same domain'
-                        : row.authorized_via === 'approved_domain' ? 'Approved domain'
-                        : row.authorized_via === 'cache' ? 'Returning'
-                        : row.authorized_via;
-                      const viaTone: BadgeTone =
-                        row.authorized_via === 'exact' ? 'success'
-                        : row.authorized_via === 'cache' ? 'neutral'
-                        : 'info';
-                      return (
-                        <TableRow key={row.id} className="border-cream-100">
-                          <TableCell className="px-3 py-2 text-xs text-ink-warm-700 whitespace-nowrap">
-                            {new Date(row.accessed_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="px-3 py-2 text-xs text-ink-warm-900">{row.email}</TableCell>
-                          <TableCell className="px-3 py-2">
-                            <StatusBadge tone={viaTone} size="sm" bordered withDot>{viaLabel}</StatusBadge>
-                          </TableCell>
-                          <TableCell className="px-3 py-2 text-xs text-ink-warm-400 font-mono">
-                            {row.ip_address || '—'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-            </div>
+            {/* [2026-06-08] Audience filter — defaults to External so the
+                modal matches the on-card "Visit log" badge (which always
+                excludes @holohive.io / @holohive.agency). User can flip
+                to Internal to QA team traffic or All to see the full
+                audit log. Counts live next to each label so it's clear
+                what the split is at a glance. */}
+            {(() => {
+              const isInternal = (email: string | null | undefined) => {
+                if (!email) return false;
+                const lower = email.toLowerCase();
+                return lower.endsWith('@holohive.io') || lower.endsWith('@holohive.agency');
+              };
+              const externalCount = accessLogRows.filter(r => !isInternal(r.email)).length;
+              const internalCount = accessLogRows.filter(r => isInternal(r.email)).length;
+              const visibleRows = accessLogRows.filter(r => {
+                if (accessLogAudience === 'all') return true;
+                if (accessLogAudience === 'external') return !isInternal(r.email);
+                return isInternal(r.email);
+              });
+              return (
+                <>
+                  {!accessLogLoading && accessLogRows.length > 0 && (
+                    // Audience selector — uses the same Tabs primitive
+                    // as every other in-popup selector in this page
+                    // (Meeting Notes / Decision Log at L3597, the
+                    // Context / Action Board switch at L3861, etc.)
+                    // so dialog chrome stays consistent.
+                    <Tabs value={accessLogAudience} onValueChange={(v) => setAccessLogAudience(v as 'external' | 'internal' | 'all')}>
+                      <TabsList className="bg-cream-100 p-1 mb-3 shrink-0 w-fit">
+                        <TabsTrigger value="external" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">
+                          External
+                          <span className="ml-1.5 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full pointer-events-none">{externalCount}</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="internal" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">
+                          Internal
+                          <span className="ml-1.5 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full pointer-events-none">{internalCount}</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="all" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">
+                          All
+                          <span className="ml-1.5 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full pointer-events-none">{accessLogRows.length}</span>
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  )}
+                  <div className="flex-1 overflow-y-auto px-1">
+                    {accessLogLoading ? (
+                      <div className="space-y-2 py-4">
+                        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                      </div>
+                    ) : accessLogRows.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-ink-warm-500">
+                        No portal visits recorded yet.
+                        <p className="text-xs text-ink-warm-400 mt-1">
+                          Share the portal link via the <Share2 className="inline h-3 w-3" /> icon to start tracking.
+                        </p>
+                      </div>
+                    ) : visibleRows.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-ink-warm-500">
+                        No {accessLogAudience} visits.
+                        <p className="text-xs text-ink-warm-400 mt-1">
+                          Try a different audience above.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-cream-50 hover:bg-cream-50">
+                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">When</TableHead>
+                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Email</TableHead>
+                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Via</TableHead>
+                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">IP</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {visibleRows.map(row => {
+                              // Pretty labels for the authorization-rule enum.
+                              // 'cache' = returning visitor on a still-valid
+                              // 24h localStorage token, distinct from a fresh
+                              // login.
+                              const viaLabel =
+                                row.authorized_via === 'exact' ? 'Primary email'
+                                : row.authorized_via === 'approved_email' ? 'Approved email'
+                                : row.authorized_via === 'same_domain' ? 'Same domain'
+                                : row.authorized_via === 'approved_domain' ? 'Approved domain'
+                                : row.authorized_via === 'cache' ? 'Returning'
+                                : row.authorized_via;
+                              const viaTone: BadgeTone =
+                                row.authorized_via === 'exact' ? 'success'
+                                : row.authorized_via === 'cache' ? 'neutral'
+                                : 'info';
+                              const rowIsInternal = isInternal(row.email);
+                              return (
+                                <TableRow key={row.id} className="border-cream-100">
+                                  <TableCell className="px-3 py-2 text-xs text-ink-warm-700 whitespace-nowrap">
+                                    {new Date(row.accessed_at).toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="px-3 py-2 text-xs text-ink-warm-900">
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <span>{row.email}</span>
+                                      {rowIsInternal && (
+                                        // Tiny internal-team marker so admins can
+                                        // scan the All view without reading every
+                                        // domain. Slate to read as "ops/admin"
+                                        // per the StatusBadge palette.
+                                        <StatusBadge tone="slate" size="sm" bordered>Internal</StatusBadge>
+                                      )}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="px-3 py-2">
+                                    <StatusBadge tone={viaTone} size="sm" bordered withDot>{viaLabel}</StatusBadge>
+                                  </TableCell>
+                                  <TableCell className="px-3 py-2 text-xs text-ink-warm-400 font-mono">
+                                    {row.ip_address || '—'}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
             <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setAccessLogModalClient(null)}>Close</Button>
             </DialogFooter>
@@ -3365,9 +4407,9 @@ export default function ClientsPage() {
                 own overflow-y-auto becomes the single scroll surface,
                 instead of stacking against a fixed 55vh cap. */}
             <Tabs value={meetingNotesTab} onValueChange={setMeetingNotesTab} className="flex-1 flex flex-col min-h-0">
-              <TabsList className="bg-cream-100 p-1 mb-4 shrink-0">
-                <TabsTrigger value="notes" className="data-[state=active]:bg-white px-4 py-2">Meeting Notes</TabsTrigger>
-                <TabsTrigger value="decisions" className="data-[state=active]:bg-white px-4 py-2">Decision Log</TabsTrigger>
+              <TabsList className="bg-cream-100 p-1 mb-3 shrink-0 w-fit">
+                <TabsTrigger value="notes" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Meeting Notes</TabsTrigger>
+                <TabsTrigger value="decisions" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Decision Log</TabsTrigger>
               </TabsList>
               <TabsContent value="decisions" className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
                 {!isDecisionFormOpen && (
@@ -3620,18 +4662,45 @@ export default function ClientsPage() {
         <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } }}>
           <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Client Context — {contextModalClient?.name}</DialogTitle>
-              <DialogDescription>Manage engagement context and action board for this client.</DialogDescription>
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
+                <span>Client Context — {contextModalClient?.name}</span>
+                {/* [2026-06-11] Draft mode chip removed alongside the
+                    bell teardown. Without notifications, there's no
+                    real-time stream to suppress; the activity_category
+                    filter on client_activity_log already excludes
+                    setup churn from the future "This Week" snapshot. */}
+              </DialogTitle>
+              <DialogDescription>
+                Manage engagement context and action board for this client.
+              </DialogDescription>
             </DialogHeader>
             <Tabs value={contextModalTab} onValueChange={(v) => {
               setContextModalTab(v);
               if (v === 'actionboard' && contextModalClient) {
                 seedMilestones(contextModalClient.id);
               }
+              if (v === 'weekly-update' && contextModalClient) {
+                // Lazy-load the v2 row only when the tab is opened so
+                // we don't pay the round-trip for every Context modal
+                // open. Each tab switch reloads the row in case
+                // another team member edited it in the meantime.
+                loadWeeklyV2Row(contextModalClient.id, weeklyV2Week);
+              }
             }} className="flex-1 flex flex-col min-h-0">
-              <TabsList className="mb-3 shrink-0">
-                <TabsTrigger value="context">Context</TabsTrigger>
-                <TabsTrigger value="actionboard">Action Board</TabsTrigger>
+              {/* Popup tab chrome aligned with the other in-popup tab
+                  strips in this page (Meeting Notes / Decision Log
+                  + Portal Visits audience filter): bg-cream-100
+                  outer, mb-3 shrink-0, white active tile, sm font
+                  medium so all dialog selectors read the same. */}
+              <TabsList className="bg-cream-100 p-1 mb-3 shrink-0 w-fit">
+                <TabsTrigger value="context" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Context</TabsTrigger>
+                <TabsTrigger value="actionboard" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Action Board</TabsTrigger>
+                {/* [2026-06-08] 3rd tab — Weekly Update per Phase 2 of
+                    the Post-Onboarding Campaign View spec. Three-zone
+                    form inside: Strategic Direction (internal),
+                    Execution Plan (Zone A — batch-creates HQ tasks),
+                    This Week Feed (Zone B — drives portal). */}
+                <TabsTrigger value="weekly-update" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Weekly Update</TabsTrigger>
               </TabsList>
               {/* Each tab is its own flex-col so the body scrolls and
                   the action row stays pinned below it. Previously the
@@ -3700,32 +4769,14 @@ export default function ClientsPage() {
                       <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="focus-brand" rows={3} />
                     )}
                   </div>
-                  <div className="grid gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Start Date</Label>
-                      {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
-                        <span className="text-xs text-brand font-medium">From Pipeline</span>
-                      )}
-                    </div>
-                    {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
-                      <div className="flex h-10 w-full items-center rounded-md border border-cream-200 bg-cream-50 px-3 py-2 text-sm text-ink-warm-700">
-                        <CalendarIcon className="mr-2 h-4 w-4 text-ink-warm-400" />
-                        {contextForm.start_date ? contextForm.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                      </div>
-                    ) : (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {contextForm.start_date ? contextForm.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select start date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={contextForm.start_date} onSelect={(date) => setContextForm({ ...contextForm, start_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  </div>
+                  {/* [2026-06-08] Start Date moved out of this popup
+                      to the Edit Client popup — engagement start is a
+                      core attribute that belongs alongside Status, not
+                      buried in the context tab. The contextForm still
+                      carries start_date in its payload (round-tripped
+                      from the existing row) so this save doesn't blow
+                      away the value; edits happen in the Edit Client
+                      dialog. */}
                   {/* Free-text "Milestones" field removed per May 2026
                       feedback — redundant with the structured milestones
                       managed under the Action Board tab. The contextForm
@@ -3833,74 +4884,63 @@ export default function ClientsPage() {
                         <Label className="text-xs">Telegram Group URL</Label>
                         <Input value={contextForm.telegram_url} onChange={(e) => setContextForm({ ...contextForm, telegram_url: e.target.value })} placeholder="https://t.me/..." className="focus-brand" />
                       </div>
+                      {/* [2026-06-11] Telegram chat ID — sits with the
+                          group URL because they're paired. The URL is
+                          what humans share; the chat ID is what the bot
+                          needs to actually post to the group (e.g.
+                          push call note summaries from /dashboard).
+                          Accepts a numeric chat_id (-1001234567...) or
+                          a @username. Bot must already be a member of
+                          the group before sends will land. */}
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Telegram Chat ID (for bot sends)</Label>
+                        <Input
+                          value={contextForm.telegram_chat_id}
+                          onChange={(e) => setContextForm({ ...contextForm, telegram_chat_id: e.target.value })}
+                          placeholder="-1001234567890 or @publicgroup"
+                          className="focus-brand font-mono text-sm"
+                        />
+                        <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                          Required for "Send to client TG" on dashboard call notes. Bot must be a member of the group.
+                        </p>
+                      </div>
                       <div className="grid gap-1">
                         <Label className="text-xs">Brand Assets URL</Label>
                         <Input value={contextForm.shared_drive_url} onChange={(e) => setContextForm({ ...contextForm, shared_drive_url: e.target.value })} placeholder="https://drive.google.com/..." className="focus-brand" />
                       </div>
                       <div className="grid gap-1">
-                        <Label className="text-xs">GTM Plan URL</Label>
+                        <Label className="text-xs">GTM Overview URL</Label>
                         <Input value={contextForm.gtm_sync_url} onChange={(e) => setContextForm({ ...contextForm, gtm_sync_url: e.target.value })} placeholder="https://..." className="focus-brand" />
+                      </div>
+                      {/* [2026-06-08] KOL Content Brief URL — 4th resource
+                          link per the Post-Onboarding Campaign View spec
+                          v2 (Phase 1 / Resources card). Stored on
+                          client_context.kol_content_brief_url. Portal
+                          renders it as the 4th card next to TG / Brand
+                          Assets / GTM. */}
+                      <div className="grid gap-1">
+                        <Label className="text-xs">KOL Content Brief URL</Label>
+                        <Input value={contextForm.kol_content_brief_url} onChange={(e) => setContextForm({ ...contextForm, kol_content_brief_url: e.target.value })} placeholder="https://docs.google.com/..." className="focus-brand" />
                       </div>
                     </div>
                   </div>
-                  {/* Portal Access & Features */}
-                  <div className="border rounded-lg p-3 bg-cream-50 space-y-3">
-                    <p className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wider">Portal Access & Features</p>
-
-                    {/* Approved Domains */}
+                  {/* [2026-06-08] Approved Domains was removed from this
+                      popup — it now lives only in the Edit Client dialog,
+                      which is the right home for clients-table identity
+                      / access attributes. The Mindshare toggle stayed
+                      because it's a true portal feature flag, but the
+                      cream-50 "Portal Access & Features" wrapper was
+                      collapsed since a single toggle in a decorated box
+                      reads as visual filler. */}
+                  <div className="flex items-center justify-between border-t border-cream-200 pt-3">
                     <div>
-                      <p className="text-sm font-medium text-ink-warm-900 mb-1">Approved Domains</p>
-                      <p className="text-xs text-ink-warm-500 mb-2">Users with these email domains can access the portal, campaigns, and reports</p>
-                      <div className="flex gap-2 mb-2">
-                        <Input
-                          value={contextDomainInput}
-                          onChange={(e) => setContextDomainInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const domain = contextDomainInput.replace(/^@/, '').trim().toLowerCase();
-                              if (domain && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) && !clientApprovedDomains.includes(domain)) {
-                                setClientApprovedDomains([...clientApprovedDomains, domain]);
-                                setContextDomainInput('');
-                              }
-                            }
-                          }}
-                          placeholder="e.g. company.com"
-                          className="focus-brand flex-1"
-                        />
-                        <Button size="sm" variant="outline" className="text-xs" onClick={() => {
-                          const domain = contextDomainInput.replace(/^@/, '').trim().toLowerCase();
-                          if (domain && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) && !clientApprovedDomains.includes(domain)) {
-                            setClientApprovedDomains([...clientApprovedDomains, domain]);
-                            setContextDomainInput('');
-                          }
-                        }}>Add</Button>
-                      </div>
-                      {clientApprovedDomains.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {clientApprovedDomains.map((domain, i) => (
-                            // Brand-soft chip — same palette as the other
-                            // approved-domain chip in Add Client (line ~2710).
-                            <span key={i} className="inline-flex items-center gap-1 bg-brand-soft text-brand-deep border border-brand-light text-xs px-2 py-0.5 rounded-full">
-                              @{domain}
-                              <button onClick={() => setClientApprovedDomains(clientApprovedDomains.filter((_, j) => j !== i))} className="text-brand hover:text-brand-dark cursor-pointer">×</button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <p className="text-sm font-medium text-ink-warm-900">Korean Mindshare Tracker</p>
+                      <p className="text-xs text-ink-warm-500">Show mindshare analytics on the client portal</p>
                     </div>
-
-                    {/* Mindshare Toggle */}
-                    <div className="flex items-center justify-between pt-2 border-t border-cream-200">
-                      <div>
-                        <p className="text-sm font-medium text-ink-warm-900">Korean Mindshare Tracker</p>
-                        <p className="text-xs text-ink-warm-500">Show mindshare analytics on the client portal</p>
-                      </div>
-                      <Switch
-                        checked={contextModalClient ? (clientMindshareEnabled[contextModalClient.id] ?? false) : false}
-                        onCheckedChange={() => contextModalClient && toggleMindshare(contextModalClient.id)}
-                      />
-                    </div>
+                    <Switch
+                      checked={contextModalClient ? (clientMindshareEnabled[contextModalClient.id] ?? false) : false}
+                      onCheckedChange={() => contextModalClient && toggleMindshare(contextModalClient.id)}
+                    />
                   </div>
                 </div>
                 <DialogFooter className="border-t border-cream-100 pt-3 mt-0 shrink-0">
@@ -4198,120 +5238,553 @@ export default function ClientsPage() {
                   );
                 })()}
               </TabsContent>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
+              {/* ─── Weekly Update (v2) Tab ──────────────────────────
+                  Phase 2 of the Post-Onboarding Campaign View spec.
+                  Three sequential sections:
+                    1. Strategic Direction (Jdot's notes — internal)
+                    2. Zone A: Execution Plan (internal, batch-creates
+                       HQ tasks on submit, locks after submit)
+                    3. Zone B: This Week Feed (client-facing, drives
+                       portal "This Week" card with pending/done dots)
+                  Zone C (Top Post override) currently shows the
+                  auto-selected post read-only — the picker UI to
+                  override is queued for a follow-up. */}
+              <TabsContent value="weekly-update" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
+                  {/* Week selector + save status */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-ink-warm-500 uppercase tracking-wider">Week of</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="focus-brand font-normal h-8">
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                            {weeklyV2Week.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={weeklyV2Week}
+                            onSelect={(date) => {
+                              if (!date) return;
+                              const monday = getMondayOf(date);
+                              setWeeklyV2Week(monday);
+                              if (contextModalClient) loadWeeklyV2Row(contextModalClient.id, monday);
+                            }}
+                            classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {/* Quick-jump buttons for the most common cases —
+                          Andy mentioned "current week is 95% of opens." */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-ink-warm-500 hover:text-brand"
+                        onClick={() => {
+                          const monday = getMondayOf(new Date());
+                          setWeeklyV2Week(monday);
+                          if (contextModalClient) loadWeeklyV2Row(contextModalClient.id, monday);
+                        }}
+                      >
+                        This week
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {/* Save-status pill — flashes briefly after each
+                          autosave so the user knows their change landed. */}
+                      {weeklyV2SaveStatus === 'saving' && (
+                        <span className="text-xs text-ink-warm-500">Saving…</span>
+                      )}
+                      {weeklyV2SaveStatus === 'saved' && (
+                        <span className="text-xs text-emerald-600">Saved</span>
+                      )}
+                      {weeklyV2SaveStatus === 'error' && (
+                        <span className="text-xs text-rose-600">Save failed</span>
+                      )}
+                      {/* [2026-06-11] Q5 audit-log viewer. Same pattern as
+                          Lineup Manager's AuditLogButton — popover anchored
+                          to the action row, lazy-fetches on open. Hidden
+                          when the weekly update row doesn't exist yet
+                          (nothing to audit until first save). */}
+                      {weeklyV2Row?.id && (
+                        <Popover
+                          open={weeklyAuditOpen}
+                          onOpenChange={(open) => {
+                            setWeeklyAuditOpen(open);
+                            if (open && weeklyV2Row?.id) {
+                              fetchWeeklyAuditLog(weeklyV2Row.id);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 focus-brand" title="View edit history">
+                              <History className="h-3.5 w-3.5 mr-1" />
+                              History
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[420px] p-0 z-[80]" align="end">
+                            <div className="p-3 border-b border-cream-100">
+                              <p className="text-sm font-semibold text-ink-warm-900">Edit history</p>
+                              <p className="text-[11px] text-ink-warm-500">Reverse chronological. Latest 100 edits.</p>
+                            </div>
+                            <div className="max-h-[400px] overflow-y-auto">
+                              {weeklyAuditLoading ? (
+                                <div className="p-4 space-y-2">
+                                  {Array.from({ length: 3 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-10 rounded" />
+                                  ))}
+                                </div>
+                              ) : weeklyAuditRows.length === 0 ? (
+                                <p className="p-6 text-center text-xs text-ink-warm-500 italic">
+                                  No edits logged yet.
+                                </p>
+                              ) : (
+                                <ul className="divide-y divide-cream-100">
+                                  {weeklyAuditRows.map(r => (
+                                    <li key={r.id} className="px-3 py-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <StatusBadge tone={weeklyAuditKindTone(r.edit_kind)} size="sm">
+                                            {weeklyAuditKindLabel(r.edit_kind)}
+                                          </StatusBadge>
+                                          <span className="text-xs text-ink-warm-700 truncate">
+                                            {r.edited_by_name || 'Unknown'}
+                                          </span>
+                                        </div>
+                                        <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
+                                          {new Date(r.edited_at).toLocaleString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                          })}
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                                        {summarizeWeeklyAudit(r)}
+                                      </p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
+                  </div>
 
-        {/* Weekly Updates Modal */}
-        <Dialog open={!!weeklyModalClient} onOpenChange={(open) => { if (!open) { setWeeklyModalClient(null); setIsWeeklyFormOpen(false); setEditingWeeklyId(null); setDeletingWeeklyId(null); } }}>
-          <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Weekly Updates — {weeklyModalClient?.name}</DialogTitle>
-              <DialogDescription>Manage weekly status updates for this client.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
-              {!isWeeklyFormOpen && (
-                <Button variant="brand" size="sm" onClick={() => openWeeklyForm()}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Update
-                </Button>
-              )}
-              {isWeeklyFormOpen && (
-                <div className="border rounded-lg p-4 space-y-3 bg-cream-50">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label>Week Of <span className="text-rose-500">*</span></Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.week_of ? '#111827' : '#9ca3af' }}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {weeklyForm.week_of ? weeklyForm.week_of.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select week'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={weeklyForm.week_of} onSelect={(date) => setWeeklyForm({ ...weeklyForm, week_of: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Next Check-in</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.next_checkin ? '#111827' : '#9ca3af' }}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {weeklyForm.next_checkin ? weeklyForm.next_checkin.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={weeklyForm.next_checkin} onSelect={(date) => setWeeklyForm({ ...weeklyForm, next_checkin: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Current Focus <span className="text-rose-500">*</span></Label>
-                    <Input value={weeklyForm.current_focus} onChange={(e) => setWeeklyForm({ ...weeklyForm, current_focus: e.target.value })} placeholder="1 sentence current focus" className="focus-brand" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Active Initiatives</Label>
-                    <Textarea value={weeklyForm.active_initiatives} onChange={(e) => setWeeklyForm({ ...weeklyForm, active_initiatives: e.target.value })} placeholder="Max ~3 items, one per line" className="focus-brand" rows={3} />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Open Questions / Blockers</Label>
-                    <Textarea value={weeklyForm.open_questions} onChange={(e) => setWeeklyForm({ ...weeklyForm, open_questions: e.target.value })} placeholder="Blockers or open items..." className="focus-brand" rows={2} />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="brand" size="sm" onClick={handleWeeklySubmit} disabled={!weeklyForm.current_focus.trim() || !weeklyForm.week_of}>
-                      {editingWeeklyId ? 'Save' : 'Add'}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setIsWeeklyFormOpen(false); setEditingWeeklyId(null); }}>Cancel</Button>
-                  </div>
-                </div>
-              )}
-              {weeklyModalClient && (clientWeeklyUpdates[weeklyModalClient.id] || []).map((update) => (
-                <div key={update.id} className="border rounded-lg p-3 bg-white">
-                  {deletingWeeklyId === update.id ? (
-                    <div className="space-y-2">
-                      <p className="text-sm text-ink-warm-700">Delete this update?</p>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="destructive" onClick={() => deleteWeeklyUpdate(update.id)}>Delete</Button>
-                        <Button size="sm" variant="outline" onClick={() => setDeletingWeeklyId(null)}>Cancel</Button>
-                      </div>
+                  {weeklyV2Loading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-24 rounded-lg" />
+                      <Skeleton className="h-40 rounded-lg" />
+                      <Skeleton className="h-32 rounded-lg" />
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-xs text-ink-warm-400">Week of {new Date(update.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                          <p className="font-medium text-sm mt-1">{update.current_focus}</p>
-                          {update.active_initiatives && (
-                            <div className="mt-2 text-xs text-ink-warm-700">
-                              {update.active_initiatives.split('\n').map((item, i) => (
-                                <p key={i}>{item.startsWith('-') || item.startsWith('•') ? item : `• ${item}`}</p>
+                      {/* ─── Section 1: Strategic Direction ─────────
+                          Amber background per spec — "distinct
+                          background (light amber/yellow)". Auto-saves
+                          on blur. Last-touched metadata shows below
+                          so Bolt knows when Jdot last edited it. */}
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">Strategic Direction</p>
+                            <p className="text-xs text-amber-700/80">Internal only · Jdot's guidance for this week</p>
+                          </div>
+                          {weeklyV2Row?.strategic_notes_updated_at && (
+                            <span className="text-[10px] text-amber-700/70 font-mono">
+                              edited {new Date(weeklyV2Row.strategic_notes_updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        <Textarea
+                          value={weeklyV2StrategicNotes}
+                          onChange={(e) => setWeeklyV2StrategicNotes(e.target.value)}
+                          onBlur={() => {
+                            if (!contextModalClient) return;
+                            // Skip the save if nothing changed — avoids
+                            // pointless writes when the user just
+                            // tabs through.
+                            if ((weeklyV2Row?.strategic_notes || '') === weeklyV2StrategicNotes) return;
+                            saveWeeklyV2(contextModalClient.id, weeklyV2Week, { strategic_notes: weeklyV2StrategicNotes });
+                          }}
+                          placeholder={"Strategic guidance for the week. e.g.\n• Read EWL gc for this week's activation context\n• Biweekly campaign report with the same format"}
+                          className="focus-brand bg-white border-amber-200 min-h-[80px]"
+                          rows={4}
+                        />
+                        {/* Previous-weeks history — disclose-to-view so
+                            the current-week form isn't cluttered. Lazy
+                            fetches on first open. Read-only quotes of
+                            the last ~8 weeks of Jdot's notes; clicking
+                            "Open" jumps the week picker to that week. */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !strategicHistoryOpen;
+                            setStrategicHistoryOpen(next);
+                            if (next && contextModalClient && strategicHistoryRows.length === 0) {
+                              fetchStrategicHistory(contextModalClient.id);
+                            }
+                          }}
+                          className="text-[11px] text-amber-800/80 hover:text-amber-900 underline-offset-2 hover:underline mt-1 inline-flex items-center gap-1"
+                        >
+                          <ChevronDown className={`h-3 w-3 transition-transform ${strategicHistoryOpen ? 'rotate-180' : ''}`} />
+                          {strategicHistoryOpen ? 'Hide previous notes' : 'View previous notes'}
+                        </button>
+                        {strategicHistoryOpen && (
+                          <div className="space-y-2 pt-2 border-t border-amber-200">
+                            {strategicHistoryLoading ? (
+                              <div className="space-y-2">
+                                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
+                              </div>
+                            ) : strategicHistoryRows.length === 0 ? (
+                              <p className="text-[11px] text-amber-800/70 italic">No prior strategic notes for this client yet.</p>
+                            ) : (
+                              strategicHistoryRows.map(row => (
+                                <div key={row.id} className="bg-white border border-amber-200 rounded-md p-2">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-900">
+                                      Week of {new Date(row.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const wk = new Date(row.week_of + 'T00:00:00');
+                                        setWeeklyV2Week(wk);
+                                        if (contextModalClient) loadWeeklyV2Row(contextModalClient.id, wk);
+                                        setStrategicHistoryOpen(false);
+                                      }}
+                                      className="text-[10px] text-brand hover:text-brand-dark"
+                                    >
+                                      Open
+                                    </button>
+                                  </div>
+                                  <p className="text-[11px] text-ink-warm-700 whitespace-pre-wrap line-clamp-4">{row.strategic_notes}</p>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ─── Section 2: Zone A — Execution Plan ─────
+                          Yellow background per spec. Structured rows
+                          (description + assignee + due date +
+                          deliverable type). On submit, each row
+                          becomes an HQ task. Locked after submit (rows
+                          render read-only). */}
+                      {(() => {
+                        const isLocked = !!weeklyV2Row?.execution_plan_submitted_at;
+                        // Approved team members for assignee dropdown
+                        // (excludes clients + inactive users — same
+                        // gate as elsewhere in the page).
+                        const teamMembers = allUsers.filter((u: any) => u.role !== 'client' && u.is_active !== false);
+                        return (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-semibold text-yellow-900 uppercase tracking-wider">Zone A · Execution Plan</p>
+                                <p className="text-xs text-yellow-800/80">
+                                  Internal only · Each row creates an HQ task on submit
+                                </p>
+                              </div>
+                              {isLocked && (
+                                <StatusBadge tone="success" size="sm" bordered withDot>Submitted</StatusBadge>
+                              )}
+                            </div>
+
+                            {weeklyV2ExecPlan.length === 0 && !isLocked && (
+                              <p className="text-xs text-yellow-800/70 italic">No tasks yet. Add a row to start.</p>
+                            )}
+
+                            <div className="space-y-2">
+                              {weeklyV2ExecPlan.map((row, idx) => (
+                                <div key={row.id} className="grid grid-cols-12 gap-2 items-start bg-white border border-yellow-200 rounded-md p-2">
+                                  <Input
+                                    value={row.description}
+                                    onChange={(e) => {
+                                      const next = [...weeklyV2ExecPlan];
+                                      next[idx] = { ...row, description: e.target.value };
+                                      setWeeklyV2ExecPlan(next);
+                                    }}
+                                    onBlur={() => contextModalClient && saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: weeklyV2ExecPlan })}
+                                    placeholder="Task description"
+                                    className="focus-brand col-span-5 h-8"
+                                    disabled={isLocked}
+                                  />
+                                  <Select
+                                    value={row.assignee_id || ''}
+                                    onValueChange={(v) => {
+                                      const next = [...weeklyV2ExecPlan];
+                                      next[idx] = { ...row, assignee_id: v || null };
+                                      setWeeklyV2ExecPlan(next);
+                                      if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
+                                    }}
+                                    disabled={isLocked}
+                                  >
+                                    <SelectTrigger className="focus-brand col-span-3 h-8 text-xs">
+                                      <SelectValue placeholder="Assignee" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {teamMembers.map((u: any) => (
+                                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start" disabled={isLocked}>
+                                        <CalendarIcon className="mr-1 h-3 w-3" />
+                                        {row.due_date
+                                          ? new Date(row.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                          : 'Due'}
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                                      <Calendar
+                                        mode="single"
+                                        selected={row.due_date ? new Date(row.due_date + 'T00:00:00') : undefined}
+                                        onSelect={(date) => {
+                                          const next = [...weeklyV2ExecPlan];
+                                          next[idx] = { ...row, due_date: date ? formatLocalYMD(date) : null };
+                                          setWeeklyV2ExecPlan(next);
+                                          if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
+                                        }}
+                                        classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                                        modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                  <Select
+                                    value={row.deliverable_type || ''}
+                                    onValueChange={(v) => {
+                                      const next = [...weeklyV2ExecPlan];
+                                      next[idx] = { ...row, deliverable_type: (v as DeliverableType) || null };
+                                      setWeeklyV2ExecPlan(next);
+                                      if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
+                                    }}
+                                    disabled={isLocked}
+                                  >
+                                    <SelectTrigger className="focus-brand col-span-1 h-8 text-xs px-1">
+                                      <SelectValue placeholder="Type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(Object.keys(DELIVERABLE_TYPE_LABELS) as DeliverableType[]).map(t => (
+                                        <SelectItem key={t} value={t}>{DELIVERABLE_TYPE_LABELS[t]}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!isLocked && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="col-span-1 h-8 w-8 p-0 text-ink-warm-400 hover:text-rose-600"
+                                      onClick={() => {
+                                        const next = weeklyV2ExecPlan.filter(r => r.id !== row.id);
+                                        setWeeklyV2ExecPlan(next);
+                                        if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
+                                      }}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
                               ))}
                             </div>
-                          )}
-                          {update.next_checkin && (
-                            <p className="text-xs text-ink-warm-400 mt-2">Next check-in: {new Date(update.next_checkin + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                          )}
-                          {update.open_questions && (
-                            <p className="text-xs text-orange-600 mt-1 whitespace-pre-wrap">Open: {update.open_questions}</p>
-                          )}
+
+                            {!isLocked && (
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-8 border-yellow-300 text-yellow-900 hover:bg-yellow-100"
+                                  onClick={() => {
+                                    setWeeklyV2ExecPlan([
+                                      ...weeklyV2ExecPlan,
+                                      { id: localId(), description: '', assignee_id: null, due_date: null, deliverable_type: null },
+                                    ]);
+                                  }}
+                                >
+                                  <Plus className="h-3.5 w-3.5 mr-1" /> Add task
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="brand"
+                                  className="text-xs h-8"
+                                  onClick={() => contextModalClient && submitExecutionPlan(contextModalClient.id)}
+                                  disabled={weeklyV2ExecPlan.length === 0}
+                                >
+                                  Submit & create HQ tasks
+                                </Button>
+                              </div>
+                            )}
+
+                            {isLocked && weeklyV2Row?.execution_plan_submitted_at && (
+                              <p className="text-[11px] text-yellow-800/80 italic">
+                                Locked · {new Date(weeklyV2Row.execution_plan_submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Add new tasks via HQ.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* ─── Section 3: Zone B — This Week Feed ─────
+                          Green per spec. Client-facing items that the
+                          portal renders. Status toggle (pending/done)
+                          updates the portal in real-time. */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone B · This Week (client-facing)</p>
+                          <p className="text-xs text-emerald-800/80">
+                            Drives the portal's "This Week" card · Toggle status as work completes
+                          </p>
                         </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-cream-100 w-auto px-2" onClick={() => openWeeklyForm(update)}><Edit className="h-4 w-4 text-ink-warm-700" /></Button>
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingWeeklyId(update.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
+
+                        {weeklyV2ThisWeekFeed.length === 0 && (
+                          <p className="text-xs text-emerald-800/70 italic">No items yet. Add 3–5 client-friendly bullets.</p>
+                        )}
+
+                        <div className="space-y-2">
+                          {weeklyV2ThisWeekFeed.map((item, idx) => (
+                            <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-white border border-emerald-200 rounded-md p-2">
+                              {/* Status dot + click-to-toggle */}
+                              <button
+                                type="button"
+                                className="col-span-1 flex items-center justify-center h-7"
+                                onClick={() => contextModalClient && toggleThisWeekItemStatus(contextModalClient.id, item.id)}
+                                title={item.status === 'done' ? 'Mark pending' : 'Mark done'}
+                              >
+                                <span className={`h-2.5 w-2.5 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                              </button>
+                              <Input
+                                value={item.text}
+                                onChange={(e) => {
+                                  const next = [...weeklyV2ThisWeekFeed];
+                                  next[idx] = { ...item, text: e.target.value };
+                                  setWeeklyV2ThisWeekFeed(next);
+                                }}
+                                onBlur={() => contextModalClient && saveWeeklyV2(contextModalClient.id, weeklyV2Week, { this_week_feed: weeklyV2ThisWeekFeed })}
+                                placeholder="Client-friendly item (e.g. Content Brief 2 shipping to creators)"
+                                className="focus-brand col-span-8 h-8 text-sm"
+                              />
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start">
+                                    <CalendarIcon className="mr-1 h-3 w-3" />
+                                    {item.date
+                                      ? new Date(item.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                      : 'Date'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={item.date ? new Date(item.date + 'T00:00:00') : undefined}
+                                    onSelect={(date) => {
+                                      const next = [...weeklyV2ThisWeekFeed];
+                                      next[idx] = { ...item, date: date ? formatLocalYMD(date) : null };
+                                      setWeeklyV2ThisWeekFeed(next);
+                                      if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { this_week_feed: next });
+                                    }}
+                                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="col-span-1 h-8 w-8 p-0 text-ink-warm-400 hover:text-rose-600"
+                                onClick={() => {
+                                  const next = weeklyV2ThisWeekFeed.filter(it => it.id !== item.id);
+                                  setWeeklyV2ThisWeekFeed(next);
+                                  if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { this_week_feed: next });
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
                         </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
+                          onClick={() => {
+                            const today = formatLocalYMD(new Date());
+                            setWeeklyV2ThisWeekFeed([
+                              ...weeklyV2ThisWeekFeed,
+                              { id: localId(), text: '', date: today, status: 'pending' },
+                            ]);
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add item
+                        </Button>
+                      </div>
+
+                      {/* ─── Section 4: Zone C — Top Post Review ────
+                          Auto-pick by default, with an override picker
+                          for the CM to pin a specific post if the
+                          auto-pick isn't the best representative of
+                          the week. Pinned id is saved on
+                          top_post_override; the portal reads it and
+                          swaps in that post when rendering. */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone C · Top Post (client-facing)</p>
+                            <p className="text-xs text-emerald-800/80">
+                              {weeklyV2Row?.top_post_override
+                                ? 'Pinned post — overrides the auto-pick on the portal.'
+                                : 'Auto-selected by Content Dashboard (highest engagement).'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-8 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
+                              onClick={() => {
+                                if (!contextModalClient) return;
+                                setTopPostPickerOpen(true);
+                                fetchTopPostCandidates(contextModalClient.id);
+                              }}
+                            >
+                              {weeklyV2Row?.top_post_override ? 'Change pinned post' : 'Pin a different post'}
+                            </Button>
+                            {weeklyV2Row?.top_post_override && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs h-8 text-emerald-900 hover:bg-emerald-100"
+                                onClick={() => contextModalClient && clearTopPostOverride(contextModalClient.id)}
+                              >
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {weeklyV2Row?.top_post_override && (
+                          <div className="bg-white border border-emerald-200 rounded-md p-2 text-xs text-emerald-900">
+                            <span className="font-medium">Pinned content_id:</span>{' '}
+                            <span className="font-mono text-[11px] text-emerald-700">{weeklyV2Row.top_post_override.content_id}</span>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
                 </div>
-              ))}
-              {weeklyModalClient && (!clientWeeklyUpdates[weeklyModalClient.id] || clientWeeklyUpdates[weeklyModalClient.id].length === 0) && !isWeeklyFormOpen && (
-                <p className="text-sm text-ink-warm-500 text-center py-4">No weekly updates yet.</p>
-              )}
-            </div>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
+
       </div>
     </ProtectedRoute>
   );

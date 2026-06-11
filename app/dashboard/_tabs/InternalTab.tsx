@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Users, ListTodo, AlertCircle, CheckCircle2, Flame, Compass, Sparkles, ClipboardCheck,
+  Users, ListTodo, AlertCircle, CheckCircle2, Flame, Compass, ClipboardCheck,
 } from 'lucide-react';
 
 type WorkloadRow = { id: string | null; name: string; photo: string | null; open: number; overdue: number };
@@ -29,8 +29,11 @@ type Initiative = {
   id: string;
   name: string;
   owner_user_id: string | null;
+  owner_name: string | null;
   category_tags: string[];
   daysIdle: number;
+  updated_at: string | null;
+  linkedTaskCount: number;
   tone: 'red' | 'amber' | 'fresh';
 };
 type AdHocTask = {
@@ -177,22 +180,17 @@ export default function InternalTab() {
       <div className="space-y-4">
         <SectionHeader label="Overview" dot="brand" counter="01 — KPIs · Live" first />
 
-        {/* KPI strip — v11: shorter labels (no wrap on tighter cards),
-            5 columns only at lg+; sm/md fall back to 2 then 3 columns. */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <KpiCard
-            icon={Users}
-            label="Clients"
-            value={data.kpis.activeStandardClients}
-            sub="standard"
-            accent="brand"
-            topAccent
-          />
+        {/* [2026-06-11] KPI row realigned to spec § 3.1 exactly:
+            Active Tasks (to-do) | Overdue | Completed (7d) | Completion Rate (7d).
+            Dropped the "Clients" card — that count lives on the Client tab
+            via the Health table's row count + ad-hoc side list. Promoted
+            "Completed this week" from a sub-line on Tasks to its own card. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard
             icon={ListTodo}
-            label="Tasks"
+            label="Active Tasks"
             value={data.kpis.openTasks}
-            sub={`${data.kpis.completedThisWeek} done this wk`}
+            sub="to-do"
             accent="sky"
             topAccent
           />
@@ -206,18 +204,18 @@ export default function InternalTab() {
           />
           <KpiCard
             icon={CheckCircle2}
-            label="Completion"
-            value={`${data.kpis.completionRate}%`}
+            label="Completed (7d)"
+            value={data.kpis.completedThisWeek}
             sub="this week"
             accent="emerald"
             topAccent
           />
           <KpiCard
-            icon={Sparkles}
-            label="Ad-hoc"
-            value={data.adHocWork.recentCount}
-            sub="open"
-            accent="purple"
+            icon={Compass}
+            label="Completion Rate (7d)"
+            value={`${data.kpis.completionRate}%`}
+            sub="completed / total"
+            accent="brand"
             topAccent
           />
         </div>
@@ -380,9 +378,14 @@ export default function InternalTab() {
 
       {/* ── 03 Strategy ─────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionHeader label="Strategy" dot="violet" counter="03 — Initiatives · Ad-hoc work" />
+        <SectionHeader label="Strategy" dot="violet" counter="03 — Initiatives" />
 
-      {/* Initiatives */}
+      {/* Initiatives — card grid per mockup. Each card shows name + tone
+          status badge, owner + updated date, linked task count chip,
+          and free-form category tag chips. Click navigates to /initiatives
+          (the admin page) since cards on the dashboard are read-only.
+          Stale (amber/red) cards get a colored top accent rail so the
+          eye lands on them in a dense grid. */}
       <Card className="border-cream-200 overflow-hidden">
         <CardHeaderEditorial
           icon={Compass}
@@ -399,74 +402,61 @@ export default function InternalTab() {
             />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Initiative</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Tags</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Days idle</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.initiatives.map(i => (
-                <TableRow key={i.id} className="border-cream-100 row-accent cursor-pointer">
-                  <TableCell className="py-3.5 px-5 font-medium text-ink-warm-900">{i.name}</TableCell>
-                  <TableCell className="py-3.5 px-5 text-xs text-ink-warm-700">
-                    {i.category_tags.length > 0 ? i.category_tags.join(', ') : <span className="text-ink-warm-400">—</span>}
-                  </TableCell>
-                  <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{i.daysIdle}d</TableCell>
-                  <TableCell className="py-3.5 px-5">
-                    <StatusBadge tone={initiativeTone[i.tone]} size="sm" bordered withDot>{initiativeLabel[i.tone]}</StatusBadge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
-
-      {/* Ad-hoc work */}
-      <Card className="border-cream-200 overflow-hidden">
-        <CardHeaderEditorial
-          icon={Sparkles}
-          iconClassName="text-purple-500"
-          title="Ad-Hoc Work"
-          subtitle={`Unplanned · ${data.adHocWork.recentCount} recent`}
-        />
-
-        {data.adHocWork.recent.length === 0 ? (
-          <div className="p-8">
-            <EmptyState
-              icon={Sparkles}
-              title="No ad-hoc work logged"
-              description="When fires come in, flag them as ad-hoc to surface here."
-            />
-          </div>
-        ) : (
-          <ul className="divide-y divide-cream-100">
-            {data.adHocWork.recent.map(t => (
-              <li key={t.id} className="px-4 py-3 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-ink-warm-900 truncate">{t.name}</div>
-                  <div className="text-xs text-ink-warm-500 mt-0.5">
-                    {t.assignee ?? 'Unassigned'}
-                    {t.due_date ? <span className="ml-2">· due {t.due_date}</span> : null}
-                  </div>
-                </div>
-                <StatusBadge
-                  tone={t.status === 'complete' ? 'success' : t.status === 'in_progress' ? 'info' : 'neutral'}
-                  size="sm"
-                  bordered
-                  withDot
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {data.initiatives.map(i => {
+              const accentRail =
+                i.tone === 'red' ? 'before:bg-rose-400' :
+                i.tone === 'amber' ? 'before:bg-amber-400' :
+                'before:bg-transparent';
+              const updatedLabel = i.updated_at
+                ? formatRelativeDays(i.updated_at)
+                : 'Never updated';
+              return (
+                <Link
+                  key={i.id}
+                  href="/initiatives"
+                  className={`group relative bg-white border border-cream-200 rounded-lg p-3 hover:border-brand/40 hover:shadow-sm transition-all before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:rounded-t-lg ${accentRail}`}
                 >
-                  {t.status.replace(/_/g, ' ')}
-                </StatusBadge>
-              </li>
-            ))}
-          </ul>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <p className="text-sm font-semibold text-ink-warm-900 group-hover:text-brand transition-colors truncate flex-1">
+                      {i.name}
+                    </p>
+                    <StatusBadge tone={initiativeTone[i.tone]} size="sm">
+                      {i.tone === 'fresh' ? 'Active' : `Stale ${i.daysIdle}d`}
+                    </StatusBadge>
+                  </div>
+                  <p className="text-[11px] text-ink-warm-500 mb-2">
+                    {i.owner_name ? <span className="font-medium text-ink-warm-700">{i.owner_name}</span> : 'Unassigned'}
+                    {' · '}
+                    Updated {updatedLabel}
+                  </p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 font-medium">
+                      {i.linkedTaskCount} task{i.linkedTaskCount === 1 ? '' : 's'} linked
+                    </span>
+                    {i.category_tags.map(t => (
+                      <span
+                        key={t}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-cream-50 text-ink-warm-500 border border-cream-200"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
       </Card>
+
+      {/* Ad-Hoc Work card removed 2026-06-08 per Andy — the team
+          wasn't actively flagging tasks as ad-hoc so the card
+          consistently rendered empty. AdHocTask type + the
+          `adHocWork` field on DashboardData stay in place because
+          /api/dashboard/internal still returns them; revive the
+          surfaces above + restore this Card block to bring the
+          feature back. */}
       </div>
     </div>
   );
@@ -499,4 +489,23 @@ function InternalTabSkeleton() {
       </div>
     </div>
   );
+}
+
+/**
+ * Humane "Updated Nd ago" / "Updated 3w ago" relative-time string for
+ * the initiative card grid. Avoids pulling a full date library for one
+ * cosmetic helper. Caps at days < 14, then weeks; the actual stale-tone
+ * logic that matters lives in the API.
+ */
+function formatRelativeDays(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return 'just now';
+  const days = Math.floor(ms / 86_400_000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }

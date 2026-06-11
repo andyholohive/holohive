@@ -12,7 +12,8 @@
  * stale clock starts ticking on edit).
  */
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,11 +31,23 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { useToast } from '@/hooks/use-toast';
-import { Compass, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-react';
+import { Compass, Plus, Edit, Trash2, MoreHorizontal, Bug, FileCheck2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
+import BacklogTab from './_tabs/BacklogTab';
+import SpecsTab from './_tabs/SpecsTab';
+
+// Backlog Tab landed 2026-06-09 per the HHP Backlog Tab spec (Jdot).
+// Two tabs in the Initiatives space — Initiatives keeps its existing
+// behavior (this file's contents below); Backlog is its own component
+// inside _tabs/. URL state syncs via ?tab= so links + back-button work.
+type SpaceTab = 'initiatives' | 'backlog' | 'specs';
+const VALID_TABS: readonly SpaceTab[] = ['initiatives', 'backlog', 'specs'] as const;
+const isValidTab = (s: string | null): s is SpaceTab =>
+  !!s && (VALID_TABS as readonly string[]).includes(s);
 
 type Status = 'active' | 'completed' | 'parked';
 
@@ -56,15 +69,80 @@ const statusTone: Record<Status, BadgeTone> = {
   parked: 'neutral',
 };
 
+// Title Case display labels for the status pill — DB stores lowercase
+// (matches the Status type union); the pill on /initiatives now shows
+// the capitalized form for visual consistency with the Select options
+// in the edit dialog and with how status pills read across the rest
+// of the v11 surface. 2026-06-08.
+const statusLabel: Record<Status, string> = {
+  active: 'Active',
+  completed: 'Completed',
+  parked: 'Parked',
+};
+
 function staleTone(updatedAt: string): { tone: BadgeTone; label: string } {
+  // Label is just "Xd" — the badge tone (rose / amber / emerald) already
+  // encodes the stale / idle / fresh dimension visually, so the extra
+  // word was redundant noise. Thresholds (30d red, 14d amber) unchanged.
   const days = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 86_400_000);
-  if (days >= 30) return { tone: 'danger', label: `${days}d stale` };
-  if (days >= 14) return { tone: 'warning', label: `${days}d idle` };
-  return { tone: 'success', label: `${days}d fresh` };
+  const label = `${days}d`;
+  if (days >= 30) return { tone: 'danger', label };
+  if (days >= 14) return { tone: 'warning', label };
+  return { tone: 'success', label };
 }
 
+// Wrapper so we can hold the Suspense boundary required by
+// useSearchParams in the App Router. The page itself just renders
+// PageHeader + Tabs + the tab body; both tabs lazy-mount.
 export default function InitiativesPage() {
+  return (
+    <Suspense fallback={<InitiativesPageSkeleton />}>
+      <InitiativesPageInner />
+    </Suspense>
+  );
+}
+
+function InitiativesPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={Compass}
+        title="Initiatives"
+        subtitle="Strategic threads the team owns. Drives the dashboard's Initiative Tracker."
+        kicker="Operations · Strategy"
+        kickerDot="violet"
+      />
+      <Skeleton className="h-10 w-[280px] rounded-md" />
+      <Skeleton className="h-64 rounded-lg" />
+    </div>
+  );
+}
+
+function InitiativesPageInner() {
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // ─── Tab state with URL sync ────────────────────────────────────
+  // Default to 'initiatives' on first visit, but respect ?tab= so
+  // deep links and back-button work. Only read URL once on mount;
+  // changing the tab in-page does a router.replace which would
+  // re-trigger this effect → infinite loop. Same pattern as
+  // /dashboard.
+  const [tab, setTab] = useState<SpaceTab>('initiatives');
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    if (isValidTab(urlTab)) setTab(urlTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const handleTabChange = (next: string) => {
+    if (!isValidTab(next)) return;
+    setTab(next);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', next);
+    router.replace(`/initiatives?${params.toString()}`, { scroll: false });
+  };
+
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,20 +253,49 @@ export default function InitiativesPage() {
       <PageHeader
         icon={Compass}
         title="Initiatives"
-        subtitle="Strategic threads the team owns. Drives the dashboard's Initiative Tracker."
+        subtitle="Strategic threads + HHP backlog. Initiatives drive the dashboard's Initiative Tracker; Backlog captures bugs & requests."
         kicker="Operations · Strategy"
         kickerDot="violet"
-        actions={(
+        actions={tab === 'initiatives' ? (
           <Button variant="brand" size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />New initiative
           </Button>
-        )}
+        ) : undefined}
       />
 
-      {loading ? (
-        <Skeleton className="h-64 rounded-lg" />
-      ) : (
-        <Card className="border-cream-200 overflow-hidden">
+      {/* Tab strip — page-level tabs (not popup), so v11 chrome with
+          border-cream-200 outer + brand active text + count-pill
+          conventions matches /clients and /dashboard. */}
+      <Tabs value={tab} onValueChange={handleTabChange}>
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+          <TabsTrigger
+            value="initiatives"
+            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm font-medium px-4 py-2 text-ink-warm-500 flex items-center gap-1.5"
+          >
+            <Compass className="h-4 w-4" />
+            Initiatives
+          </TabsTrigger>
+          <TabsTrigger
+            value="backlog"
+            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm font-medium px-4 py-2 text-ink-warm-500 flex items-center gap-1.5"
+          >
+            <Bug className="h-4 w-4" />
+            Backlog
+          </TabsTrigger>
+          <TabsTrigger
+            value="specs"
+            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm font-medium px-4 py-2 text-ink-warm-500 flex items-center gap-1.5"
+          >
+            <FileCheck2 className="h-4 w-4" />
+            Specs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="initiatives" className="mt-4">
+          {loading ? (
+            <Skeleton className="h-64 rounded-lg" />
+          ) : (
+            <Card className="border-cream-200 overflow-hidden">
           <div className="p-4 border-b border-cream-100 flex items-center gap-2 flex-wrap">
             <Select value={statusFilter} onValueChange={v => setStatusFilter(v as Status | 'all')}>
               <SelectTrigger className="h-9 w-40 focus-brand">
@@ -245,7 +352,7 @@ export default function InitiativesPage() {
                           : <span className="text-ink-warm-400">—</span>}
                       </TableCell>
                       <TableCell className="py-3">
-                        <StatusBadge tone={statusTone[i.status]} size="sm" bordered withDot>{i.status}</StatusBadge>
+                        <StatusBadge tone={statusTone[i.status]} size="sm" bordered withDot>{statusLabel[i.status]}</StatusBadge>
                       </TableCell>
                       <TableCell className="py-3">
                         <StatusBadge tone={stale.tone} size="sm" bordered withDot={stale.tone === 'danger' ? 'pulse' : true}>{stale.label}</StatusBadge>
@@ -284,8 +391,17 @@ export default function InitiativesPage() {
               </TableBody>
             </Table>
           )}
-        </Card>
-      )}
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="backlog" className="mt-4">
+          <BacklogTab />
+        </TabsContent>
+        <TabsContent value="specs" className="mt-4">
+          <SpecsTab />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="sm:max-w-md">

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -284,21 +285,27 @@ export default function ArchivePage() {
   const counts = getCounts();
 
   const CardSkeleton = () => (
-    <Card className="transition-shadow">
+    <Card className="border-cream-200">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center">
+        <div className="mb-3">
+          <div className="flex items-center mb-2">
             <Skeleton className="h-8 w-8 rounded-lg mr-2" />
             <Skeleton className="h-5 w-40" />
           </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
         </div>
-        <Skeleton className="h-4 w-32 mb-2" />
-        <Skeleton className="h-4 w-24" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-44" />
+        </div>
       </CardHeader>
       <CardContent className="pt-4 border-t border-cream-100">
         <div className="flex gap-2">
-          <Skeleton className="h-8 w-full rounded" />
-          <Skeleton className="h-8 w-full rounded" />
+          <Skeleton className="h-8 w-full rounded-md" />
+          <Skeleton className="h-8 w-full rounded-md" />
         </div>
       </CardContent>
     </Card>
@@ -310,10 +317,17 @@ export default function ArchivePage() {
         <PageHeader
           icon={ArchiveIcon}
           title="Archive"
-          subtitle="Manage archived items - restore or permanently delete"
+          subtitle="Manage archived items — restore or permanently delete"
           kicker="Admin · Archive"
           kickerDot="brand"
         />
+        {/* Filter row skeleton — mirrors the loaded layout (tab strip on
+            the left, search input on the right) so title + filter row
+            don't shift when data lands. */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <Skeleton className="h-10 w-[520px] max-w-full rounded-md" />
+          <Skeleton className="h-9 w-full max-w-sm rounded-md" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <CardSkeleton key={index} />
@@ -328,19 +342,67 @@ export default function ArchivePage() {
       <PageHeader
         icon={ArchiveIcon}
         title="Archive"
-        subtitle="Manage archived items - restore or permanently delete"
+        subtitle="Manage archived items — restore or permanently delete"
         kicker="Admin · Archive"
         kickerDot="brand"
       />
 
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
+      {/* Filter row — tab strip on the left, search on the right. Same
+          pattern as /clients so the page reads like a peer admin view
+          rather than a one-off layout. The Tabs component wraps both
+          its TabsList and TabsContent so the active-tab state plumbing
+          stays intact. */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
+            <TabsTrigger
+              value="clients"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card text-sm font-medium px-3 py-2 text-ink-warm-500 flex items-center gap-1.5"
+            >
+              <Users className="h-4 w-4" />
+              Clients
+              <span className="ml-1 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{counts.clients}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="lists"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card text-sm font-medium px-3 py-2 text-ink-warm-500 flex items-center gap-1.5"
+            >
+              <List className="h-4 w-4" />
+              Lists
+              <span className="ml-1 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{counts.lists}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="campaigns"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card text-sm font-medium px-3 py-2 text-ink-warm-500 flex items-center gap-1.5"
+            >
+              <Megaphone className="h-4 w-4" />
+              Campaigns
+              <span className="ml-1 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{counts.campaigns}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="forms"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card text-sm font-medium px-3 py-2 text-ink-warm-500 flex items-center gap-1.5"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Forms
+              <span className="ml-1 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{counts.forms}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="kols"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card text-sm font-medium px-3 py-2 text-ink-warm-500 flex items-center gap-1.5"
+            >
+              <Crown className="h-4 w-4" />
+              KOLs
+              <span className="ml-1 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{counts.kols}</span>
+            </TabsTrigger>
+          </TabsList>
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
             <Input
               placeholder="Search archived items..."
@@ -350,45 +412,6 @@ export default function ArchivePage() {
             />
           </div>
         </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="clients" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Clients
-              {counts.clients > 0 && (
-                <Badge variant="secondary" className="ml-1">{counts.clients}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="lists" className="flex items-center gap-2">
-              <List className="h-4 w-4" />
-              Lists
-              {counts.lists > 0 && (
-                <Badge variant="secondary" className="ml-1">{counts.lists}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="campaigns" className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4" />
-              Campaigns
-              {counts.campaigns > 0 && (
-                <Badge variant="secondary" className="ml-1">{counts.campaigns}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="forms" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Forms
-              {counts.forms > 0 && (
-                <Badge variant="secondary" className="ml-1">{counts.forms}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="kols" className="flex items-center gap-2">
-              <Crown className="h-4 w-4" />
-              KOLs
-              {counts.kols > 0 && (
-                <Badge variant="secondary" className="ml-1">{counts.kols}</Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
 
           {/* Clients Tab */}
           <TabsContent value="clients">
@@ -654,7 +677,7 @@ function ArchivedItemCard({
   onDelete,
 }: ArchivedItemCardProps) {
   return (
-    <Card className="transition-shadow">
+    <Card className="border-cream-200 transition-shadow">
       <CardHeader className="pb-4">
         <div className="mb-3">
           <div className="flex items-center text-lg font-semibold text-ink-warm-700 mb-2">
@@ -664,9 +687,13 @@ function ArchivedItemCard({
             {name}
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+            {/* "Archived" lives in the 9-tone palette as `warning` (amber)
+                via StatusBadge — keeps the badge style identical to every
+                other status pill in the app and stops the orange-100 /
+                orange-800 colors that drifted outside the palette. */}
+            <StatusBadge tone="warning" size="sm" bordered withDot>
               Archived
-            </Badge>
+            </StatusBadge>
             {extraBadges}
           </div>
         </div>
@@ -689,10 +716,15 @@ function ArchivedItemCard({
             <RotateCcw className="h-4 w-4 mr-2" />
             Restore
           </Button>
+          {/* Destructive secondary button — rose-* border + text per the
+              CLAUDE.md convention. Full `variant="destructive"` is
+              reserved for the modal's confirm action (where it really
+              is the primary destructive intent); here we want "yes,
+              this is destructive, but you still have to confirm." */}
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-rose-600 hover:bg-rose-50"
+            className="w-full border-rose-300 text-rose-600 hover:bg-rose-50"
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4 mr-2" />

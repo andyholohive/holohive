@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { createClient } from '@supabase/supabase-js';
-import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,10 +31,102 @@ type Campaign = {
   created_at: string;
   client_id: string;
   client_name?: string | null;
+  // Section 3.1 of HHP Campaign Dashboard Spec: client logo replaces
+  // the generic megaphone icon in the slim hero. Pulled via the
+  // clients FK join.
+  client_logo_url?: string | null;
   budget_allocations?: { id: string; region: string; allocated_budget: number }[];
   share_creator_type?: boolean | null;
   share_kol_notes?: boolean | null;
   share_content_notes?: boolean | null;
+  // Section 9 — showcase mode. When the page is opened with a
+  // matching ?showcase=<token> URL param and showcase_enabled is true,
+  // the email gate is bypassed and showcase_config masks render
+  // accordingly. The token IS the auth; revocation = clearing it.
+  showcase_enabled?: boolean;
+  showcase_token?: string | null;
+  showcase_config?: ShowcaseConfig | null;
+};
+
+type ShowcaseConfig = {
+  hide_client_identity?: boolean;
+  hide_kol_handles?: boolean;
+  hide_budget?: boolean;
+  hide_notes?: boolean;
+};
+
+/**
+ * Section 4 — Activation Results data shape.
+ *
+ * The snapshot itself is just metadata + 5 JSONB blobs; the UI
+ * components render only when their corresponding blob is present.
+ * The blob shapes are intentionally loose — the activation portal
+ * spec hasn't pinned them yet, and the Fogo-style components only
+ * read a handful of well-named keys (entries, participants, etc.)
+ * so the contract is forgiving.
+ */
+type ActivationSnapshot = {
+  id: string;
+  campaign_id: string;
+  activation_name: string | null;
+  activation_type: string | null;
+  status: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  // Section 4.2 endpoint blobs.
+  summary_json: SummaryBlob | null;
+  entries_daily_json: EntriesDailyBlob | null;
+  entries_by_kol_json: EntriesByKolBlob | null;
+  clicks_json: ClicksBlob | null;
+  ugc_json: UgcBlob | null;
+  synced_at: string;
+};
+
+type SummaryBlob = {
+  // KPI headlines — every key is optional; the UI renders cards
+  // for whichever ones are present.
+  total_entries?: number;
+  unique_participants?: number;
+  kols_activated?: number;
+  wallets_registered?: number;
+  cards_minted?: number;
+  frames_created?: number;
+  // For sublabel context lines like "60% of registered wallets".
+  context_sublabels?: Record<string, string>;
+  // Section 4.1 hero meta — duplicates the top-level columns but
+  // some portals nest them inside summary.
+  target_market?: string;
+  // Section 4.1 Points/Prizes block.
+  prize_pool?: string | number;
+  draw_structure?: string;
+  points_by_source?: Array<{ source: string; points: number }>;
+};
+type EntriesDailyBlob = Array<{ date: string; entries: number }>;
+type EntriesByKolBlob = Array<{
+  // Either kol_id or label is enough — kol_id lets us map to the
+  // campaign_kols table for masked names, label is the portal's
+  // pre-baked display name.
+  kol_id?: string;
+  label?: string;
+  entries: number;
+}>;
+type ClicksBlob = {
+  by_protocol?: Array<{ protocol: string; clicks: number }>;
+  by_source?: Array<{ source: string; clicks: number }>;
+  total_referrals?: number;
+};
+type UgcBlob = {
+  posts_approved?: number;
+  creators?: number;
+  approval_rate?: number;
+  views?: number;
+  top_post?: {
+    creator_label?: string;
+    snippet?: string;
+    views?: number;
+    likes?: number;
+    link?: string;
+  };
 };
 
 type CampaignKOL = {
@@ -44,6 +136,10 @@ type CampaignKOL = {
   allocated_budget: number | null;
   budget_type: string | null;
   notes: string | null;
+  // Section 5.2 — approved client-facing one-line bio per KOL per
+  // campaign. NULL = team hasn't reviewed yet → column hides until
+  // approved.
+  profile_note: string | null;
   master_kol: {
     id: string;
     name: string;
@@ -70,6 +166,25 @@ type ContentItem = {
   comments: number | null;
   bookmarks: number | null;
   notes: string | null;
+  // Section 3.1: drives the page-footer "Data as of …" snapshot
+  // line. Picked as the max across rendered content so the stamp
+  // reflects when the most recent metric pull landed.
+  updated_at?: string | null;
+  // [Spec 7.5] Tag assignments joined via content_tag_assignments.
+  // The public page renders client-visibility tags as inline badges
+  // before the Notes text; internal tags are filtered out at render.
+  content_tag_assignments?: Array<{
+    id: string;
+    sequence_n: number | null;
+    sequence_of: number | null;
+    multipost_group_id: string | null;
+    tag: {
+      id: string;
+      name: string;
+      visibility: 'client' | 'internal';
+      color: string | null;
+    } | null;
+  }> | null;
 };
 
 const formatDate = (dateString: string) =>
@@ -114,20 +229,27 @@ const getRegionIcon = (region: string) => {
 
 const getCreatorTypeColor = (creatorType: string) => {
   const colorMap: { [key: string]: string } = {
-    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-    'Drama-Forward': 'bg-rose-100 text-rose-800',
-    'Skeptic': 'bg-orange-100 text-orange-800',
-    'Educator': 'bg-blue-100 text-blue-800',
-    'Bridge Builder': 'bg-emerald-100 text-emerald-800',
+    // ─── Spec types (HHP Creator Taxonomy Spec, 2026-05) ───
+    'Native':    'bg-orange-100 text-orange-800',
+    'Scout':     'bg-sky-100 text-sky-800',
+    'Tracker':   'bg-slate-100 text-slate-800',
+    'Analyst':   'bg-cyan-100 text-cyan-800',
+    'Educator':  'bg-blue-100 text-blue-800',
     'Visionary': 'bg-indigo-100 text-indigo-800',
     'Onboarder': 'bg-teal-100 text-teal-800',
-    'General': 'bg-gray-100 text-gray-800',
-    'Gaming': 'bg-pink-100 text-pink-800',
-    'Crypto': 'bg-yellow-100 text-yellow-800',
+    'Curator':   'bg-lime-100 text-lime-800',
+    // ─── Legacy values (kept for backward-compat) ───
+    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+    'Drama-Forward':  'bg-rose-100 text-rose-800',
+    'Skeptic':        'bg-orange-100 text-orange-800',
+    'Bridge Builder': 'bg-emerald-100 text-emerald-800',
+    'General':  'bg-gray-100 text-gray-800',
+    'Gaming':   'bg-pink-100 text-pink-800',
+    'Crypto':   'bg-yellow-100 text-yellow-800',
     'Memecoin': 'bg-orange-100 text-orange-800',
-    'NFT': 'bg-purple-100 text-purple-800',
-    'Trading': 'bg-emerald-100 text-emerald-800',
-    'AI': 'bg-blue-100 text-blue-800',
+    'NFT':      'bg-purple-100 text-purple-800',
+    'Trading':  'bg-emerald-100 text-emerald-800',
+    'AI':       'bg-blue-100 text-blue-800',
   };
   return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
 };
@@ -216,11 +338,48 @@ const getStatusBadge = (status: string) => {
 
 export default function PublicCampaignPage({ params }: { params: { id: string } }) {
   const campaignId = params.id;
+  // Showcase mode — Spec section 9. Detect ?showcase=<token> in the URL
+  // on mount so we can fetch the campaign by token instead of by id/slug
+  // and skip the email gate. Captured once via window.location so the
+  // page-level Suspense boundary isn't required (no useSearchParams).
+  const [showcaseToken, setShowcaseToken] = useState<string | null>(null);
+  const [showcaseActive, setShowcaseActive] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('showcase');
+    if (t) setShowcaseToken(t);
+  }, []);
+
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [kols, setKols] = useState<CampaignKOL[]>([]);
   const [contents, setContents] = useState<ContentItem[]>([]);
+  // Section 4 — most recent activation snapshot for this campaign.
+  // The Activation Results UI renders only when this is non-null.
+  // Missing column (legacy DB) or no row both yield null; the UI
+  // section just doesn't render and nothing in the rest of the
+  // page depends on this state.
+  const [activation, setActivation] = useState<ActivationSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Showcase masking helpers. Centralized so the spec's per-flag
+  // behavior reads the same wherever it's applied. When the page
+  // isn't in showcase mode (typical path), every getter returns the
+  // real value. Spec section 9 — defaults to all-hidden so the first
+  // share never leaks anything sensitive.
+  const cfg: ShowcaseConfig | null = showcaseActive ? (campaign?.showcase_config || null) : null;
+  const mask = {
+    clientIdentity: !!cfg?.hide_client_identity,
+    kolHandles:     !!cfg?.hide_kol_handles,
+    budget:         !!cfg?.hide_budget,
+    notes:          !!cfg?.hide_notes,
+  };
+  const maskedKolName = (originalName: string, idx: number): string =>
+    mask.kolHandles ? `KOL #${idx + 1}` : originalName;
+  // Effective notes visibility — share_content_notes is the team's
+  // intent ("show notes to the client"), masked to false when
+  // showcase mode hides notes (Section 9 default).
+  const notesVisible = !!campaign?.share_content_notes && !mask.notes;
+
   const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'cards'>('table');
   const [contentViewMode, setContentViewMode] = useState<'table' | 'overview'>('table');
   const [email, setEmail] = useState('');
@@ -711,13 +870,23 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       setLoading(true);
       setError(null);
 
-      // Campaign
+      // Campaign — supports three lookup paths:
+      //   1. ?showcase=<token> present → look up by showcase_token,
+      //      requires showcase_enabled = true (Spec section 9)
+      //   2. UUID-shaped path id → look up by id
+      //   3. Otherwise → look up by slug
+      // Showcase wins so a campaign can be both publicly-shared AND
+      // showcase-linked without the email gate.
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
       let campaignQuery = supabasePublic
         .from('campaigns')
-        .select(`*, clients!campaigns_client_id_fkey(name), campaign_budget_allocations(*)`);
+        .select(`*, clients!campaigns_client_id_fkey(name, logo_url), campaign_budget_allocations(*)`);
 
-      if (isUUID) {
+      if (showcaseToken) {
+        campaignQuery = campaignQuery
+          .eq('showcase_token', showcaseToken)
+          .eq('showcase_enabled', true);
+      } else if (isUUID) {
         campaignQuery = campaignQuery.eq('id', campaignId);
       } else {
         campaignQuery = campaignQuery.eq('slug', campaignId);
@@ -759,12 +928,26 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         created_at: campaignData.created_at,
         client_id: campaignData.client_id,
         client_name: (campaignData.clients as any)?.name || null,
+        client_logo_url: (campaignData.clients as any)?.logo_url || null,
         budget_allocations: (campaignData.campaign_budget_allocations || []).map((b: any) => ({ id: b.id, region: b.region, allocated_budget: b.allocated_budget })),
         share_creator_type: campaignData.share_creator_type || false,
         share_kol_notes: campaignData.share_kol_notes || false,
         share_content_notes: (campaignData as any).share_content_notes || false,
+        // Showcase (Section 9) — only carry through when a token
+        // matched on this fetch. The masking logic below uses
+        // showcaseActive to decide whether to apply showcase_config.
+        showcase_enabled: (campaignData as any).showcase_enabled || false,
+        showcase_token: (campaignData as any).showcase_token || null,
+        showcase_config: (campaignData as any).showcase_config || null,
       };
       setCampaign(normalizedCampaign);
+      // If we reached this row via a matching showcase_token, the
+      // token itself is the auth — skip the email gate and mark the
+      // page as in-showcase so downstream masks apply.
+      if (showcaseToken && normalizedCampaign.showcase_token === showcaseToken) {
+        setShowcaseActive(true);
+        setIsAuthenticated(true);
+      }
 
       // KOLs - don't fail the whole page if this fails
       // Use the actual campaign UUID, not the slug from URL
@@ -772,7 +955,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       try {
         const { data: kolData, error: kolError } = await supabasePublic
           .from('campaign_kols')
-          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
+          // Section 5: profile_note is the approved client-facing
+          // one-line bio per KOL per campaign. Different from notes
+          // (internal/team) and from master_kol.notes (per-KOL global).
+          // Renders as a new "Profile" column on the KOL Dashboard.
+          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, profile_note, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
           .eq('campaign_id', actualCampaignId)
           .or('hidden.is.null,hidden.eq.false')
           .order('created_at', { ascending: false });
@@ -788,14 +975,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         setKols([]);
       }
 
-      // Contents - don't fail the whole page if this fails
+      // Contents - don't fail the whole page if this fails.
+      //
+      // [Spec 7.5] We fetch tag assignments + their parent tag rows
+      // inline so the public table can render client-facing badges
+      // without an N+1 lookup. Internal-visibility tags get filtered
+      // client-side so the public page never sees them even though
+      // the joined row is in the payload.
       try {
         const { data: contentData, error: contentError } = await supabasePublic
           .from('contents')
-          .select('*, campaign_kol:campaign_kols(master_kol:master_kols(id, name, link))')
+          .select(`
+            *,
+            campaign_kol:campaign_kols(master_kol:master_kols(id, name, link)),
+            content_tag_assignments(
+              id, sequence_n, sequence_of, multipost_group_id,
+              tag:content_tags(id, name, visibility, color)
+            )
+          `)
           .eq('campaign_id', actualCampaignId)
           .order('created_at', { ascending: false });
-        
+
         if (contentError) {
           console.warn('Contents fetch error:', contentError);
           setContents([]);
@@ -805,6 +1005,29 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       } catch (contentErr) {
         console.warn('Contents fetch failed:', contentErr);
         setContents([]);
+      }
+
+      // Section 4 — most recent activation snapshot for this campaign.
+      // Soft-fail to null: the Activation Results section just won't
+      // render. Logged at warn-level so the rest of the page never
+      // breaks if the table is missing or the row is unparsed.
+      try {
+        const { data: snapData, error: snapErr } = await (supabasePublic as any)
+          .from('activation_snapshots')
+          .select('*')
+          .eq('campaign_id', actualCampaignId)
+          .order('synced_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (snapErr) {
+          console.warn('Activation snapshot fetch error:', snapErr);
+          setActivation(null);
+        } else {
+          setActivation((snapData as ActivationSnapshot | null) || null);
+        }
+      } catch (snapErr) {
+        console.warn('Activation snapshot fetch failed:', snapErr);
+        setActivation(null);
       }
     } catch (e: any) {
       console.error('Unexpected error loading public campaign:', e);
@@ -946,62 +1169,103 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       </div>
 
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-        {/* Title */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="bg-gray-100 p-2 rounded-lg">
-            <Megaphone className="h-6 w-6 text-gray-600" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
-          </div>
-          <div className="ml-auto">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(campaign.status)}`}>
-              {campaign.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Information + Metrics */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <div className={`grid gap-4 ${campaign.budget_allocations && campaign.budget_allocations.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
-            <div className="space-y-3">
-              <div className="flex items-center text-sm text-gray-600">
-                <Building2 className="h-4 w-4 mr-2 text-gray-500" />
-                <span className="text-gray-700">{campaign.client_name || 'Unknown Client'}</span>
+        {/* ─── Slim Hero ─────────────────────────────────────────────
+            HHP Campaign Dashboard Spec section 3. Replaces both the
+            old title row (Megaphone + name + status) and the
+            "Information + Metrics" card. Layout:
+              - Left:  client logo (fallback to letter tile) + campaign name + status
+              - Right: budget · date range on one line
+              - Below: week-of-N progress bar (same math as the portal)
+            Dropped per the spec: description paragraph, KOL count
+            line, standalone Metrics block (budget-per-region). Each
+            of those was either duplicated on the portal or noisy. */}
+        {(() => {
+          // Week math — identical to the portal hero so the two
+          // experiences read in sync.
+          const startMs = campaign.start_date ? new Date(`${campaign.start_date}T00:00:00`).getTime() : null;
+          const endMs = campaign.end_date ? new Date(`${campaign.end_date}T00:00:00`).getTime() : null;
+          const todayMs = Date.now();
+          let weekN = 0, weekOf = 0, progressPct = 0;
+          if (startMs && endMs && endMs > startMs) {
+            const elapsedDays = Math.max(0, Math.floor((todayMs - startMs) / 86_400_000));
+            const totalDays = Math.max(1, Math.ceil((endMs - startMs) / 86_400_000));
+            weekN = Math.min(Math.ceil(elapsedDays / 7), Math.ceil(totalDays / 7));
+            weekOf = Math.ceil(totalDays / 7);
+            progressPct = Math.max(0, Math.min(1, (todayMs - startMs) / (endMs - startMs)));
+          }
+          const initial = (campaign.client_name || campaign.name || 'C').trim().charAt(0).toUpperCase();
+          return (
+            <div className="bg-white rounded-lg shadow-sm border mb-6 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 flex-wrap">
+                {/* Client logo — replaces the old generic Megaphone.
+                    Falls back to a brand-tinted letter tile when no
+                    logo is on the client record. Showcase: replaced
+                    by a generic placeholder when client identity is
+                    masked. */}
+                {mask.clientIdentity ? (
+                  <div className="w-10 h-10 rounded-md flex items-center justify-center bg-gray-100 text-gray-400 shrink-0">
+                    <Megaphone className="h-5 w-5" />
+                  </div>
+                ) : campaign.client_logo_url ? (
+                  <div className="w-10 h-10 rounded-md overflow-hidden border border-gray-200 bg-white shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={campaign.client_logo_url} alt={`${campaign.client_name || 'Client'} logo`} className="w-full h-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded-md flex items-center justify-center text-sm font-bold bg-brand/10 text-brand shrink-0">
+                    {initial}
+                  </div>
+                )}
+                {/* Name + status, takes remaining left-half space.
+                    Showcase: the campaign NAME stays (it's typically
+                    a project codename, not an identity leak); the
+                    client name underneath is what gets masked. */}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-bold text-gray-900 truncate">
+                    {mask.clientIdentity ? 'Confidential campaign' : campaign.name}
+                  </h2>
+                  {!mask.clientIdentity && campaign.client_name && (
+                    <p className="text-xs text-gray-500 truncate">{campaign.client_name}</p>
+                  )}
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadge(campaign.status)}`}>
+                  {campaign.status}
+                </span>
+                {/* Budget + dates. Showcase: budget hidden when the
+                    flag is set; dates always shown (engagement window
+                    isn't sensitive). When budget is hidden and we
+                    still have dates, just show dates without a pipe. */}
+                <div className="text-sm text-gray-700 font-medium shrink-0 whitespace-nowrap">
+                  {!mask.budget && formatCurrency(campaign.total_budget)}
+                  {campaign.start_date && campaign.end_date && (
+                    <>
+                      {!mask.budget && <span className="text-gray-300 mx-2">|</span>}
+                      <span className="text-gray-600">
+                        {formatDate(campaign.start_date)} – {formatDate(campaign.end_date)}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <Users className="h-4 w-4 mr-2 text-gray-500" />
-                <span className="text-gray-700">{kols.length} KOL{kols.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
-                <span className="text-gray-700">{formatCurrency(campaign.total_budget)}</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <CalendarIcon className="h-4 w-4 mr-2 text-gray-500" />
-                <span className="text-gray-700">{formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}</span>
-              </div>
-              {campaign.description && (
-                <div className="text-sm text-gray-700">
-                  <span className="font-medium">Description: </span>
-                  <span>{campaign.description}</span>
+              {/* Week progress bar — only when we have a valid date
+                  range. Thin so it reads as ambient, not a CTA. */}
+              {weekOf > 0 && (
+                <div className="border-t border-gray-100 px-5 py-2.5 bg-gray-50/60">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+                    <span>Week {weekN} of {weekOf}</span>
+                    <span className="tabular-nums">{Math.round(progressPct * 100)}%</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full bg-brand transition-all"
+                      style={{ width: `${Math.round(progressPct * 100)}%` }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
-            {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
-                <div className="flex flex-wrap gap-2">
-                  {campaign.budget_allocations.map((alloc) => (
-                    <span key={alloc.id} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                      {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {formatCurrency(alloc.allocated_budget)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Tabs for KOLs and Contents */}
         <Tabs defaultValue="kols" className="bg-white rounded-lg shadow-sm border">
@@ -1053,318 +1317,176 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   </div>
 
                 {/* Overview View */}
-                {kolViewMode === 'overview' && (
-                  <div className="space-y-6">
-                    {/* Overview Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {/* Total KOLs in Campaign */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <Users className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-gray-600">Total KOLs in Campaign</p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {kols.length}
-                          </div>
-                        </CardContent>
-                      </Card>
+                {/* ─── KOL Performance Leaderboard ─────────────────
+                    HHP Campaign Dashboard Spec section 6. Replaces
+                    the old Overview (4 vanity stats + two degenerate
+                    single-bar charts). The new Overview is built for
+                    the question clients actually ask: "Who's
+                    driving the results?"
 
-                      {/* Average Followers per KOL */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-gray-600">Average Followers per KOL</p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {(() => {
-                              if (kols.length > 0) {
-                                const totalFollowers = kols.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
-                                const average = Math.round(totalFollowers / kols.length);
-                                return formatFollowers(average);
-                              }
-                              return '0';
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
+                    Aggregates from `contents` per KOL (the
+                    Content-Dashboard fallback path called out in the
+                    spec — `kol_deliverables` will swap in once Phase
+                    2 of the KOL Database Overhaul lands). Sorted
+                    views-desc so the highest performer is row 1. */}
+                {kolViewMode === 'overview' && (() => {
+                  // ─── Aggregate ──────────────────────────────────
+                  type Stats = { contentCount: number; views: number; engagements: number };
+                  const byKol = new Map<string, Stats>();
+                  for (const c of contents) {
+                    const key = c.campaign_kols_id;
+                    if (!key) continue;
+                    const s = byKol.get(key) || { contentCount: 0, views: 0, engagements: 0 };
+                    s.contentCount += 1;
+                    s.views += c.impressions || 0;
+                    s.engagements +=
+                      (c.likes || 0) +
+                      (c.comments || 0) +
+                      (c.retweets || 0) +
+                      (c.bookmarks || 0);
+                    byKol.set(key, s);
+                  }
+                  const totalCampaignViews = Array.from(byKol.values()).reduce((sum, s) => sum + s.views, 0);
+                  const totalContentLive = contents.length;
+                  const totalEngagements = Array.from(byKol.values()).reduce((sum, s) => sum + s.engagements, 0);
 
-                      {/* Distribution of KOLs by Platform */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <Globe className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              {(() => {
-                                const platforms = new Set();
-                                kols.forEach(kol => {
-                                  if (kol.master_kol.platform) {
-                                    kol.master_kol.platform.forEach((p: string) => platforms.add(p));
-                                  }
-                                });
-                                return platforms.size === 1 ? 'Unique Platform' : 'Unique Platforms';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {(() => {
-                              const platforms = new Set();
-                              kols.forEach(kol => {
-                                if (kol.master_kol.platform) {
-                                  kol.master_kol.platform.forEach((p: string) => platforms.add(p));
-                                }
-                              });
-                              return platforms.size;
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
+                  // Each leaderboard row pairs a kol with its stats.
+                  // KOLs without any content still show up at the
+                  // bottom so the client can see who's been activated
+                  // vs. who's posted.
+                  const rows = kols
+                    .map(k => ({
+                      kol: k,
+                      stats: byKol.get(k.id) || { contentCount: 0, views: 0, engagements: 0 },
+                    }))
+                    .sort((a, b) => b.stats.views - a.stats.views);
 
-                      {/* KOLs by Region */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <Flag className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              {(() => {
-                                const regions = new Set();
-                                kols.forEach(kol => {
-                                  if (kol.master_kol.region) {
-                                    regions.add(kol.master_kol.region);
-                                  }
-                                });
-                                return regions.size === 1 ? 'Region Represented' : 'Regions Represented';
-                              })()}
-                            </p>
-                          </div>
+                  const formatNum = (n: number): string => {
+                    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+                    if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+                    return n.toLocaleString();
+                  };
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Stat strip — Total KOLs · Content Posted ·
+                          Views · Engagements. Compact horizontal
+                          card row vs the old 4-up grid; less visual
+                          noise and the leaderboard does the heavy
+                          storytelling below. */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                          { label: 'Total KOLs', value: kols.length },
+                          { label: 'Content Posted', value: totalContentLive },
+                          { label: 'Total Views', value: formatNum(totalCampaignViews) },
+                          { label: 'Total Engagements', value: formatNum(totalEngagements) },
+                        ].map(stat => (
+                          <Card key={stat.label} className="border border-gray-200">
+                            <CardContent className="p-4">
+                              <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">{stat.label}</p>
+                              <p className="text-2xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {/* Leaderboard table */}
+                      <Card className="border border-gray-200 overflow-hidden">
+                        <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+                          <CardTitle className="text-base font-semibold text-gray-900">
+                            KOL Performance Leaderboard
+                          </CardTitle>
+                          <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
                         </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {(() => {
-                              const regions = new Set();
-                              kols.forEach(kol => {
-                                if (kol.master_kol.region) {
-                                  regions.add(kol.master_kol.region);
-                                }
-                              });
-                              return regions.size;
-                            })()}
-                          </div>
+                        <CardContent className="p-0">
+                          {rows.length === 0 ? (
+                            <div className="p-8 text-center text-sm text-gray-500">
+                              No KOLs activated yet.
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50/80 text-[10px] uppercase tracking-wider text-gray-500">
+                                  <tr>
+                                    <th className="text-left py-2.5 px-4 w-12">#</th>
+                                    <th className="text-left py-2.5 px-4">KOL</th>
+                                    <th className="text-right py-2.5 px-4 w-24">Content</th>
+                                    <th className="text-right py-2.5 px-4 w-28">Views</th>
+                                    <th className="text-right py-2.5 px-4 w-32">Engagements</th>
+                                    <th className="text-left py-2.5 px-4 w-[28%]">Share of Views</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rows.map((r, idx) => {
+                                    const sharePct = totalCampaignViews > 0
+                                      ? (r.stats.views / totalCampaignViews) * 100
+                                      : 0;
+                                    return (
+                                      <tr key={r.kol.id} className="border-t border-gray-100 hover:bg-gray-50/40">
+                                        <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
+                                        <td className="py-3 px-4">
+                                          <div className="font-medium text-gray-900 truncate">
+                                            {maskedKolName(r.kol.master_kol.name, idx)}
+                                          </div>
+                                          {/* Platform stays visible even when handles are
+                                              masked — knowing "this KOL was X-native" is
+                                              category-level, not identity. */}
+                                          {r.kol.master_kol.platform && r.kol.master_kol.platform.length > 0 && (
+                                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">
+                                              {r.kol.master_kol.platform.join(' · ')}
+                                            </div>
+                                          )}
+                                          {/* Section 5 — profile note. Truncated to
+                                              one line so the leaderboard row doesn't
+                                              grow tall when notes are long. */}
+                                          {!mask.kolHandles && r.kol.profile_note && (
+                                            <div className="text-[11px] text-gray-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
+                                              {r.kol.profile_note}
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">
+                                          {r.stats.contentCount}
+                                        </td>
+                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900">
+                                          {formatNum(r.stats.views)}
+                                        </td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">
+                                          {formatNum(r.stats.engagements)}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                              <div
+                                                className="h-full bg-brand"
+                                                style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
+                                              />
+                                            </div>
+                                            <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">
+                                              {sharePct.toFixed(1)}%
+                                            </span>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     </div>
-
-                    {/* Charts Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Platform Distribution Chart */}
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">KOLs by Platform</h3>
-                          </div>
-                        </div>
-                        <div className="h-96">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart 
-                              data={(() => {
-                                const platformCounts: { [key: string]: number } = {};
-                                kols.forEach(kol => {
-                                  if (kol.master_kol.platform) {
-                                    kol.master_kol.platform.forEach((platform: string) => {
-                                      platformCounts[platform] = (platformCounts[platform] || 0) + 1;
-                                    });
-                                  }
-                                });
-                                return Object.entries(platformCounts).map(([platform, count]) => ({
-                                  platform,
-                                  count
-                                }));
-                              })()}
-                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                              <XAxis 
-                                dataKey="platform" 
-                                axisLine={false}
-                                tickLine={false}
-                                tick={({ x, y, payload }) => (
-                                  <g transform={`translate(${x},${y})`}>
-                                    {payload.value === 'X' ? (
-                                      <text x={0} y={0} dy={16} textAnchor="middle" fill="#000000" fontSize={14} fontWeight="bold">
-                                        𝕏
-                                      </text>
-                                    ) : payload.value === 'Telegram' ? (
-                                      <g>
-                                        <svg x={-8} y={0} width={16} height={16} viewBox="0 0 24 24" fill="#0088cc">
-                                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-                                        </svg>
-                                      </g>
-                                    ) : (
-                                      <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={12}>
-                                        {payload.value}
-                                      </text>
-                                    )}
-                                  </g>
-                                )}
-                              />
-                              <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b' }}
-                                allowDecimals={false}
-                              />
-                              <Tooltip 
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                                  fontSize: '14px',
-                                  padding: '12px 16px',
-                                  fontWeight: '500'
-                                }}
-                                formatter={(value: number) => [value, 'KOLs']}
-                                labelFormatter={(label: string) => `Platform: ${label}`}
-                                labelStyle={{
-                                  color: '#374151',
-                                  fontWeight: '600',
-                                  marginBottom: '4px'
-                                }}
-                              />
-                              <Bar 
-                                dataKey="count" 
-                                radius={[8, 8, 0, 0]}
-                              >
-                                {(() => {
-                                  const platformCounts: { [key: string]: number } = {};
-                                  kols.forEach(kol => {
-                                    if (kol.master_kol.platform) {
-                                      kol.master_kol.platform.forEach((platform: string) => {
-                                        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
-                                      });
-                                    }
-                                  });
-                                  return Object.entries(platformCounts).map(([platform, count], index) => {
-                                    let color = '#3e8692'; // Default teal
-                                    if (platform === 'X') color = '#000000'; // Black for X
-                                    else if (platform === 'Telegram') color = '#0088cc'; // Telegram blue
-                                    
-                                    return (
-                                      <Cell key={`cell-${index}`} fill={color} />
-                                    );
-                                  });
-                                })()}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      {/* Region Distribution Chart */}
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">KOLs by Region</h3>
-                          </div>
-                        </div>
-                        <div className="h-96">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart 
-                              data={(() => {
-                                const regionCounts: { [key: string]: number } = {};
-                                kols.forEach(kol => {
-                                  if (kol.master_kol.region) {
-                                    regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
-                                  }
-                                });
-                                return Object.entries(regionCounts).map(([region, count]) => ({
-                                  region,
-                                  count
-                                }));
-                              })()}
-                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                              <XAxis 
-                                dataKey="region" 
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
-                              />
-                              <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b' }}
-                                allowDecimals={false}
-                              />
-                              <Tooltip 
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                                  fontSize: '14px',
-                                  padding: '12px 16px',
-                                  fontWeight: '500'
-                                }}
-                                formatter={(value: number) => [value, 'KOLs']}
-                                labelFormatter={(label: string) => `Region: ${label}`}
-                                labelStyle={{
-                                  color: '#374151',
-                                  fontWeight: '600',
-                                  marginBottom: '4px'
-                                }}
-                              />
-                              <Bar 
-                                dataKey="count" 
-                                radius={[8, 8, 0, 0]}
-                              >
-                                {(() => {
-                                  const regionCounts: { [key: string]: number } = {};
-                                  kols.forEach(kol => {
-                                    if (kol.master_kol.region) {
-                                      regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
-                                    }
-                                  });
-                                  return Object.entries(regionCounts).map(([region, count], index) => {
-                                    let color = '#3e8692'; // Default teal
-                                    if (region === 'China') color = '#de2910'; // Chinese red
-                                    else if (region === 'Korea') color = '#cd2e3a'; // Korean red
-                                    else if (region === 'Vietnam') color = '#da251d'; // Vietnamese red
-                                    else if (region === 'Turkey') color = '#e30a17'; // Turkish red
-                                    else if (region === 'Philippines') color = '#0038a8'; // Philippine blue
-                                    else if (region === 'Brazil') color = '#009c3b'; // Brazilian green
-                                    else if (region === 'Global') color = '#1e40af'; // Global blue
-                                    else if (region === 'SEA') color = '#059669'; // Southeast Asia green
-                                    
-                                    return (
-                                      <Cell key={`cell-${region}`} fill={color} />
-                                    );
-                                  });
-                                })()}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
+                {/* The legacy 4-stat Overview + degenerate single-bar
+                    charts (Total KOLs in Campaign / Avg Followers /
+                    Unique Platforms / KOLs by Region) was removed
+                    here when the leaderboard above replaced it. Spec
+                    section 6: "automated performance leaderboard."
+                    Keeping the old block dead-coded made the file
+                    50% larger for no gain. The leaderboard's
+                    aggregation does all the heavy lifting. */}
 
                 {/* Table View */}
                 {kolViewMode === 'table' && (
@@ -1670,18 +1792,35 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     {index + 1}
                                   </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
-                                    <div className="flex items-center w-full h-full">
-                                      <div className="truncate font-bold">{campaignKOL.master_kol.name}</div>
-                                      {campaignKOL.master_kol.link && (
-                                        <a
-                                          href={campaignKOL.master_kol.link}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-sm ml-2 underline hover:no-underline font-normal"
-                                          style={{ color: 'inherit' }}
-                                        >
-                                          View Profile
-                                        </a>
+                                    <div className="w-full h-full">
+                                      <div className="flex items-center w-full">
+                                        <div className="truncate font-bold">
+                                          {maskedKolName(campaignKOL.master_kol.name, index)}
+                                        </div>
+                                        {/* Profile link hidden in showcase mode — the
+                                            point of masking the name is to keep the KOL
+                                            unidentifiable. */}
+                                        {!mask.kolHandles && campaignKOL.master_kol.link && (
+                                          <a
+                                            href={campaignKOL.master_kol.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm ml-2 underline hover:no-underline font-normal"
+                                            style={{ color: 'inherit' }}
+                                          >
+                                            View Profile
+                                          </a>
+                                        )}
+                                      </div>
+                                      {/* Section 5 — approved client-facing profile
+                                          note. Renders as a subtitle under the KOL
+                                          name. Hidden in showcase mode when handles
+                                          are masked (the note would re-identify
+                                          the KOL even with a masked name). */}
+                                      {!mask.kolHandles && campaignKOL.profile_note && (
+                                        <div className="text-xs text-gray-500 italic font-normal mt-0.5 leading-snug whitespace-normal max-w-md">
+                                          {campaignKOL.profile_note}
+                                        </div>
                                       )}
                                     </div>
                                   </TableCell>
@@ -1754,12 +1893,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="flex flex-col items-center text-center">
                             <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
                               <span className="text-white font-bold text-xl">
-                                {item.master_kol.name.charAt(0).toUpperCase()}
+                                {(mask.kolHandles ? `#${index + 1}` : item.master_kol.name.charAt(0).toUpperCase()).toString()}
                               </span>
                             </div>
                             <div className="mb-2">
-                              <h3 className="font-semibold text-gray-900 text-lg">{item.master_kol.name}</h3>
+                              <h3 className="font-semibold text-gray-900 text-lg">
+                                {maskedKolName(item.master_kol.name, index)}
+                              </h3>
+                              {/* Region kept — geographic distribution is
+                                  category-level evidence, not identity. */}
                               <p className="text-sm text-gray-500">{item.master_kol.region || 'No region'}</p>
+                              {/* Section 5 — client-facing profile note. */}
+                              {!mask.kolHandles && item.profile_note && (
+                                <p className="text-xs text-gray-500 italic mt-1.5 leading-snug">
+                                  {item.profile_note}
+                                </p>
+                              )}
                             </div>
                             <div className="flex items-center space-x-2">
                               {(item.master_kol.platform || []).map((platform: string) => (
@@ -1801,8 +1950,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             </div>
                           )}
 
-                          {/* View Profile Link */}
-                          {item.master_kol.link && (
+                          {/* View Profile Link — hidden in showcase
+                              mode when handles are masked (else the
+                              link defeats the mask). */}
+                          {!mask.kolHandles && item.master_kol.link && (
                             <div className="pt-2 border-t border-gray-100">
                               <a
                                 href={item.master_kol.link}
@@ -1870,7 +2021,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       </CardContent>
                     </Card>
 
-                    {/* Total Impressions */}
+                    {/* Total Views */}
                     <Card className="hover:shadow-lg transition-shadow duration-200">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -1882,15 +2033,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <CardContent>
                         <div className="text-2xl font-bold text-gray-900">
                           {(() => {
-                            const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                            return totalImpressions.toLocaleString();
+                            const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                            return totalViews.toLocaleString();
                           })()}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
+                        <p className="text-sm text-gray-600 mt-1">Total Views</p>
                       </CardContent>
                     </Card>
 
-                    {/* Total Likes */}
+                    {/* Total Reactions */}
                     <Card className="hover:shadow-lg transition-shadow duration-200">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -1902,32 +2053,34 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <CardContent>
                         <div className="text-2xl font-bold text-gray-900">
                           {(() => {
-                            const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                            return totalLikes.toLocaleString();
+                            const totalReactions = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                            return totalReactions.toLocaleString();
                           })()}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">Total Likes</p>
+                        <p className="text-sm text-gray-600 mt-1">Total Reactions</p>
                       </CardContent>
                     </Card>
                   </div>
 
                   {/* Charts Section */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Top KOLs by Likes */}
+                    {/* Top KOLs by Reactions */}
                     <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                       <div className="mb-6">
-                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Likes</h3>
+                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Reactions</h3>
                         <p className="text-sm text-gray-500 mt-1">KOLs ranked by total likes</p>
                       </div>
                       <div className="h-96">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
                             data={(() => {
-                              // Calculate total likes per KOL
-                              const kolLikes = contents.reduce((acc, content) => {
-                                const kol = kols.find(k => k.id === content.campaign_kols_id);
-                                if (kol) {
-                                  const kolName = kol.master_kol.name;
+                              // Calculate total likes per KOL.
+                              // Showcase: label by masked handle so
+                              // the chart axis doesn't leak names.
+                              const kolReactions = contents.reduce((acc, content) => {
+                                const kolIdx = kols.findIndex(k => k.id === content.campaign_kols_id);
+                                if (kolIdx >= 0) {
+                                  const kolName = maskedKolName(kols[kolIdx].master_kol.name, kolIdx);
                                   if (!acc[kolName]) {
                                     acc[kolName] = 0;
                                   }
@@ -1936,7 +2089,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return acc;
                               }, {} as Record<string, number>);
 
-                              return Object.entries(kolLikes)
+                              return Object.entries(kolReactions)
                                 .map(([name, likes]) => ({ name, likes }))
                                 .sort((a, b) => b.likes - a.likes)
                                 .slice(0, 10); // Top 10
@@ -1966,7 +2119,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                 fontSize: '14px'
                               }}
-                              formatter={(value: number) => [value.toLocaleString(), 'Likes']}
+                              formatter={(value: number) => [value.toLocaleString(), 'Reactions']}
                             />
                             <Bar dataKey="likes" fill="#3e8692" radius={[8, 8, 0, 0]} />
                           </BarChart>
@@ -1974,21 +2127,23 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       </div>
                     </div>
 
-                    {/* Top KOLs by Impressions */}
+                    {/* Top KOLs by Views */}
                     <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                       <div className="mb-6">
-                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Impressions</h3>
+                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Views</h3>
                         <p className="text-sm text-gray-500 mt-1">KOLs ranked by total impressions</p>
                       </div>
                       <div className="h-96">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
                             data={(() => {
-                              // Calculate total impressions per KOL
-                              const kolImpressions = contents.reduce((acc, content) => {
-                                const kol = kols.find(k => k.id === content.campaign_kols_id);
-                                if (kol) {
-                                  const kolName = kol.master_kol.name;
+                              // Calculate total impressions per KOL.
+                              // Showcase masking applied — see the
+                              // Reactions chart above for rationale.
+                              const kolViews = contents.reduce((acc, content) => {
+                                const kolIdx = kols.findIndex(k => k.id === content.campaign_kols_id);
+                                if (kolIdx >= 0) {
+                                  const kolName = maskedKolName(kols[kolIdx].master_kol.name, kolIdx);
                                   if (!acc[kolName]) {
                                     acc[kolName] = 0;
                                   }
@@ -1997,7 +2152,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return acc;
                               }, {} as Record<string, number>);
 
-                              return Object.entries(kolImpressions)
+                              return Object.entries(kolViews)
                                 .map(([name, impressions]) => ({ name, impressions }))
                                 .sort((a, b) => b.impressions - a.impressions)
                                 .slice(0, 10); // Top 10
@@ -2027,7 +2182,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                 fontSize: '14px'
                               }}
-                              formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                              formatter={(value: number) => [value.toLocaleString(), 'Views']}
                             />
                             <Bar dataKey="impressions" fill="#2d6470" radius={[8, 8, 0, 0]} />
                           </BarChart>
@@ -2053,6 +2208,361 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                 </CardHeader>
 
                 <CardContent className="pt-6">
+                  {/* ─── Activation Results — Spec section 4 ───────
+                      Fogo-style reusable block. Renders only when
+                      an activation_snapshots row exists for this
+                      campaign. Each sub-component conditionally
+                      renders on its own data blob being present —
+                      a simple PFP activation shows 3-4 blocks; a
+                      Trader Card style shows all 8. Showcase mode
+                      masks KOL names where they appear. */}
+                  {activation && (() => {
+                    const s = activation.summary_json;
+                    const daily = activation.entries_daily_json;
+                    const byKol = activation.entries_by_kol_json;
+                    const clicks = activation.clicks_json;
+                    const ugc = activation.ugc_json;
+
+                    const formatNum = (n: number | null | undefined): string => {
+                      if (n == null) return '—';
+                      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+                      if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+                      return n.toLocaleString();
+                    };
+                    // Build per-KOL labels with showcase masking
+                    // applied. We look up the campaign_kol by kol_id
+                    // when the portal provides it; fall back to the
+                    // portal's pre-baked `label` field otherwise.
+                    const labelForKol = (entry: { kol_id?: string; label?: string }, idx: number): string => {
+                      if (entry.kol_id) {
+                        const kolIdx = kols.findIndex(k => k.id === entry.kol_id);
+                        if (kolIdx >= 0) return maskedKolName(kols[kolIdx].master_kol.name, kolIdx);
+                      }
+                      // No mapping → use whatever label the portal
+                      // returned. In showcase mode we still mask by
+                      // position so the chart axis doesn't leak.
+                      return mask.kolHandles ? `KOL #${idx + 1}` : (entry.label || `KOL #${idx + 1}`);
+                    };
+
+                    const totalEntries = byKol ? byKol.reduce((sum, e) => sum + (e.entries || 0), 0) : 0;
+                    const sortedByKol = byKol
+                      ? [...byKol].sort((a, b) => (b.entries || 0) - (a.entries || 0))
+                      : [];
+
+                    // Donut palette — recycle through 8 colors so a
+                    // 20-KOL chart still reads. Matches the leaderboard
+                    // share-bar so the two visuals feel paired.
+                    const PIE = ['#3e8692', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#0ea5e9', '#ef4444', '#64748b'];
+
+                    return (
+                      <div className="mb-6 border border-brand/20 rounded-xl overflow-hidden bg-gradient-to-br from-brand/[0.03] to-transparent">
+                        {/* ─── Activation Hero ───────────────────── */}
+                        <div className="p-6 border-b border-brand/15 bg-white">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-brand mb-1">Activation Results</p>
+                              <h3 className="text-2xl font-bold text-gray-900">
+                                {activation.activation_name || 'Live Activation'}
+                              </h3>
+                              <div className="flex items-center gap-3 mt-1.5 text-sm text-gray-600 flex-wrap">
+                                {activation.activation_type && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand">
+                                    {activation.activation_type}
+                                  </span>
+                                )}
+                                {activation.start_date && activation.end_date && (
+                                  <span>
+                                    {formatDate(activation.start_date)} – {formatDate(activation.end_date)}
+                                  </span>
+                                )}
+                                {s?.target_market && (
+                                  <span className="text-gray-500">· {s.target_market}</span>
+                                )}
+                              </div>
+                            </div>
+                            {activation.status && (
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(activation.status)}`}>
+                                {/* Display lowercase DB values ("active",
+                                    "completed", "in_progress") in
+                                    Title Case so the badge reads
+                                    cleanly. Word-split on _ and space
+                                    handles snake_case statuses too. */}
+                                {activation.status
+                                  .replace(/[_-]/g, ' ')
+                                  .split(' ')
+                                  .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                                  .join(' ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                          {/* ─── KPI cards ─────────────────────────
+                              Each card renders only if the summary
+                              blob has its key. The spec lists
+                              concrete fields (total_entries, etc.)
+                              + an open-ended "activation-specific"
+                              bucket — we render the named ones
+                              first, then any extras. */}
+                          {s && (() => {
+                            const cards = [
+                              { key: 'total_entries',     label: 'Total Entries',       value: s.total_entries },
+                              { key: 'unique_participants', label: 'Unique Participants', value: s.unique_participants },
+                              { key: 'kols_activated',    label: 'KOLs Activated',      value: s.kols_activated },
+                              { key: 'wallets_registered',label: 'Wallets Registered',  value: s.wallets_registered },
+                              { key: 'cards_minted',      label: 'Cards Minted',        value: s.cards_minted },
+                              { key: 'frames_created',    label: 'Frames Created',      value: s.frames_created },
+                            ].filter(c => typeof c.value === 'number');
+
+                            if (cards.length === 0) return null;
+                            return (
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                                {cards.map(c => (
+                                  <div key={c.key} className="bg-white border border-gray-200 rounded-lg p-3">
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{c.label}</p>
+                                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatNum(c.value)}</p>
+                                    {s.context_sublabels?.[c.key] && (
+                                      <p className="text-[10px] text-gray-500 mt-0.5">{s.context_sublabels[c.key]}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* ─── Daily entries chart ──────────── */}
+                            {daily && daily.length > 0 && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-gray-900 mb-3">Daily Entries</p>
+                                <div className="h-56">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={daily} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                      <Tooltip
+                                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
+                                        formatter={(value: number) => [value.toLocaleString(), 'Entries']}
+                                      />
+                                      <Bar dataKey="entries" fill="#3e8692" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ─── Entries by KOL channel donut ── */}
+                            {byKol && byKol.length > 0 && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-gray-900 mb-3">Entries by KOL Channel</p>
+                                <div className="h-56">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                      <Pie
+                                        data={sortedByKol.map((e, idx) => ({
+                                          name: labelForKol(e, idx),
+                                          value: e.entries,
+                                        }))}
+                                        dataKey="value"
+                                        innerRadius={50}
+                                        outerRadius={80}
+                                        paddingAngle={2}
+                                      >
+                                        {sortedByKol.map((_, idx) => (
+                                          <Cell key={idx} fill={PIE[idx % PIE.length]} />
+                                        ))}
+                                      </Pie>
+                                      <Tooltip
+                                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
+                                        formatter={(value: number, name: string) => [value.toLocaleString(), name]}
+                                      />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ─── KOL performance breakdown ──────── */}
+                          {byKol && byKol.length > 0 && (
+                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+                                <p className="text-sm font-semibold text-gray-900">KOL Performance</p>
+                                <p className="text-[11px] text-gray-500 mt-0.5">Ranked by entries · share-of-pie shown below name.</p>
+                              </div>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+                                    <tr>
+                                      <th className="text-left py-2 px-4 w-12">#</th>
+                                      <th className="text-left py-2 px-4">KOL</th>
+                                      <th className="text-right py-2 px-4 w-24">Entries</th>
+                                      <th className="text-left py-2 px-4 w-[30%]">Share</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {sortedByKol.map((e, idx) => {
+                                      const sharePct = totalEntries > 0 ? (e.entries / totalEntries) * 100 : 0;
+                                      return (
+                                        <tr key={`${e.kol_id || e.label || idx}`} className="border-t border-gray-100">
+                                          <td className="py-2 px-4 text-gray-500 tabular-nums">{idx + 1}</td>
+                                          <td className="py-2 px-4 font-medium text-gray-900 truncate">{labelForKol(e, idx)}</td>
+                                          <td className="py-2 px-4 text-right tabular-nums text-gray-900 font-medium">{formatNum(e.entries)}</td>
+                                          <td className="py-2 px-4">
+                                            <div className="flex items-center gap-2">
+                                              <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                                <div className="h-full bg-brand" style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }} />
+                                              </div>
+                                              <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* ─── Ecosystem engagement ─────────── */}
+                            {clicks && (clicks.by_protocol?.length || clicks.by_source?.length || clicks.total_referrals) && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+                                <p className="text-sm font-semibold text-gray-900">Ecosystem Engagement</p>
+                                {typeof clicks.total_referrals === 'number' && (
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-2xl font-bold text-gray-900 tabular-nums">{formatNum(clicks.total_referrals)}</span>
+                                    <span className="text-xs text-gray-500">total referrals</span>
+                                  </div>
+                                )}
+                                {clicks.by_protocol && clicks.by_protocol.length > 0 && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">dApp clicks by protocol</p>
+                                    <ul className="space-y-1.5">
+                                      {clicks.by_protocol.map((p, idx) => (
+                                        <li key={p.protocol + idx} className="flex items-center justify-between text-xs">
+                                          <span className="text-gray-700">{p.protocol}</span>
+                                          <span className="font-medium text-gray-900 tabular-nums">{formatNum(p.clicks)}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {clicks.by_source && clicks.by_source.length > 0 && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">By source</p>
+                                    <ul className="space-y-1.5">
+                                      {clicks.by_source.map((p, idx) => (
+                                        <li key={p.source + idx} className="flex items-center justify-between text-xs">
+                                          <span className="text-gray-700">{p.source}</span>
+                                          <span className="font-medium text-gray-900 tabular-nums">{formatNum(p.clicks)}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* ─── Points and prizes ────────────── */}
+                            {s && (s.prize_pool || s.draw_structure || s.points_by_source) && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+                                <p className="text-sm font-semibold text-gray-900">Points & Prizes</p>
+                                {s.prize_pool && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Prize pool</p>
+                                    <p className="text-xl font-bold text-gray-900 tabular-nums">{s.prize_pool}</p>
+                                  </div>
+                                )}
+                                {s.draw_structure && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Draw structure</p>
+                                    <p className="text-xs text-gray-700">{s.draw_structure}</p>
+                                  </div>
+                                )}
+                                {s.points_by_source && s.points_by_source.length > 0 && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Points by source</p>
+                                    <ul className="space-y-1.5">
+                                      {s.points_by_source.map((p, idx) => (
+                                        <li key={p.source + idx} className="flex items-center justify-between text-xs">
+                                          <span className="text-gray-700">{p.source}</span>
+                                          <span className="font-medium text-gray-900 tabular-nums">{formatNum(p.points)}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ─── UGC performance ──────────────── */}
+                          {ugc && (ugc.posts_approved || ugc.creators || ugc.views || ugc.top_post) && (
+                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <p className="text-sm font-semibold text-gray-900 mb-3">UGC Performance</p>
+                              {/* Headline stats */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                {typeof ugc.posts_approved === 'number' && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Posts Approved</p>
+                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{formatNum(ugc.posts_approved)}</p>
+                                  </div>
+                                )}
+                                {typeof ugc.creators === 'number' && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Creators</p>
+                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{formatNum(ugc.creators)}</p>
+                                  </div>
+                                )}
+                                {typeof ugc.approval_rate === 'number' && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Approval Rate</p>
+                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{(ugc.approval_rate * 100).toFixed(1)}%</p>
+                                  </div>
+                                )}
+                                {typeof ugc.views === 'number' && (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Views</p>
+                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{formatNum(ugc.views)}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Top post */}
+                              {ugc.top_post && (
+                                <div className="border-t border-gray-100 pt-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Top Post</p>
+                                  <div className="flex items-start gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-semibold text-gray-900">
+                                        {mask.kolHandles ? 'Top creator' : (ugc.top_post.creator_label || 'Creator')}
+                                      </p>
+                                      {ugc.top_post.snippet && (
+                                        <p className="text-xs text-gray-600 italic mt-0.5 line-clamp-3">"{ugc.top_post.snippet}"</p>
+                                      )}
+                                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-500 tabular-nums">
+                                        {typeof ugc.top_post.views === 'number' && <span>{formatNum(ugc.top_post.views)} views</span>}
+                                        {typeof ugc.top_post.likes === 'number' && <span>{formatNum(ugc.top_post.likes)} reactions</span>}
+                                      </div>
+                                    </div>
+                                    {!mask.kolHandles && ugc.top_post.link && (
+                                      <a href={ugc.top_post.link} target="_blank" rel="noopener noreferrer" className="text-brand hover:text-brand/80 shrink-0">
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Content View Toggle */}
                   <div className="mb-4">
                     <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
@@ -2251,36 +2761,36 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Impressions">
-                                  <span>Impressions</span>
+                                <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Views">
+                                  <span>Views</span>
                                   {sortIcon(contentSort.key === 'impressions', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Likes">
-                                  <span>Likes</span>
+                                <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Reactions">
+                                  <span>Reactions</span>
                                   {sortIcon(contentSort.key === 'likes', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Retweets">
-                                  <span>Retweets</span>
+                                <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Shares">
+                                  <span>Shares</span>
                                   {sortIcon(contentSort.key === 'retweets', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Comments">
-                                  <span>Comments</span>
+                                <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Replies">
+                                  <span>Replies</span>
                                   {sortIcon(contentSort.key === 'comments', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className={`relative bg-gray-50 ${campaign?.share_content_notes ? 'border-r border-gray-200' : ''} select-none`}>
-                                <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Bookmarks">
-                                  <span>Bookmarks</span>
+                              <TableHead className={`relative bg-gray-50 ${notesVisible ? 'border-r border-gray-200' : ''} select-none`}>
+                                <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Saves">
+                                  <span>Saves</span>
                                   {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              {campaign?.share_content_notes && (
+                              {notesVisible && (
                                 <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
                               )}
                             </TableRow>
@@ -2288,7 +2798,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <TableBody className="bg-white">
                             {sortedContents.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={12 + (campaign?.share_content_notes ? 1 : 0)} className="text-center py-12">
+                                <TableCell colSpan={12 + (notesVisible ? 1 : 0)} className="text-center py-12">
                                   <div className="flex flex-col items-center justify-center text-gray-500">
                                     <FileText className="h-12 w-12 mb-4 text-gray-300" />
                                     <p className="text-lg font-medium mb-2">No content matches your filters</p>
@@ -2384,13 +2894,60 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                       {content.comments ? formatFollowers(content.comments) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${campaign?.share_content_notes ? 'border-r border-gray-200' : ''} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${notesVisible ? 'border-r border-gray-200' : ''} p-2 overflow-hidden`}>
                                       {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
                                     </TableCell>
-                                    {campaign?.share_content_notes && (
-                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
-                                        <div className="text-sm text-gray-600 max-w-xs whitespace-pre-wrap">
-                                          {content.notes || <span className="text-gray-400 italic">-</span>}
+                                    {notesVisible && (
+                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 align-top`}>
+                                        {/* HHP Onboarding Overhaul Spec § 9 #11 —
+                                            "Complimen Post" truncation fix.
+                                            The cell used to have overflow-hidden
+                                            + max-w-xs, which under certain
+                                            column widths could clip mid-word.
+                                            break-words ensures clean wrapping
+                                            at word boundaries; max-w-[18rem]
+                                            keeps the column from over-stretching
+                                            on long notes; align-top so multi-
+                                            line notes don't shift the row. */}
+                                        <div className="text-sm text-gray-600 max-w-[18rem] whitespace-pre-wrap break-words">
+                                          {/* [Spec 7.5] Client-facing tag
+                                              badges render before notes
+                                              text. Internal tags filtered
+                                              client-side. Multi-Post tag
+                                              renders its sequence as
+                                              "Post N of M" automatically. */}
+                                          {(() => {
+                                            const assignments = (content.content_tag_assignments || [])
+                                              .filter(a => a.tag && a.tag.visibility === 'client');
+                                            if (assignments.length === 0) return null;
+                                            return (
+                                              <div className="flex flex-wrap gap-1 mb-1.5">
+                                                {assignments.map(a => {
+                                                  const isMultiPost = a.tag!.name === 'Multi-Post' && a.sequence_n && a.sequence_of;
+                                                  const label = isMultiPost
+                                                    ? `Post ${a.sequence_n} of ${a.sequence_of}`
+                                                    : a.tag!.name;
+                                                  // Inline style for tag color since
+                                                  // Tailwind can't bind dynamic hex.
+                                                  const bg = a.tag!.color || '#10b981';
+                                                  return (
+                                                    <span
+                                                      key={a.id}
+                                                      className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium text-white"
+                                                      style={{ backgroundColor: bg }}
+                                                    >
+                                                      {label}
+                                                    </span>
+                                                  );
+                                                })}
+                                              </div>
+                                            );
+                                          })()}
+                                          {content.notes || (
+                                            ((content.content_tag_assignments || []).some(a => a.tag?.visibility === 'client'))
+                                              ? null
+                                              : <span className="text-gray-400 italic">-</span>
+                                          )}
                                         </div>
                                       </TableCell>
                                     )}
@@ -2409,7 +2966,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <div className="space-y-6">
                       {/* Metrics Cards */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* Total Impressions */}
+                        {/* Total Views */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
@@ -2418,8 +2975,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                               <p className="text-sm text-gray-600">
                                 {(() => {
-                                  const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                  return totalImpressions === 1 ? 'Total Impression' : 'Total Impressions';
+                                  const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                  return totalViews === 1 ? 'Total View' : 'Total Views';
                                 })()}
                               </p>
                             </div>
@@ -2427,14 +2984,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <CardContent>
                             <div className="text-2xl font-bold text-gray-900">
                               {(() => {
-                                const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                return totalImpressions.toLocaleString();
+                                const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                return totalViews.toLocaleString();
                               })()}
                             </div>
                           </CardContent>
                         </Card>
 
-                        {/* Total Comments */}
+                        {/* Total Replies */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
@@ -2443,8 +3000,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                               <p className="text-sm text-gray-600">
                                 {(() => {
-                                  const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                                  return totalComments === 1 ? 'Total Comment' : 'Total Comments';
+                                  const totalReplies = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                                  return totalReplies === 1 ? 'Total Reply' : 'Total Replies';
                                 })()}
                               </p>
                             </div>
@@ -2452,14 +3009,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <CardContent>
                             <div className="text-2xl font-bold text-gray-900">
                               {(() => {
-                                const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                                return totalComments.toLocaleString();
+                                const totalReplies = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                                return totalReplies.toLocaleString();
                               })()}
                             </div>
                           </CardContent>
                         </Card>
 
-                        {/* Total Retweets */}
+                        {/* Total Shares */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
@@ -2468,8 +3025,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                               <p className="text-sm text-gray-600">
                                 {(() => {
-                                  const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                                  return totalRetweets === 1 ? 'Total Retweet' : 'Total Retweets';
+                                  const totalShares = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                                  return totalShares === 1 ? 'Total Share' : 'Total Shares';
                                 })()}
                               </p>
                             </div>
@@ -2477,14 +3034,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <CardContent>
                             <div className="text-2xl font-bold text-gray-900">
                               {(() => {
-                                const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                                return totalRetweets.toLocaleString();
+                                const totalShares = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                                return totalShares.toLocaleString();
                               })()}
                             </div>
                           </CardContent>
                         </Card>
 
-                        {/* Total Likes */}
+                        {/* Total Reactions */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
@@ -2493,8 +3050,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                               <p className="text-sm text-gray-600">
                                 {(() => {
-                                  const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                                  return totalLikes === 1 ? 'Total Like' : 'Total Likes';
+                                  const totalReactions = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                                  return totalReactions === 1 ? 'Total Reaction' : 'Total Reactions';
                                 })()}
                               </p>
                             </div>
@@ -2502,8 +3059,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <CardContent>
                             <div className="text-2xl font-bold text-gray-900">
                               {(() => {
-                                const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                                return totalLikes.toLocaleString();
+                                const totalReactions = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                                return totalReactions.toLocaleString();
                               })()}
                             </div>
                           </CardContent>
@@ -2536,7 +3093,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           </CardContent>
                         </Card>
 
-                        {/* Total Bookmarks */}
+                        {/* Total Saves */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
@@ -2545,8 +3102,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                               <p className="text-sm text-gray-600">
                                 {(() => {
-                                  const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                                  return totalBookmarks === 1 ? 'Total Bookmark' : 'Total Bookmarks';
+                                  const totalSaves = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                                  return totalSaves === 1 ? 'Total Save' : 'Total Saves';
                                 })()}
                               </p>
                             </div>
@@ -2554,13 +3111,43 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <CardContent>
                             <div className="text-2xl font-bold text-gray-900">
                               {(() => {
-                                const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                                return totalBookmarks.toLocaleString();
+                                const totalSaves = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                                return totalSaves.toLocaleString();
                               })()}
                             </div>
                           </CardContent>
                         </Card>
                       </div>
+
+                      {/* Value Anchor — Spec section 10. One factual
+                          line sitting below the stat cards, deliberately
+                          plain so it reads as evidence rather than a
+                          marketing claim. Shows total views + budget.
+                          Auto-hidden in showcase mode when the budget
+                          mask is on (Section 10: "Hidden automatically
+                          in showcase mode when budget is hidden"). */}
+                      {!mask.budget && campaign?.total_budget && campaign.total_budget > 0 && (() => {
+                        const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                        if (totalViews === 0) return null;
+                        // 57945 → "57.9K", 1245000 → "1.2M". Spec
+                        // example uses "57.9K" so we match that
+                        // shorthand format rather than full
+                        // toLocaleString.
+                        const formatShort = (n: number): string => {
+                          if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+                          if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+                          return n.toLocaleString();
+                        };
+                        const budgetFmt = `$${campaign.total_budget.toLocaleString()}`;
+                        return (
+                          <p className="text-sm text-gray-600 italic">
+                            <span className="font-semibold text-gray-900 not-italic">{formatShort(totalViews)} views</span>
+                            {' '}delivered against a{' '}
+                            <span className="font-semibold text-gray-900 not-italic">{budgetFmt}</span>
+                            {' '}engagement.
+                          </p>
+                        );
+                      })()}
 
                       {/* Average Engagement Rate */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
@@ -2570,24 +3157,24 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <CardContent>
                           <div className="text-3xl font-bold text-gray-900">
                             {(() => {
-                              const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                              const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
                               const totalEngagements = contents.reduce((sum, content) => 
                                 sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                              const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
+                              const engagementRate = totalViews > 0 ? (totalEngagements / totalViews) * 100 : 0;
                               return `${engagementRate.toFixed(2)}%`;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
+                          <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Reactions + Replies + Shares + Saves) / Views</p>
                         </CardContent>
                       </Card>
 
                       {/* Charts Section */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Total Impressions */}
+                        {/* Total Views */}
                         <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Total Impressions</h3>
+                              <h3 className="text-xl font-bold text-gray-900">Total Views</h3>
                             </div>
                           </div>
                           <div className="h-96">
@@ -2611,12 +3198,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     new Date(dateA).getTime() - new Date(dateB).getTime()
                                   ) as [string, number][];
 
-                                  let cumulativeImpressions = 0;
+                                  let cumulativeViews = 0;
                                   return sortedEntries.map(([date, impressions]) => {
-                                    cumulativeImpressions += impressions;
+                                    cumulativeViews += impressions;
                                     return {
                                       date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                      impressions: cumulativeImpressions
+                                      impressions: cumulativeViews
                                     };
                                   });
                                 })()}
@@ -2645,7 +3232,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     padding: '12px 16px',
                                     fontWeight: '500'
                                   }}
-                                  formatter={(value: number) => [value.toLocaleString(), 'Cumulative Impressions']}
+                                  formatter={(value: number) => [value.toLocaleString(), 'Cumulative Views']}
                                   labelFormatter={(label: string) => `Date: ${label}`}
                                   labelStyle={{
                                     color: '#374151',
@@ -2665,11 +3252,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           </div>
                         </div>
 
-                        {/* Impressions by Platform */}
+                        {/* Views by Platform */}
                         <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
+                              <h3 className="text-xl font-bold text-gray-900">Views by Platform</h3>
                             </div>
                           </div>
                           <div className="h-96">
@@ -2677,7 +3264,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <PieChart margin={{ top: 20, right: 80, bottom: 20, left: 80 }}>
                                 <Pie
                                   data={(() => {
-                                    const platformImpressions = contents.reduce((acc, content) => {
+                                    const platformViews = contents.reduce((acc, content) => {
                                       const platform = content.platform || 'Unknown';
                                       if (!acc[platform]) {
                                         acc[platform] = 0;
@@ -2686,7 +3273,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       return acc;
                                     }, {} as Record<string, number>);
 
-                                    return Object.entries(platformImpressions).map(([platform, impressions]) => ({
+                                    return Object.entries(platformViews).map(([platform, impressions]) => ({
                                       platform,
                                       impressions,
                                       name: platform
@@ -2721,7 +3308,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   dataKey="impressions"
                                 >
                                   {(() => {
-                                    const platformImpressions = contents.reduce((acc, content) => {
+                                    const platformViews = contents.reduce((acc, content) => {
                                       const platform = content.platform || 'Unknown';
                                       if (!acc[platform]) {
                                         acc[platform] = 0;
@@ -2731,7 +3318,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     }, {} as Record<string, number>);
 
                                     const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
-                                    return Object.entries(platformImpressions).map((entry, index) => (
+                                    return Object.entries(platformViews).map((entry, index) => (
                                       <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                                     ));
                                   })()}
@@ -2747,11 +3334,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     fontWeight: '500'
                                   }}
                                   formatter={(value: number, name: string, props: any) => {
-                                    const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                    const percentage = totalImpressions > 0 ? ((value / totalImpressions) * 100).toFixed(1) : 0;
+                                    const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                    const percentage = totalViews > 0 ? ((value / totalViews) * 100).toFixed(1) : 0;
                                     return [
                                       `${value.toLocaleString()} (${percentage}%)`,
-                                      'Impressions'
+                                      'Views'
                                     ];
                                   }}
                                   labelFormatter={(label: string) => `Platform: ${label}`}
@@ -2773,6 +3360,35 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             </TabsContent>
           </div>
         </Tabs>
+
+        {/* Snapshot timestamp — Spec section 3.1. Renders the most
+            recent metrics update as a quiet footer line so clients
+            know how fresh the numbers are. Uses the max updated_at
+            across contents (the actual "last metrics pull") with a
+            fallback to "now" when no content rows have updates yet. */}
+        {(() => {
+          let mostRecent: number | null = null;
+          for (const c of contents) {
+            if (c.updated_at) {
+              const t = new Date(c.updated_at).getTime();
+              if (!mostRecent || t > mostRecent) mostRecent = t;
+            }
+          }
+          const stamp = (mostRecent ? new Date(mostRecent) : new Date()).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: 'UTC',
+            timeZoneName: 'short',
+          });
+          return (
+            <p className="text-[11px] text-gray-400 text-center mt-8">
+              Data as of {stamp}
+            </p>
+          );
+        })()}
       </div>
     </div>
   );

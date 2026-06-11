@@ -51,6 +51,14 @@ type DeliveryLogEntry = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Phase 3 (Post-Onboarding Campaign View v2): auto-drafts created
+  // when a Weekly Update "This Week" item flips to done. Drafts render
+  // in the amber Pending Review section at the top of the table;
+  // confirming a draft flips pending_review to false and it joins the
+  // main log.
+  pending_review?: boolean;
+  source?: string | null;
+  source_ref?: string | null;
 };
 
 type Client = {
@@ -389,7 +397,17 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     }
   };
 
+  // Phase 3: pending-review drafts live in a separate amber section at
+  // the top of the page (see below). The main filtered list excludes
+  // them so the confirmed log reads as a clean history.
+  const pendingReviewEntries = entries.filter(e => e.pending_review === true).sort((a, b) => {
+    // Newest drafts first — the CM usually wants to act on the most
+    // recently flipped item.
+    return b.updated_at.localeCompare(a.updated_at);
+  });
+
   const filtered = entries.filter((e) => {
+    if (e.pending_review === true) return false; // drafts handled separately
     const matchesSearch = !searchTerm ||
       e.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (e.who && e.who.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -403,6 +421,51 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     if (dateDiff !== 0) return sortAsc ? dateDiff : -dateDiff;
     return a.sort_order - b.sort_order;
   });
+
+  /** Phase 3 — Confirm: flip pending_review to false (joins the log). */
+  const confirmDraft = async (id: string) => {
+    const draft = entries.find(e => e.id === id);
+    if (!draft) return;
+    // Optimistic update so the row disappears from Pending Review
+    // immediately and slots into the main log.
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, pending_review: false } : e));
+    const { error } = await supabase
+      .from('client_delivery_log')
+      .update({ pending_review: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      console.error('Confirm draft failed:', error);
+      await fetchEntries(); // revert on error
+    }
+  };
+
+  /** Phase 3 — Dismiss: hard-delete the draft. */
+  const dismissDraft = async (id: string) => {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    const { error } = await supabase
+      .from('client_delivery_log')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.error('Dismiss draft failed:', error);
+      await fetchEntries(); // revert on error
+    }
+  };
+
+  /** Confirm All — flips every draft to confirmed in one round-trip. */
+  const confirmAllDrafts = async () => {
+    if (pendingReviewEntries.length === 0) return;
+    const ids = pendingReviewEntries.map(e => e.id);
+    setEntries(prev => prev.map(e => ids.includes(e.id) ? { ...e, pending_review: false } : e));
+    const { error } = await supabase
+      .from('client_delivery_log')
+      .update({ pending_review: false, updated_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) {
+      console.error('Confirm all drafts failed:', error);
+      await fetchEntries();
+    }
+  };
 
   // Render an editable cell (KOL-style: double-click to edit text, blur to save, selects save immediately)
   const renderEditableCell = (entry: DeliveryLogEntry, field: string, type: 'text' | 'textarea' | 'select-type' | 'select-trigger' | 'who' = 'text') => {
@@ -703,6 +766,141 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
           )}
         </div>
       </div>
+
+      {/* ─── Phase 3 — Pending Review section ───────────────────────
+          Drafts auto-created when a Weekly Update "This Week" item
+          flips to done. Sits above the main Entries table, amber-bg
+          so it reads as "needs your attention." Each row is a
+          compact form — pre-filled action/date/type from the Zone B
+          item, blank Who/How/Where/Trigger that the CM fills in
+          before clicking Confirm. Dismiss removes the draft without
+          logging it. Confirm All shows when every draft has at
+          least a Who filled (the spec's minimum signal of
+          completeness). */}
+      {pendingReviewEntries.length > 0 && (
+        <div className="mt-5">
+          <Card className="border-amber-200 bg-amber-50/40 overflow-hidden">
+            <div className="px-4 py-3 border-b border-amber-200 bg-amber-50 flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">Pending Review</p>
+                <p className="text-xs text-amber-800/80">
+                  {pendingReviewEntries.length} draft{pendingReviewEntries.length === 1 ? '' : 's'} from the Weekly Update feed · fill in details, then Confirm
+                </p>
+              </div>
+              {pendingReviewEntries.every(e => !!e.who) && pendingReviewEntries.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="brand"
+                  className="h-8 text-xs"
+                  onClick={confirmAllDrafts}
+                >
+                  Confirm All ({pendingReviewEntries.length})
+                </Button>
+              )}
+            </div>
+            <div className="divide-y divide-amber-200">
+              {pendingReviewEntries.map(draft => (
+                <div key={draft.id} className="px-4 py-3 space-y-2 hover:bg-amber-50/60">
+                  {/* Top line: pre-filled fields read-only-ish, with
+                      visual cues that they came from the Zone B item. */}
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs text-ink-warm-500 mb-0.5">
+                        <CalendarIcon className="h-3 w-3" />
+                        {new Date(draft.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <span className="text-amber-700/70">·</span>
+                        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${workTypeBadge(draft.work_type)}`}>
+                          {draft.work_type}
+                        </span>
+                        <span className="text-amber-700/70">·</span>
+                        <span className="text-[10px] text-amber-700 italic">from This Week feed</span>
+                      </div>
+                      <p className="text-sm font-medium text-ink-warm-900">{draft.action}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="brand"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => confirmDraft(draft.id)}
+                        disabled={!draft.who}
+                        title={!draft.who ? 'Add a Who before confirming' : 'Move this draft to the main log'}
+                      >
+                        Confirm
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs border-rose-300 text-rose-600 hover:bg-rose-50"
+                        onClick={() => dismissDraft(draft.id)}
+                      >
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Empty-fields row — Who / How / Where / Trigger /
+                      Notes inputs that the CM fills before confirming.
+                      Compact inline inputs so the section doesn't
+                      explode to full-table width. Save on blur. */}
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    {(() => {
+                      // Tiny helper to upsert one field on a draft
+                      // optimistically + persist on blur.
+                      const setDraftField = async (field: keyof DeliveryLogEntry, value: string) => {
+                        const next = value.trim() || null;
+                        setEntries(prev => prev.map(e => e.id === draft.id ? { ...e, [field]: next, updated_at: new Date().toISOString() } : e));
+                        await supabase
+                          .from('client_delivery_log')
+                          .update({ [field]: next, updated_at: new Date().toISOString() } as any)
+                          .eq('id', draft.id);
+                      };
+                      return (
+                        <>
+                          <Input
+                            defaultValue={draft.who || ''}
+                            placeholder="Who"
+                            className="h-8 text-xs focus-brand bg-white"
+                            onBlur={(e) => setDraftField('who', e.target.value)}
+                          />
+                          <Input
+                            defaultValue={draft.method || ''}
+                            placeholder="How (method)"
+                            className="h-8 text-xs focus-brand bg-white"
+                            onBlur={(e) => setDraftField('method', e.target.value)}
+                          />
+                          <Input
+                            defaultValue={draft.location || ''}
+                            placeholder="Where"
+                            className="h-8 text-xs focus-brand bg-white"
+                            onBlur={(e) => setDraftField('location', e.target.value)}
+                          />
+                          <Select
+                            value={draft.trigger || ''}
+                            onValueChange={(v) => setDraftField('trigger', v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs focus-brand bg-white">
+                              <SelectValue placeholder="Trigger" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TRIGGERS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            defaultValue={draft.notes || ''}
+                            placeholder="Notes (optional)"
+                            className="h-8 text-xs focus-brand bg-white"
+                            onBlur={(e) => setDraftField('notes', e.target.value)}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Table — v11 spreadsheet chrome matching parent
           /delivery-logs: Card wrapper + bg-cream-50 header +

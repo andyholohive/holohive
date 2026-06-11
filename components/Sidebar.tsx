@@ -15,6 +15,10 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+// [2026-06-11] NotificationBell removed per Andy's call. "This Week"
+// snapshot on the portal becomes the visibility mechanism (driven by
+// the curated Weekly Update tab landing in Post-Onboarding spec Phase 2).
+// Clients don't actively check the portal — a bell is wasted UX.
 
 interface SidebarProps {
   children: React.ReactNode;
@@ -790,13 +794,22 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Admin Section — hidden for guests */}
               {!guestHideAlways && (
                 <CollapsibleSection id="admin" icon={Settings}>
-                  {/* Single "Admin Tools" entry — combines Field Options,
-                      Claude MCP, and Archive into a tabbed /admin page.
-                      Original routes (/admin/field-options, /mcp, /archive)
-                      still work for direct linking + bookmarks; this just
-                      collapses three sidebar entries into one. */}
+                  {/* "Admin Tools" entry — combines Field Options +
+                      Claude MCP into a tabbed /admin page. Original
+                      routes (/admin/field-options, /mcp) still work for
+                      direct linking + bookmarks.
+
+                      [2026-06-08] Archive was promoted out of the
+                      Admin Tools tabs into its own NavItem below —
+                      it's a destination view (search + restore of
+                      archived records), not a config surface, so it
+                      reads better as its own sidebar entry. Sitting as
+                      the last item in the lowest section also matches
+                      the "rarely used, easy to find when needed"
+                      mental model for archived content. */}
                   <NavItem href="/admin" icon={Sliders} label="Admin Tools" />
                   {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
+                  <NavItem href="/archive" icon={Archive} label="Archive" />
                 </CollapsibleSection>
               )}
 
@@ -811,7 +824,8 @@ export default function Sidebar({ children }: SidebarProps) {
                 a cream hairline. The whole row is the dropdown trigger
                 so users get a big tap target. */}
             {userProfile && (
-              <div className="px-3 py-3 border-t border-cream-200">
+              <div className="px-3 py-3 border-t border-cream-200 space-y-1">
+                {/* [2026-06-11] NotificationBell removed — see comment at top. */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
