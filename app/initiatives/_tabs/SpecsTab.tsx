@@ -832,6 +832,9 @@ function FeatureRow({
           {feature.test_reference && (
             <TestReferenceChip reference={feature.test_reference} pickerOptions={pickerOptions} />
           )}
+          {feature.test_instructions && (
+            <TestInstructionsBlock instructions={feature.test_instructions} />
+          )}
           {feature.notes && !notesOpen && (
             <p className="text-[11px] text-ink-warm-600 italic">📝 {feature.notes}</p>
           )}
@@ -1141,6 +1144,40 @@ function DocUploadDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * "How to validate this" collapsible block. Sits under the
+ * test_reference chip. Default collapsed so the feature list stays
+ * scannable; expand for the step-by-step.
+ *
+ * Renders newlines as separate paragraphs so SQL inserts can use
+ * plain `\n` line breaks. No Markdown parsing — keep it boring.
+ */
+function TestInstructionsBlock({ instructions }: { instructions: string }) {
+  const [open, setOpen] = useState(false);
+  const lines = instructions.split('\n').map(l => l.trim()).filter(Boolean);
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(prev => !prev); }}
+        className="inline-flex items-center gap-1 text-[10px] text-ink-warm-500 hover:text-brand transition-colors"
+      >
+        <ChevronDown className={`h-2.5 w-2.5 transition-transform ${open ? 'rotate-0' : '-rotate-90'}`} />
+        <span>How to test ({lines.length} step{lines.length === 1 ? '' : 's'})</span>
+      </button>
+      {open && (
+        <ul className="mt-1.5 ml-3 space-y-1 border-l-2 border-brand/20 pl-2.5">
+          {lines.map((line, i) => (
+            <li key={i} className="text-[11px] leading-snug text-ink-warm-700">
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

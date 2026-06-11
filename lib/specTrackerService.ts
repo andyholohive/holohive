@@ -47,6 +47,13 @@ export type SpecFeature = {
    * `http`, plain text otherwise.
    */
   test_reference: string | null;
+  /**
+   * [2026-06-12] "How to validate this" steps. Multi-line text rendered as
+   * a collapsed-by-default block under the test_reference chip. Typical
+   * format: 2-5 numbered steps with concrete actions + observations + the
+   * success/failure signal at the end.
+   */
+  test_instructions: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
