@@ -100,8 +100,30 @@ export default function SpecsTab() {
 
   const [specs, setSpecs] = useState<SpecCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+
+  // [2026-06-12] URL-linked spec routing — `?tab=specs&spec=<id>` deep
+  // links straight to the detail view. Browser back/forward + share-URL
+  // both work. Reads + writes via URLSearchParams so we don't add a
+  // routing library dependency.
+  const [selectedSpecId, setSelectedSpecId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('spec');
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (selectedSpecId) params.set('spec', selectedSpecId);
+    else params.delete('spec');
+    const next = `${window.location.pathname}?${params.toString()}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [selectedSpecId]);
+
+  // [2026-06-12] Test-status filter tabs. Filters the spec grid + drives
+  // worst-status pill emphasis on cards.
+  const [statusFilter, setStatusFilter] = useState<'all' | TestStatus>('all');
 
   // Doc upload dialog
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -161,13 +183,36 @@ export default function SpecsTab() {
   }
 
   const filteredSpecs = useMemo(() => {
-    if (!search.trim()) return specs;
-    const q = search.toLowerCase();
-    return specs.filter(s =>
-      s.name.toLowerCase().includes(q)
-      || (s.summary && s.summary.toLowerCase().includes(q)),
-    );
-  }, [specs, search]);
+    let rows = specs;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter(s =>
+        s.name.toLowerCase().includes(q)
+        || (s.summary && s.summary.toLowerCase().includes(q)),
+      );
+    }
+    if (statusFilter !== 'all') {
+      // Match if the spec has at least one feature in this status — that
+      // way "Issues" surfaces every spec with at least one issue, even if
+      // the overall worst status is broken.
+      rows = rows.filter(s => (s.rollup as any)[statusFilter] > 0);
+    }
+    return rows;
+  }, [specs, search, statusFilter]);
+
+  // Totals for the tab chip counts. Sum feature-status counts across all
+  // specs so each tab tells you how much work remains in that bucket.
+  const statusTotals = useMemo(() => {
+    const totals = { all: 0, working: 0, untested: 0, issues: 0, broken: 0 };
+    for (const s of specs) {
+      totals.all += s.rollup.total;
+      totals.working += s.rollup.working;
+      totals.untested += s.rollup.untested;
+      totals.issues += s.rollup.issues;
+      totals.broken += s.rollup.broken;
+    }
+    return totals;
+  }, [specs]);
 
   if (selectedSpecId) {
     return (
@@ -203,6 +248,37 @@ export default function SpecsTab() {
             onChange={(e) => setSearch(e.target.value)}
             className="focus-brand h-9 pl-8"
           />
+        </div>
+        {/* [2026-06-12] Status filter tabs. Click a tab → grid narrows to
+            specs that have at least one feature in that status. Counts
+            are total feature-status counts across all specs. */}
+        <div className="flex items-center gap-1 bg-cream-100 p-1 rounded-md border border-cream-200">
+          {([
+            { key: 'all',      label: 'All',      count: statusTotals.all,      color: 'text-ink-warm-900' },
+            { key: 'working',  label: 'Working',  count: statusTotals.working,  color: 'text-emerald-700' },
+            { key: 'untested', label: 'Untested', count: statusTotals.untested, color: 'text-ink-warm-600' },
+            { key: 'issues',   label: 'Issues',   count: statusTotals.issues,   color: 'text-amber-700' },
+            { key: 'broken',   label: 'Broken',   count: statusTotals.broken,   color: 'text-rose-700' },
+          ] as const).map(t => {
+            const active = statusFilter === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setStatusFilter(t.key)}
+                className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                  active
+                    ? 'bg-white shadow-card font-medium ' + t.color
+                    : 'text-ink-warm-600 hover:text-ink-warm-900'
+                }`}
+              >
+                {t.label}
+                <span className={`ml-1.5 tabular-nums ${active ? 'opacity-80' : 'opacity-60'}`}>
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
           <Upload className="h-3.5 w-3.5 mr-1.5" />
