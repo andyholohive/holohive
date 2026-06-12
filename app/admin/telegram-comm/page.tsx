@@ -17,7 +17,7 @@
  * a similar multi-user picker for non-super-admin approvers).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,7 +27,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
-  ExternalLink, Plus, X, MessagesSquare,
+  ExternalLink, Plus, X, MessagesSquare, ChevronRight,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -275,17 +275,16 @@ export default function LineupSettingsPage() {
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* ─── Approvers section ─── */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <UserCheck className="h-4 w-4 text-brand" />
-          <h3 className="text-sm font-semibold text-ink-warm-900">Lineup Approvers</h3>
-        </div>
-        <p className="text-xs text-ink-warm-500 mb-3">
-          Every user listed below receives a TG DM when a lineup is proposed. Anyone in the list can confirm a proposed lineup. Empty list → falls back to <code className="bg-cream-100 px-1 rounded text-[10px]">LINEUP_APPROVER_EMAIL</code> env var, then <code className="bg-cream-100 px-1 rounded text-[10px]">jdot@holohive.io</code>.
-        </p>
-
+      <CollapsibleSection
+        icon={UserCheck}
+        title="Lineup Approvers"
+        badge={!approversLoading ? <CountChip n={approvers.length} /> : null}
+        subtitle={(
+          <>Every user listed below receives a TG DM when a lineup is proposed. Anyone in the list can confirm a proposed lineup. Empty list → falls back to <code className="bg-cream-100 px-1 rounded text-[10px]">LINEUP_APPROVER_EMAIL</code> env var, then <code className="bg-cream-100 px-1 rounded text-[10px]">jdot@holohive.io</code>.</>
+        )}
+      >
         {approversLoading ? (
           <Skeleton className="h-32 rounded-lg" />
         ) : (
@@ -364,18 +363,17 @@ export default function LineupSettingsPage() {
             </CardContent>
           </Card>
         )}
-      </section>
+      </CollapsibleSection>
 
       {/* ─── Per-campaign ops chat section ─── */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <MessageCircle className="h-4 w-4 text-brand" />
-          <h3 className="text-sm font-semibold text-ink-warm-900">Campaign Ops Chats</h3>
-        </div>
-        <p className="text-xs text-ink-warm-500 mb-3">
-          Telegram group chat where confirmed lineups get auto-posted (§ 6.3). Pick from the list of chats HHP has seen — same source as <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>.
-        </p>
-
+      <CollapsibleSection
+        icon={MessageCircle}
+        title="Campaign Ops Chats"
+        badge={!campaignsLoading ? <CountChip n={campaigns.filter(c => c.tg_ops_group_id).length} total={campaigns.length} /> : null}
+        subtitle={(
+          <>Telegram group chat where confirmed lineups get auto-posted (§ 6.3). Pick from the list of chats HHP has seen — same source as <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>.</>
+        )}
+      >
         <Card className="border-cream-200">
           <div className="p-3 border-b border-cream-100">
             <div className="relative">
@@ -526,7 +524,7 @@ export default function LineupSettingsPage() {
             )}
           </CardContent>
         </Card>
-      </section>
+      </CollapsibleSection>
 
       {/* ─── Content Review Channel section [2026-06-12] ─── */}
       <ContentReviewChannelSection />
@@ -596,15 +594,18 @@ function ContentReviewChannelSection() {
   }
 
   return (
-    <section>
-      <div className="flex items-center gap-2 mb-3">
-        <MessagesSquare className="h-4 w-4 text-brand" />
-        <h3 className="text-sm font-semibold text-ink-warm-900">Content Review Channel</h3>
-      </div>
-      <p className="text-xs text-ink-warm-500 mb-3">
-        Central TG channel where KOL <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> forwards land with Approve/Reject buttons. Per the TG Bot Content Submission spec — one channel for the whole team, not per-campaign. Pick a chat (or a specific forum topic inside it). Approve/Reject reply goes back to the KOL&apos;s per-KOL group chat.
-      </p>
-
+    <CollapsibleSection
+      icon={MessagesSquare}
+      title="Content Review Channel"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm"><span className="inline-flex items-center gap-1"><AlertTriangle className="h-2.5 w-2.5" />Unset</span></StatusBadge>)
+        : null}
+      subtitle={(
+        <>Central TG channel where KOL <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> forwards land with Approve/Reject buttons. Per the TG Bot Content Submission spec — one channel for the whole team, not per-campaign. Pick a chat (or a specific forum topic inside it). Approve/Reject reply goes back to the KOL&apos;s per-KOL group chat.</>
+      )}
+    >
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
@@ -644,7 +645,63 @@ function ContentReviewChannelSection() {
           )}
         </CardContent>
       </Card>
+    </CollapsibleSection>
+  );
+}
+
+// ─── Collapsible section wrapper + small count chip ──────────────────
+
+/**
+ * Per Andy 2026-06-12: Telegram Comm sections start collapsed so the
+ * page lands clean. Click the header to toggle. The badge (count chip
+ * or status pill) stays visible while collapsed so you can see at a
+ * glance how many approvers/campaigns are configured.
+ */
+function CollapsibleSection({
+  icon: Icon,
+  title,
+  subtitle,
+  badge,
+  defaultOpen = false,
+  children,
+}: {
+  icon: any;
+  title: string;
+  subtitle?: ReactNode;
+  badge?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 -mx-2 px-2 py-1.5 rounded-md hover:bg-cream-50/60 transition-colors group"
+      >
+        <ChevronRight className={`h-4 w-4 text-ink-warm-400 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <Icon className="h-4 w-4 text-brand" />
+        <h3 className="text-sm font-semibold text-ink-warm-900">{title}</h3>
+        {badge && <span className="ml-1">{badge}</span>}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          {subtitle && <p className="text-xs text-ink-warm-500">{subtitle}</p>}
+          {children}
+        </div>
+      )}
     </section>
+  );
+}
+
+/** Small N or N/total chip for collapsed-section glance state. */
+function CountChip({ n, total }: { n: number; total?: number }) {
+  return (
+    <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-light text-brand font-semibold tabular-nums">
+      {total !== undefined ? `${n}/${total}` : n}
+    </span>
   );
 }
 
