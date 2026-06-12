@@ -121,9 +121,6 @@ export default function SpecsTab() {
     }
   }, [selectedSpecId]);
 
-  // [2026-06-12] Test-status filter tabs. Filters the spec grid + drives
-  // worst-status pill emphasis on cards.
-  const [statusFilter, setStatusFilter] = useState<'all' | TestStatus>('all');
 
   // Doc upload dialog
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -183,36 +180,13 @@ export default function SpecsTab() {
   }
 
   const filteredSpecs = useMemo(() => {
-    let rows = specs;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      rows = rows.filter(s =>
-        s.name.toLowerCase().includes(q)
-        || (s.summary && s.summary.toLowerCase().includes(q)),
-      );
-    }
-    if (statusFilter !== 'all') {
-      // Match if the spec has at least one feature in this status — that
-      // way "Issues" surfaces every spec with at least one issue, even if
-      // the overall worst status is broken.
-      rows = rows.filter(s => (s.rollup as any)[statusFilter] > 0);
-    }
-    return rows;
-  }, [specs, search, statusFilter]);
-
-  // Totals for the tab chip counts. Sum feature-status counts across all
-  // specs so each tab tells you how much work remains in that bucket.
-  const statusTotals = useMemo(() => {
-    const totals = { all: 0, working: 0, untested: 0, issues: 0, broken: 0 };
-    for (const s of specs) {
-      totals.all += s.rollup.total;
-      totals.working += s.rollup.working;
-      totals.untested += s.rollup.untested;
-      totals.issues += s.rollup.issues;
-      totals.broken += s.rollup.broken;
-    }
-    return totals;
-  }, [specs]);
+    if (!search.trim()) return specs;
+    const q = search.toLowerCase();
+    return specs.filter(s =>
+      s.name.toLowerCase().includes(q)
+      || (s.summary && s.summary.toLowerCase().includes(q)),
+    );
+  }, [specs, search]);
 
   if (selectedSpecId) {
     return (
@@ -248,37 +222,6 @@ export default function SpecsTab() {
             onChange={(e) => setSearch(e.target.value)}
             className="focus-brand h-9 pl-8"
           />
-        </div>
-        {/* [2026-06-12] Status filter tabs. Click a tab → grid narrows to
-            specs that have at least one feature in that status. Counts
-            are total feature-status counts across all specs. */}
-        <div className="flex items-center gap-1 bg-cream-100 p-1 rounded-md border border-cream-200">
-          {([
-            { key: 'all',      label: 'All',      count: statusTotals.all,      color: 'text-ink-warm-900' },
-            { key: 'working',  label: 'Working',  count: statusTotals.working,  color: 'text-emerald-700' },
-            { key: 'untested', label: 'Untested', count: statusTotals.untested, color: 'text-ink-warm-600' },
-            { key: 'issues',   label: 'Issues',   count: statusTotals.issues,   color: 'text-amber-700' },
-            { key: 'broken',   label: 'Broken',   count: statusTotals.broken,   color: 'text-rose-700' },
-          ] as const).map(t => {
-            const active = statusFilter === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setStatusFilter(t.key)}
-                className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                  active
-                    ? 'bg-white shadow-card font-medium ' + t.color
-                    : 'text-ink-warm-600 hover:text-ink-warm-900'
-                }`}
-              >
-                {t.label}
-                <span className={`ml-1.5 tabular-nums ${active ? 'opacity-80' : 'opacity-60'}`}>
-                  {t.count}
-                </span>
-              </button>
-            );
-          })}
         </div>
         <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
           <Upload className="h-3.5 w-3.5 mr-1.5" />
@@ -539,6 +482,11 @@ function SpecDetailView({
   const [deleteFeatureTarget, setDeleteFeatureTarget] = useState<SpecFeature | null>(null);
   const [deletingFeature, setDeletingFeature] = useState(false);
 
+  // [2026-06-12] Test-status filter tabs within the detail view. Narrows
+  // the feature list to a single status bucket so the validator can focus
+  // on just the working / untested / issues / broken slice.
+  const [statusFilter, setStatusFilter] = useState<'all' | TestStatus>('all');
+
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -697,15 +645,52 @@ function SpecDetailView({
 
       {/* Feature list */}
       <Card className="border-cream-200">
-        <div className="px-4 py-3 border-b border-cream-100 bg-cream-50/40">
+        <div className="px-4 py-3 border-b border-cream-100 bg-cream-50/40 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm font-semibold text-ink-warm-900">Features</p>
+          {/* [2026-06-12] Status filter tabs in the detail view. Counts
+              come from this spec's rollup, not the whole tracker. */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-md border border-cream-200">
+            {([
+              { key: 'all',      label: 'All',      count: spec.rollup.total,     color: 'text-ink-warm-900' },
+              { key: 'working',  label: 'Working',  count: spec.rollup.working,   color: 'text-emerald-700' },
+              { key: 'untested', label: 'Untested', count: spec.rollup.untested,  color: 'text-ink-warm-600' },
+              { key: 'issues',   label: 'Issues',   count: spec.rollup.issues,    color: 'text-amber-700' },
+              { key: 'broken',   label: 'Broken',   count: spec.rollup.broken,    color: 'text-rose-700' },
+            ] as const).map(t => {
+              const active = statusFilter === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setStatusFilter(t.key)}
+                  className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                    active
+                      ? 'bg-cream-100 shadow-sm font-medium ' + t.color
+                      : 'text-ink-warm-600 hover:text-ink-warm-900'
+                  }`}
+                >
+                  {t.label}
+                  <span className={`ml-1.5 tabular-nums ${active ? 'opacity-80' : 'opacity-60'}`}>
+                    {t.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <CardContent className="p-0">
           {spec.features.length === 0 ? (
             <p className="p-6 text-center text-xs text-ink-warm-500 italic">No features yet.</p>
-          ) : (
+          ) : (() => {
+            const visible = statusFilter === 'all'
+              ? spec.features
+              : spec.features.filter(f => f.test_status === statusFilter);
+            if (visible.length === 0) {
+              return <p className="p-6 text-center text-xs text-ink-warm-500 italic">No features in this status.</p>;
+            }
+            return (
             <ul className="divide-y divide-cream-100">
-              {spec.features.map(feature => (
+              {visible.map(feature => (
                 <FeatureRow
                   key={feature.id}
                   feature={feature}
@@ -733,7 +718,8 @@ function SpecDetailView({
                 />
               ))}
             </ul>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
 
