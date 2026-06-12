@@ -44,6 +44,7 @@ import { KolDashboardOverview } from "@/components/campaign/KolDashboardOverview
 import { KolDashboardCardsView } from "@/components/campaign/KolDashboardCardsView";
 import { KolDashboardTableView } from "@/components/campaign/KolDashboardTableView";
 import { BudgetOverview } from "@/components/campaign/BudgetOverview";
+import { BudgetDashboardV2 } from "@/components/campaign/BudgetDashboardV2";
 import { BudgetTableView } from "@/components/campaign/BudgetTableView";
 import { ContentDashboardOverview } from "@/components/campaign/ContentDashboardOverview";
 import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
@@ -2595,7 +2596,7 @@ const CampaignDetailsPage = () => {
                     `components/campaign/BudgetOverview.tsx` on
                     2026-06-02. Read-only: 3-KPI hero + Regional
                     Budget Summary grid + 4 recharts panels. */}
-                {paymentViewMode === 'graph' && <BudgetOverview />}
+                {paymentViewMode === 'graph' && <BudgetDashboardV2 />}
               </div>
           </TabsContent>
 

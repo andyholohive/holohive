@@ -50,6 +50,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   BACKLOG_WEEKLY_SUMMARY: 1,   // weekly (Monday) — Phase 5 of HHP Backlog spec
   LINEUP_COMPLETION: 1,        // daily — HHP Lineup Manager Spec § 4.1 auto-completion
   DELIVERABLE_RECURRENCE: 1,   // daily — HHP Deliverable Templates spec Template 2 Notes
+  STINT_LAPSE_SWEEP: 1,        // daily — HHP Stint+Period F1 auto-stamp churn after grace
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

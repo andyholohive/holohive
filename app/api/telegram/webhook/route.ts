@@ -2213,6 +2213,30 @@ async function finalizeSubmission(opts: {
   platform: string;
   contentType: string;
 }): Promise<string | null> {
+  // [2026-06-12] F3 dual-write: also create the canonical content_items
+  // row so the rest of HHP (dashboards, leaderboards, lineup_slots.status)
+  // can read a single source. content_submissions stays for v1 review
+  // queue compat; eventually approval there will just flip status here.
+  await (supabaseAdmin as any)
+    .from('content_items')
+    .insert({
+      kol_id: opts.kolId,
+      campaign_id: opts.campaignId,
+      type: opts.contentType,
+      link: opts.link,
+      status: 'submitted',
+    })
+    .select('id')
+    .single()
+    .then(() => {/* idempotent — dup-link is fine, the unique index catches */})
+    .catch((err: any) => {
+      // Most expected error is 23505 (duplicate link) — the staging row
+      // path below handles user feedback. Log anything else for debug.
+      if (err?.code !== '23505') {
+        console.warn('[/submit F3] content_items mirror insert failed:', err);
+      }
+    });
+
   // Insert. The UNIQUE partial index handles dup-link rejection in the DB.
   const { data: row, error } = await (supabaseAdmin as any)
     .from('content_submissions')
@@ -2290,6 +2314,16 @@ async function finalizeSubmission(opts: {
     submittedAt: submittedLabel,
   });
 
+  // [2026-06-12] Fire the Submission-Progress Alert to the campaign's
+  // tg_ops_group_id. Bot counts live posts + shows target cadence + tells
+  // team when a day is full. Safe to call; suppresses silently if no
+  // ops group configured.
+  await sendSubmissionProgressAlert({
+    campaignId: opts.campaignId,
+    campaignName: opts.campaignName,
+    kolName: opts.kolName,
+  });
+
   return submissionId;
 }
 
@@ -2299,6 +2333,117 @@ async function finalizeSubmission(opts: {
  * (key: content_submissions_channel_id) so ops can change it without
  * a Vercel redeploy. Skips silently if no channel is set (logs).
  */
+/**
+ * [2026-06-12] HHP Submission-Progress Alert — fires after every
+ * successful /submit. Posts day-split + daily quota push to the
+ * campaign's tg_ops_group_id. Bot counts; team paces.
+ *
+ * Data sources (all already exist):
+ *   - Live count: distinct content_items WHERE campaign + this week
+ *   - Planned count: lineup_slots for campaign's current confirmed week
+ *   - Destination: campaigns.tg_ops_group_id
+ *   - KOL name: rendered live from master_kols
+ *
+ * Day-split: 1-4 KOLs → 2-day, 5+ → 3-day. Daily quota = ceil(planned/days).
+ * Push line appears when today's count hits quota.
+ *
+ * Edge cases: no confirmed lineup → omit % + split + push line. No ops
+ * group configured → suppress + log warning.
+ */
+async function sendSubmissionProgressAlert(opts: {
+  campaignId: string;
+  campaignName: string;
+  kolName: string;
+}) {
+  // Get ops group id
+  const { data: campaign } = await (supabaseAdmin as any)
+    .from('campaigns')
+    .select('id, name, tg_ops_group_id, start_date')
+    .eq('id', opts.campaignId)
+    .maybeSingle();
+  const opsGroup = campaign?.tg_ops_group_id;
+  if (!opsGroup) {
+    console.log('[progress-alert] No tg_ops_group_id for campaign — suppressed.');
+    return;
+  }
+
+  // Compute this-week boundary (Monday-anchored — simple v1; F1
+  // refinement to stint-anchored is a v2 polish).
+  const today = new Date();
+  const dow = today.getUTCDay() || 7; // 1-7 ISO
+  const weekStart = new Date(today);
+  weekStart.setUTCDate(today.getUTCDate() - (dow - 1));
+  weekStart.setUTCHours(0, 0, 0, 0);
+
+  // Live count: distinct content_items this week (F3 path) — fallback to
+  // content_submissions if F3 isn't fully wired yet.
+  const { data: liveRows } = await (supabaseAdmin as any)
+    .from('content_items')
+    .select('id, kol_id')
+    .eq('campaign_id', opts.campaignId)
+    .gte('submitted_at', weekStart.toISOString())
+    .neq('status', 'rejected');
+  const liveCount = (liveRows ?? []).length;
+
+  // Today's count
+  const todayStart = new Date(today);
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const { data: todayRows } = await (supabaseAdmin as any)
+    .from('content_items')
+    .select('id')
+    .eq('campaign_id', opts.campaignId)
+    .gte('submitted_at', todayStart.toISOString())
+    .neq('status', 'rejected');
+  const todayCount = (todayRows ?? []).length;
+
+  // Planned count: lineup_slots for this campaign + current week.
+  // The lineup schema keys by lineup_id; we look up the active campaign_lineup.
+  const { data: lineup } = await (supabaseAdmin as any)
+    .from('campaign_lineups')
+    .select('id, status')
+    .eq('campaign_id', opts.campaignId)
+    .eq('status', 'confirmed')
+    .gte('week_start_date', weekStart.toISOString().slice(0, 10))
+    .order('week_start_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let plannedCount = 0;
+  if (lineup?.id) {
+    const { data: slots } = await (supabaseAdmin as any)
+      .from('lineup_slots')
+      .select('id')
+      .eq('lineup_id', lineup.id);
+    plannedCount = (slots ?? []).length;
+  }
+
+  // Day-split rule
+  const days = plannedCount >= 5 ? 3 : 2;
+  const dailyQuota = plannedCount > 0 ? Math.ceil(plannedCount / days) : 0;
+  const quotaMet = todayCount >= dailyQuota && dailyQuota > 0;
+
+  // Build the alert message
+  const lines: string[] = [];
+  lines.push(`📥 <b>${escapeHtml(opts.campaignName)}</b>, post live`);
+  lines.push(`<b>${escapeHtml(opts.kolName)}</b> just posted.`);
+  if (plannedCount > 0) {
+    const pct = Math.round((liveCount / plannedCount) * 100);
+    lines.push(`${liveCount} of ${plannedCount} live this week (${pct}%).`);
+    lines.push(`Target: ${days}-day split, about ${dailyQuota}/day.`);
+    if (quotaMet) {
+      lines.push('');
+      lines.push(`✅ Today's quota met (${todayCount} of ${dailyQuota}).`);
+      lines.push('Push anyone still drafting today to post tomorrow.');
+    }
+  } else {
+    // No confirmed lineup: omit the breakdown per spec edge case
+    lines.push(`${liveCount} live this week.`);
+    lines.push('<i>No confirmed lineup yet.</i>');
+  }
+
+  await sendTelegramMessage(opsGroup, lines.join('\n'), 'HTML');
+}
+
 async function forwardSubmissionToReviewChannel(opts: {
   submissionId: string;
   kolName: string;
@@ -2511,6 +2656,25 @@ async function handleSubmReviewCallback(
     await answerCallbackQuery(callbackId, 'Update failed.');
     return;
   }
+
+  // [2026-06-12] F3 mirror: flip the content_items row matched by
+  // (campaign_id, link). Approve → status=approved + approved_at + approved_by.
+  // Reject → status=rejected. Best-effort; staging row is already the
+  // user-visible state.
+  await (supabaseAdmin as any)
+    .from('content_items')
+    .update(
+      action === 'approve'
+        ? {
+            status: 'approved',
+            approved_at: new Date().toISOString(),
+            approved_by: teamMember.id,
+            updated_at: new Date().toISOString(),
+          }
+        : { status: 'rejected', updated_at: new Date().toISOString() },
+    )
+    .eq('link', sub.link)
+    .neq('status', 'rejected');
 
   // Edit the review-channel message to reflect the decision (replaces the
   // buttons so it can't be tapped again).

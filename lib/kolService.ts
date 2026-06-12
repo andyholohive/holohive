@@ -23,6 +23,10 @@ export interface MasterKOL {
   group_chat: boolean | null;
   in_house: string | null;
   description: string | null;
+  /** Renamed alias per KOL DB Overhaul May '26. DB-level trigger keeps notes + description in sync; new code can read either. */
+  notes?: string | null;
+  /** Renamed alias per KOL DB Overhaul May '26. Same DB sync as notes. */
+  community_founder?: boolean | null;
   wallet: string | null;
   projects_worked_together: string[] | null;
   created_at: string | null;
