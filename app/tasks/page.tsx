@@ -26,6 +26,7 @@ import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import { ThisWeekFeedWidget } from '@/components/tasks/ThisWeekFeedWidget';
 import { PreShipGateModal, logPreShipGate, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
 import { RecurringConfigEditor } from '@/components/tasks/RecurringConfig';
+import { InitiativesTaskTab } from '@/components/tasks/InitiativesTaskTab';
 import { DeliverableService } from '@/lib/deliverableService';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -1945,6 +1946,17 @@ export default function TasksPage() {
                     Deliverables
                     <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full tabular-nums">{deliverableCount}</span>
                   </TabsTrigger>
+                  {/* [2026-06-12] Initiatives tab per Appendix v3 Initiative
+                      Milestones Add-on placement: "Initiatives are a new tab
+                      on HQ (/tasks), alongside One-Time, Recurring, and
+                      Deliverables." Renders inline table from
+                      InitiativesTaskTab; deep edit still lives at /initiatives. */}
+                  <TabsTrigger
+                    value="initiatives"
+                    className="text-sm px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card"
+                  >
+                    Initiatives
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -2044,6 +2056,11 @@ export default function TasksPage() {
                 )}
               </EmptyState>
             </Card>
+          ) : activeTab === 'initiatives' ? (
+            // [2026-06-12] Initiative Milestones Add-on placement: render
+            // the dedicated tab component, fully separate from the task
+            // grouping logic. Deep edit + create still happens at /initiatives.
+            <InitiativesTaskTab />
           ) : (
             <div className="space-y-4">
               {grouped.map((group, groupIdx) => {
