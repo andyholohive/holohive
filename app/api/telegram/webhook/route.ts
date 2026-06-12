@@ -2257,11 +2257,16 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
     return;
   }
 
+  // [2026-06-12 FIX] Telegram callback_data has a 64-byte hard limit. Two
+  // full UUIDs + "subm:pick::" would be 83 bytes — the message silently
+  // fails to send and the bot appears unresponsive. We use only the first
+  // 8 chars of the campaign UUID (plenty unique within this KOL's small
+  // active-campaign set) and resolve back to the full id on callback.
   const buttons = activeCampaigns.map(c => [{
     text: c.name,
-    callback_data: `subm:pick:${pending.id}:${c.id}`,
+    callback_data: `subm:pick:${pending.id}:${c.id.slice(0, 8)}`,
   }]);
-  buttons.push([{ text: '❌ Cancel', callback_data: `subm:cancel:${pending.id}:_` }]);
+  buttons.push([{ text: '❌ Cancel', callback_data: `subm:cancel:${pending.id}` }]);
   await sendTelegramMessageWithButtons(
     chatId,
     `Which campaign is this for?\n<i>Link:</i> ${escapeHtml(link)}`,
@@ -2570,11 +2575,15 @@ async function forwardSubmissionToReviewChannel(opts: {
 }
 
 /**
- * Handle subm:* button callbacks.
- *   subm:pick:<pending_id>:<campaign_id>    — KOL chose a campaign
- *   subm:cancel:<pending_id>:_              — KOL cancelled the picker
- *   subm:approve:<submission_id>            — team approved
- *   subm:reject:<submission_id>             — team rejected (generic reason)
+ * Handle subm:* button callbacks. Encoding constraints: Telegram caps
+ * callback_data at 64 bytes, so two full UUIDs don't fit. We pass the
+ * pending row UUID (36) + an 8-char campaign UUID prefix and resolve
+ * the prefix back to the full campaign in the picker handler.
+ *
+ *   subm:pick:<pending_id>:<campaign_id_prefix8>  — KOL chose a campaign
+ *   subm:cancel:<pending_id>                       — KOL cancelled the picker
+ *   subm:approve:<submission_id>                   — team approved
+ *   subm:reject:<submission_id>                    — team rejected (generic reason)
  */
 async function handleSubmCallback(cq: any) {
   const callbackId: string = cq.id;
@@ -2586,8 +2595,9 @@ async function handleSubmCallback(cq: any) {
 
   if (action === 'pick' || action === 'cancel') {
     const pendingId = parts[2];
-    const campaignId = parts[3];
-    await handleSubmPickerCallback(cq, action, pendingId, campaignId);
+    // pick: parts[3] is the 8-char campaign UUID prefix; cancel: undefined.
+    const campaignIdPrefix = parts[3];
+    await handleSubmPickerCallback(cq, action, pendingId, campaignIdPrefix);
     return;
   }
   if (action === 'approve' || action === 'reject') {
@@ -2603,7 +2613,15 @@ async function handleSubmPickerCallback(
   cq: any,
   action: 'pick' | 'cancel',
   pendingId: string,
-  campaignId: string,
+  /**
+   * For 'pick': the first 8 chars of the campaign UUID. Encoded short
+   * because Telegram's callback_data limit is 64 bytes and two full
+   * UUIDs would overflow. Resolved to the full campaign by joining
+   * through campaign_kols (the KOL's active campaigns are a small set,
+   * so prefix collisions are functionally impossible). For 'cancel':
+   * unused — pass undefined.
+   */
+  campaignIdPrefix: string | undefined,
 ) {
   const callbackId: string = cq.id;
   const messageChatId = cq.message?.chat?.id?.toString();
@@ -2635,12 +2653,21 @@ async function handleSubmPickerCallback(
     return;
   }
 
-  // Look up the chosen campaign for the friendly name
-  const { data: campaign } = await (supabaseAdmin as any)
-    .from('campaigns')
-    .select('id, name')
-    .eq('id', campaignId)
-    .maybeSingle();
+  // Resolve the 8-char prefix back to the full campaign by walking the
+  // KOL's active assignments. Constrains the search to ~1–10 rows so
+  // collisions are functionally impossible.
+  if (!campaignIdPrefix) {
+    await answerCallbackQuery(callbackId, 'Missing campaign.');
+    return;
+  }
+  const { data: assignments } = await (supabaseAdmin as any)
+    .from('campaign_kols')
+    .select('campaign:campaigns!inner(id, name)')
+    .eq('master_kol_id', pending.kol_id)
+    .is('deleted_at', null);
+  const campaign = ((assignments ?? []) as Array<{ campaign: { id: string; name: string } | null }>)
+    .map(a => a.campaign)
+    .find(c => c?.id?.startsWith(campaignIdPrefix));
   if (!campaign) {
     await answerCallbackQuery(callbackId, 'Campaign not found.');
     return;
