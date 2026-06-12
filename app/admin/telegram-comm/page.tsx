@@ -1,19 +1,20 @@
 'use client';
 
 /**
- * Lineup Manager admin settings.
+ * Telegram Comm — admin settings page (renamed from lineup-settings
+ * 2026-06-12 per Andy). Sections:
  *
- * Two sections, both per HHP Lineup Manager Spec (Jdot, 2026-06-01)
- * plus the multi-approver and chat-picker enhancements requested
- * during testing:
+ *   1. Lineup Approvers — list of users who receive a TG DM when a
+ *      lineup is proposed.
+ *   2. Per-campaign ops group chats — destination for the confirmed-
+ *      lineup post + Submission-Progress Alert.
+ *   3. Content Review Channel — destination for KOL /submit forwards
+ *      with Approve/Reject buttons. Single central channel per the
+ *      TG Bot Content Submission spec § Team Review Flow Option 1.
  *
- *   1. Approvers (§ 7.1, extended) — list of users who receive a
- *      TG DM when a lineup is proposed. Add/remove via picker. Each
- *      row shows TG ID status so admins know who's actually reachable.
- *
- *   2. Per-campaign ops group chats (§ 5.5) — destination for the
- *      confirmed-lineup post. Picker reads from telegram_chats so
- *      operators don't have to copy/paste numeric chat IDs.
+ * The Content Submissions approver list is NOT exposed in this UI yet
+ * (super_admin auto-included covers the common case; future work to add
+ * a similar multi-user picker for non-super-admin approvers).
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -31,6 +32,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 
 type UserRow = {
   id: string;
@@ -525,7 +527,124 @@ export default function LineupSettingsPage() {
           </CardContent>
         </Card>
       </section>
+
+      {/* ─── Content Review Channel section [2026-06-12] ─── */}
+      <ContentReviewChannelSection />
     </div>
+  );
+}
+
+/**
+ * ContentReviewChannelSection — picker for the central KOL /submit review
+ * queue. Uses the shared ChatThreadPicker (chat + optional forum topic).
+ * Writes to app_settings.content_submissions_channel_id +
+ * content_submissions_channel_thread_id.
+ */
+function ContentReviewChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'content_submissions_channel_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'content_submissions_channel_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'content_submissions_channel_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'content_submissions_channel_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Content review destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'Submissions will post in this topic.' : 'Submissions will post in this chat.'
+          : 'Forwards are suppressed silently until set.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-3">
+        <MessagesSquare className="h-4 w-4 text-brand" />
+        <h3 className="text-sm font-semibold text-ink-warm-900">Content Review Channel</h3>
+      </div>
+      <p className="text-xs text-ink-warm-500 mb-3">
+        Central TG channel where KOL <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> forwards land with Approve/Reject buttons. Per the TG Bot Content Submission spec — one channel for the whole team, not per-campaign. Pick a chat (or a specific forum topic inside it). Approve/Reject reply goes back to the KOL&apos;s per-KOL group chat.
+      </p>
+
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              {!savedChatId && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusBadge tone="warning" size="sm">
+                    <span className="inline-flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Not configured
+                    </span>
+                  </StatusBadge>
+                  <span className="text-xs text-ink-warm-500">
+                    /submit forwards are suppressed silently until set.
+                  </span>
+                </div>
+              )}
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Review destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 

@@ -48,6 +48,7 @@ import { BudgetDashboardV2 } from "@/components/campaign/BudgetDashboardV2";
 import { BudgetTableView } from "@/components/campaign/BudgetTableView";
 import { ContentDashboardOverview } from "@/components/campaign/ContentDashboardOverview";
 import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
+import { ContentSubmissionsBanner } from "@/components/campaign/ContentSubmissionsBanner";
 import { MasterKolEditDialog } from "@/components/campaign/MasterKolEditDialog";
 import { EditPaymentDialog } from "@/components/campaign/EditPaymentDialog";
 import { ShareCampaignDialog } from "@/components/campaign/ShareCampaignDialog";
@@ -2447,6 +2448,11 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="contents" className="mt-4">
+              {/* [2026-06-12] Per Andy: KOL /submit pending review banner.
+                  Lives at the top of the Content Dashboard. Auto-hides
+                  when nothing pending. Web fallback for TG-bot approval. */}
+              {campaign?.id && <ContentSubmissionsBanner campaignId={campaign.id} />}
+
               {/* Toolbar row: view-mode toggle on the left, Add
                   Content on the right — merged onto one line. */}
               <div className="mb-3 flex flex-row items-center justify-between gap-2">
