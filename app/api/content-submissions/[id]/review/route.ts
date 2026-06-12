@@ -118,6 +118,7 @@ export async function POST(
   // Dashboard reflects the submission immediately. Closes the F2/F3 loop
   // that previously required manual logging.
   let createdContentId: string | null = null;
+  let createContentError: string | null = null;
   if (action === 'approve') {
     // Find this KOL's campaign_kols row (the relationship key the
     // contents table requires).
@@ -129,20 +130,30 @@ export async function POST(
       .is('deleted_at', null)
       .maybeSingle();
     if (campaignKol?.id) {
-      const { data: contentRow } = await (adminClient as any)
+      // content_submissions uses friendlier values ('X (Twitter)', 'tweet')
+      // than the contents CHECK constraints accept ('X', 'Post'). Map
+      // before inserting so the constraint passes.
+      const { data: contentRow, error: contentErr } = await (adminClient as any)
         .from('contents')
         .insert({
           campaign_kols_id: campaignKol.id,
           campaign_id: sub.campaign_id,
           content_link: sub.link,
-          platform: sub.platform,
-          type: sub.content_type,
+          platform: mapSubmissionPlatformToContents(sub.platform),
+          type: mapSubmissionTypeToContents(sub.content_type),
           status: 'posted',
           activation_date: nowIso.slice(0, 10),
         })
         .select('id')
         .single();
-      createdContentId = (contentRow as any)?.id ?? null;
+      if (contentErr) {
+        console.error('[/api/content-submissions/review] contents insert failed:', contentErr);
+        createContentError = contentErr.message ?? 'insert failed';
+      } else {
+        createdContentId = (contentRow as any)?.id ?? null;
+      }
+    } else {
+      createContentError = 'KOL is not on this campaign (campaign_kols row missing).';
     }
   }
 
@@ -175,5 +186,40 @@ export async function POST(
     action,
     submission_id: params.id,
     created_content_id: createdContentId,
+    create_content_error: createContentError,
   });
+}
+
+/**
+ * content_submissions stores friendlier display values than the contents
+ * table's CHECK constraint accepts. Map to the canonical contents values
+ * so the auto-insert on approve actually lands.
+ *
+ * contents.platform CHECK: ('X', 'Telegram')
+ */
+function mapSubmissionPlatformToContents(p: string | null | undefined): string {
+  const s = (p ?? '').toLowerCase();
+  if (s.includes('telegram') || s === 'tg') return 'Telegram';
+  // X / X (Twitter) / Twitter — everything else collapses to X for now
+  // (YouTube doesn't exist in contents.platform yet; that's a future
+  // schema change, tracked as a v2 gap.)
+  return 'X';
+}
+
+/**
+ * contents.type CHECK: ('Post', 'Video', 'Article', 'AMA', 'Ambassadorship',
+ *                       'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter')
+ */
+function mapSubmissionTypeToContents(t: string | null | undefined): string {
+  const s = (t ?? '').toLowerCase();
+  if (s === 'tweet' || s === 'tg_post' || s === 'post') return 'Post';
+  if (s === 'video') return 'Video';
+  if (s === 'article') return 'Article';
+  if (s === 'ama') return 'AMA';
+  if (s === 'thread') return 'Thread';
+  if (s === 'qrt') return 'QRT';
+  if (s === 'spaces') return 'Spaces';
+  // Default to Post — least surprising; the team can re-classify in the
+  // Content Dashboard if the auto-mapping picked wrong.
+  return 'Post';
 }
