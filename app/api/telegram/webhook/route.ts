@@ -884,15 +884,31 @@ async function resolveTeamMember(message: any): Promise<{ id: string; name: stri
  */
 type ResolvedCaller =
   | { kind: 'team'; id: string; name: string; tgUserId: string }
-  | { kind: 'kol';  id: string; name: string; tgUserId: string }
+  | { kind: 'kol';  id: string; name: string; tgUserId: string; chatId: string }
   | { kind: 'unknown'; tgUserId: string | null };
 
+/**
+ * [2026-06-12 v0.4.2] Refactored per Andy's clarification: KOL identity
+ * resolves via the per-KOL TG GROUP CHAT (the same chats tracked on the
+ * /crm/telegram page), not via a DM bot with master_kols.telegram_id.
+ *
+ * Lookup precedence:
+ *   1. Team check — message sender's TG user_id matches users.telegram_id
+ *   2. KOL group chat — the CHAT (not the sender) is registered in
+ *      telegram_chats with a master_kol_id FK. Anyone posting `/submit` in
+ *      that group is treated as the KOL.
+ *   3. Fallback to master_kols.telegram_id (kept as a secondary DM path)
+ *   4. Unknown
+ *
+ * This matches existing operational reality: HoloHive already has per-KOL
+ * groups where team + KOL collaborate. /submit lives in those groups.
+ */
 async function resolveCaller(message: any): Promise<ResolvedCaller> {
   const tgUserId = message?.from?.id?.toString() ?? null;
+  const tgChatId = message?.chat?.id?.toString() ?? null;
   if (!tgUserId) return { kind: 'unknown', tgUserId: null };
 
-  // Team first — most callers will be team members and the users index is
-  // smaller than master_kols.
+  // 1. Team first — sender's TG user_id maps to a team member.
   const { data: teamRow } = await supabaseAdmin
     .from('users')
     .select('id, name')
@@ -902,16 +918,32 @@ async function resolveCaller(message: any): Promise<ResolvedCaller> {
     return { kind: 'team', id: (teamRow as any).id, name: (teamRow as any).name, tgUserId };
   }
 
-  // KOL fallback. master_kols.telegram_id added in the same session as this
-  // helper; rows without it can't be resolved as KOLs and fall through to
-  // unknown (the spec's exact expectation).
+  // 2. KOL via group chat — preferred per Andy 2026-06-12. The chat where
+  //    the message came from is registered as a per-KOL group via
+  //    telegram_chats.master_kol_id. Same mapping as /crm/telegram page.
+  if (tgChatId) {
+    const { data: chatRow } = await (supabaseAdmin as any)
+      .from('telegram_chats')
+      .select('master_kol_id, master_kols!inner(id, name)')
+      .eq('chat_id', tgChatId)
+      .not('master_kol_id', 'is', null)
+      .maybeSingle();
+    if (chatRow?.master_kol_id) {
+      const kol = (chatRow as any).master_kols;
+      return { kind: 'kol', id: kol.id, name: kol.name, tgUserId, chatId: tgChatId };
+    }
+  }
+
+  // 3. Legacy DM fallback — master_kols.telegram_id lookup. Kept so any
+  //    KOL who DMs the bot directly still resolves. The group-chat path
+  //    above is the operational primary.
   const { data: kolRow } = await (supabaseAdmin as any)
     .from('master_kols')
     .select('id, name')
     .eq('telegram_id', tgUserId)
     .maybeSingle();
   if (kolRow) {
-    return { kind: 'kol', id: kolRow.id, name: kolRow.name, tgUserId };
+    return { kind: 'kol', id: kolRow.id, name: kolRow.name, tgUserId, chatId: tgChatId ?? tgUserId };
   }
 
   return { kind: 'unknown', tgUserId };
@@ -2084,16 +2116,20 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   const caller = await resolveCaller(message);
 
   if (caller.kind !== 'kol') {
-    // Soft reject — team members shouldn't be calling /submit on behalf
-    // of KOLs, and unknown users shouldn't get a useful error.
-    await sendTelegramMessage(
-      chatId,
-      caller.kind === 'team'
-        ? '⚠️ <code>/submit</code> is for KOLs — log content through the dashboards.'
-        : "I don't have you in the KOL system. Ask your HoloHive contact to link your Telegram account.",
-      'HTML',
-      threadId,
-    );
+    // Soft reject. Different copy per caller type:
+    //   - Team: explain /submit isn't for them
+    //   - Unknown in group: explain the chat needs to be linked to a KOL
+    //   - Unknown elsewhere: generic friendly reject
+    let msg = '';
+    if (caller.kind === 'team') {
+      msg = '⚠️ <code>/submit</code> is for KOLs — log content through the dashboards.';
+    } else if (message?.chat?.type && message.chat.type !== 'private') {
+      // Came from a group/supergroup but the group isn't linked to a KOL.
+      msg = "This chat isn't linked to a KOL yet. A HoloHive team member can link it on /crm/telegram. Then /submit will work here.";
+    } else {
+      msg = "I don't recognize you as a KOL. /submit only works in the per-KOL group chat your HoloHive contact set up. Ask them to add the bot to your chat.";
+    }
+    await sendTelegramMessage(chatId, msg, 'HTML', threadId);
     return;
   }
 
