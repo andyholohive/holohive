@@ -2314,15 +2314,14 @@ async function finalizeSubmission(opts: {
       }
     });
 
-  // Insert. The UNIQUE partial index handles dup-link rejection in the DB.
+  // [2026-06-12] Per Appendix v3 F2 + Andy: kol_id + campaign_id FKs are
+  // the only authoritative identity. Display names render live via JOIN.
+  // kol_telegram_id, kol_name, campaign_name columns were dropped.
   const { data: row, error } = await (supabaseAdmin as any)
     .from('content_submissions')
     .insert({
-      kol_telegram_id: opts.kolTgId,
       kol_id: opts.kolId,
-      kol_name: opts.kolName,
       campaign_id: opts.campaignId,
-      campaign_name: opts.campaignName,
       link: opts.link,
       platform: opts.platform,
       content_type: opts.contentType,
@@ -2699,9 +2698,16 @@ async function handleSubmReviewCallback(
     return;
   }
 
+  // [2026-06-12] Render live names via JOIN per Appendix F2. Also pull the
+  // KOL's per-KOL group chat_id so the reply 👍/reject DM lands in the
+  // same chat where they originally /submitted.
   const { data: sub } = await (supabaseAdmin as any)
     .from('content_submissions')
-    .select('id, kol_telegram_id, kol_name, campaign_name, link, status')
+    .select(`
+      id, kol_id, campaign_id, link, status,
+      kol:master_kols!inner(id, name),
+      campaign:campaigns!inner(id, name)
+    `)
     .eq('id', submissionId)
     .maybeSingle();
   if (!sub) {
@@ -2712,6 +2718,19 @@ async function handleSubmReviewCallback(
     await answerCallbackQuery(callbackId, `Already ${sub.status}.`);
     return;
   }
+  const kolName: string = (sub as any).kol?.name ?? 'KOL';
+  const campaignName: string = (sub as any).campaign?.name ?? 'Campaign';
+
+  // Look up the KOL's per-KOL group chat — the natural destination for
+  // approval/rejection replies (where they originally /submitted).
+  const { data: kolChat } = await (supabaseAdmin as any)
+    .from('telegram_chats')
+    .select('chat_id')
+    .eq('master_kol_id', (sub as any).kol_id)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  const kolChatId: string | null = (kolChat as any)?.chat_id ?? null;
 
   const nextStatus = action === 'approve' ? 'approved' : 'rejected';
   const { error: updErr } = await (supabaseAdmin as any)
@@ -2764,21 +2783,22 @@ async function handleSubmReviewCallback(
       messageId,
       [
         tag,
-        `KOL: ${escapeHtml(sub.kol_name)}`,
-        `Campaign: ${escapeHtml(sub.campaign_name)}`,
-        `Link: ${escapeHtml(sub.link)}`,
+        `KOL: ${escapeHtml(kolName)}`,
+        `Campaign: ${escapeHtml(campaignName)}`,
+        `Link: ${escapeHtml((sub as any).link)}`,
       ].join('\n'),
     );
   }
 
   // Notify the KOL per Andy's Q3 answer (option b: 👍 reaction on approval,
-  // text DM on rejection).
-  if (sub.kol_telegram_id) {
+  // text on rejection). Posted to the KOL's per-KOL group chat where they
+  // originally /submitted — matches the group-chat architecture.
+  if (kolChatId) {
     if (action === 'approve') {
-      await sendTelegramMessage(sub.kol_telegram_id, '👍', 'HTML');
+      await sendTelegramMessage(kolChatId, '👍', 'HTML');
     } else {
       await sendTelegramMessage(
-        sub.kol_telegram_id,
+        kolChatId,
         `Submission issue: <i>Did not meet criteria.</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`,
         'HTML',
       );
