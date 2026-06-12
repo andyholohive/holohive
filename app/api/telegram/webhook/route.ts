@@ -2133,6 +2133,44 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
     return;
   }
 
+  // [2026-06-12] Sender capture + verification per Andy's clarification.
+  // The /submit MUST come from the KOL themselves, not from a team member
+  // in their group. We auto-capture on the first /submit (matches the
+  // Appendix "auto-captured first time the payment bot interacts with the
+  // KOL" semantics) and verify on every subsequent /submit.
+  //
+  // Lookup current stored telegram_id for this KOL
+  const senderTgUserId = message?.from?.id?.toString();
+  const { data: kolRow } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('telegram_id, name')
+    .eq('id', caller.id)
+    .maybeSingle();
+  const storedSenderId = (kolRow as any)?.telegram_id ?? null;
+
+  if (!storedSenderId) {
+    // First /submit ever — capture this sender as the authoritative KOL TG user_id
+    await (supabaseAdmin as any)
+      .from('master_kols')
+      .update({ telegram_id: senderTgUserId })
+      .eq('id', caller.id);
+    console.log('[/submit] auto-captured telegram_id for KOL:', { kol_id: caller.id, senderTgUserId });
+  } else if (storedSenderId !== senderTgUserId) {
+    // Mismatch — someone other than the recognized KOL is /submitting from
+    // this group. Reject + tell them to use the dashboard if they're team.
+    const kolName = (kolRow as any)?.name || caller.name || 'the KOL';
+    await sendTelegramMessage(
+      chatId,
+      `⚠️ Only <b>${escapeHtml(kolName)}</b> can <code>/submit</code> from this group.\n\n` +
+      `Team members: log content via <code>/campaigns</code>. ` +
+      `KOLs switching TG accounts: ask a team member to clear the stored TG ID.`,
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+  // else: sender matches stored — proceed as the verified KOL.
+
   const link = args.join(' ').trim();
   if (!link) {
     await sendTelegramMessage(
