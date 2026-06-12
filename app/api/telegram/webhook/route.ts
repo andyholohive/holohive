@@ -908,19 +908,12 @@ async function resolveCaller(message: any): Promise<ResolvedCaller> {
   const tgChatId = message?.chat?.id?.toString() ?? null;
   if (!tgUserId) return { kind: 'unknown', tgUserId: null };
 
-  // 1. Team first — sender's TG user_id maps to a team member.
-  const { data: teamRow } = await supabaseAdmin
-    .from('users')
-    .select('id, name')
-    .eq('telegram_id', tgUserId)
-    .maybeSingle();
-  if (teamRow) {
-    return { kind: 'team', id: (teamRow as any).id, name: (teamRow as any).name, tgUserId };
-  }
-
-  // 2. KOL via group chat — preferred per Andy 2026-06-12. The chat where
-  //    the message came from is registered as a per-KOL group via
-  //    telegram_chats.master_kol_id. Same mapping as /crm/telegram page.
+  // 1. KOL via group chat takes PRECEDENCE [Andy 2026-06-12]. In a
+  //    per-KOL group chat, the chat context wins — even if the sender is
+  //    also a team member (e.g., Andy in his own KOL test group). The
+  //    sender-verification step in handleSubmitCommand still rejects
+  //    anyone whose user_id doesn't match the stored KOL telegram_id, so
+  //    team-member-in-KOL-group can't /submit unless they ARE the KOL.
   if (tgChatId) {
     const { data: chatRow } = await (supabaseAdmin as any)
       .from('telegram_chats')
@@ -934,9 +927,19 @@ async function resolveCaller(message: any): Promise<ResolvedCaller> {
     }
   }
 
+  // 2. Team — sender's TG user_id maps to a team member. Applies when
+  //    NOT in a known KOL group (e.g., internal ops chats, DMs).
+  const { data: teamRow } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', tgUserId)
+    .maybeSingle();
+  if (teamRow) {
+    return { kind: 'team', id: (teamRow as any).id, name: (teamRow as any).name, tgUserId };
+  }
+
   // 3. Legacy DM fallback — master_kols.telegram_id lookup. Kept so any
-  //    KOL who DMs the bot directly still resolves. The group-chat path
-  //    above is the operational primary.
+  //    KOL who DMs the bot directly still resolves.
   const { data: kolRow } = await (supabaseAdmin as any)
     .from('master_kols')
     .select('id, name')
