@@ -2451,7 +2451,12 @@ const CampaignDetailsPage = () => {
               {/* [2026-06-12] Per Andy: KOL /submit pending review banner.
                   Lives at the top of the Content Dashboard. Auto-hides
                   when nothing pending. Web fallback for TG-bot approval. */}
-              {campaign?.id && <ContentSubmissionsBanner campaignId={campaign.id} />}
+              {campaign?.id && (
+                <ContentSubmissionsBanner
+                  campaignId={campaign.id}
+                  onReviewed={fetchContents}
+                />
+              )}
 
               {/* Toolbar row: view-mode toggle on the left, Add
                   Content on the right — merged onto one line. */}

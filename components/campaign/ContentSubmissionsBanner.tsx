@@ -40,7 +40,17 @@ type PendingSubmission = {
   kol: { id: string; name: string } | null;
 };
 
-export function ContentSubmissionsBanner({ campaignId }: { campaignId: string }) {
+type Props = {
+  campaignId: string;
+  /**
+   * Called after a successful Approve or Reject. The parent uses this to
+   * refetch its own content list so the new contents row (auto-created
+   * on approve) shows up without a manual page refresh.
+   */
+  onReviewed?: () => void;
+};
+
+export function ContentSubmissionsBanner({ campaignId, onReviewed }: Props) {
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<PendingSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +93,9 @@ export function ContentSubmissionsBanner({ campaignId }: { campaignId: string })
       setRejectingId(null);
       setRejectReason('');
       await refresh();
+      // Tell the parent to refetch its content list so the new auto-
+      // created contents row appears without a manual reload.
+      onReviewed?.();
     } catch (err: any) {
       toast({ title: 'Network error', description: err?.message, variant: 'destructive' });
     } finally {
