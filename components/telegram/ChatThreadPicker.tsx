@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/command';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import {
-  Check, ChevronsUpDown, MessageSquare, Hash, RefreshCw,
+  Check, ChevronsUpDown, MessageSquare, Hash, RefreshCw, Pencil, X as XIcon,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -132,6 +132,12 @@ export function ChatThreadPicker({
   // the user picks a thread from the popover. Lives separately so the
   // user can type freely without immediately committing partial input.
   const [manualThreadInput, setManualThreadInput] = useState(threadId);
+  // [2026-06-12] Inline topic rename: telegram_threads.name often starts
+  // null when topics existed before the bot joined. We auto-backfill via
+  // forum_topic_created (in the webhook) but offer a manual override here.
+  const [editingThreadKey, setEditingThreadKey] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
 
   // Keep manual input in sync if the controlled threadId changes externally
   useEffect(() => {
@@ -178,6 +184,42 @@ export function ChatThreadPicker({
       toast({ title: 'Refreshed' });
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const startRename = (chatIdArg: string, messageThreadId: number, currentName: string | null) => {
+    setEditingThreadKey(`${chatIdArg}:${messageThreadId}`);
+    setRenameValue(currentName || '');
+  };
+
+  const cancelRename = () => {
+    setEditingThreadKey(null);
+    setRenameValue('');
+  };
+
+  const saveRename = async (chatIdArg: string, messageThreadId: number) => {
+    const name = renameValue.trim();
+    if (!name) { cancelRename(); return; }
+    setSavingRename(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_threads')
+        .update({ name })
+        .eq('chat_id', chatIdArg)
+        .eq('message_thread_id', messageThreadId);
+      if (error) {
+        toast({ title: 'Rename failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      setThreads(prev => prev.map(t =>
+        (t.chat_id === chatIdArg && t.message_thread_id === messageThreadId)
+          ? { ...t, name }
+          : t,
+      ));
+      cancelRename();
+      toast({ title: 'Topic renamed', description: name });
+    } finally {
+      setSavingRename(false);
     }
   };
 
@@ -327,23 +369,98 @@ export function ChatThreadPicker({
                   const threadRows = chatThreads.map(thr => {
                     const threadName = thr.name || `Topic ${thr.message_thread_id}`;
                     const isSelected = chatId === c.chat_id && String(thr.message_thread_id) === threadId;
+                    const editKey = `${c.chat_id}:${thr.message_thread_id}`;
+                    const isEditing = editingThreadKey === editKey;
+                    const hasName = !!thr.name;
                     return (
                       <CommandItem
                         key={`thread-${c.chat_id}-${thr.message_thread_id}`}
                         value={`${threadName} ${title} ${c.chat_id} ${thr.message_thread_id}`}
                         onSelect={() => {
+                          if (isEditing) return; // selection disabled while editing
                           const nextThreadId = String(thr.message_thread_id);
                           onChange({ chatId: c.chat_id, threadId: nextThreadId });
                           setManualThreadInput(nextThreadId);
                           setPickerOpen(false);
                         }}
+                        className="group"
                       >
                         <Check className={`mr-2 h-4 w-4 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
                         <div className="flex items-center gap-2 min-w-0 flex-1 pl-5">
                           <span className="text-ink-warm-400 text-[10px] font-mono">↳</span>
                           <Hash className="h-3 w-3 text-ink-warm-400 shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm text-ink-warm-900 truncate">{threadName}</div>
+                            {isEditing ? (
+                              <div
+                                className="flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Input
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      saveRename(c.chat_id, thr.message_thread_id);
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      cancelRename();
+                                    }
+                                  }}
+                                  placeholder={`Topic ${thr.message_thread_id}`}
+                                  className="h-6 text-xs focus-brand"
+                                  autoFocus
+                                  disabled={savingRename}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-emerald-600 hover:bg-emerald-50"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    saveRename(c.chat_id, thr.message_thread_id);
+                                  }}
+                                  disabled={savingRename}
+                                  title="Save"
+                                >
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-ink-warm-400 hover:bg-cream-100"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    cancelRename();
+                                  }}
+                                  disabled={savingRename}
+                                  title="Cancel"
+                                >
+                                  <XIcon className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <div className={`text-sm truncate ${hasName ? 'text-ink-warm-900' : 'text-ink-warm-500 italic'}`}>
+                                  {threadName}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    startRename(c.chat_id, thr.message_thread_id, thr.name);
+                                  }}
+                                  className={`p-0.5 rounded hover:bg-cream-100 text-ink-warm-400 hover:text-brand transition-opacity ${hasName ? 'opacity-0 group-hover:opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                                  title={hasName ? 'Rename topic' : 'Add topic name'}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                             <div className="text-[10px] text-ink-warm-500 font-mono truncate">
                               topic #{thr.message_thread_id} · {relativeTime(thr.last_seen_at)}
                             </div>

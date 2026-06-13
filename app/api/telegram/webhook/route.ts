@@ -3114,6 +3114,23 @@ async function handleMessage(message: any) {
   if (message.forum_topic_edited?.name && messageThreadId) {
     await upsertThreadName(chatId, messageThreadId, message.forum_topic_edited.name);
   }
+  // [2026-06-12] Retro-backfill: in a forum supergroup, every message in
+  // a topic carries reply_to_message pointing at the topic-creation
+  // message, which holds forum_topic_created.name. Topics that existed
+  // BEFORE the bot joined never fire a forum_topic_created event — but
+  // the first reply that flows through the bot will surface the name
+  // via this path. Combined with the two events above, every topic with
+  // any traffic eventually gets named.
+  if (
+    message.reply_to_message?.forum_topic_created?.name
+    && messageThreadId
+  ) {
+    await upsertThreadName(
+      chatId,
+      messageThreadId,
+      message.reply_to_message.forum_topic_created.name,
+    );
+  }
 
   // Check for Telegram/X links in KOL chats and forward to Content thread
   await forwardKolSocialLinks(chatId, chatTitle, fromName, messageText, messageDate);
