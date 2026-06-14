@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { formatRelativeShort } from '@/lib/dateFormat';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -498,14 +499,5 @@ function InternalTabSkeleton() {
  * logic that matters lives in the API.
  */
 function formatRelativeDays(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 0) return 'just now';
-  const days = Math.floor(ms / 86_400_000);
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 14) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 8) return `${weeks}w ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  return formatRelativeShort(iso);
 }

@@ -54,6 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
+import { formatDate, formatRelativeShort } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import { CRMOpportunity } from '@/lib/crmService';
 
@@ -1194,21 +1195,7 @@ export default function TelegramChatsPage() {
     }
   };
 
-  const formatTimeAgo = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const formatTimeAgo = (dateString: string | null) => dateString ? formatRelativeShort(dateString) : 'Never';
 
   const getActivityStatus = (lastMessageAt: string | null) => {
     if (!lastMessageAt) return { color: 'bg-ink-warm-400', label: 'No activity' };
@@ -3639,18 +3626,7 @@ function TopicsTabContent({
     }
   };
 
-  const relative = (iso: string | null) => {
-    if (!iso) return '—';
-    const diffMs = Date.now() - new Date(iso).getTime();
-    const m = Math.floor(diffMs / 60_000);
-    if (m < 1) return 'just now';
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    const d = Math.floor(h / 24);
-    if (d < 30) return `${d}d ago`;
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+  const relative = (iso: string | null) => iso ? formatRelativeShort(iso) : '—';
 
   return (
     <div className="space-y-4">

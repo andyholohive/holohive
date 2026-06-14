@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { formatDate } from '@/lib/dateFormat';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -245,10 +246,12 @@ export default function RenewalsPipelineTab() {
                     </Link>
                   </TableCell>
                   <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">
-                    {r.engagement_start_date ?? <span className="text-ink-warm-400">—</span>}
+                    {r.engagement_start_date
+                      ? formatDate(r.engagement_start_date)
+                      : <span className="text-ink-warm-400">—</span>}
                   </TableCell>
                   <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">
-                    {r.engagement_end_date}
+                    {formatDate(r.engagement_end_date)}
                   </TableCell>
                   <TableCell className={`py-3 text-right tabular-nums ${r.tone === 'red' ? 'text-rose-600 font-semibold' : r.tone === 'amber' ? 'text-amber-700 font-medium' : 'text-ink-warm-700'}`}>
                     {r.daysLeft}d

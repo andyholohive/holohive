@@ -40,6 +40,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
+import { formatRelativeShort } from '@/lib/dateFormat';
 import dynamic from 'next/dynamic';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -322,19 +323,7 @@ type ClientWithStatus = ClientWithAccess & {
  * minute/hour precision in the card itself is just noise.
  */
 function relativeTimeFromNow(iso: string): string {
-  const ts = new Date(iso).getTime();
-  if (isNaN(ts)) return '—';
-  const diffMs = Date.now() - ts;
-  if (diffMs < 0) return 'just now';
-  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days} days ago`;
-  if (days < 14) return '1 week ago';
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 60) return '1 month ago';
-  if (days < 365) return `${Math.floor(days / 30)} months ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatRelativeShort(iso) || '—';
 }
 
 export default function ClientsPage() {

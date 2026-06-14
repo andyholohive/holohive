@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { formatRelativeShort } from '@/lib/dateFormat';
 
 type PendingSubmission = {
   id: string;
@@ -156,7 +157,7 @@ export function ContentSubmissionsBanner({ campaignId, onReviewed }: Props) {
                     </StatusBadge>
                     <span className="inline-flex items-center gap-1 text-[11px] text-ink-warm-500 tabular-nums">
                       <Clock className="h-2.5 w-2.5" />
-                      {relativeTime(s.submitted_at)}
+                      {formatRelativeShort(s.submitted_at)}
                     </span>
                   </div>
 
@@ -292,17 +293,3 @@ function formatType(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-/** "2h ago", "5m ago", "Mar 12". Short + scannable. */
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return 'just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}

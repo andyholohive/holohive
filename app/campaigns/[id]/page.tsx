@@ -25,7 +25,6 @@ import {
   BRAND_DARK_HEX,
   formatDateLocal,
   formatDateForInput,
-  formatDateLong as formatDate,
   formatDisplayDate,
   displayRegion,
   parseDate,
@@ -84,6 +83,7 @@ import ContentTagDialog from './_components/ContentTagDialog';
 import ActivationSettingsDialog from './_components/ActivationSettingsDialog';
 import LineupsTab from '@/components/campaign/LineupsTab';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatDate } from '@/lib/dateFormat';
 
 /**
  * Columns the user can sort the KOL Dashboard table by. Adding a new
@@ -1411,12 +1411,11 @@ const CampaignDetailsPage = () => {
     //   1) prepend `[Client Name] - Post (DD MMM YYYY)` header line
     //   2) drop the `!` after the wallet
     //   3) "Thanks for" → "Thank you for"
-    // Date formatted in the campaign's locale-default short form
-    // (e.g. "5 Jun 2026"); falls back to "Date TBD" if the picker
-    // somehow handed us an invalid date.
+    // Date formatted in the canonical mm/dd/yyyy shape (e.g. "06/05/2026");
+    // falls back to "Date TBD" if the picker handed us an invalid date.
     const clientName = campaign?.client_name?.trim() || 'Holo Hive';
     const dateStr = opts.date && !isNaN(opts.date.getTime())
-      ? opts.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      ? formatDate(opts.date)
       : 'Date TBD';
     setPaymentNotificationMessage(
       `${clientName} - Post (${dateStr})\n\n` +
