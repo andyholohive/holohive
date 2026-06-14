@@ -68,6 +68,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import type { CampaignWithDetails } from '@/lib/campaignService';
+import { formatDateTime } from '@/lib/dateFormat';
 import {
   displayRegion,
   formatDateForInput,
@@ -262,13 +263,7 @@ export function InformationEditMode({
                                 {campaignUpdates[currentUpdateIndex]?.update_text}
                               </div>
                               <div className="text-xs text-ink-warm-500">
-                                {campaignUpdates[currentUpdateIndex] && new Date(campaignUpdates[currentUpdateIndex].created_at).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                                {campaignUpdates[currentUpdateIndex] && formatDateTime(campaignUpdates[currentUpdateIndex].created_at)}
                               </div>
                               {/* Delete Button */}
                               <Dialog open={isDeleteUpdateDialogOpen} onOpenChange={setIsDeleteUpdateDialogOpen}>

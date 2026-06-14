@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, MessageCircleQuestion, ArrowLeft, CheckCircle2, X, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { formatDateTime } from '@/lib/dateFormat';
 
 /**
  * /dashboard/check-in
@@ -129,7 +130,7 @@ function CheckInForm() {
         {submittedAt && (
           <p className="text-sm inline-flex items-center gap-1 text-emerald-700">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Submitted {new Date(submittedAt).toLocaleString()} — re-submit to update.
+            Submitted {formatDateTime(submittedAt)} — re-submit to update.
           </p>
         )}
       </PageHeader>

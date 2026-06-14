@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AdvancedAIService, AutomatedWorkflow, WorkflowAction } from '@/lib/advancedAIService';
 import { Plus, Play, Pause, Edit, Trash2, Settings, Zap, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/lib/dateFormat';
 
 export function WorkflowManager() {
   const { toast } = useToast();
@@ -468,7 +469,7 @@ export function WorkflowManager() {
                   {workflow.lastRun && (
                     <div className="flex items-center gap-1 text-ink-warm-500">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(workflow.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span>{formatDate(workflow.lastRun)}</span>
                     </div>
                   )}
                 </div>

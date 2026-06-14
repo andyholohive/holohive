@@ -46,6 +46,7 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { formatDateTime } from '@/lib/dateFormat';
 import {
   SpecTrackerService,
   type SpecCard, type SpecFull, type SpecFeature,
@@ -902,7 +903,7 @@ function FeatureRow({
           )}
           {feature.last_tested_at && (
             <p className="text-[10px] text-ink-warm-400 mt-1">
-              Last tested {new Date(feature.last_tested_at).toLocaleString()}
+              Last tested {formatDateTime(feature.last_tested_at)}
             </p>
           )}
         </div>
@@ -1102,7 +1103,7 @@ function HistoryDialog({
                         )}
                       </div>
                       <span className="text-[10px] text-ink-warm-400 tabular-nums">
-                        {new Date(row.tested_at).toLocaleString()}
+                        {formatDateTime(row.tested_at)}
                       </span>
                     </div>
                     {row.notes && (
@@ -1494,7 +1495,7 @@ function formatPreviewCell(v: any): string {
   const str = String(v);
   // Detect ISO timestamps and shorten to "MMM D HH:MM"
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(str)) {
-    return new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatDateTime(str);
   }
   return str;
 }

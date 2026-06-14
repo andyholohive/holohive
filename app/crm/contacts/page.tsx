@@ -26,6 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { formatDate } from '@/lib/dateFormat';
 import {
   CRMService,
   CRMContact,
@@ -629,7 +630,7 @@ export default function ContactsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-ink-warm-500 text-sm">
-                      {new Date(contact.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatDate(contact.created_at)}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

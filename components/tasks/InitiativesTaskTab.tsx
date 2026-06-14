@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Compass, ChevronRight, Play, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/lib/dateFormat';
 
 type Milestone = {
   id: string;
@@ -179,7 +180,7 @@ export function InitiativesTaskTab() {
                   </StatusBadge>
                 </TableCell>
                 <TableCell className="py-3 text-xs text-ink-warm-500">
-                  {new Date(i.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {formatDate(i.updated_at)}
                 </TableCell>
                 <TableCell className="py-3 text-right">
                   <div className="flex items-center gap-1 justify-end">

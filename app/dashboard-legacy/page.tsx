@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import {
   Table, TableBody, TableHead, TableHeader, TableRow, TableCell,
 } from '@/components/ui/table';
@@ -122,10 +123,9 @@ function currentMondayUTC(): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Format a YYYY-MM-DD as "Mon May 5" for display in the week selector.
+// Format a YYYY-MM-DD as "mm/dd/yyyy" for display in the week selector.
 function fmtWeekLabel(weekOf: string): string {
-  const d = new Date(weekOf + 'T00:00:00Z');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return formatDate(weekOf + 'T00:00:00Z');
 }
 
 const COORD_TONE: Record<string, BadgeTone> = {
@@ -702,8 +702,8 @@ function CheckInRoster({
             <div
               key={u.id}
               title={
-                status === 'responded' ? `${displayName} — submitted ${r!.responded_at ? new Date(r!.responded_at).toLocaleString() : ''}` :
-                status === 'prompted'  ? `${displayName} — DM sent ${r!.prompted_at ? new Date(r!.prompted_at).toLocaleString() : ''}, awaiting response` :
+                status === 'responded' ? `${displayName} — submitted ${r!.responded_at ? formatDateTime(r!.responded_at) : ''}` :
+                status === 'prompted'  ? `${displayName} — DM sent ${r!.prompted_at ? formatDateTime(r!.prompted_at) : ''}, awaiting response` :
                 `${displayName} — not yet prompted (no telegram_id?)`
               }
               className={`relative inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border text-[10px] ${

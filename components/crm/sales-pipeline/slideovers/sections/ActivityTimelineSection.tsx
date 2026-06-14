@@ -46,6 +46,7 @@ import {
 import { format, formatDistanceToNow } from 'date-fns';
 import { useSalesPipeline } from '@/contexts/SalesPipelineContext';
 import type { ActivityType } from '@/lib/salesPipelineService';
+import { formatDate } from '@/lib/dateFormat';
 
 /** Convert URLs inside free-text into clickable anchors. Used by the
  *  timeline entries so pasted Notion/Linear/Calendly links work
@@ -294,7 +295,7 @@ export function ActivityTimelineSection() {
               >
                 <Calendar className="mr-2 h-4 w-4" />
                 {activityForm.next_step_date
-                  ? new Date(activityForm.next_step_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  ? formatDate(activityForm.next_step_date)
                   : 'Next step date'}
               </Button>
             </PopoverTrigger>

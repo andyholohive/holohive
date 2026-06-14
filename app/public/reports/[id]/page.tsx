@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -57,8 +58,7 @@ type CampaignReport = {
   custom_message: string | null;
 };
 
-const formatDate = (dateString: string) =>
-  new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+const formatDate = (dateString: string) => fmtDate(dateString);
 
 const formatFileSize = (bytes: number) => {
   if (bytes < 1024) return bytes + ' B';
@@ -432,7 +432,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
   const timelineDataRaw = contents
     .filter(c => c.activation_date)
     .reduce((acc: any[], content) => {
-      const date = new Date(content.activation_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const date = fmtDate(content.activation_date!);
       const existing = acc.find(item => item.date === date);
       if (existing) {
         existing.impressions += content.impressions || 0;

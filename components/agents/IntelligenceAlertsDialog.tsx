@@ -16,6 +16,7 @@ import {
   Loader2, Send, AlertTriangle, CheckCircle, XCircle, Bell,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatDateTime } from '@/lib/dateFormat';
 
 /**
  * Configures Telegram alert routing for the Intelligence page.
@@ -426,7 +427,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
                   : <XCircle className="h-3.5 w-3.5" />}
                 Last test: <span className="font-semibold">{config.last_test_status}</span>
                 <span className="text-ink-warm-500">
-                  · {new Date(config.last_test_at).toLocaleString()}
+                  · {formatDateTime(config.last_test_at)}
                 </span>
               </div>
             )}

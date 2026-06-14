@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import ICPSettingsDialog from './ICPSettingsDialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
+import { formatDate } from '@/lib/dateFormat';
 import {
   Search, Globe, ExternalLink, ArrowRight, XCircle, MoreHorizontal,
   Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings,
@@ -850,7 +851,7 @@ export default function ProspectsTab() {
                       </span>
                     </TableCell>
                     <TableCell className="text-xs text-gray-500">
-                      {p.scraped_at ? new Date(p.scraped_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                      {p.scraped_at ? formatDate(p.scraped_at) : '—'}
                     </TableCell>
                     <TableCell onClick={e => e.stopPropagation()}>
                       <DropdownMenu>

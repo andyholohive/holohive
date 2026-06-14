@@ -46,6 +46,7 @@ import {
 import { tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { formatDate } from "@/lib/dateFormat";
 
 /**
  * KOL profile detail modal — Phase 2 of the May 2026 KOL overhaul.
@@ -827,7 +828,7 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
   // spec). Display as "Mon YYYY" since the day is meaningless.
   const monthLabel = (() => {
     const d = new Date(s.snapshot_date + "T00:00:00");
-    return isNaN(d.getTime()) ? s.snapshot_date : d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    return isNaN(d.getTime()) ? s.snapshot_date : formatDate(d);
   })();
 
   // Computed columns from mig 075. Show alongside the raw stats so
@@ -1114,7 +1115,7 @@ function CallLogRow({ c, onDelete }: { c: KolCallLog; onDelete: () => void }) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-ink-warm-900">{new Date(c.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            <span className="text-sm font-semibold text-ink-warm-900">{formatDate(c.call_date)}</span>
             {c.call_type && (
               <StatusBadge tone="purple" size="sm" bordered>
                 {titleCase(c.call_type)}

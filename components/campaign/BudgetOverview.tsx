@@ -34,6 +34,7 @@ import { KpiCard } from '@/components/ui/kpi-card';
 import { CampaignService } from '@/lib/campaignService';
 import { BRAND_HEX } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
+import { formatDate } from '@/lib/dateFormat';
 
 export function BudgetOverview() {
   const { campaign, campaignKOLs, payments } = useCampaignDetail();
@@ -478,10 +479,7 @@ export function BudgetOverview() {
                                 data={(() => {
                                   // Group payments by date and payment method
                                   const paymentsByDate = payments.reduce((acc, payment) => {
-                                    const date = new Date(payment.payment_date).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric'
-                                    });
+                                    const date = formatDate(payment.payment_date);
                                     
                                     if (!acc[date]) {
                                       acc[date] = {

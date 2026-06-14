@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/dateFormat';
 import {
   getAppSettingBrowser, setAppSettingBrowser,
 } from '@/lib/appSettings';
@@ -120,7 +121,7 @@ function relativeTime(iso: string | null): string {
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(iso);
 }
 
 export default function BacklogSettingsDialog({

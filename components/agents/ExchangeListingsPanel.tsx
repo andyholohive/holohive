@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   Building2, Loader2, ExternalLink, RefreshCw, Play, TestTube2,
   CheckCircle, XCircle, Clock, AlertTriangle, Sparkles,
@@ -92,7 +93,7 @@ function formatDate(iso: string): string {
   if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`;
   if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`;
   if (diff < 7 * 86_400_000) return `${Math.round(diff / 86_400_000)}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return fmtDate(d);
 }
 
 function exchangeMarketUrl(exchange: string, market_pair: string, symbol: string, quote: string): string {

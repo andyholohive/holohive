@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { CampaignService } from '@/lib/campaignService';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
+import { formatDate } from '@/lib/dateFormat';
 
 interface ShareCampaignDialogProps {
   open: boolean;
@@ -73,7 +74,7 @@ export function ShareCampaignDialog({ open, onOpenChange }: ShareCampaignDialogP
               <div className="flex justify-between mb-2">
                 <span className="font-medium">Dates:</span>
                 <span>
-                  {campaign ? new Date(campaign.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} - {campaign?.end_date ? new Date(campaign.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+                  {campaign ? formatDate(campaign.start_date) : ''} - {campaign?.end_date ? formatDate(campaign.end_date) : 'TBD'}
                 </span>
               </div>
               <div className="flex justify-between">

@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/lib/dateFormat';
 import {
   DeliverableService,
   DeliverableTemplate,
@@ -390,7 +391,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                       style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: '#111827' }}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatDate(startDate)}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -578,7 +579,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                                 {(() => {
                                   const dateStr = dueDateOverrides[s.step_order] || dueDates[s.step_order];
                                   if (!dateStr) return 'Select date';
-                                  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                  return formatDate(dateStr + 'T00:00:00');
                                 })()}
                               </Button>
                             </PopoverTrigger>

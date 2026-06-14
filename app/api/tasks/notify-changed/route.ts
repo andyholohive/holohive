@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -174,10 +175,9 @@ function formatStatus(s: string | null | undefined): string {
 function formatDate(d: string | null | undefined): string {
   if (!d) return 'none';
   // Stored as YYYY-MM-DD (date column) or full ISO. Slice handles both —
-  // avoids timezone shifts that toLocaleDateString() introduces when the
-  // column is a bare date string.
+  // avoids timezone shifts the canonical formatter would introduce when
+  // the column is a bare date string.
   const dateOnly = d.length >= 10 ? d.slice(0, 10) : d;
-  const parsed = new Date(`${dateOnly}T00:00:00`);
-  if (isNaN(parsed.getTime())) return dateOnly;
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const formatted = fmtDate(`${dateOnly}T00:00:00`);
+  return formatted || dateOnly;
 }

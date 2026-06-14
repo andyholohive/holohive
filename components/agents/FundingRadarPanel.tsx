@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   Search, Loader2, DollarSign, TrendingUp, Users, Globe, ExternalLink,
   ArrowRight, Radar, RefreshCw, Building2, Flag, Zap, ChevronDown, ChevronUp,
@@ -110,7 +111,7 @@ function formatAmount(amount: number | null): string {
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return fmtDate(dateStr) || dateStr;
   } catch {
     return dateStr;
   }

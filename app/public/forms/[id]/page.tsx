@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useSearchParams } from 'next/navigation';
 import { FormService, FormWithFields, FieldType } from '@/lib/formService';
 import { CheckCircle2, FileText, Loader, Calendar as CalendarIcon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 // Create a standalone Supabase client for public access
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -58,7 +59,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   // Date formatting helpers
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return fmtDate(dateString);
   };
 
   const formatDateForInput = (date: Date | undefined) => {

@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { RecurringConfigEditor } from './RecurringConfig';
 import { DeliverableProgressTracker } from './DeliverableProgressTracker';
 import { DeliverableService } from '@/lib/deliverableService';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import {
   Calendar as CalendarIcon,
   Circle,
@@ -585,7 +586,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
                   style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.due_date ? '#111827' : '#9ca3af' }}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {form.due_date ? form.due_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
+                  {form.due_date ? formatDate(form.due_date) : 'Select date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -890,9 +891,7 @@ function PreShipGateHistory({ taskId }: { taskId: string }) {
                     {r.completed_by_name || 'Unknown'}
                   </span>
                   <span className="text-ink-warm-500 tabular-nums">
-                    {new Date(r.completed_at).toLocaleString('en-US', {
-                      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                    })}
+                    {formatDateTime(r.completed_at)}
                   </span>
                   <div className="flex items-center gap-0.5 ml-auto">
                     {states.map((s, i) => (

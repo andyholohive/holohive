@@ -27,6 +27,7 @@ import { UserService } from '@/lib/userService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek,
   format, isSameMonth, isSameDay, addMonths, subMonths,
@@ -232,8 +233,7 @@ export default function MeetingsPage() {
   }
 
   function formatDate(dateStr: string) {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return fmtDate(dateStr + 'T00:00:00');
   }
 
   function formatTime(time: string) {

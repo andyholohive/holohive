@@ -31,6 +31,7 @@ import { DeliverableService } from '@/lib/deliverableService';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   Plus,
   ListTodo,
@@ -1011,9 +1012,7 @@ export default function TasksPage() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const formatDate = (dateStr: string) => fmtDate(dateStr + 'T00:00:00');
 
   const userColors = [
     { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
@@ -1339,7 +1338,7 @@ export default function TasksPage() {
             <Popover>
               <PopoverTrigger asChild>
                 <button className={`text-sm hover:text-ink-warm-700 cursor-pointer ${getDueDateColor(task.due_date) || 'text-ink-warm-500'}`}>
-                  {task.due_date ? new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                  {task.due_date ? fmtDate(task.due_date + 'T00:00:00') : '—'}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -1528,7 +1527,7 @@ export default function TasksPage() {
         return (
           <td key={col} className={`py-3 px-3 whitespace-nowrap ${COL.created}`}>
             <span className="text-ink-warm-500 text-xs">
-              {new Date(task.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {fmtDate(task.created_at)}
             </span>
           </td>
         );
@@ -1541,7 +1540,7 @@ export default function TasksPage() {
           <td key={col} className={`py-3 px-3 whitespace-nowrap ${COL.completedAt}`}>
             {task.completed_at ? (
               <span className="text-emerald-700 text-xs font-medium">
-                {new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {fmtDate(task.completed_at)}
               </span>
             ) : (
               <span className="text-ink-warm-300 text-xs">—</span>

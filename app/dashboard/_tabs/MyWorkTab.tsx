@@ -39,6 +39,7 @@ import {
   AlertTriangle, Clock, CheckCircle2, PlayCircle, Circle, PauseCircle,
   MessageCircle, LayoutDashboard,
 } from 'lucide-react';
+import { formatDate } from '@/lib/dateFormat';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
   to_do:              { label: 'To Do',     icon: Circle,         color: 'text-ink-warm-400' },
@@ -361,7 +362,7 @@ function TaskListCard({
               )}
               {task.due_date && (
                 <span className={`text-xs tabular-nums ${getDueDateColor(task.due_date)}`}>
-                  {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {formatDate(task.due_date + 'T00:00:00')}
                 </span>
               )}
               {task.task_type && (

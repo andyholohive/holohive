@@ -29,6 +29,7 @@ import { Bookmark, Eye, Heart, MessageSquare, Repeat2 } from 'lucide-react';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { BRAND_DARK_HEX, BRAND_HEX, getPlatformIcon } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
+import { formatDate } from '@/lib/dateFormat';
 
 export function ContentDashboardOverview() {
   const { contents } = useCampaignDetail();
@@ -123,7 +124,7 @@ export function ContentDashboardOverview() {
                                 return sortedEntries.map(([date, impressions]) => {
                                   cumulativeImpressions += impressions;
                                   return {
-                                    date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                    date: formatDate(date),
                                     impressions: cumulativeImpressions
                                   };
                                 });

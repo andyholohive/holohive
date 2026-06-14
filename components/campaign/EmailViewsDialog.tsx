@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
+import { formatDateTime } from '@/lib/dateFormat';
 
 export type EmailViewRow = {
   id: string;
@@ -76,15 +77,7 @@ export function EmailViewsDialog({ open, onOpenChange, emailViews, loading }: Em
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-ink-warm-900 truncate">{view.email}</p>
                     <p className="text-xs text-ink-warm-500">
-                      {view.viewed_at
-                        ? new Date(view.viewed_at).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : ''}
+                      {view.viewed_at ? formatDateTime(view.viewed_at) : ''}
                     </p>
                   </div>
                 </div>

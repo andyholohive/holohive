@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '@/lib/dateFormat';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -187,8 +188,7 @@ type ContentItem = {
   }> | null;
 };
 
-const formatDate = (dateString: string) =>
-  new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+const formatDate = (dateString: string) => fmtDate(dateString);
 
 // KOL workflow stages, in journey order — used by the default Status
 // sort so rows appear Curated → Contacted → Interested → Onboarded →
@@ -3202,7 +3202,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   return sortedEntries.map(([date, impressions]) => {
                                     cumulativeViews += impressions;
                                     return {
-                                      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                      date: fmtDate(date),
                                       impressions: cumulativeViews
                                     };
                                   });
@@ -3374,15 +3374,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
               if (!mostRecent || t > mostRecent) mostRecent = t;
             }
           }
-          const stamp = (mostRecent ? new Date(mostRecent) : new Date()).toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: 'UTC',
-            timeZoneName: 'short',
-          });
+          const stamp = fmtDateTime(mostRecent ? new Date(mostRecent) : new Date());
           return (
             <p className="text-[11px] text-gray-400 text-center mt-8">
               Data as of {stamp}

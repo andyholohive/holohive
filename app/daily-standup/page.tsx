@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate as fmtDate, formatTime as fmtTime } from '@/lib/dateFormat';
 import Image from 'next/image';
 import {
   Plus,
@@ -224,12 +225,10 @@ export default function DailyStandupPage() {
     if (dateStr === today.toISOString().split('T')[0]) return 'Today';
     if (dateStr === yesterday.toISOString().split('T')[0]) return 'Yesterday';
 
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return fmtDate(date);
   };
 
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
+  const formatTime = (dateStr: string) => fmtTime(dateStr);
 
   return (
     <div className="space-y-6">
@@ -427,7 +426,7 @@ export default function DailyStandupPage() {
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit Stand-Up' : 'Daily Stand-Up'}</DialogTitle>
             <DialogDescription>
-              {userProfile?.name || userProfile?.email} &mdash; {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              {userProfile?.name || userProfile?.email} &mdash; {fmtDate(new Date())}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 max-h-[60vh] overflow-y-auto px-1 pb-2">

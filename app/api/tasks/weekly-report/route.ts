@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
 
     const lines = [
       `📊 <b>Weekly Task Report</b>`,
-      `<i>${weekAgo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</i>`,
+      `<i>${formatDate(weekAgo)} – ${formatDate(now)}</i>`,
       ``,
       `✅ Completed: <b>${completedCount}</b>`,
       `📝 Created: <b>${createdCount || 0}</b>`,

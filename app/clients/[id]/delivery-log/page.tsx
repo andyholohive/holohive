@@ -19,6 +19,7 @@ import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
+import { formatDate } from '@/lib/dateFormat';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -807,7 +808,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 text-xs text-ink-warm-500 mb-0.5">
                         <CalendarIcon className="h-3 w-3" />
-                        {new Date(draft.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatDate(draft.logged_at + 'T00:00:00')}
                         <span className="text-amber-700/70">·</span>
                         <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${workTypeBadge(draft.work_type)}`}>
                           {draft.work_type}
@@ -959,7 +960,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                             <Popover>
                               <PopoverTrigger asChild>
                                 <button className="text-sm text-ink-warm-500 hover:text-ink-warm-700 cursor-pointer">
-                                  {inlineNew.logged_at ? new Date(inlineNew.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Select date'}
+                                  {inlineNew.logged_at ? formatDate(inlineNew.logged_at + 'T00:00:00') : 'Select date'}
                                 </button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
@@ -1098,7 +1099,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                             <Popover>
                               <PopoverTrigger asChild>
                                 <button className="text-ink-warm-500 text-sm hover:text-ink-warm-700 cursor-pointer">
-                                  {new Date(entry.logged_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  {formatDate(entry.logged_at + 'T00:00:00')}
                                 </button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
@@ -1205,7 +1206,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.logged_at ? form.logged_at.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
+                      {form.logged_at ? formatDate(form.logged_at) : 'Select date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">

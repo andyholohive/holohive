@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DeliverableService } from '@/lib/deliverableService';
+import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -216,10 +217,7 @@ export async function GET(request: Request) {
 
       // Title format mirrors what a human would type in the wizard:
       // "{Template} · {Client} · Wk of {Mon date}"
-      const monLabel = new Date(weekAnchorIso + 'T00:00:00Z').toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      });
+      const monLabel = formatDate(weekAnchorIso + 'T00:00:00Z');
       const title = `${templateName} · ${clientName} · Wk of ${monLabel}`;
 
       try {

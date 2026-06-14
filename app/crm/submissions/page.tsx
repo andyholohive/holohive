@@ -25,6 +25,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 interface ContactSubmission {
   id: number;
@@ -314,10 +315,7 @@ export default function SubmissionsPage() {
       : <ChevronDown className="h-3 w-3 inline ml-1" />;
   };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const formatDate = (dateStr: string) => fmtDate(dateStr);
 
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);

@@ -42,6 +42,7 @@ import {
   AffiliateStatus
 } from '@/lib/crmService';
 import { UserService } from '@/lib/userService';
+import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '@/lib/dateFormat';
 
 type NetworkTab = 'partners' | 'affiliates';
 
@@ -834,15 +835,7 @@ export default function NetworkPage() {
     setIsHistoryOpen(true);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) => fmtDateTime(dateString);
 
   // Get linked contacts for a partner
   const getPartnerContacts = (partnerId: string) => {
@@ -979,12 +972,7 @@ export default function NetworkPage() {
     }
   };
 
-  const formatShortDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  const formatShortDate = (dateString: string) => fmtDate(dateString);
 
   // Inline editing functions
   const startEditing = (id: string, field: string, type: 'partner' | 'affiliate', currentValue: string | number | null | undefined) => {

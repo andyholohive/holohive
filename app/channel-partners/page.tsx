@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Edit, Building2, Mail, Globe, Trash2, CheckCircle, PauseCircle, Calendar, Handshake } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { formatDate } from '@/lib/dateFormat';
 
 interface Partner {
   id: string;
@@ -353,7 +354,7 @@ export default function PartnersPage() {
                     )}
                     <div className="flex items-center text-sm text-ink-warm-700">
                       <Calendar className="h-4 w-4 mr-2 text-ink-warm-700" />
-                      <span className="text-ink-warm-700">{partner.created_at ? new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown'}</span>
+                      <span className="text-ink-warm-700">{partner.created_at ? formatDate(partner.created_at) : 'Unknown'}</span>
                     </div>
                   </div>
                 </CardHeader>

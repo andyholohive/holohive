@@ -41,6 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   DollarSign, Plus, Trash2, Upload, X, FileText, Image as ImageIcon,
   Check, Download, Filter as FilterIcon, AlertCircle, Calendar as CalendarIcon,
@@ -113,9 +114,7 @@ const formatUSD = (n: number) => new Intl.NumberFormat('en-US', {
 
 const formatDate = (iso: string | null) => {
   if (!iso) return '—';
-  return new Date(iso + (iso.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
+  return fmtDate(iso + (iso.length === 10 ? 'T00:00:00' : ''));
 };
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -620,7 +619,7 @@ function DateField({
         >
           <CalendarIcon className="mr-2 h-3.5 w-3.5" />
           {value
-            ? selectedDate!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            ? fmtDate(selectedDate!)
             : (placeholder || 'Select date')}
           {allowClear && value && (
             <span

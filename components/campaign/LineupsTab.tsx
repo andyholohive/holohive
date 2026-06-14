@@ -60,6 +60,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { formatDateTime } from '@/lib/dateFormat';
 import {
   LineupManagerService,
   type LineupStatus,
@@ -611,7 +612,7 @@ export default function LineupsTab({
               )}
               {lineup?.confirmed_at && (
                 <span className="text-[11px] text-ink-warm-500">
-                  Confirmed {new Date(lineup.confirmed_at).toLocaleString()}
+                  Confirmed {formatDateTime(lineup.confirmed_at)}
                 </span>
               )}
             </div>
@@ -1248,7 +1249,7 @@ function SummaryView({
         </div>
         <div className="text-right text-xs text-ink-warm-500">
           {lineup.confirmed_at && (
-            <p>Confirmed {new Date(lineup.confirmed_at).toLocaleString()}</p>
+            <p>Confirmed {formatDateTime(lineup.confirmed_at)}</p>
           )}
         </div>
       </div>
@@ -1352,7 +1353,7 @@ function AuditLogButton({
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium text-ink-warm-900">{ACTION_LABEL[r.action]}</p>
                     <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
-                      {new Date(r.ts).toLocaleString()}
+                      {formatDateTime(r.ts)}
                     </span>
                   </div>
                   {r.details && (

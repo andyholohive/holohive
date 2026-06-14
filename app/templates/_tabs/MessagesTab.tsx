@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 interface MessageTemplate {
   id: string;
@@ -148,11 +149,7 @@ export default function MessagesTab() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return fmtDate(dateString);
   };
 
   const formatMessageType = (type: string) => {

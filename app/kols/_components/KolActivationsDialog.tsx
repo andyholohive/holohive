@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Activity, ExternalLink, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/dateFormat';
 
 type ParticipationRow = {
   campaign_id: string;
@@ -57,9 +58,7 @@ function fmt(n: number | null | undefined): string {
 function fmtDate(s: string | null): string {
   if (!s) return '';
   try {
-    return new Date(s + 'T00:00:00').toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-    });
+    return formatDate(s + 'T00:00:00');
   } catch { return s; }
 }
 

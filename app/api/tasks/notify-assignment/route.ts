@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
+import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
   const idPrefix = task.short_id ? `${task.short_id} ` : '';
   const safeTitle = escapeHtml(`${idPrefix}${task.task_name || '(untitled task)'}`);
   const dueLine = task.due_date
-    ? `\n\u{1F4C5} <b>Due:</b> ${escapeHtml(new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}`
+    ? `\n\u{1F4C5} <b>Due:</b> ${escapeHtml(formatDate(task.due_date))}`
     : '';
   const priorityLine = task.priority
     ? `\n\u{1F525} <b>Priority:</b> ${escapeHtml(String(task.priority))}`

@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
 import { useToast } from '@/hooks/use-toast';
 import { generateUniqueSlug } from '@/lib/slugUtils';
+import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '@/lib/dateFormat';
 
 interface SavedSortOrder {
   field: string;
@@ -1294,13 +1295,7 @@ export default function ListsPage() {
     return regionMap[region] || { flag: '🏳️', icon: Flag };
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = (dateString: string) => fmtDate(dateString);
 
   // ListCardSkeleton extracted to module scope below the page component
   // (audit 2026-05-06): was defined inline here, re-allocated every
@@ -2350,13 +2345,7 @@ export default function ListsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-ink-warm-900 truncate">{view.email}</p>
                         <p className="text-xs text-ink-warm-500">
-                          {new Date(view.viewed_at).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {fmtDateTime(view.viewed_at)}
                         </p>
                       </div>
                     </div>
@@ -2742,7 +2731,7 @@ export default function ListsPage() {
                             </TableCell>
                             <TableCell className="py-3.5 px-5 text-sm text-ink-warm-500 tabular-nums">
                               {bucket.lastVisitAt
-                                ? new Date(bucket.lastVisitAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                ? fmtDate(bucket.lastVisitAt)
                                 : '—'}
                             </TableCell>
                           </TableRow>
@@ -2765,8 +2754,8 @@ export default function ListsPage() {
                                             <span className="font-medium text-ink-warm-900 truncate flex-1">{g.email}</span>
                                             <span className="text-ink-warm-400 text-[10px] flex-shrink-0">
                                               {g.granted_by_name ? `by ${g.granted_by_name} · ` : ''}
-                                              {new Date(g.granted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                              {g.expires_at && ` · exp ${new Date(g.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                                              {fmtDate(g.granted_at)}
+                                              {g.expires_at && ` · exp ${fmtDate(g.expires_at)}`}
                                             </span>
                                           </div>
                                         ))}
@@ -2792,7 +2781,7 @@ export default function ListsPage() {
                                             <Clock className="h-3 w-3 text-ink-warm-400 flex-shrink-0" />
                                             <span className="text-ink-warm-900 truncate flex-1">{v.email}</span>
                                             <span className="text-ink-warm-400 text-[10px] flex-shrink-0">
-                                              {new Date(v.viewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                              {fmtDateTime(v.viewed_at)}
                                             </span>
                                           </div>
                                         ))}

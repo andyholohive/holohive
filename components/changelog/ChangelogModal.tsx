@@ -18,6 +18,7 @@ import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Changelog } from '@/lib/changelogService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 export default function ChangelogModal() {
   const { user } = useAuth();
@@ -65,11 +66,7 @@ export default function ChangelogModal() {
   // Format date
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return fmtDate(dateString);
   };
 
   // Simple markdown-like rendering (bold, newlines, bullet points)

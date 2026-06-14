@@ -59,6 +59,7 @@ import {
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import type { CampaignWithDetails } from '@/lib/campaignService';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   displayRegion,
   formatDateForInput,
@@ -165,7 +166,7 @@ export function CampaignDetailViewLayout({
   const formatDate = (iso: string | null) => {
     if (!iso) return '—';
     try {
-      return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return fmtDate(iso + 'T00:00:00') || iso;
     } catch {
       return iso;
     }
@@ -960,7 +961,7 @@ export function EngagementEditForm({
   const displayDate = (s: string) => {
     if (!s) return '';
     try {
-      return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return fmtDate(s + 'T12:00:00') || s;
     } catch {
       return s;
     }

@@ -8,6 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RecurringConfig as RecurringConfigType } from '@/lib/taskService';
 import { RefreshCw, X, Calendar as CalendarIcon } from 'lucide-react';
+import { formatDate } from '@/lib/dateFormat';
 
 interface RecurringConfigProps {
   value: RecurringConfigType | null;
@@ -133,7 +134,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
               style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: endDate ? '#111827' : '#9ca3af' }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {endDate ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select end date'}
+              {endDate ? formatDate(endDate) : 'Select end date'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">

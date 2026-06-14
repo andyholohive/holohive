@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 // ─── DateField — matches the canonical project pattern from
 //     app/expenses/page.tsx (Popover + Button trigger + Calendar
@@ -62,7 +63,7 @@ function DateField({
         >
           <CalendarIcon className="mr-2 h-3.5 w-3.5" />
           {value
-            ? selectedDate!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            ? formatDate(selectedDate!)
             : (placeholder || 'Select date')}
           {allowClear && value && (
             <span
@@ -493,7 +494,7 @@ export default function ActivationSettingsDialog({
                     <div className="flex justify-between">
                       <span className="text-ink-warm-500">Last sync</span>
                       <span className="font-medium text-ink-warm-900">
-                        {new Date(latest.synced_at).toLocaleString()}
+                        {formatDateTime(latest.synced_at)}
                       </span>
                     </div>
                   </div>

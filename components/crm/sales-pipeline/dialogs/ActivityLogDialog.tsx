@@ -92,6 +92,7 @@ import {
 import { format } from 'date-fns';
 import { useSalesPipeline } from '@/contexts/SalesPipelineContext';
 import type { ActivityType } from '@/lib/salesPipelineService';
+import { formatDate } from '@/lib/dateFormat';
 
 const ACTIVITY_TYPE_LABELS: Record<ActivityType, { label: string; icon: React.ReactNode; color: string }> = {
   call:     { label: 'Call',     icon: <Phone className="h-3.5 w-3.5" />,           color: 'bg-blue-100 text-blue-700' },
@@ -470,7 +471,7 @@ export function ActivityLogDialog() {
                 >
                   <Calendar className="mr-2 h-4 w-4" />
                   {activityLogForm.next_step_date
-                    ? new Date(activityLogForm.next_step_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    ? formatDate(activityLogForm.next_step_date)
                     : 'Select date'}
                 </Button>
               </PopoverTrigger>

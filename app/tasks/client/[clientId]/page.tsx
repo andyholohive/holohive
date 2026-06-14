@@ -23,6 +23,7 @@ import {
   ListTodo,
 } from 'lucide-react';
 import Link from 'next/link';
+import { formatDate } from '@/lib/dateFormat';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
   to_do:              { label: 'To Do',     icon: Circle,         color: 'text-ink-warm-400' },
@@ -225,7 +226,7 @@ export default function ClientTasksPage() {
                   )}
                   {task.due_date && (
                     <span className={`text-xs tabular-nums ${getDueDateColor(task.due_date)}`}>
-                      {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {formatDate(task.due_date + 'T00:00:00')}
                     </span>
                   )}
                 </div>
@@ -256,7 +257,7 @@ export default function ClientTasksPage() {
                 <span className="flex-1 text-sm text-ink-warm-400 line-through">{task.task_name}</span>
                 {task.completed_at && (
                   <span className="text-xs text-ink-warm-400 tabular-nums">
-                    {new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {formatDate(task.completed_at)}
                   </span>
                 )}
               </div>

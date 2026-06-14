@@ -30,6 +30,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { CSS } from '@dnd-kit/utilities';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 // v11: tone map for form status pills. Replaces FormService.getStatusColor
 // (which returns inline bg-X-100 text-X-800 pills) — render with <StatusBadge>.
@@ -1720,7 +1721,7 @@ export default function FormBuilderPage() {
       const headerHtml = `
         <div style="padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">
           <div style="font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 4px;">${form.name}</div>
-          <div style="font-size: 11px; color: #6b7280;">Submitted on ${new Date(response.submitted_at).toLocaleString()}</div>
+          <div style="font-size: 11px; color: #6b7280;">Submitted on ${formatDateTime(response.submitted_at)}</div>
         </div>
       `;
       const { canvas: headerCanvas } = await renderCardWithLinks(headerHtml, []);
@@ -2208,7 +2209,7 @@ export default function FormBuilderPage() {
             {titleCase(form.status)}
           </StatusBadge>
           <span className="text-sm text-ink-warm-500">
-            Created {new Date(form.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            Created {formatDate(form.created_at)}
           </span>
         </div>
 
@@ -2800,7 +2801,7 @@ export default function FormBuilderPage() {
                       {responses.map((response) => (
                         <TableRow key={response.id} className="border-cream-100 row-accent">
                           <TableCell className="py-3.5 px-5">
-                            {new Date(response.submitted_at).toLocaleString()}
+                            {formatDateTime(response.submitted_at)}
                           </TableCell>
                           <TableCell className="py-3.5 px-5">{response.submitted_by_name || '-'}</TableCell>
                           <TableCell className="py-3.5 px-5">{response.submitted_by_email || '-'}</TableCell>
@@ -3120,7 +3121,7 @@ export default function FormBuilderPage() {
                     <div>
                       <Label className="text-xs font-semibold text-ink-warm-700 uppercase">Submitted</Label>
                       <p className="text-sm font-medium text-ink-warm-900 mt-1">
-                        {new Date(selectedResponse.submitted_at).toLocaleString()}
+                        {formatDateTime(selectedResponse.submitted_at)}
                       </p>
                     </div>
                     <div>

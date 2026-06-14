@@ -56,6 +56,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { formatDate } from '@/lib/dateFormat';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuLabel,
@@ -1318,9 +1319,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                           )}
                           <div className="flex items-center gap-3 mt-2">
                             <span className="text-[10px] text-gray-400">
-                              {new Date(signal.detected_at).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric', year: 'numeric',
-                              })}
+                              {formatDate(signal.detected_at)}
                             </span>
                             {signal.source_url && (
                               <a

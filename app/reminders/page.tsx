@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_TEMPLATES } from '@/lib/reminderService';
+import { formatDateTime } from '@/lib/dateFormat';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -756,7 +757,7 @@ export default function RemindersPage() {
                   {rule.last_run_at && (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      Last run: {new Date(rule.last_run_at).toLocaleString()}
+                      Last run: {formatDateTime(rule.last_run_at)}
                       {rule.last_run_result && (
                         <span>
                           ({rule.last_run_result.items_found} items
@@ -792,7 +793,7 @@ export default function RemindersPage() {
                         ) : (
                           <span className="h-3 w-3 rounded-full bg-cream-300 inline-block shrink-0" />
                         )}
-                        <span>{new Date(log.run_at).toLocaleString()}</span>
+                        <span>{formatDateTime(log.run_at)}</span>
                         <span>{log.items_found} items</span>
                         {log.duration_ms && <span>{log.duration_ms}ms</span>}
                         {log.error && <span className="text-rose-500 truncate max-w-[200px]">{log.error}</span>}

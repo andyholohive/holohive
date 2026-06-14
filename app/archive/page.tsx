@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RotateCcw, Trash2, Building2, Mail, MapPin, Calendar, List, Megaphone, ClipboardList, Users, AlertTriangle, Crown, Globe, Archive as ArchiveIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatDateTime } from '@/lib/dateFormat';
 
 // Local row types. Field nullability mirrors the Supabase schema
 // (database.types.ts) — `archived_at`, `created_at`, `is_active`, etc.
@@ -240,15 +241,7 @@ export default function ArchivePage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) => formatDateTime(dateString);
 
   // Filter items based on search term
   const filteredClients = archivedClients.filter(client =>

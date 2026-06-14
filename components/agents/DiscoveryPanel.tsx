@@ -26,6 +26,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { formatDateTime } from '@/lib/dateFormat';
 import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
@@ -1325,7 +1326,7 @@ export default function DiscoveryPanel() {
               Discovery cron is disabled — no new prospects are being scanned.
             </p>
             <p className="text-xs text-rose-700 mt-0.5">
-              Last run: {schedule?.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : 'never'} ({schedule?.last_run_status || 'unknown'}).
+              Last run: {schedule?.last_run_at ? formatDateTime(schedule.last_run_at) : 'never'} ({schedule?.last_run_status || 'unknown'}).
               Open the schedule dialog (gear icon at the top of /intelligence) and re-enable, or run an on-demand scan with &ldquo;Run Discovery&rdquo;.
             </p>
           </div>
@@ -1339,7 +1340,7 @@ export default function DiscoveryPanel() {
               No successful discovery scan in the last 48h.
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Cron is enabled but the last run was: {schedule?.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : 'never'}
+              Cron is enabled but the last run was: {schedule?.last_run_at ? formatDateTime(schedule.last_run_at) : 'never'}
               {schedule?.last_run_status ? ` (${schedule.last_run_status})` : ''}.
               If this persists, check the scheduled_scans config or the cron logs.
             </p>
@@ -1865,7 +1866,7 @@ export default function DiscoveryPanel() {
                               BD needs to change angle or dismiss. Red because
                               it's a hard ICP-violation signal. */}
                           {p.post_korea_listing_at && (
-                            <span title={`Listed on ${p.post_korea_listing_exchange} (${p.post_korea_listing_market_pair}) on ${new Date(p.post_korea_listing_at).toLocaleString()}`}>
+                            <span title={`Listed on ${p.post_korea_listing_exchange} (${p.post_korea_listing_market_pair}) on ${formatDateTime(p.post_korea_listing_at)}`}>
                               <StatusBadge tone="danger" size="sm" className="font-bold">
                                 📍 LISTED ON {String(p.post_korea_listing_exchange || '').toUpperCase()}
                                 <span className="font-normal ml-0.5">

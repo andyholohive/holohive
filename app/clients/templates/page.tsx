@@ -50,6 +50,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatDate } from '@/lib/dateFormat';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -466,9 +467,7 @@ export default function ActionBoardTemplatesPage() {
                       {t.milestones.length}
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-sm text-ink-warm-500 tabular-nums">
-                      {t.created_at
-                        ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : '—'}
+                      {t.created_at ? formatDate(t.created_at) : '—'}
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-right">
                       <DropdownMenu>

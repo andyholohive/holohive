@@ -11,6 +11,7 @@ import { UserService } from '@/lib/userService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { DeliverableService } from '@/lib/deliverableService';
+import { formatDate } from '@/lib/dateFormat';
 import {
   Plus,
   Trash2,
@@ -370,7 +371,7 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
                 </span>
                 {subtask.due_date && (
                   <span className="text-[10px] text-gray-400">
-                    {new Date(subtask.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {formatDate(subtask.due_date + 'T00:00:00')}
                   </span>
                 )}
                 {renderAssigneePicker(

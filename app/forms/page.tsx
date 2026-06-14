@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FormService, FormWithStats, FormStatus, FormResponse, FormWithFields, FormField } from '@/lib/formService';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 // Types for submissions
 interface LeadSubmission {
@@ -525,7 +526,7 @@ export default function FormsPage() {
 
     // Submission info
     doc.setFontSize(10);
-    doc.text(`Submitted: ${new Date(response.submitted_at).toLocaleString()}`, margin, yPosition);
+    doc.text(`Submitted: ${formatDateTime(response.submitted_at)}`, margin, yPosition);
     yPosition += lineHeight;
     doc.text(`Name: ${response.submitted_by_name || '-'}`, margin, yPosition);
     yPosition += lineHeight;
@@ -805,7 +806,7 @@ export default function FormsPage() {
                         <Eye className="h-3 w-3 ml-1" />
                       </button>
                       <div className="text-xs text-ink-warm-500">
-                        {new Date(form.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatDate(form.created_at)}
                       </div>
                     </div>
                     {/* Subdomain Connection */}
@@ -934,7 +935,7 @@ export default function FormsPage() {
                         <TableCell className="py-3.5 px-5">
                           {lead.deal_value ? `$${lead.deal_value.toLocaleString()}` : '-'}
                         </TableCell>
-                        <TableCell className="py-3.5 px-5">{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                        <TableCell className="py-3.5 px-5">{formatDate(lead.created_at)}</TableCell>
                         <TableCell className="py-3.5 px-5">
                           <Button
                             variant="outline"
@@ -1025,7 +1026,7 @@ export default function FormsPage() {
                             {partner.poc_email && <div className="text-ink-warm-500">{partner.poc_email}</div>}
                           </div>
                         </TableCell>
-                        <TableCell className="py-3.5 px-5">{new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                        <TableCell className="py-3.5 px-5">{formatDate(partner.created_at)}</TableCell>
                         <TableCell className="py-3.5 px-5">
                           <Button
                             variant="outline"
@@ -1125,7 +1126,7 @@ export default function FormsPage() {
                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
                           </a>
                         </TableCell>
-                        <TableCell className="py-3.5 px-5">{new Date(link.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                        <TableCell className="py-3.5 px-5">{formatDate(link.created_at)}</TableCell>
                         <TableCell className="py-3.5 px-5">
                           <Button
                             variant="outline"
@@ -1301,7 +1302,7 @@ export default function FormsPage() {
                     {responses.map((response) => (
                       <TableRow key={response.id} className="border-cream-100">
                         <TableCell className="py-3.5 px-5">
-                          {new Date(response.submitted_at).toLocaleString()}
+                          {formatDateTime(response.submitted_at)}
                         </TableCell>
                         <TableCell className="py-3.5 px-5">{response.submitted_by_name || '-'}</TableCell>
                         <TableCell className="py-3.5 px-5">{response.submitted_by_email || '-'}</TableCell>
@@ -1367,7 +1368,7 @@ export default function FormsPage() {
                     <div>
                       <Label className="text-xs font-semibold text-ink-warm-700 uppercase">Submitted</Label>
                       <p className="text-sm font-medium text-ink-warm-900 mt-1">
-                        {new Date(selectedResponse.submitted_at).toLocaleString()}
+                        {formatDateTime(selectedResponse.submitted_at)}
                       </p>
                     </div>
                     <div>

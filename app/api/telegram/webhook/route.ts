@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -284,7 +285,7 @@ async function forwardKolSocialLinks(
     // Format the notification message
     const kolName = (chat.master_kols as any)?.name || 'Unknown KOL';
     const chatName = chat.title || chatTitle || 'Unknown Chat';
-    const dateStr = messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const dateStr = formatDate(messageDate);
 
     let message = `🔗 New KOL Link Detected\n\n`;
     message += `KOL: ${kolName}\n`;
@@ -1127,7 +1128,7 @@ function shortDueLabel(due: string | null): string {
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Tomorrow';
   if (diffDays < 7) return dueDate.toLocaleDateString('en-US', { weekday: 'short' });
-  return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(dueDate);
 }
 
 /**
@@ -2349,7 +2350,7 @@ async function finalizeSubmission(opts: {
         .limit(1)
         .maybeSingle();
       const when = dup?.submitted_at
-        ? new Date(dup.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        ? formatDate(dup.submitted_at)
         : 'earlier';
       await sendTelegramMessage(
         opts.chatId,
@@ -2366,9 +2367,7 @@ async function finalizeSubmission(opts: {
 
   const submissionId = (row as { id: string }).id;
   const submittedAt = new Date();
-  const submittedLabel = submittedAt.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  });
+  const submittedLabel = formatDateTime(submittedAt);
 
   // Send KOL confirmation receipt per spec verbatim.
   await sendTelegramMessage(

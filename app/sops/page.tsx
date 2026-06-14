@@ -30,6 +30,7 @@ import dynamic from 'next/dynamic';
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 import 'react-quill/dist/quill.snow.css';
+import { formatDate as fmtDate, formatDateTime } from '@/lib/dateFormat';
 
 /**
  * One entry in an SOP's deliverable_template_sequence. Stored as jsonb
@@ -175,13 +176,7 @@ const getStatusColor = (status: string) =>
 const getCategoryColor = (category: string) =>
   toneClassName(CATEGORY_TONES[category] ?? 'neutral');
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+const formatDate = (dateString: string) => fmtDate(dateString);
 
 // Quill editor modules configuration
 const quillModules = {
@@ -1653,7 +1648,7 @@ export default function SOPsPage() {
                         </span>
                       </div>
                       <span className="text-xs text-ink-warm-500">
-                        {new Date(version.changed_at).toLocaleString()}
+                        {formatDateTime(version.changed_at)}
                       </span>
                     </div>
                     {version.change_summary && (

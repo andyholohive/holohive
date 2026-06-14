@@ -7,6 +7,7 @@ import { TaskService, TaskComment } from '@/lib/taskService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Reply, Trash2, Edit, CornerDownRight, MessageSquare } from 'lucide-react';
+import { formatDate } from '@/lib/dateFormat';
 
 interface TaskCommentsProps {
   taskId: string;
@@ -102,7 +103,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
     if (hrs < 24) return `${hrs}h ago`;
     const days = Math.floor(hrs / 24);
     if (days < 7) return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatDate(dateStr);
   };
 
   const renderComment = (comment: TaskComment, isReply = false) => {

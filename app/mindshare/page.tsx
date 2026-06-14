@@ -27,6 +27,7 @@ import {
   XCircle, HelpCircle, ShieldAlert, ArrowRight,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
+import { formatDateTime } from '@/lib/dateFormat';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -1512,7 +1513,7 @@ export default function MindsharePage() {
                           <div key={m.id} className="text-xs p-2.5 border border-cream-200 rounded">
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <div className="flex items-center gap-1.5 text-[10px] text-ink-warm-500 min-w-0">
-                                <span className="shrink-0">{new Date(m.message_date).toLocaleString()}</span>
+                                <span className="shrink-0">{formatDateTime(m.message_date)}</span>
                                 {m.channel?.channel_name && (
                                   <span className="truncate">
                                     ·{' '}
@@ -2003,7 +2004,7 @@ export default function MindsharePage() {
                             className="disabled:opacity-50"
                             title={
                               checkingBotStatus === c.id ? 'Checking…' :
-                              `Bot status: ${status}${c.bot_status_checked_at ? ` (checked ${new Date(c.bot_status_checked_at).toLocaleString()})` : ''}. Click to recheck.`
+                              `Bot status: ${status}${c.bot_status_checked_at ? ` (checked ${formatDateTime(c.bot_status_checked_at)})` : ''}. Click to recheck.`
                             }
                           >
                             <StatusBadge tone={tone} size="sm" className="hover:opacity-80 transition-opacity">

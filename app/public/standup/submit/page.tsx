@@ -10,6 +10,7 @@ import { Check, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/dateFormat';
 
 export default function StandupSubmitPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
@@ -167,7 +168,7 @@ export default function StandupSubmitPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Daily Stand-Up</h1>
           <p className="text-gray-500 mt-1">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            {formatDate(new Date())}
           </p>
         </div>
 

@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/lib/userService';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 interface TeamMember {
   id: string;
@@ -493,11 +494,7 @@ export default function TeamPage() {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Unknown date';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return fmtDate(dateString);
   };
 
   // Derived counts — used both in the tab chips and the SectionHeader

@@ -19,6 +19,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BookingService, BookingPage, AvailableSlot } from '@/lib/bookingService';
 import { TimePicker } from '@/components/ui/time-picker';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 export default function SettingsPage() {
   return (
@@ -764,13 +765,7 @@ function SettingsContent() {
               <div className="flex items-center justify-between py-2 border-t border-cream-100">
                 <span className="text-sm text-ink-warm-500">Member Since</span>
                 <span className="text-sm font-medium text-ink-warm-900 tabular-nums">
-                  {userProfile?.created_at
-                    ? new Date(userProfile.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
-                    : 'Unknown'}
+                  {userProfile?.created_at ? formatDate(userProfile.created_at) : 'Unknown'}
                 </span>
               </div>
             </CardContent>
@@ -989,9 +984,7 @@ function SettingsContent() {
                     <div className="flex items-center justify-between py-2 border-t border-cream-100">
                       <span className="text-sm text-ink-warm-500">Linked on</span>
                       <span className="text-sm text-ink-warm-900 tabular-nums">
-                        {new Date(googleStatus.connected_at).toLocaleDateString('en-US', {
-                          year: 'numeric', month: 'long', day: 'numeric',
-                        })}
+                        {formatDate(googleStatus.connected_at)}
                       </span>
                     </div>
                   )}
@@ -1122,7 +1115,7 @@ function SettingsContent() {
                             {webhookStatus.last_error_message}
                             {webhookStatus.last_error_date && (
                               <span className="text-ink-warm-400 ml-2">
-                                ({new Date(webhookStatus.last_error_date * 1000).toLocaleString()})
+                                ({formatDateTime(webhookStatus.last_error_date * 1000)})
                               </span>
                             )}
                           </p>

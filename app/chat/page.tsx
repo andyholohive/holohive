@@ -21,6 +21,7 @@ import { AdvancedInsightsCard } from '@/components/ai/AdvancedInsightsCard';
 import { AgentStatusIndicator, AgentStatus } from '@/components/ai/AgentStatusIndicator';
 import { AgentActionCard } from '@/components/ai/AgentActionCard';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/dateFormat';
 
 export default function ChatPage() {
   const { userProfile } = useAuth();
@@ -637,7 +638,7 @@ export default function ChatPage() {
                       {session.title || `Chat ${session.id.slice(0, 8)}`}
                     </div>
                     <div className="text-xs text-ink-warm-500 mt-1">
-                      {new Date(session.updated_at || "").toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatDate(session.updated_at)}
                     </div>
                   </div>
                   <Button

@@ -25,6 +25,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, ListChecks, Loader2 } from 'lucide-react';
+import { formatDate } from '@/lib/dateFormat';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -304,10 +305,7 @@ export function ThisWeekFeedWidget({
                   <StatusBadge tone="brand" size="sm">{entry.clientName}</StatusBadge>
                   {entry.item.date && (
                     <span className="text-[10px] text-ink-warm-500 tabular-nums">
-                      {new Date(entry.item.date + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {formatDate(entry.item.date + 'T00:00:00')}
                     </span>
                   )}
                 </div>

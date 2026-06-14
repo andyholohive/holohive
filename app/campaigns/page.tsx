@@ -41,6 +41,7 @@ const CURRENT_PHASE_OPTIONS = [
   'Reporting Phase',
 ] as const;
 import { UserService } from '@/lib/userService';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 export default function CampaignsPage() {
   const { user, userProfile } = useAuth();
@@ -370,9 +371,7 @@ export default function CampaignsPage() {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, clientIdParam]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const formatDate = (dateString: string) => fmtDate(dateString);
 
   const formatDateForInput = (date: Date | undefined) => {
     if (!date) return "";
@@ -911,7 +910,7 @@ export default function CampaignsPage() {
                             }}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {newCampaign.intro_call_date ? new Date(newCampaign.intro_call_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select intro call date'}
+                            {newCampaign.intro_call_date ? fmtDate(newCampaign.intro_call_date) : 'Select intro call date'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -1480,7 +1479,7 @@ export default function CampaignsPage() {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
-                  <span>{sharingCampaign ? new Date(sharingCampaign.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}{sharingCampaign?.end_date ? ` - ${new Date(sharingCampaign.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ' - TBD'}</span>
+                  <span>{sharingCampaign ? fmtDate(sharingCampaign.start_date) : ''}{sharingCampaign?.end_date ? ` - ${fmtDate(sharingCampaign.end_date)}` : ' - TBD'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>

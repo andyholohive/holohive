@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { renderTemplate } from '@/lib/intelligenceAlerts';
+import { formatDateTime } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
     rendered = renderTemplate(template, {
       run_type: 'Auto Discovery scan',
       error_message: 'fetch failed: AbortError after 280s',
-      triggered_at: now.toLocaleString(),
+      triggered_at: formatDateTime(now),
       triggered_at_iso: now.toISOString(),
       intelligence_url: `${baseUrl}/intelligence`,
     });

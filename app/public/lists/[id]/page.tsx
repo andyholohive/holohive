@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 // Create a standalone Supabase client for public access
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -155,13 +156,7 @@ const getCreatorTypeColor = (type: string) => {
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 };
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+const formatDate = (dateString: string) => fmtDate(dateString);
 
 const statusOptions = [
   { value: 'curated', label: 'Curated' },
@@ -597,9 +592,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     // error. Lets the viewer know it's not a typo or broken page — their
     // access just ended — and gives them a clear next step.
     if (expiryInfo) {
-      const revokedDate = new Date(expiryInfo.revoked_at).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      });
+      const revokedDate = fmtDate(expiryInfo.revoked_at);
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-lg border p-8 max-w-md w-full">
@@ -748,9 +741,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
           const msLeft = new Date(viewerExpiresAt).getTime() - Date.now();
           const daysLeft = Math.ceil(msLeft / 86_400_000);
           if (daysLeft > 7 || daysLeft < 0) return null;
-          const expiryStr = new Date(viewerExpiresAt).toLocaleDateString('en-US', {
-            year: 'numeric', month: 'long', day: 'numeric',
-          });
+          const expiryStr = fmtDate(viewerExpiresAt);
           return (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2.5">
               <Calendar className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />

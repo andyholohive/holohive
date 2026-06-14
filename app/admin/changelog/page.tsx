@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { ChangelogService, Changelog, CreateChangelogData } from '@/lib/changelogService';
+import { formatDateTime } from '@/lib/dateFormat';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -241,13 +242,7 @@ export default function ChangelogAdminPage() {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not published';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTime(dateString);
   };
 
   // Show access denied for non-super_admins

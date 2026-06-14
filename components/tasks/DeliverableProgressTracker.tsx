@@ -10,6 +10,7 @@ import {
 } from '@/lib/deliverableService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDate } from '@/lib/dateFormat';
 import {
   Circle,
   CheckCircle2,
@@ -159,7 +160,7 @@ export function DeliverableProgressTracker({ parentTaskId }: DeliverableProgress
                   {/* Due date */}
                   {subtask?.due_date && (
                     <div className="text-[9px] text-gray-400 mt-0.5">
-                      {new Date(subtask.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {formatDate(subtask.due_date + 'T00:00:00')}
                     </div>
                   )}
                 </div>

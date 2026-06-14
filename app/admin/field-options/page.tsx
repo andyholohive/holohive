@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
 import { FieldOptionsService, FieldOption, CreateFieldOptionData } from '@/lib/fieldOptionsService';
+import { formatDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, GripVertical, Sliders, MoreHorizontal, Power, PowerOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -58,7 +59,7 @@ function SortableRow({ option, onToggleActive, onDelete }: SortableRowProps) {
         </Badge>
       </TableCell>
       <TableCell>
-        {new Date(option.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        {formatDate(option.created_at)}
       </TableCell>
       <TableCell className="text-right">
         <DropdownMenu>

@@ -23,6 +23,7 @@ import {
 } from '@/lib/deliverableService';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
+import { formatDate } from '@/lib/dateFormat';
 import {
   Plus,
   Package,
@@ -637,7 +638,7 @@ export default function DeliverablesPage() {
                                               ? 'text-rose-500 font-semibold'
                                               : 'text-ink-warm-400'
                                           }`}>
-                                            {new Date(sub.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                            {formatDate(sub.due_date + 'T00:00:00')}
                                           </span>
                                         )}
                                       </div>
@@ -649,10 +650,10 @@ export default function DeliverablesPage() {
                               {/* Dates footer */}
                               <div className="flex items-center gap-3 mt-2 pt-2 border-t border-cream-100 text-[10px] text-ink-warm-500 tabular-nums">
                                 {d.start_date && (
-                                  <span>Started {new Date(d.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                  <span>Started {formatDate(d.start_date + 'T00:00:00')}</span>
                                 )}
                                 {d.target_completion && (
-                                  <span>Target {new Date(d.target_completion + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                  <span>Target {formatDate(d.target_completion + 'T00:00:00')}</span>
                                 )}
                               </div>
                             </div>

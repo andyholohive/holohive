@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
+import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -235,7 +236,7 @@ const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'TBD';
-  return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  return fmtDate(dateString);
 };
 
 const formatCurrency = (amount: number | null) => {
@@ -1520,7 +1521,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       });
       for (const it of sortedV2.slice(0, 5)) {
         const dateLabel = it.date
-          ? new Date(it.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          ? fmtDate(it.date + 'T00:00:00')
           : null;
         items.push({ text: it.text, dateLabel, status: it.status });
       }
@@ -2698,7 +2699,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   return startDate ? (
                     <span className="ml-auto text-sm text-gray-400 flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      Since {new Date(startDate.includes('T') ? startDate : startDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                      Since {fmtDate(startDate.includes('T') ? startDate : startDate + 'T00:00:00')}
                     </span>
                   ) : null;
                 })()}
@@ -2861,7 +2862,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <Activity className="h-5 w-5 text-white" />
                 </div>
                 <CardTitle className="text-lg font-bold text-gray-900">What's Active Now</CardTitle>
-                <span className="text-sm text-gray-500">Week of {new Date(weeklyUpdates[0].week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <span className="text-sm text-gray-500">Week of {fmtDate(weeklyUpdates[0].week_of + 'T00:00:00')}</span>
               </div>
             </CardHeader>
             <CardContent className="p-6">
@@ -2886,7 +2887,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   {weeklyUpdates[0].next_checkin && (
                     <div>
                       <p className="text-sm font-medium text-gray-500">Next Check-in</p>
-                      <p className="text-sm text-gray-700 font-medium">{new Date(weeklyUpdates[0].next_checkin + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                      <p className="text-sm text-gray-700 font-medium">{fmtDate(weeklyUpdates[0].next_checkin + 'T00:00:00')}</p>
                     </div>
                   )}
                 </div>
@@ -2909,7 +2910,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       <div className="mt-3 space-y-3">
                         {weeklyUpdates.slice(1).map((update) => (
                           <div key={update.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                            <p className="text-xs text-gray-400 mb-1">Week of {new Date(update.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            <p className="text-xs text-gray-400 mb-1">Week of {fmtDate(update.week_of + 'T00:00:00')}</p>
                             <p className="text-sm font-medium text-gray-700">{update.current_focus}</p>
                             {update.active_initiatives && (
                               <div className="mt-1">
@@ -2958,7 +2959,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           <div>
                             <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">{sub.formName}</p>
                             <p className="text-xs text-gray-500">
-                              {new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {fmtDate(sub.submittedAt)}
                             </p>
                           </div>
                         </div>
@@ -3143,12 +3144,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     <Calendar className="h-3.5 w-3.5" />
                     <span>
                       Submitted{' '}
-                      {viewingSubmission &&
-                        new Date(viewingSubmission.submittedAt).toLocaleDateString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                      {viewingSubmission && fmtDate(viewingSubmission.submittedAt)}
                     </span>
                   </div>
                 </div>
@@ -3287,8 +3283,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
                       {(d.startDate || d.targetCompletion) && (
                         <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
-                          {d.startDate && <span>Started {new Date(d.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
-                          {d.targetCompletion && <span>Target {new Date(d.targetCompletion + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                          {d.startDate && <span>Started {fmtDate(d.startDate + 'T00:00:00')}</span>}
+                          {d.targetCompletion && <span>Target {fmtDate(d.targetCompletion + 'T00:00:00')}</span>}
                         </div>
                       )}
                     </div>
@@ -3582,7 +3578,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <div className="p-1 bg-gray-100 rounded">
                               <Calendar className="h-3.5 w-3.5 text-gray-500" />
                             </div>
-                            <span>{new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            <span>{fmtDate(note.meeting_date + 'T00:00:00')}</span>
                           </div>
                         </div>
                         <Button
@@ -3613,7 +3609,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <Calendar className="h-3.5 w-3.5 text-gray-500" />
                 </div>
                 <span>
-                  {viewingNote && new Date(viewingNote.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {viewingNote && fmtDate(viewingNote.meeting_date + 'T00:00:00')}
                 </span>
               </div>
             </DialogHeader>
@@ -3660,7 +3656,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 {decisionLog.map((dec) => (
                   <div key={dec.id} className="flex items-start gap-4 border-l-4 border-l-purple-300 pl-4 py-2">
                     <div className="text-xs text-gray-400 whitespace-nowrap mt-0.5">
-                      {new Date(dec.decision_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {fmtDate(dec.decision_date + 'T00:00:00')}
                     </div>
                     <p className="text-sm text-gray-700">{dec.summary}</p>
                   </div>
@@ -3814,7 +3810,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             if (hours < 24) return `${hours}h ago`;
                             const days = Math.floor(hours / 24);
                             if (days < 7) return `${days}d ago`;
-                            return new Date(activity.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            return fmtDate(activity.created_at);
                           })();
 
                           // [Portal notification cleanup] task_added is the

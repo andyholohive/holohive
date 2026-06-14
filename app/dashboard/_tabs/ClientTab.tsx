@@ -21,6 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Users, FileText, AlertCircle, MessageCircle, Tag, Activity, Megaphone, ExternalLink, Send, CheckCircle2 } from 'lucide-react';
+import { formatDate } from '@/lib/dateFormat';
 
 /**
  * v11 (matches the revamp mockup exactly): client avatar = logo image
@@ -417,9 +418,7 @@ function CallNoteCard({ note }: { note: CallNote }) {
   const [error, setError] = useState<string | null>(null);
 
   const meetingDateFmt = note.meeting_date
-    ? new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric',
-      })
+    ? formatDate(note.meeting_date + 'T00:00:00')
     : '';
 
   // Split content into bullets — newline-separated, strip bullet

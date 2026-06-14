@@ -15,6 +15,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatDate } from '@/lib/dateFormat';
 // [2026-06-11] NotificationBell removed per Andy's call. "This Week"
 // snapshot on the portal becomes the visibility mechanism (driven by
 // the curated Weekly Update tab landing in Post-Onboarding spec Phase 2).
@@ -133,11 +134,7 @@ export default function Sidebar({ children }: SidebarProps) {
   // Format date for changelog display
   const formatChangelogDate = (dateString: string | null) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return formatDate(dateString);
   };
 
   // Render changelog content

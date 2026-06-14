@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@/lib/supabase-server';
 import { TelegramService } from '@/lib/telegramService';
+import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,9 +105,7 @@ export async function POST(
   // ─── Format the TG message ─────────────────────────────────────
   const clientName = (client as any)?.name || 'Client';
   const meetingDateFmt = note.meeting_date
-    ? new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
-      })
+    ? formatDate(note.meeting_date + 'T00:00:00')
     : 'Recent';
 
   // Escape user-provided strings before interpolating into HTML.

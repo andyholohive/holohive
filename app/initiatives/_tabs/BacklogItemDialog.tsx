@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/dateFormat';
 import {
   Upload, X, Paperclip, ExternalLink, FileText, Bug,
 } from 'lucide-react';
@@ -332,7 +333,7 @@ export default function BacklogItemDialog({
           </DialogTitle>
           <DialogDescription>
             {item
-              ? `Reported ${new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${BACKLOG_STATUS_LABELS[item.status]}`
+              ? `Reported ${formatDate(item.created_at)} · ${BACKLOG_STATUS_LABELS[item.status]}`
               : 'Bug or feature request. Attachments help — paste screenshots directly.'}
           </DialogDescription>
         </DialogHeader>
@@ -505,7 +506,7 @@ export default function BacklogItemDialog({
                               {att.storage_path.split('/').pop()}
                             </div>
                             <div className="text-[10px] text-ink-warm-500">
-                              {att.size_bytes != null ? `${Math.round(att.size_bytes / 1024)} KB` : '—'} · {new Date(att.uploaded_at).toLocaleDateString()}
+                              {att.size_bytes != null ? `${Math.round(att.size_bytes / 1024)} KB` : '—'} · {formatDate(att.uploaded_at)}
                             </div>
                           </div>
                           {url && (

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAppSetting } from '@/lib/appSettings';
+import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -104,9 +105,7 @@ export async function GET(request: Request) {
       || process.env.NEXT_PUBLIC_APP_BASE_URL
       || 'https://app.holohive.io';
     const quazoUrl = `${appBase}/initiatives?tab=backlog&status=open&sort=age_asc&group=type_area`;
-    const todayLabel = new Date().toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-    });
+    const todayLabel = formatDate(new Date());
 
     let message: string;
     if (rows.length === 0) {
