@@ -54,7 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
-import { formatDate, formatRelativeShort } from '@/lib/dateFormat';
+import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import { CRMOpportunity } from '@/lib/crmService';
 
@@ -3354,7 +3354,7 @@ export default function TelegramChatsPage() {
                 yesterday.setDate(yesterday.getDate() - 1);
                 if (isSameDay(date, now)) return 'Today';
                 if (isSameDay(date, yesterday)) return 'Yesterday';
-                return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                return formatDate(date);
               };
               const formatTime = (date: Date): string =>
                 date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -3446,7 +3446,7 @@ export default function TelegramChatsPage() {
                         // Hover shows the exact timestamp for any
                         // message — useful for buried mid-block messages
                         // that don't have an inline label.
-                        title={validTs ? validTs.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : undefined}
+                        title={validTs ? formatDateTime(validTs) : undefined}
                       >
                         {msg.text || <span className="italic text-ink-warm-400">(empty message)</span>}
                       </div>

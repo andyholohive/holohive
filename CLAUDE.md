@@ -361,6 +361,42 @@ for the canonical wrapper. The base pattern:
 
 ---
 
+## Date formatting
+
+The canonical format is **mm/dd/yyyy** (en-US, 2-digit month + day, 4-digit
+year). Per Andy 2026-06-14. **Never** call `toLocaleDateString` or
+`toLocaleString('en-…', …)` directly — always go through
+`@/lib/dateFormat`.
+
+```tsx
+import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
+
+formatDate(client.engagement_end_date)   // "12/15/2025"
+formatDateTime(meeting.submitted_at)     // "12/15/2025 3:45 PM"
+formatRelativeShort(chat.last_message)   // "5m ago" / "3h ago" / "12/15/2025"
+formatRelative(activity.created_at)      // "about 2 hours ago"
+formatTime(meeting.start_time)           // "3:45 PM"
+toIsoDate(form.due_date)                 // "2025-12-15" — STORAGE ONLY, never display
+```
+
+**Forbidden:**
+- `someDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })` — use `formatDate`
+- `someDate.toLocaleString('en-US', …)` for dates — use `formatDateTime`
+- `'en-GB'` anywhere — the app is en-US throughout
+- Raw ISO strings (`{record.created_at}` directly in JSX) — use `formatDate`
+- Local copies of "X ago" helpers — use `formatRelativeShort` (terse: `5m / 3h / 2d ago`) or `formatRelative` (verbose: `"2 days ago"`)
+
+The lint rule `no-raw-toLocaleDateString` (in `scripts/lint-conventions.mjs`)
+catches drift. Numeric `.toLocaleString()` (e.g. `Number(x).toLocaleString('en-US')`)
+is allowed — the rule excludes lines containing `Number(`.
+
+**Legitimate exception:** if you genuinely need a non-mm/dd/yyyy format
+(e.g. a "Jun 2026" month+year-only header where mm/dd/yyyy would be
+misleading), add a `lint-conventions: disable-next-line no-raw-toLocaleDateString`
+comment with a one-line justification above.
+
+---
+
 ## Stat / KPI cards
 
 Use the shared `@/components/ui/kpi-card` — the canonical KpiCard.

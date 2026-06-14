@@ -40,7 +40,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
-import { formatRelativeShort } from '@/lib/dateFormat';
+import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import dynamic from 'next/dynamic';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -2870,7 +2870,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.callDate ? startClientForm.callDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select call date'}
+                                    {startClientForm.callDate ? formatDate(startClientForm.callDate) : 'Select call date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -2943,7 +2943,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.startDate ? startClientForm.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select start date'}
+                                    {startClientForm.startDate ? formatDate(startClientForm.startDate) : 'Select start date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -2976,7 +2976,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.endDate ? startClientForm.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select end date'}
+                                    {startClientForm.endDate ? formatDate(startClientForm.endDate) : 'Select end date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -3057,7 +3057,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.intro_call_date ? startClientForm.intro_call_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select intro call date'}
+                                    {startClientForm.intro_call_date ? formatDate(startClientForm.intro_call_date) : 'Select intro call date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -3437,7 +3437,7 @@ export default function ClientsPage() {
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {newClient.start_date
-                                ? newClient.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                ? formatDate(newClient.start_date)
                                 : 'Select start date'}
                             </Button>
                           </PopoverTrigger>
@@ -3840,7 +3840,7 @@ export default function ClientsPage() {
                               </span>
                               {ctx?.start_date && (
                                 <span className="text-xs text-ink-warm-500">
-                                  Started {new Date(ctx.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  Started {formatDate(new Date(ctx.start_date + 'T00:00:00'))}
                                 </span>
                               )}
                             </div>
@@ -4414,7 +4414,7 @@ export default function ClientsPage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: decisionForm.decision_date ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {decisionForm.decision_date ? decisionForm.decision_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
+                            {decisionForm.decision_date ? formatDate(decisionForm.decision_date) : 'Select date'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -4447,7 +4447,7 @@ export default function ClientsPage() {
                     ) : (
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-xs text-ink-warm-400">{new Date(dec.decision_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                          <p className="text-xs text-ink-warm-400">{formatDate(new Date(dec.decision_date + 'T00:00:00'))}</p>
                           <p className="text-sm text-ink-warm-700 mt-1">{dec.summary}</p>
                         </div>
                         <div className="flex gap-1">
@@ -4523,7 +4523,7 @@ export default function ClientsPage() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? '#111827' : '#9ca3af' }}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {meetingNoteForm.meeting_date ? meetingNoteForm.meeting_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
+                          {meetingNoteForm.meeting_date ? formatDate(meetingNoteForm.meeting_date) : 'Select date'}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -4620,7 +4620,7 @@ export default function ClientsPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="font-medium text-sm">{note.title}</p>
-                          <p className="text-xs text-ink-warm-500">{new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                          <p className="text-xs text-ink-warm-500">{formatDate(new Date(note.meeting_date + 'T00:00:00'))}</p>
                         </div>
                         <div className="flex gap-1">
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-cream-100 w-auto px-2" onClick={() => openNoteForm(note)} title="Edit note"><Edit className="h-4 w-4 text-ink-warm-700" /></Button>
@@ -5248,7 +5248,7 @@ export default function ClientsPage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" size="sm" className="focus-brand font-normal h-8">
                             <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                            {weeklyV2Week.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {formatDate(weeklyV2Week)}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
@@ -5344,12 +5344,7 @@ export default function ClientsPage() {
                                           </span>
                                         </div>
                                         <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
-                                          {new Date(r.edited_at).toLocaleString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            hour: 'numeric',
-                                            minute: '2-digit',
-                                          })}
+                                          {formatDateTime(new Date(r.edited_at))}
                                         </span>
                                       </div>
                                       <p className="text-[11px] text-ink-warm-500 mt-0.5">
@@ -5387,7 +5382,7 @@ export default function ClientsPage() {
                           </div>
                           {weeklyV2Row?.strategic_notes_updated_at && (
                             <span className="text-[10px] text-amber-700/70 font-mono">
-                              edited {new Date(weeklyV2Row.strategic_notes_updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              edited {formatDateTime(new Date(weeklyV2Row.strategic_notes_updated_at))}
                             </span>
                           )}
                         </div>
@@ -5438,7 +5433,7 @@ export default function ClientsPage() {
                                 <div key={row.id} className="bg-white border border-amber-200 rounded-md p-2">
                                   <div className="flex items-center justify-between gap-2 mb-1">
                                     <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-900">
-                                      Week of {new Date(row.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      Week of {formatDate(new Date(row.week_of + 'T00:00:00'))}
                                     </span>
                                     <button
                                       type="button"
@@ -5530,7 +5525,7 @@ export default function ClientsPage() {
                                       <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start" disabled={isLocked}>
                                         <CalendarIcon className="mr-1 h-3 w-3" />
                                         {row.due_date
-                                          ? new Date(row.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                          ? formatDate(new Date(row.due_date + 'T00:00:00'))
                                           : 'Due'}
                                       </Button>
                                     </PopoverTrigger>
@@ -5615,7 +5610,7 @@ export default function ClientsPage() {
 
                             {isLocked && weeklyV2Row?.execution_plan_submitted_at && (
                               <p className="text-[11px] text-yellow-800/80 italic">
-                                Locked · {new Date(weeklyV2Row.execution_plan_submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Add new tasks via HQ.
+                                Locked · {formatDateTime(new Date(weeklyV2Row.execution_plan_submitted_at))}. Add new tasks via HQ.
                               </p>
                             )}
                           </div>
@@ -5666,7 +5661,7 @@ export default function ClientsPage() {
                                   <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start">
                                     <CalendarIcon className="mr-1 h-3 w-3" />
                                     {item.date
-                                      ? new Date(item.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                      ? formatDate(new Date(item.date + 'T00:00:00'))
                                       : 'Date'}
                                   </Button>
                                 </PopoverTrigger>

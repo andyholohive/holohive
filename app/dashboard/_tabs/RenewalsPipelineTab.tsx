@@ -82,6 +82,8 @@ const toneToBadge: Record<RenewalTone, BadgeTone> = {
 const formatMonth = (key: string): string => {
   const [y, m] = key.split('-');
   const date = new Date(Number(y), Number(m) - 1, 1);
+  // Month+year only ("Jun 2026") — not a date format, intentional.
+  // lint-conventions: disable-next-line no-raw-toLocaleDateString
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 };
 

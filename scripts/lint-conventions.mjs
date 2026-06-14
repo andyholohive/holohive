@@ -80,6 +80,25 @@ const RULES = [
     pattern: /<Button[^>]*\bclassName=["'][^"']*bg-brand[^"']*text-white/,
   },
   {
+    id: 'no-raw-toLocaleDateString',
+    description:
+      '`toLocaleDateString` / `toLocaleString` for dates is forbidden. Canonical is ' +
+      'mm/dd/yyyy via `formatDate` / `formatDateTime` from `@/lib/dateFormat`. (CLAUDE.md → Date formatting)',
+    // Catches raw .toLocaleDateString(...) and .toLocaleString('en-...', ...) on Date values.
+    pattern: /\.toLocaleDateString\s*\(|\.toLocaleString\s*\(\s*['"]en-/,
+    // Number(x).toLocaleString('en-US') is numeric formatting and stays.
+    excludeLineRegex: /Number\s*\(/,
+    // The dateFormat module itself uses toLocaleDateString to *implement* the helpers.
+    excludePathRegex: /\/lib\/dateFormat\.ts$/,
+  },
+  {
+    id: 'no-en-gb-locale',
+    description:
+      'en-GB locale is forbidden — the app is en-US throughout. Use `formatDate` from ' +
+      '`@/lib/dateFormat` instead. (CLAUDE.md → Date formatting)',
+    pattern: /['"`]en-GB['"`]/,
+  },
+  {
     id: 'no-card-shell',
     description:
       'The card-shell page wrapper `min-h-[calc(100vh-64px)] bg-gray-50` + white-Card ' +

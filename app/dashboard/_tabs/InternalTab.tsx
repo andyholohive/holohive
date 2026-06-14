@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatRelativeShort } from '@/lib/dateFormat';
+import { formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -358,7 +358,7 @@ export default function InternalTab() {
                     <div className="text-sm font-medium text-ink-warm-900">{e.name}</div>
                     {e.submitted_at && (
                       <div className="text-[11px] text-ink-warm-500 tabular-nums">
-                        submitted {new Date(e.submitted_at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}
+                        submitted {formatDateTime(new Date(e.submitted_at))}
                       </div>
                     )}
                   </div>
