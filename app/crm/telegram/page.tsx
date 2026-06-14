@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +47,8 @@ import {
   Briefcase,
   MessageCircle,
   Bot,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -200,6 +202,17 @@ const SAMPLE_MESSAGES: Record<string, TelegramMessage[]> = {
 export default function TelegramChatsPage() {
   const { toast } = useToast();
   const [chats, setChats] = useState<TelegramChat[]>([]);
+  /**
+   * Forum topics (telegram_threads). One row per topic in any supergroup.
+   * Fetched alongside chats so the Topics tab can group them by parent.
+   */
+  const [topics, setTopics] = useState<Array<{
+    id: string;
+    chat_id: string;
+    message_thread_id: number;
+    name: string | null;
+    last_seen_at: string;
+  }>>([]);
   const [messages, setMessages] = useState<Record<string, TelegramMessage[]>>({});
   const [opportunities, setOpportunities] = useState<CRMOpportunity[]>([]);
   const [masterKOLs, setMasterKOLs] = useState<MasterKOL[]>([]);
@@ -274,7 +287,35 @@ export default function TelegramChatsPage() {
   }, []);
 
   const fetchData = async () => {
-    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities(), fetchMasterKOLs(), fetchClients(), fetchTeamTelegramIds()]);
+    await Promise.all([
+      fetchChats(),
+      fetchTopics(),
+      fetchMessages(),
+      fetchOpportunities(),
+      fetchMasterKOLs(),
+      fetchClients(),
+      fetchTeamTelegramIds(),
+    ]);
+  };
+
+  /**
+   * Pull every visible forum topic. We render them grouped by parent chat
+   * in the Topics tab, and surface a "↳ N topics" chip on supergroup rows
+   * in the existing chat tabs so users know they exist.
+   */
+  const fetchTopics = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('telegram_threads')
+        .select('id, chat_id, message_thread_id, name, last_seen_at')
+        .eq('is_hidden', false)
+        .order('last_seen_at', { ascending: false })
+        .limit(2000);
+      if (error) throw error;
+      setTopics((data || []) as any);
+    } catch (err) {
+      console.error('Error fetching telegram topics:', err);
+    }
   };
 
   const fetchChats = async () => {
@@ -1481,6 +1522,13 @@ export default function TelegramChatsPage() {
               <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="topics" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <Hash className="h-4 w-4" />
+            Topics
+            {topics.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{topics.length}</span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="commands" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
             <Terminal className="h-4 w-4" />
             Commands
@@ -2394,6 +2442,22 @@ export default function TelegramChatsPage() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* Topics Tab — forum topics grouped by parent supergroup */}
+        <TabsContent value="topics" className="mt-4 space-y-4">
+          <TopicsTabContent
+            chats={chats}
+            topics={topics}
+            onTopicRenamed={(chatId, threadId, name) => {
+              setTopics(prev => prev.map(t =>
+                (t.chat_id === chatId && t.message_thread_id === threadId)
+                  ? { ...t, name }
+                  : t,
+              ));
+            }}
+            onRefresh={fetchTopics}
+          />
         </TabsContent>
 
         {/* Commands Tab */}
@@ -3461,6 +3525,272 @@ export default function TelegramChatsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Topics tab ──────────────────────────────────────────────────────
+// Groups every visible forum topic under its parent supergroup. Supports
+// inline rename so names can be set without waiting for a fresh message
+// to flow through the webhook auto-capture path. Mirrors the rename
+// pattern from components/telegram/ChatThreadPicker.tsx.
+
+type TopicRow = {
+  id: string;
+  chat_id: string;
+  message_thread_id: number;
+  name: string | null;
+  last_seen_at: string;
+};
+
+function TopicsTabContent({
+  chats, topics, onTopicRenamed, onRefresh,
+}: {
+  chats: TelegramChat[];
+  topics: TopicRow[];
+  onTopicRenamed: (chatId: string, threadId: number, name: string) => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState('');
+  const [editKey, setEditKey] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const chatByChatId = useMemo(() => {
+    const m = new Map<string, TelegramChat>();
+    for (const c of chats) m.set(c.chat_id, c);
+    return m;
+  }, [chats]);
+
+  // Group topics by parent chat. Filter chats with at least one topic.
+  const groups = useMemo(() => {
+    const map = new Map<string, TopicRow[]>();
+    for (const t of topics) {
+      const arr = map.get(t.chat_id) || [];
+      arr.push(t);
+      map.set(t.chat_id, arr);
+    }
+    // Sort each chat's topics by last_seen_at desc
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (b.last_seen_at || '').localeCompare(a.last_seen_at || ''));
+    }
+    // Build [chat, topics][] entries sorted by chat title
+    return Array.from(map.entries())
+      .map(([chatId, ts]) => ({ chat: chatByChatId.get(chatId), chatId, topics: ts }))
+      .sort((a, b) => {
+        const at = (a.chat?.title || a.chatId).toLowerCase();
+        const bt = (b.chat?.title || b.chatId).toLowerCase();
+        return at.localeCompare(bt);
+      });
+  }, [topics, chatByChatId]);
+
+  const filteredGroups = useMemo(() => {
+    if (!search.trim()) return groups;
+    const q = search.toLowerCase();
+    return groups
+      .map(g => ({
+        ...g,
+        topics: g.topics.filter(t =>
+          (t.name || '').toLowerCase().includes(q)
+          || String(t.message_thread_id).includes(q)
+          || (g.chat?.title || '').toLowerCase().includes(q)
+          || g.chatId.includes(q),
+        ),
+      }))
+      .filter(g => g.topics.length > 0);
+  }, [groups, search]);
+
+  const startRename = (chatId: string, threadId: number, currentName: string | null) => {
+    setEditKey(`${chatId}:${threadId}`);
+    setRenameValue(currentName || '');
+  };
+  const cancelRename = () => { setEditKey(null); setRenameValue(''); };
+  const saveRename = async (chatId: string, threadId: number) => {
+    const name = renameValue.trim();
+    if (!name) { cancelRename(); return; }
+    setSaving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_threads')
+        .update({ name })
+        .eq('chat_id', chatId)
+        .eq('message_thread_id', threadId);
+      if (error) {
+        toast({ title: 'Rename failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      onTopicRenamed(chatId, threadId, name);
+      cancelRename();
+      toast({ title: 'Topic renamed', description: name });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await onRefresh();
+      toast({ title: 'Refreshed', description: `${topics.length} topic${topics.length === 1 ? '' : 's'} loaded.` });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const relative = (iso: string | null) => {
+    if (!iso) return '—';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diffMs / 60_000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d < 30) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-ink-warm-700 text-sm">
+          Forum topics tracked across every supergroup — {topics.length} topic{topics.length === 1 ? '' : 's'} across {groups.length} chat{groups.length === 1 ? '' : 's'}.
+          {' '}
+          <span className="text-xs text-ink-warm-500">
+            Click the pencil to set a topic name. New topic names also auto-capture via the bot when anyone posts in them.
+          </span>
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 text-ink-warm-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              placeholder="Search topics or chats…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="focus-brand h-8 text-sm pl-7 w-[240px]"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="h-8 text-xs"
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {filteredGroups.length === 0 ? (
+        <Card className="border-cream-200">
+          <CardContent className="p-10 text-center">
+            <Hash className="h-8 w-8 mx-auto mb-2 text-ink-warm-300" />
+            <p className="text-sm text-ink-warm-700 mb-1">
+              {topics.length === 0 ? 'No topics tracked yet' : 'No matches'}
+            </p>
+            <p className="text-xs text-ink-warm-500">
+              {topics.length === 0
+                ? 'Topics appear here as the bot sees messages in forum supergroups. Make sure the bot is in the group.'
+                : 'Try a different search term.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredGroups.map(g => {
+            const chatTitle = g.chat?.title || `Chat ${g.chatId}`;
+            const chatType = g.chat?.chat_type;
+            return (
+              <Card key={g.chatId} className="border-cream-200 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-cream-100 bg-cream-50/30 flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-brand" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-ink-warm-900 truncate">{chatTitle}</p>
+                    <p className="text-[10px] text-ink-warm-500 font-mono truncate">
+                      {g.chatId}
+                      {chatType && <span className="ml-2">· {chatType}</span>}
+                    </p>
+                  </div>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-light text-brand font-semibold tabular-nums">
+                    {g.topics.length} topic{g.topics.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <ul className="divide-y divide-cream-100">
+                  {g.topics.map(t => {
+                    const key = `${t.chat_id}:${t.message_thread_id}`;
+                    const isEditing = editKey === key;
+                    const hasName = !!t.name;
+                    return (
+                      <li key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-cream-50/40 group">
+                        <Hash className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') { e.preventDefault(); saveRename(t.chat_id, t.message_thread_id); }
+                                  else if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+                                }}
+                                placeholder={`Topic ${t.message_thread_id}`}
+                                className="h-7 text-sm focus-brand"
+                                autoFocus
+                                disabled={saving}
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50"
+                                onClick={() => saveRename(t.chat_id, t.message_thread_id)}
+                                disabled={saving}
+                                title="Save"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-ink-warm-400 hover:bg-cream-100"
+                                onClick={cancelRename}
+                                disabled={saving}
+                                title="Cancel"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <p className={`text-sm truncate ${hasName ? 'text-ink-warm-900 font-medium' : 'text-ink-warm-500 italic'}`}>
+                                {t.name || `Topic ${t.message_thread_id}`}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => startRename(t.chat_id, t.message_thread_id, t.name)}
+                                className={`p-0.5 rounded hover:bg-cream-100 text-ink-warm-400 hover:text-brand transition-opacity ${hasName ? 'opacity-0 group-hover:opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                                title={hasName ? 'Rename topic' : 'Add topic name'}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                          <p className="text-[10px] text-ink-warm-500 font-mono">
+                            topic #{t.message_thread_id} · last seen {relative(t.last_seen_at)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
