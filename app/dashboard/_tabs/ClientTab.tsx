@@ -150,19 +150,33 @@ export default function ClientTab() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    // [2026-06-16] Pass ?fresh=1 to bypass the 60s server cache on
+    // initial load + when the window regains focus. Without this, call
+    // notes saved in another tab (e.g. /clients Edit Portal modal)
+    // don't appear here until the TTL expires.
+    const fetchClientData = async (fresh: boolean) => {
       try {
-        const res = await fetch('/api/dashboard/v2/client');
+        const qs = fresh ? '?fresh=1' : '';
+        const res = await fetch(`/api/dashboard/v2/client${qs}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        if (!cancelled) setData(json);
+        if (!cancelled) {
+          setData(json);
+          setError(null);
+        }
       } catch (err) {
         if (!cancelled) setError((err as Error).message);
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    fetchClientData(true);
+    const onFocus = () => { void fetchClientData(true); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   if (loading) return <ClientTabSkeleton />;

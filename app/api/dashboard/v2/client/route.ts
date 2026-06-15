@@ -44,8 +44,13 @@ function startOfWeekUtc(): Date {
   return x;
 }
 
-export async function GET() {
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+export async function GET(request: Request) {
+  // ?fresh=1 bypasses the 60s in-memory cache. Used by the Client
+  // Context modal close handler so a freshly-saved call note shows up
+  // immediately instead of after the next TTL window.
+  const url = new URL(request.url);
+  const force = url.searchParams.get('fresh') === '1';
+  if (!force && cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return NextResponse.json(cached.value);
   }
 
@@ -60,6 +65,11 @@ export async function GET() {
     ]);
 
     const standardClientIds = standardClients.map(c => c.id);
+    // [2026-06-16] Recent Call Notes spans ALL live clients (standard +
+    // ad-hoc). KPI rollups stay standard-only — the spec only excludes
+    // ad-hoc from "average client" math, not from conversation logs.
+    const adHocClientIds = adHocClients.map(c => c.id);
+    const allLiveClientIds = [...standardClientIds, ...adHocClientIds];
     if (standardClientIds.length === 0) {
       const empty = {
         asOf: new Date().toISOString(),
@@ -115,10 +125,12 @@ export async function GET() {
       // action items, and TG send stamps inline — we flatten them
       // below into the same DTO shape so /dashboard/_tabs/ClientTab.tsx
       // doesn't change.
+      // [2026-06-16] Reads across ALL live clients (standard + ad-hoc)
+      // so notes logged against an ad-hoc engagement still surface.
       (sb as any)
         .from('client_context')
         .select('client_id, call_notes')
-        .in('client_id', standardClientIds),
+        .in('client_id', allLiveClientIds),
       // [2026-06-15] External portal visits per client this week —
       // wired against portal_visits (created by portal_visits_skeleton
       // migration). Empty table → counts return 0. Once the
@@ -286,9 +298,11 @@ export async function GET() {
     flatCallNotes.sort((a, b) => (b.meeting_date || '').localeCompare(a.meeting_date || ''));
 
     // Client name lookup so the call note card can render the client
-    // header without a per-row join in the UI.
+    // header without a per-row join in the UI. Ad-hoc clients are
+    // included so notes against them resolve to a name, not "null".
     const clientNameById = new Map<string, string>();
     for (const c of standardClients) clientNameById.set(c.id, c.name);
+    for (const c of adHocClients) clientNameById.set(c.id, c.name);
 
     // [2026-06-11] Compute week-number per spec § 4.2:
     // FLOOR((NOW - started_date) / 7) + 1 — week 1 is the week the

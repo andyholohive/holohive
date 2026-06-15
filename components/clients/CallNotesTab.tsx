@@ -312,6 +312,26 @@ export function CallNotesTab({
     }
   }
 
+  /** Toggle a single action item's is_done flag inline (from the list
+   *  view), without opening the edit form. Optimistic UI + write-through
+   *  to client_context.call_notes JSONB. */
+  async function toggleActionItem(noteId: string, itemId: string) {
+    const target = notes.find(n => n.id === noteId);
+    if (!target) return;
+    const nextItems = target.action_items.map(it =>
+      it.id === itemId ? { ...it, is_done: !it.is_done } : it,
+    );
+    const nextNote = { ...target, action_items: nextItems };
+    const nextNotes = notes.map(n => n.id === noteId ? nextNote : n);
+    // Optimistic local update so the checkbox feels instant
+    setNotes(nextNotes);
+    const ok = await persist(nextNotes);
+    if (!ok) {
+      // Persist failed — revert by refetching authoritative state
+      await refresh();
+    }
+  }
+
   function startEdit(note: CallNote) {
     setForm({
       meeting_date: note.meeting_date ? new Date(note.meeting_date + 'T00:00:00') : undefined,
@@ -433,16 +453,14 @@ export function CallNotesTab({
                       </p>
                       <ul className="space-y-1">
                         {note.action_items.map(it => (
-                          <li key={it.id} className="flex items-center gap-2 text-xs">
-                            <span className={`inline-flex w-3.5 h-3.5 rounded-sm border items-center justify-center shrink-0 ${
-                              it.is_done
-                                ? 'bg-emerald-500 border-emerald-500 text-white'
-                                : it.owner_client_side
-                                  ? 'border-purple-400'
-                                  : 'border-amber-400'
-                            }`}>
-                              {it.is_done && <CheckCircle2 className="h-2.5 w-2.5" />}
-                            </span>
+                          <li key={it.id} className="flex items-center gap-2 text-xs group/aitem">
+                            <Checkbox
+                              checked={it.is_done}
+                              onCheckedChange={() => toggleActionItem(note.id, it.id)}
+                              disabled={saving}
+                              aria-label={it.is_done ? `Mark "${it.text}" not done` : `Mark "${it.text}" done`}
+                              className="h-3.5 w-3.5 shrink-0"
+                            />
                             <span className={it.is_done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}>
                               {it.text}
                             </span>
