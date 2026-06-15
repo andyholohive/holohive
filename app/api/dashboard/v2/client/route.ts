@@ -236,6 +236,8 @@ export async function GET(request: Request) {
       id: string;
       client_id: string;
       client_name: string | null;
+      client_logo_url: string | null;
+      client_renewal_tone: 'green' | 'amber' | 'red' | 'unknown';
       title: string;
       content: string;
       meeting_date: string;
@@ -285,6 +287,8 @@ export async function GET(request: Request) {
           id: n.id,
           client_id: row.client_id,
           client_name: null, // filled in below
+          client_logo_url: null, // filled in below
+          client_renewal_tone: 'unknown', // filled in below
           title: '', // free-form notes don't have a title in the spec'd shape
           content: n.content,
           meeting_date: n.meeting_date,
@@ -297,12 +301,33 @@ export async function GET(request: Request) {
     }
     flatCallNotes.sort((a, b) => (b.meeting_date || '').localeCompare(a.meeting_date || ''));
 
-    // Client name lookup so the call note card can render the client
-    // header without a per-row join in the UI. Ad-hoc clients are
-    // included so notes against them resolve to a name, not "null".
-    const clientNameById = new Map<string, string>();
-    for (const c of standardClients) clientNameById.set(c.id, c.name);
-    for (const c of adHocClients) clientNameById.set(c.id, c.name);
+    // Client name + logo + renewal-tone lookup so the call note card
+    // can render the client header without a per-row join in the UI.
+    // Ad-hoc clients are included so notes against them resolve to a
+    // name, not "null".
+    type ClientMeta = {
+      name: string;
+      logo_url: string | null;
+      renewal_tone: 'green' | 'amber' | 'red' | 'unknown';
+    };
+    const clientMetaById = new Map<string, ClientMeta>();
+    for (const c of standardClients) {
+      const renewal = renewalToneFor(c.engagement_end_date, cfg.renewal_red_days, cfg.renewal_amber_days);
+      clientMetaById.set(c.id, {
+        name: c.name,
+        logo_url: (c as any).logo_url ?? null,
+        renewal_tone: c.engagement_end_date ? renewal.tone : 'unknown',
+      });
+    }
+    for (const c of adHocClients) {
+      clientMetaById.set(c.id, {
+        name: c.name,
+        // Ad-hoc clients query doesn't fetch logo_url. Fine — they
+        // render the letter-tile fallback like the standard pipeline.
+        logo_url: null,
+        renewal_tone: 'unknown',
+      });
+    }
 
     // [2026-06-11] Compute week-number per spec § 4.2:
     // FLOOR((NOW - started_date) / 7) + 1 — week 1 is the week the
@@ -351,10 +376,15 @@ export async function GET(request: Request) {
       };
     });
 
-    const callNotes = flatCallNotes.slice(0, 10).map(n => ({
-      ...n,
-      client_name: clientNameById.get(n.client_id) ?? null,
-    }));
+    const callNotes = flatCallNotes.slice(0, 10).map(n => {
+      const meta = clientMetaById.get(n.client_id);
+      return {
+        ...n,
+        client_name: meta?.name ?? null,
+        client_logo_url: meta?.logo_url ?? null,
+        client_renewal_tone: meta?.renewal_tone ?? 'unknown',
+      };
+    });
 
     const payload = {
       asOf: new Date().toISOString(),

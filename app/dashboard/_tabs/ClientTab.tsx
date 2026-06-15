@@ -94,6 +94,8 @@ type CallNote = {
   id: string;
   client_id: string;
   client_name: string | null;
+  client_logo_url: string | null;
+  client_renewal_tone: RenewalTone | 'unknown';
   title: string | null;
   content: string | null;
   meeting_date: string | null;
@@ -465,81 +467,115 @@ function CallNoteCard({ note }: { note: CallNote }) {
     }
   }
 
+  // Logo tile reuses the same renewal-tone fallback palette as the
+  // Client Health table so the visual language matches across cards.
+  const tone = note.client_renewal_tone || 'unknown';
+  const letter = (note.client_name || '?').trim().charAt(0).toUpperCase();
+  // Subtle left rail tinted by renewal tone — gives a quick at-a-glance
+  // signal without adding another badge.
+  const RAIL_TONE: Record<string, string> = {
+    green: 'bg-brand/40',
+    amber: 'bg-amber-300',
+    red:   'bg-rose-300',
+    unknown: 'bg-cream-200',
+  };
+
   return (
-    <div className="bg-white border border-cream-200 rounded-lg p-3.5">
-      {/* Header row — client + date + send status */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0">
-          <Link
-            href={`/clients/${note.client_id}`}
-            className="text-sm font-semibold text-ink-warm-900 hover:text-brand transition-colors"
-          >
-            {note.client_name || 'Client'}
-          </Link>
-          {meetingDateFmt && (
-            <span className="text-xs text-ink-warm-500 ml-2">Sync — {meetingDateFmt}</span>
+    <div className="relative bg-white border border-cream-200 rounded-lg overflow-hidden hover:border-cream-300 hover:shadow-sm transition-all">
+      {/* Renewal-tone rail */}
+      <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${RAIL_TONE[tone] || RAIL_TONE.unknown}`} />
+
+      <div className="p-3.5 pl-4">
+        {/* Header — logo + client + date + send status */}
+        <div className="flex items-start justify-between gap-3 mb-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {note.client_logo_url ? (
+              <div className="w-8 h-8 rounded-md overflow-hidden border border-cream-200 shrink-0 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={note.client_logo_url} alt={`${note.client_name} logo`} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-semibold shrink-0 ${STATUS_TILE[tone]}`}>
+                {letter}
+              </div>
+            )}
+            <div className="min-w-0">
+              <Link
+                href={`/clients/${note.client_id}`}
+                className="text-sm font-semibold text-ink-warm-900 hover:text-brand transition-colors block leading-tight"
+              >
+                {note.client_name || 'Client'}
+              </Link>
+              {meetingDateFmt && (
+                <span className="text-[11px] text-ink-warm-500 leading-tight">
+                  Sync · {meetingDateFmt}
+                </span>
+              )}
+            </div>
+          </div>
+          {sentAt ? (
+            <StatusBadge tone="success" size="sm" bordered>
+              <CheckCircle2 className="h-3 w-3 mr-1" />Sent to TG
+            </StatusBadge>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending}
+              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded border border-cream-300 bg-cream-50 text-ink-warm-700 hover:bg-cream-100 transition-colors focus-brand disabled:opacity-60 shrink-0"
+              title="Push summary + open action items to the client's Telegram group"
+            >
+              <Send className="h-3 w-3" />
+              {sending ? 'Sending…' : 'Send to TG'}
+            </button>
           )}
         </div>
-        {sentAt ? (
-          <StatusBadge tone="success" size="sm" bordered>
-            <CheckCircle2 className="h-3 w-3 mr-1" />Sent to client TG
-          </StatusBadge>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={sending}
-            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded border border-cream-300 bg-cream-50 text-ink-warm-700 hover:bg-cream-100 transition-colors focus-brand disabled:opacity-60"
-            title="Push summary + open action items to the client's Telegram group"
-          >
-            <Send className="h-3 w-3" />
-            {sending ? 'Sending…' : 'Send to TG'}
-          </button>
-        )}
-      </div>
 
-      {/* Bulleted takeaways from the note content */}
-      {bullets.length > 0 && (
-        <ul className="space-y-1 mb-2">
-          {bullets.map((b, i) => (
-            <li key={i} className="text-xs text-ink-warm-700 pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-ink-warm-400">
-              {b}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Inline action items */}
-      {note.actionItems.length > 0 && (
-        <div className="border-t border-cream-100 mt-2 pt-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1.5">
-            Action items
-          </p>
-          <ul className="space-y-1">
-            {note.actionItems.map(it => (
-              <li key={it.id} className="flex items-center gap-2 text-xs">
-                <span className={`inline-flex w-3.5 h-3.5 rounded-sm border items-center justify-center shrink-0 ${
-                  it.done
-                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'border-amber-400'
-                }`}>
-                  {it.done && <CheckCircle2 className="h-2.5 w-2.5" />}
-                </span>
-                <span className={it.done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}>
-                  {it.text}
-                </span>
-                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 shrink-0">
-                  {it.owner}
-                </span>
+        {/* Bulleted takeaways from the note content */}
+        {bullets.length > 0 && (
+          <ul className="space-y-1 mb-2">
+            {bullets.map((b, i) => (
+              <li key={i} className="text-xs text-ink-warm-700 pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-ink-warm-400">
+                {b}
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
 
-      {error && (
-        <p className="text-[11px] text-rose-600 mt-2">{error}</p>
-      )}
+        {/* Inline action items */}
+        {note.actionItems.length > 0 && (
+          <div className="border-t border-cream-100 mt-2.5 pt-2">
+            <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1.5">
+              Action items
+            </p>
+            <ul className="space-y-1.5">
+              {note.actionItems.map(it => (
+                <li key={it.id} className="flex items-center gap-2 text-xs min-h-[18px]">
+                  <span className={`inline-flex w-3.5 h-3.5 rounded-sm border items-center justify-center shrink-0 self-center ${
+                    it.done
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : it.ownerSide === 'client'
+                        ? 'border-purple-400'
+                        : 'border-amber-400'
+                  }`}>
+                    {it.done && <CheckCircle2 className="h-2.5 w-2.5" />}
+                  </span>
+                  <span className={`leading-tight ${it.done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}`}>
+                    {it.text}
+                  </span>
+                  <span className="ml-auto text-[10px] leading-none px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 shrink-0 self-center">
+                    {it.owner}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-[11px] text-rose-600 mt-2">{error}</p>
+        )}
+      </div>
     </div>
   );
 }

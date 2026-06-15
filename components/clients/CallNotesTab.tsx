@@ -451,24 +451,24 @@ export function CallNotesTab({
                       <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1">
                         Action items
                       </p>
-                      <ul className="space-y-1">
+                      <ul className="space-y-1.5">
                         {note.action_items.map(it => (
-                          <li key={it.id} className="flex items-center gap-2 text-xs group/aitem">
+                          <li key={it.id} className="flex items-center gap-2 text-xs min-h-[20px]">
                             <Checkbox
                               checked={it.is_done}
                               onCheckedChange={() => toggleActionItem(note.id, it.id)}
                               disabled={saving}
                               aria-label={it.is_done ? `Mark "${it.text}" not done` : `Mark "${it.text}" done`}
-                              className="h-3.5 w-3.5 shrink-0"
+                              className="shrink-0 self-center"
                             />
-                            <span className={it.is_done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}>
+                            <span className={`leading-tight ${it.is_done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}`}>
                               {it.text}
                             </span>
-                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 shrink-0">
+                            <span className="ml-auto text-[10px] leading-none px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 shrink-0 self-center">
                               {ownerNameFor(it)}
                             </span>
                             {it.auto_created_task_id && !it.owner_client_side && (
-                              <span className="text-[9px] text-ink-warm-400 shrink-0" title="HQ task auto-created">
+                              <span className="text-[9px] text-ink-warm-400 shrink-0 self-center" title="HQ task auto-created">
                                 ↗ task
                               </span>
                             )}
