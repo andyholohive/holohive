@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -40,7 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import {
   MessageCircle, Plus, Pencil, Trash2, Calendar as CalIcon,
-  Check, X, Send, CheckCircle2,
+  X, Send, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -130,7 +131,8 @@ export function CallNotesTab({
           .maybeSingle(),
         (supabase as any)
           .from('users')
-          .select('id, name')
+          .select('id, name, is_active')
+          .eq('is_active', true)
           .order('name'),
       ]);
       if (ctxRes.error && ctxRes.error.code !== 'PGRST116') {
@@ -557,20 +559,13 @@ function CallNoteForm({
         ) : (
           <ul className="space-y-2">
             {form.action_items.map((a, idx) => (
-              <li key={a.id} className="flex items-start gap-2 bg-cream-50/40 p-2 rounded">
+              <li key={a.id} className="flex items-center gap-2 bg-cream-50/40 p-2 rounded">
                 {isEdit && (
-                  <button
-                    type="button"
-                    onClick={() => updateItem(a.id, { is_done: !a.is_done })}
-                    className={`mt-1.5 inline-flex w-3.5 h-3.5 rounded-sm border items-center justify-center shrink-0 ${
-                      a.is_done
-                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                        : 'border-amber-400 hover:bg-amber-50'
-                    }`}
-                    title={a.is_done ? 'Mark not done' : 'Mark done'}
-                  >
-                    {a.is_done && <Check className="h-2.5 w-2.5" />}
-                  </button>
+                  <Checkbox
+                    checked={a.is_done}
+                    onCheckedChange={(v) => updateItem(a.id, { is_done: v === true })}
+                    aria-label={a.is_done ? 'Mark not done' : 'Mark done'}
+                  />
                 )}
                 <Input
                   value={a.text}
