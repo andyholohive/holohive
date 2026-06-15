@@ -1363,13 +1363,17 @@ async function handleDoneCallback(cq: any) {
     return;
   }
 
-  // Look up + close. We don't reuse closeByDbIdAndReply because
-  // that sends a NEW message; for the callback we want to EDIT the
-  // existing list message instead of cluttering the chat with a
-  // confirmation per click.
+  // [2026-06-14] BUG FIX: this callback originally only read (id, short_id,
+  // task_name, status) and flipped to complete directly, bypassing the
+  // Pre-Ship Gate. /done T-NNN gated client-linked tasks but the /tasks
+  // list "Done" buttons did not — same status flip, different door.
+  // Now we pull client_id and route through sendPreShipGatePrompt, just
+  // like closeByDbIdAndReply does. We keep the EDIT-the-list behavior
+  // for non-client tasks (the original UX rationale) but for gated tasks
+  // the prompt is a new message anyway (the list message stays as-is).
   const { data: task } = await (supabaseAdmin as any)
     .from('tasks')
-    .select('id, short_id, task_name, status')
+    .select('id, short_id, task_name, status, client_id')
     .eq('id', taskDbId)
     .maybeSingle();
 
@@ -1377,6 +1381,16 @@ async function handleDoneCallback(cq: any) {
     await answerCallbackQuery(callbackId, 'Task not found.');
     return;
   }
+
+  // Client-linked → Pre-Ship Gate. Don't flip the task yet — the gate
+  // confirm handler does the close + audit-log write in one transaction.
+  if (task.status !== 'complete' && task.client_id) {
+    await answerCallbackQuery(callbackId, 'Pre-Ship Gate required.');
+    const threadId: number | undefined = cq.message?.message_thread_id || undefined;
+    await sendPreShipGatePrompt(messageChatId, task, teamMember, threadId);
+    return;
+  }
+
   if (task.status !== 'complete') {
     const nowIso = new Date().toISOString();
     const { error: updErr } = await (supabaseAdmin as any)
