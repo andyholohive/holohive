@@ -103,6 +103,20 @@ export default function SpecsTab() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  /**
+   * Status filter for the grid. Per Andy 2026-06-14 — mini-tabs above
+   * the grid so the user can jump straight to "what still needs work"
+   * vs. "what's already locked in".
+   *
+   * - "all"      → every spec.
+   * - "ongoing"  → has any untested/issues/broken features. Where the
+   *   day-to-day validation work lives.
+   * - "finished" → no untested/issues/broken AND at least one working
+   *   feature. `not_started` (genuinely-deferred v2 work) is fine.
+   */
+  type StatusFilter = 'all' | 'ongoing' | 'finished';
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
   // [2026-06-12] URL-linked spec routing — `?tab=specs&spec=<id>` deep
   // links straight to the detail view. Browser back/forward + share-URL
   // both work. Reads + writes via URLSearchParams so we don't add a
@@ -180,7 +194,7 @@ export default function SpecsTab() {
     }
   }
 
-  const filteredSpecs = useMemo(() => {
+  const searchedSpecs = useMemo(() => {
     if (!search.trim()) return specs;
     const q = search.toLowerCase();
     return specs.filter(s =>
@@ -188,6 +202,30 @@ export default function SpecsTab() {
       || (s.summary && s.summary.toLowerCase().includes(q)),
     );
   }, [specs, search]);
+
+  /** Status-counts roll-up — drives the mini-tab badges. Computed off
+   *  the search-filtered list so the badges stay in sync with what's
+   *  actually visible after a search. */
+  const statusCounts = useMemo(() => {
+    let finished = 0;
+    let ongoing = 0;
+    for (const s of searchedSpecs) {
+      const r = s.rollup;
+      const isFinished = r.untested === 0 && r.issues === 0 && r.broken === 0 && r.working > 0;
+      if (isFinished) finished++;
+      else ongoing++;
+    }
+    return { all: searchedSpecs.length, finished, ongoing };
+  }, [searchedSpecs]);
+
+  const filteredSpecs = useMemo(() => {
+    if (statusFilter === 'all') return searchedSpecs;
+    return searchedSpecs.filter(s => {
+      const r = s.rollup;
+      const isFinished = r.untested === 0 && r.issues === 0 && r.broken === 0 && r.working > 0;
+      return statusFilter === 'finished' ? isFinished : !isFinished;
+    });
+  }, [searchedSpecs, statusFilter]);
 
   if (selectedSpecId) {
     return (
@@ -238,12 +276,52 @@ export default function SpecsTab() {
         </Button>
       </div>
 
+      {/* Mini-tabs — All / Ongoing / Finished. Per Andy 2026-06-14: lets
+          the user jump straight to "what still needs work" vs. "what's
+          already validated". Counts reflect the search-filtered list. */}
+      <div className="flex items-center gap-0.5 mb-3 border-b border-cream-200">
+        {([
+          { key: 'all',      label: 'All',      n: statusCounts.all },
+          { key: 'ongoing',  label: 'Ongoing',  n: statusCounts.ongoing },
+          { key: 'finished', label: 'Finished', n: statusCounts.finished },
+        ] as Array<{ key: StatusFilter; label: string; n: number }>).map(t => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setStatusFilter(t.key)}
+            aria-pressed={statusFilter === t.key}
+            className={`relative px-3.5 py-2 text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              statusFilter === t.key
+                ? 'text-brand-deep font-semibold after:absolute after:left-0 after:right-0 after:-bottom-px after:h-[2px] after:bg-brand after:rounded-t'
+                : 'text-ink-warm-500 hover:text-ink-warm-900'
+            }`}
+          >
+            {t.label}
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full tabular-nums ${
+              statusFilter === t.key
+                ? 'bg-brand-light text-brand'
+                : 'bg-cream-100 text-ink-warm-500'
+            }`}>
+              {t.n}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {filteredSpecs.length === 0 ? (
         <div className="border border-cream-200 rounded-lg bg-white">
           <EmptyState
             icon={FileText}
-            title="No specs yet"
-            description="Upload a spec doc or create one manually to get started."
+            title={
+              statusFilter === 'finished' ? 'No finished specs yet'
+              : statusFilter === 'ongoing' ? 'No ongoing specs'
+              : 'No specs yet'
+            }
+            description={
+              statusFilter === 'finished' ? 'Specs land here once every feature is marked Working with no untested / issues / broken.'
+              : statusFilter === 'ongoing' ? 'Specs with untested / issues / broken features show here.'
+              : 'Upload a spec doc or create one manually to get started.'
+            }
             className="py-12"
           />
         </div>
