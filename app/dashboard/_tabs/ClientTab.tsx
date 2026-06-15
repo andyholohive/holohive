@@ -26,6 +26,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 
 /**
@@ -446,6 +447,44 @@ function CallNoteCard({ note }: { note: CallNote }) {
   const [linkSaving, setLinkSaving] = useState(false);
   const isMissingChat = !!error && /telegram_chat_id|No telegram_chat_id|No chat configured/i.test(error);
 
+  // [2026-06-16] Local copy of action items so we can toggle is_done
+  // optimistically. Reverts on persist failure. Same UX as the
+  // CallNotesTab modal's inline toggle, backed by a dedicated endpoint
+  // because the dashboard reads through /api/dashboard/v2/client (no
+  // direct Supabase JS handle).
+  const [items, setItems] = useState<ActionItemDto[]>(note.actionItems);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+
+  async function toggleItem(itemId: string) {
+    const target = items.find(i => i.id === itemId);
+    if (!target) return;
+    const next = !target.done;
+    // Optimistic update + lock the row while the write is in flight.
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, done: next } : i));
+    setTogglingIds(prev => { const s = new Set(prev); s.add(itemId); return s; });
+    try {
+      const res = await fetch(
+        `/api/clients/${note.client_id}/meeting-notes/${note.id}/toggle-action-item`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId, is_done: next }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        // Roll back the optimistic toggle
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, done: !next } : i));
+        setError(json.error || 'Toggle failed');
+      }
+    } catch (e: any) {
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, done: !next } : i));
+      setError(e?.message || 'Network error');
+    } finally {
+      setTogglingIds(prev => { const s = new Set(prev); s.delete(itemId); return s; });
+    }
+  }
+
   const meetingDateFmt = note.meeting_date
     ? formatDate(note.meeting_date + 'T00:00:00')
     : '';
@@ -585,23 +624,21 @@ function CallNoteCard({ note }: { note: CallNote }) {
         )}
 
         {/* Inline action items */}
-        {note.actionItems.length > 0 && (
+        {items.length > 0 && (
           <div className="border-t border-cream-100 mt-2.5 pt-2">
             <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1.5">
               Action items
             </p>
             <ul className="space-y-1.5">
-              {note.actionItems.map(it => (
-                <li key={it.id} className="flex items-center gap-2 text-xs min-h-[18px]">
-                  <span className={`inline-flex w-3.5 h-3.5 rounded-sm border items-center justify-center shrink-0 self-center ${
-                    it.done
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : it.ownerSide === 'client'
-                        ? 'border-purple-400'
-                        : 'border-amber-400'
-                  }`}>
-                    {it.done && <CheckCircle2 className="h-2.5 w-2.5" />}
-                  </span>
+              {items.map(it => (
+                <li key={it.id} className="flex items-center gap-2 text-xs min-h-[20px]">
+                  <Checkbox
+                    checked={it.done}
+                    onCheckedChange={() => toggleItem(it.id)}
+                    disabled={togglingIds.has(it.id)}
+                    aria-label={it.done ? `Mark "${it.text}" not done` : `Mark "${it.text}" done`}
+                    className="shrink-0 self-center"
+                  />
                   <span className={`leading-tight ${it.done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}`}>
                     {it.text}
                   </span>
