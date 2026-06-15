@@ -20,8 +20,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Users, FileText, AlertCircle, MessageCircle, Tag, Activity, Megaphone, ExternalLink, Send, CheckCircle2 } from 'lucide-react';
+import { Users, FileText, AlertCircle, MessageCircle, Tag, Activity, Megaphone, ExternalLink, Send, CheckCircle2, Link2 } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 
 /**
  * v11 (matches the revamp mockup exactly): client avatar = logo image
@@ -432,6 +437,14 @@ function CallNoteCard({ note }: { note: CallNote }) {
   const [sentAt, setSentAt] = useState<string | null>(note.sent_to_client_tg_at);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // [2026-06-16] Inline "Link TG chat" affordance — when the send fails
+  // with "no chat configured," we surface a Dialog with ChatThreadPicker
+  // so the user can link a chat without leaving the dashboard. Saving
+  // auto-retries the send.
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkChatId, setLinkChatId] = useState('');
+  const [linkSaving, setLinkSaving] = useState(false);
+  const isMissingChat = !!error && /telegram_chat_id|No telegram_chat_id|No chat configured/i.test(error);
 
   const meetingDateFmt = note.meeting_date
     ? formatDate(note.meeting_date + 'T00:00:00')
@@ -464,6 +477,35 @@ function CallNoteCard({ note }: { note: CallNote }) {
       setError(e?.message || 'Network error');
     } finally {
       setSending(false);
+    }
+  }
+
+  /** Save the picked chat ID, then retry the send so the operator
+   *  doesn't have to click twice. */
+  async function handleLinkSave() {
+    if (!linkChatId.trim()) return;
+    setLinkSaving(true);
+    try {
+      const res = await fetch(
+        `/api/clients/${note.client_id}/telegram-chat-id`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatId: linkChatId.trim() }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(json.error || 'Failed to link chat');
+        return;
+      }
+      setLinkOpen(false);
+      setError(null);
+      await handleSend();
+    } catch (e: any) {
+      setError(e?.message || 'Network error');
+    } finally {
+      setLinkSaving(false);
     }
   }
 
@@ -573,9 +615,58 @@ function CallNoteCard({ note }: { note: CallNote }) {
         )}
 
         {error && (
-          <p className="text-[11px] text-rose-600 mt-2">{error}</p>
+          isMissingChat ? (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded border border-amber-200 bg-amber-50/60 px-2.5 py-1.5">
+              <span className="text-[11px] text-amber-800 leading-tight">
+                No Telegram chat linked for this client.
+              </span>
+              <button
+                type="button"
+                onClick={() => setLinkOpen(true)}
+                className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded border border-amber-300 bg-white text-amber-800 hover:bg-amber-100 transition-colors focus-brand shrink-0"
+              >
+                <Link2 className="h-3 w-3" />
+                Link chat
+              </button>
+            </div>
+          ) : (
+            <p className="text-[11px] text-rose-600 mt-2">{error}</p>
+          )
         )}
       </div>
+
+      {/* Link TG chat dialog — same picker UX as /admin/telegram-comm */}
+      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
+        <DialogContent className="!bg-white sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Link Telegram chat to {note.client_name || 'client'}</DialogTitle>
+            <DialogDescription>
+              Pick the client's Telegram group so the bot knows where to post call notes. Saves to the client's context — only needs to be done once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <ChatThreadPicker
+              chatId={linkChatId}
+              threadId=""
+              onChange={({ chatId }) => setLinkChatId(chatId)}
+              label="Telegram chat"
+              showManualThreadInput={false}
+              disabled={linkSaving}
+            />
+            <p className="text-[11px] text-ink-warm-500 mt-2">
+              Bot must already be a member of the chat. Threads aren't required — call notes post in the chat's General topic.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setLinkOpen(false)} disabled={linkSaving}>
+              Cancel
+            </Button>
+            <Button variant="brand" size="sm" onClick={handleLinkSave} disabled={linkSaving || !linkChatId.trim()}>
+              {linkSaving ? 'Linking…' : 'Link + Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
