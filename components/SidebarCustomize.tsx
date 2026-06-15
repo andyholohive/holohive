@@ -91,7 +91,6 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/crm/meetings', label: 'Meetings', icon: Calendar, section: 'CRM', pageKey: '/crm/meetings' },
   { href: '/crm/telegram', label: 'TG Chats', icon: MessageSquare, section: 'CRM', requiredRole: 'super_admin' },
 
-  { href: '/daily-standup', label: 'Daily Stand-Up', icon: CheckCircle, section: 'Workspace' },
   { href: '/tasks', label: 'HQ', icon: ListTodo, section: 'Workspace' },
   { href: '/reminders', label: 'Reminders', icon: Bell, section: 'Workspace' },
 

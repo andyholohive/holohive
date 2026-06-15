@@ -17,11 +17,13 @@
  *
  * Ad-hoc clients (Impossible, Robonet) are EXCLUDED from clientHealth.
  *
- * Ext. visits caveat (2026-06-11): the portal analytics table doesn't
- * exist yet (no `page_views` / `portal_visits`). Both the KPI and the
- * per-client column return 0 with a sub-note flagging "TBD" until the
- * analytics layer ships. The structure matches Jdot's spec so wiring
- * the real data is a one-query swap when the table lands.
+ * Ext. visits (2026-06-15): backed by `portal_visits` table (created
+ * by portal_visits_skeleton migration). Reads COUNT(*) per client
+ * WHERE is_external = true AND visited_at >= weekStart. Until the
+ * portal-side instrumentation lands (TODO: /api/portal/log-visit), the
+ * table is empty, so counts return 0. The UI subtitle still surfaces
+ * "TBD" while empty so users don't read 0 as healthy. Once visits
+ * start flowing, the dashboard light-flips with no code change.
  */
 
 import { NextResponse } from 'next/server';
@@ -76,7 +78,7 @@ export async function GET() {
       return NextResponse.json(empty);
     }
 
-    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes] = await Promise.all([
+    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes, extVisitsRes] = await Promise.all([
       // Open tasks linked to standard clients
       (sb as any)
         .from('tasks')
@@ -117,12 +119,24 @@ export async function GET() {
         .from('client_context')
         .select('client_id, call_notes')
         .in('client_id', standardClientIds),
+      // [2026-06-15] External portal visits per client this week —
+      // wired against portal_visits (created by portal_visits_skeleton
+      // migration). Empty table → counts return 0. Once the
+      // /api/portal/log-visit instrumentation lands, this lights up
+      // automatically with no UI change.
+      (sb as any)
+        .from('portal_visits')
+        .select('client_id')
+        .in('client_id', standardClientIds)
+        .eq('is_external', true)
+        .gte('visited_at', weekStartIso),
     ]);
 
     const tasks = (tasksRes.data ?? []) as any[];
     const contentsThisWeek = (contentsThisWeekRes.data ?? []) as any[];
     const contentsAllTime = (contentsAllTimeRes.data ?? []) as any[];
     const activeCampaigns = (campaignsRes.data ?? []) as any[];
+    const extVisitsThisWeek = (extVisitsRes.data ?? []) as Array<{ client_id: string }>;
     const contextRows = (meetingNotesRes.data ?? []) as Array<{
       client_id: string;
       call_notes: Array<{
@@ -167,6 +181,12 @@ export async function GET() {
       contentAllTimeByClient.set(c.client_id, (contentAllTimeByClient.get(c.client_id) ?? 0) + 1);
     }
 
+    // Per-client external visit counts this week.
+    const extVisitsByClient = new Map<string, number>();
+    for (const v of extVisitsThisWeek) {
+      extVisitsByClient.set(v.client_id, (extVisitsByClient.get(v.client_id) ?? 0) + 1);
+    }
+
     // [2026-06-11] Output Signals row — spec § 4.1.
     // Activations live: count of standard clients with non-empty
     // activations[] array. Subtitle lists the names. The array column
@@ -184,10 +204,10 @@ export async function GET() {
         count: activationNames.length,
         names: activationNames,
       },
-      // Ext. visits placeholder — see route header comment. Returns 0
-      // until the portal analytics table ships. Subtitle in the UI
-      // surfaces this as "TBD" so users don't read 0 as healthy.
-      totalExtVisitsLast7d: 0,
+      // Ext. visits — see route header comment. Reads from
+      // portal_visits; returns 0 until portal-side instrumentation
+      // starts inserting rows.
+      totalExtVisitsLast7d: extVisitsThisWeek.length,
     };
 
     // [2026-06-15] Flatten client_context.call_notes JSONB into the
@@ -309,8 +329,9 @@ export async function GET() {
         completedThisWeek: t.doneThisWeek,
         contentPostedThisWeek: contentThisWeekByClient.get(c.id) ?? 0,
         totalContentPosted: contentAllTimeByClient.get(c.id) ?? 0,
-        // Ext. visits placeholder — wired when portal analytics ships.
-        extVisitsLast7d: 0,
+        // Ext. visits — backed by portal_visits. 0 until portal-side
+        // instrumentation lands.
+        extVisitsLast7d: extVisitsByClient.get(c.id) ?? 0,
         healthTone: healthToneFor(t.overdue),
         is_whitelisted: c.is_whitelisted ?? false,
       };

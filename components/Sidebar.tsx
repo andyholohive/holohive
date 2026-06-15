@@ -254,7 +254,7 @@ export default function Sidebar({ children }: SidebarProps) {
     const SECTION_PREFIXES: Record<string, string[]> = {
       people:    ['/team', '/clients'],
       kols:      ['/kols', '/lists', '/campaigns'],
-      workspace: ['/tasks', '/templates', '/sops', '/reminders', '/daily-standup'],
+      workspace: ['/tasks', '/templates', '/sops', '/reminders'],
       crm:       ['/crm/', '/intelligence', '/analytics'],
       documents: ['/delivery-logs', '/mindshare', '/wallets', '/forms', '/expenses', '/links'],
       admin:     ['/admin'],
@@ -693,14 +693,11 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Workspace Section — [2026-06-05] moved above CRM
                   per Andy. Task-management surfaces (HQ / Templates /
                   SOPs / Reminders) get higher priority in the sidebar
-                  than CRM since the team lives in HQ day-to-day. */}
-              {!guestHideSection(['/daily-standup', '/tasks']) && (
+                  than CRM since the team lives in HQ day-to-day.
+                  [2026-06-15] /daily-standup retired with the legacy
+                  dashboard. */}
+              {!guestHideSection(['/tasks']) && (
                 <CollapsibleSection id="workspace" icon={Briefcase}>
-                  {/* Daily Stand-Up hidden from the sidebar 2026-05-13 —
-                      the page still exists at /daily-standup; just no
-                      longer surfaced as a top-level nav. Restore the
-                      NavItem below if/when the team wants it back. */}
-                  {/* <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" /> */}
                   <NavItem href="/tasks" icon={ListTodo} label="HQ" />
                   {/* HQ sub-nav — visible only when expanded AND on an HQ
                       child route. Templates (msg) + SOPs were promoted in

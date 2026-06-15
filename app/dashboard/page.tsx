@@ -20,8 +20,9 @@
  * a 60s in-memory cache on the server. Tab 0 (MyWork) pulls from
  * TaskService directly (small, per-user, no shared cache needed).
  *
- * The old LLM-snapshot dashboard moved to /dashboard-legacy as a
- * 1-week safety net before archive.
+ * The old LLM-snapshot dashboard was retired 2026-06-15 (route,
+ * crons, and dashboard_snapshots/dashboard_self_reports/daily_standups
+ * tables all dropped — see HHP Team Dashboard v2 spec § APPENDIX).
  */
 
 import { useState, useEffect, Suspense } from 'react';

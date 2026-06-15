@@ -21,14 +21,6 @@
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/cron/dashboard-self-reports",
-      "schedule": "0 10 * * 0"
-    },
-    {
-      "path": "/api/cron/dashboard-refresh",
-      "schedule": "0 0 * * 1"
-    },
-    {
       "path": "/api/cron/google-meeting-reminders",
       "schedule": "*/5 * * * *"
     },
