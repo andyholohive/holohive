@@ -60,13 +60,15 @@ export async function getStandardClients(
   return data as StandardClient[];
 }
 
-/** Live ad-hoc clients — for the side-list "ad-hoc engagements" section. */
+/** Live ad-hoc clients — for the side-list "ad-hoc engagements" section.
+ * logo_url is included so Recent Call Notes cards can render the client
+ * logo on notes logged against an ad-hoc engagement. */
 export async function getAdHocClients(
   sb: SupabaseClient = adminSupabase(),
-): Promise<Array<{ id: string; name: string; slug: string | null }>> {
+): Promise<Array<{ id: string; name: string; slug: string | null; logo_url: string | null }>> {
   const { data, error } = await (sb as any)
     .from('clients')
-    .select('id, name, slug')
+    .select('id, name, slug, logo_url')
     .eq('is_active', true)
     .eq('is_ad_hoc', true)
     .is('archived_at', null)

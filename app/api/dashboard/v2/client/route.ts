@@ -322,9 +322,9 @@ export async function GET(request: Request) {
     for (const c of adHocClients) {
       clientMetaById.set(c.id, {
         name: c.name,
-        // Ad-hoc clients query doesn't fetch logo_url. Fine — they
-        // render the letter-tile fallback like the standard pipeline.
-        logo_url: null,
+        logo_url: c.logo_url ?? null,
+        // Ad-hoc engagements have no SLA renewal window — tone stays
+        // 'unknown' so the rail / fallback tile use the neutral palette.
         renewal_tone: 'unknown',
       });
     }
