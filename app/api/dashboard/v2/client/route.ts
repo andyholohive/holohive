@@ -76,7 +76,7 @@ export async function GET() {
       return NextResponse.json(empty);
     }
 
-    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes, actionItemsRes] = await Promise.all([
+    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes] = await Promise.all([
       // Open tasks linked to standard clients
       (sb as any)
         .from('tasks')
@@ -104,31 +104,43 @@ export async function GET() {
         .in('client_id', standardClientIds)
         .eq('status', 'Active')
         .is('archived_at', null),
-      // Recent meeting notes across standard clients. content is pulled
-      // so the dashboard card can render bullet takeaways per mockup
-      // (no full-page navigate required). sent_to_client_tg_at drives
-      // the "Sent to client TG" badge.
+      // [2026-06-15] Per HHP Team Dashboard Spec § 4.3 — call notes
+      // are pulled from the "portal context field," now backed by
+      // `client_context.call_notes` JSONB. Replaces the earlier read
+      // from client_meeting_notes + meeting_action_items (parallel
+      // tables that were built but never wired to a UI entry point).
+      // Each call_notes element holds the meeting date, content,
+      // action items, and TG send stamps inline — we flatten them
+      // below into the same DTO shape so /dashboard/_tabs/ClientTab.tsx
+      // doesn't change.
       (sb as any)
-        .from('client_meeting_notes')
-        .select('id, client_id, title, content, meeting_date, attendees, created_at, sent_to_client_tg_at')
-        .in('client_id', standardClientIds)
-        .order('meeting_date', { ascending: false })
-        .limit(10),
-      // All action items for the recent notes — includes done state so
-      // the card can render strikethrough'd entries inline. owner_name
-      // is resolved via the users join below; the column itself is
-      // `text` not `action_text` per the schema.
-      (sb as any)
-        .from('meeting_action_items')
-        .select('id, meeting_note_id, text, owner_user_id, owner_client_side, is_done'),
+        .from('client_context')
+        .select('client_id, call_notes')
+        .in('client_id', standardClientIds),
     ]);
 
     const tasks = (tasksRes.data ?? []) as any[];
     const contentsThisWeek = (contentsThisWeekRes.data ?? []) as any[];
     const contentsAllTime = (contentsAllTimeRes.data ?? []) as any[];
     const activeCampaigns = (campaignsRes.data ?? []) as any[];
-    const notes = (meetingNotesRes.data ?? []) as any[];
-    const actionItems = (actionItemsRes.data ?? []) as any[];
+    const contextRows = (meetingNotesRes.data ?? []) as Array<{
+      client_id: string;
+      call_notes: Array<{
+        id: string;
+        meeting_date: string;
+        content: string;
+        action_items: Array<{
+          id: string;
+          text: string;
+          owner_user_id: string | null;
+          owner_client_side: boolean;
+          is_done: boolean;
+        }>;
+        sent_to_client_tg_at: string | null;
+        sent_to_client_tg_by: string | null;
+        created_at: string;
+      }> | null;
+    }>;
 
     // Per-client task aggregations
     const taskAgg = new Map<string, { open: number; overdue: number; doneThisWeek: number }>();
@@ -178,14 +190,40 @@ export async function GET() {
       totalExtVisitsLast7d: 0,
     };
 
-    // [2026-06-11] Group action items per meeting note so the dashboard
-    // card can render them inline (was: just a count).
-    // Owner resolution: HH-side rows look up the user's display name;
-    // client-side rows show "Client" so the card visually attributes
-    // the work.
+    // [2026-06-15] Flatten client_context.call_notes JSONB into the
+    // same shape ClientTab.tsx expects. Each row contributes 0+ notes;
+    // we sort newest-first and cap at 10 (legacy behaviour).
+    type ActionItemDto = {
+      id: string;
+      text: string;
+      owner: string;
+      ownerSide: 'hh' | 'client';
+      done: boolean;
+    };
+    type CallNoteDto = {
+      id: string;
+      client_id: string;
+      client_name: string | null;
+      title: string;
+      content: string;
+      meeting_date: string;
+      attendees: string | null;
+      sent_to_client_tg_at: string | null;
+      openHhActionItems: number;
+      actionItems: ActionItemDto[];
+    };
+
+    // Resolve HH owner names (single round-trip across all HH-side items
+    // across all flattened call notes).
     const userIdsForActionItems = new Set<string>();
-    for (const ai of actionItems) {
-      if (ai.owner_user_id && !ai.owner_client_side) userIdsForActionItems.add(ai.owner_user_id);
+    for (const row of contextRows) {
+      for (const n of row.call_notes ?? []) {
+        for (const ai of n.action_items ?? []) {
+          if (ai.owner_user_id && !ai.owner_client_side) {
+            userIdsForActionItems.add(ai.owner_user_id);
+          }
+        }
+      }
     }
     const ownerNameLookup = new Map<string, string>();
     if (userIdsForActionItems.size > 0) {
@@ -198,38 +236,34 @@ export async function GET() {
       }
     }
 
-    type ActionItemDto = {
-      id: string;
-      text: string;
-      owner: string;
-      ownerSide: 'hh' | 'client';
-      done: boolean;
-    };
-
-    const actionItemsByMeeting = new Map<string, ActionItemDto[]>();
-    for (const ai of actionItems) {
-      const ownerSide: 'hh' | 'client' = ai.owner_client_side ? 'client' : 'hh';
-      const owner = ownerSide === 'client'
-        ? 'Client'
-        : (ai.owner_user_id ? ownerNameLookup.get(ai.owner_user_id) ?? 'Holo Hive' : 'Holo Hive');
-      const cur = actionItemsByMeeting.get(ai.meeting_note_id) ?? [];
-      cur.push({
-        id: ai.id,
-        text: ai.text,
-        owner,
-        ownerSide,
-        done: !!ai.is_done,
-      });
-      actionItemsByMeeting.set(ai.meeting_note_id, cur);
+    const flatCallNotes: CallNoteDto[] = [];
+    for (const row of contextRows) {
+      for (const n of row.call_notes ?? []) {
+        const items: ActionItemDto[] = (n.action_items ?? []).map(ai => ({
+          id: ai.id,
+          text: ai.text,
+          owner: ai.owner_client_side
+            ? 'Client'
+            : (ai.owner_user_id ? ownerNameLookup.get(ai.owner_user_id) ?? 'Holo Hive' : 'Holo Hive'),
+          ownerSide: ai.owner_client_side ? 'client' : 'hh',
+          done: !!ai.is_done,
+        }));
+        const openHh = items.filter(i => i.ownerSide === 'hh' && !i.done).length;
+        flatCallNotes.push({
+          id: n.id,
+          client_id: row.client_id,
+          client_name: null, // filled in below
+          title: '', // free-form notes don't have a title in the spec'd shape
+          content: n.content,
+          meeting_date: n.meeting_date,
+          attendees: null,
+          sent_to_client_tg_at: n.sent_to_client_tg_at,
+          openHhActionItems: openHh,
+          actionItems: items,
+        });
+      }
     }
-    // Per-meeting open HH-side count (kept for legacy callers / sub-line).
-    const openHhCountByMeeting = new Map<string, number>();
-    for (const [noteId, items] of actionItemsByMeeting.entries()) {
-      openHhCountByMeeting.set(
-        noteId,
-        items.filter(i => i.ownerSide === 'hh' && !i.done).length,
-      );
-    }
+    flatCallNotes.sort((a, b) => (b.meeting_date || '').localeCompare(a.meeting_date || ''));
 
     // Client name lookup so the call note card can render the client
     // header without a per-row join in the UI.
@@ -282,17 +316,9 @@ export async function GET() {
       };
     });
 
-    const callNotes = notes.map(n => ({
-      id: n.id,
-      client_id: n.client_id,
+    const callNotes = flatCallNotes.slice(0, 10).map(n => ({
+      ...n,
       client_name: clientNameById.get(n.client_id) ?? null,
-      title: n.title,
-      content: n.content,
-      meeting_date: n.meeting_date,
-      attendees: n.attendees,
-      sent_to_client_tg_at: n.sent_to_client_tg_at,
-      openHhActionItems: openHhCountByMeeting.get(n.id) ?? 0,
-      actionItems: actionItemsByMeeting.get(n.id) ?? [],
     }));
 
     const payload = {

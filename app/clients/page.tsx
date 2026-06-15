@@ -41,6 +41,7 @@ import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
+import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import dynamic from 'next/dynamic';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -4690,6 +4691,11 @@ export default function ClientsPage() {
                     Execution Plan (Zone A — batch-creates HQ tasks),
                     This Week Feed (Zone B — drives portal). */}
                 <TabsTrigger value="weekly-update" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Weekly Update</TabsTrigger>
+                {/* [2026-06-15] 4th tab — Call Notes per HHP Team Dashboard
+                    Spec § 4.3. Stored on client_context.call_notes JSONB;
+                    dashboard reads from same column. HH-side action items
+                    auto-create HQ tasks on save. */}
+                <TabsTrigger value="call-notes" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Call Notes</TabsTrigger>
               </TabsList>
               {/* Each tab is its own flex-col so the body scrolls and
                   the action row stays pinned below it. Previously the
@@ -5762,6 +5768,22 @@ export default function ClientsPage() {
                         )}
                       </div>
                     </>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* [2026-06-15] Call Notes — HHP Team Dashboard Spec § 4.3.
+                  Notes live on client_context.call_notes JSONB so the
+                  dashboard reads from the same source. CallNotesTab
+                  handles its own state + persistence; we just give it
+                  the client_id + current user. */}
+              <TabsContent value="call-notes" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 overflow-y-auto px-1 pb-4">
+                  {contextModalClient && (
+                    <CallNotesTab
+                      clientId={contextModalClient.id}
+                      currentUserId={user?.id ?? null}
+                    />
                   )}
                 </div>
               </TabsContent>

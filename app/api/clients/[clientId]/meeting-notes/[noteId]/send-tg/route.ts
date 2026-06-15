@@ -9,24 +9,25 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/clients/[clientId]/meeting-notes/[noteId]/send-tg
  *
- * [2026-06-11] Phase 2 Bucket C.10 — push a client meeting note summary
- * to the client's Telegram group. Replaces the manual "someone copy-
- * pastes the summary into the TG group" step that was sitting in the
- * team's weekly sync ritual.
+ * Push a client call note summary to the client's Telegram group.
+ *
+ * [2026-06-15] Rewired to honor the spec literally — notes now live on
+ * `client_context.call_notes` JSONB, so we read + update by JSONB
+ * element id (the `noteId` route param). The old route hit
+ * client_meeting_notes; that path is now dormant.
  *
  * Flow:
- *   1. Look up the meeting note + the linked client_context for the
- *      target chat_id
- *   2. Format the note as TG HTML (title, date, content, action items)
- *   3. Send via the existing TelegramService.sendToChat helper
- *   4. On success: stamp sent_to_client_tg_at + sent_to_client_tg_by
- *      so the dashboard "Sent to client TG" badge can render
+ *   1. Pull the client_context row → find the note element by id
+ *   2. Format the note as TG HTML (date + content + open HH action items)
+ *   3. Send via TelegramService.sendToChat
+ *   4. On success: write back the full call_notes array with
+ *      sent_to_client_tg_at + sent_to_client_tg_by stamped on the
+ *      target element
  *
- * Body: optional { force?: boolean } — if true, re-sends even when an
- * earlier send is already on record. Default false so accidental
- * double-clicks don't spam the client.
+ * Body: optional { force?: boolean } — re-send when an earlier send is
+ * on record. Default false so accidental double-clicks don't spam.
  *
- * Auth: any authenticated admin / super_admin.
+ * Auth: any authenticated user. Same as before.
  */
 export async function POST(
   request: Request,
@@ -38,7 +39,7 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Service-role client for the cross-write
+  // Service-role client for the JSONB update (RLS-safe).
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -47,30 +48,24 @@ export async function POST(
   let body: { force?: boolean } = {};
   try { body = await request.json(); } catch { /* empty body is fine */ }
 
-  // ─── Lookup meeting note ───────────────────────────────────────
-  const { data: note, error: noteErr } = await (supabaseAdmin as any)
-    .from('client_meeting_notes')
-    .select('id, client_id, title, content, meeting_date, attendees, sent_to_client_tg_at')
-    .eq('id', params.noteId)
-    .eq('client_id', params.clientId)
-    .maybeSingle();
-  if (noteErr || !note) {
-    return NextResponse.json({ error: 'Meeting note not found' }, { status: 404 });
-  }
+  // ─── Lookup the client_context row ─────────────────────────────
+  type Note = {
+    id: string;
+    meeting_date: string;
+    content: string;
+    action_items: Array<{
+      text: string;
+      owner_client_side: boolean;
+      is_done: boolean;
+    }>;
+    sent_to_client_tg_at: string | null;
+    sent_to_client_tg_by: string | null;
+  };
 
-  if (note.sent_to_client_tg_at && !body.force) {
-    return NextResponse.json({
-      ok: true,
-      skipped: 'already_sent',
-      sent_at: note.sent_to_client_tg_at,
-    });
-  }
-
-  // ─── Lookup client context for chat_id + display name ──────────
-  const [{ data: ctx }, { data: client }] = await Promise.all([
+  const [{ data: ctx, error: ctxErr }, { data: client }] = await Promise.all([
     (supabaseAdmin as any)
       .from('client_context')
-      .select('telegram_chat_id')
+      .select('id, telegram_chat_id, call_notes')
       .eq('client_id', params.clientId)
       .maybeSingle(),
     (supabaseAdmin as any)
@@ -80,7 +75,26 @@ export async function POST(
       .maybeSingle(),
   ]);
 
-  const chatId = (ctx as any)?.telegram_chat_id?.trim();
+  if (ctxErr || !ctx) {
+    return NextResponse.json({ error: 'Client context not found' }, { status: 404 });
+  }
+
+  const callNotes = (((ctx as any).call_notes ?? []) as Note[]);
+  const noteIdx = callNotes.findIndex(n => n.id === params.noteId);
+  if (noteIdx < 0) {
+    return NextResponse.json({ error: 'Call note not found' }, { status: 404 });
+  }
+  const note = callNotes[noteIdx];
+
+  if (note.sent_to_client_tg_at && !body.force) {
+    return NextResponse.json({
+      ok: true,
+      skipped: 'already_sent',
+      sent_at: note.sent_to_client_tg_at,
+    });
+  }
+
+  const chatId = ((ctx as any).telegram_chat_id ?? '').trim();
   if (!chatId) {
     return NextResponse.json({
       ok: false,
@@ -89,39 +103,25 @@ export async function POST(
     }, { status: 400 });
   }
 
-  // ─── Optional: pull HH-side action items so the message includes them ──
-  const { data: actionItems } = await (supabaseAdmin as any)
-    .from('meeting_action_items')
-    .select('id, action_text, owner_user_id, owner_client_side, is_done')
-    .eq('meeting_note_id', params.noteId)
-    .order('created_at', { ascending: true });
-
-  const items = ((actionItems ?? []) as Array<{
-    action_text: string;
-    owner_client_side: boolean;
-    is_done: boolean;
-  }>).filter(i => !i.is_done);
-
   // ─── Format the TG message ─────────────────────────────────────
   const clientName = (client as any)?.name || 'Client';
   const meetingDateFmt = note.meeting_date
-    ? formatDate(note.meeting_date + 'T00:00:00')
+    ? formatDate(note.meeting_date + (note.meeting_date.includes('T') ? '' : 'T00:00:00'))
     : 'Recent';
 
-  // Escape user-provided strings before interpolating into HTML.
+  // HTML escape user-provided strings before interpolating.
   const esc = (s: string | null | undefined): string =>
     (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const titleLine = note.title ? `<b>${esc(note.title)}</b>\n` : '';
+  const openItems = (note.action_items ?? []).filter(i => !i.is_done);
   const contentBlock = note.content ? `${esc(note.content)}\n` : '';
-  const actionsBlock = items.length > 0
-    ? `\n<b>Action items</b>\n${items.map(i => `• ${esc(i.action_text)}${i.owner_client_side ? '' : ' <i>(Holo Hive)</i>'}`).join('\n')}`
+  const actionsBlock = openItems.length > 0
+    ? `\n<b>Action items</b>\n${openItems.map(i => `• ${esc(i.text)}${i.owner_client_side ? '' : ' <i>(Holo Hive)</i>'}`).join('\n')}`
     : '';
 
   const message =
     `🤝 <b>${esc(clientName)} — sync recap</b>\n` +
     `<i>${esc(meetingDateFmt)}</i>\n\n` +
-    titleLine +
     contentBlock +
     actionsBlock;
 
@@ -135,15 +135,19 @@ export async function POST(
     }, { status: 502 });
   }
 
-  // ─── Stamp the success on the note ─────────────────────────────
+  // ─── Stamp the success on the JSONB element ────────────────────
   const nowIso = new Date().toISOString();
+  const nextNotes = [...callNotes];
+  nextNotes[noteIdx] = {
+    ...note,
+    sent_to_client_tg_at: nowIso,
+    sent_to_client_tg_by: user.id,
+  };
+
   await (supabaseAdmin as any)
-    .from('client_meeting_notes')
-    .update({
-      sent_to_client_tg_at: nowIso,
-      sent_to_client_tg_by: user.id,
-    })
-    .eq('id', params.noteId);
+    .from('client_context')
+    .update({ call_notes: nextNotes, updated_at: nowIso })
+    .eq('id', (ctx as any).id);
 
   return NextResponse.json({
     ok: true,
