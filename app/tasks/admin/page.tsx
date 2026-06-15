@@ -19,10 +19,10 @@
  *                                        completed, owner)
  *
  * Direct routes to old admin views can be deep-linked by passing the
- * matching tab, so this hop targets `?tab=internal` (where the
- * teammate workload table lives) rather than the dashboard root.
- * Anyone with a bookmark or SOP reference still lands on the
- * up-to-date content.
+ * matching tab, so this hop targets `?tab=internal#workload` (jumps
+ * straight to the teammate workload table, the closest analogue to
+ * the old Tasks-per-Member section). Anyone with a bookmark or SOP
+ * reference still lands on the up-to-date content.
  *
  * Original 175-LOC implementation preserved in git history
  * (commit 2bf21df) for future reference.
@@ -34,7 +34,7 @@ import { useRouter } from 'next/navigation';
 export default function TasksAdminRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/dashboard?tab=internal');
+    router.replace('/dashboard?tab=internal#workload');
   }, [router]);
   return (
     <div className="flex items-center justify-center min-h-[40vh] text-sm text-ink-warm-500">

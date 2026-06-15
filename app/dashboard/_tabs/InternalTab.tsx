@@ -226,7 +226,11 @@ export default function InternalTab() {
       {/* Mockup pattern: only the Engagements section sits in an inset
           block. Workload / Strategy / etc. sit directly on the page bg
           so the chrome doesn't compete with the cards. */}
-      <div className="space-y-4">
+      {/* [2026-06-15] id="workload" anchor target so /tasks/admin redirect
+          (and any bookmarked /dashboard#workload link) jumps straight to
+          the workload table — the closest analogue to the old Tasks-per-
+          Member admin view. scroll-mt offsets the sticky chrome. */}
+      <div id="workload" className="space-y-4 scroll-mt-20">
         <SectionHeader label="Workload" dot="sky" counter="02 — Team · Escalations · Check-in" />
 
       {/* Workload + escalations */}
