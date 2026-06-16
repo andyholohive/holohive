@@ -94,20 +94,25 @@ export async function GET(request: Request) {
         .from('tasks')
         .select('id, client_id, status, due_date, completed_at')
         .in('client_id', standardClientIds),
-      // Content posted this week per standard client
+      // Content posted this week per standard client.
+      // [2026-06-17] Fixed Flow D bug — contents has no client_id column.
+      // Embed the campaign so we can derive the client_id via campaign_id.
+      // Previously the query silently errored (.in('client_id', ...) on a
+      // non-existent column), zeroing out the entire KPI.
       (sb as any)
         .from('contents')
-        .select('id, client_id, status, activation_date')
-        .in('client_id', standardClientIds)
+        .select('id, status, activation_date, campaign_id, campaigns!inner(client_id)')
         .eq('status', 'posted')
-        .gte('activation_date', weekStartIso.slice(0, 10)),
+        .gte('activation_date', weekStartIso.slice(0, 10))
+        .in('campaigns.client_id', standardClientIds),
       // [2026-06-11] All-time content posted per client — drives spec § 4.2's
       // "Content Posted" column (total count, not just this week).
+      // [2026-06-17] Same client_id-via-campaign fix as above.
       (sb as any)
         .from('contents')
-        .select('id, client_id')
-        .in('client_id', standardClientIds)
-        .eq('status', 'posted'),
+        .select('id, campaign_id, campaigns!inner(client_id)')
+        .eq('status', 'posted')
+        .in('campaigns.client_id', standardClientIds),
       // [2026-06-11] Active campaigns for the Output Signals KPI row — spec
       // § 4.1. status is TitleCase ("Active") not lowercase per a sample query.
       (sb as any)
@@ -183,14 +188,20 @@ export async function GET(request: Request) {
       taskAgg.set(t.client_id, cur);
     }
 
-    // Per-client content posted-this-week + all-time counts
+    // Per-client content posted-this-week + all-time counts.
+    // [2026-06-17] client_id resolves via the embedded campaigns row
+    // (contents has no client_id column — fixed in the fetch above).
     const contentThisWeekByClient = new Map<string, number>();
     for (const c of contentsThisWeek) {
-      contentThisWeekByClient.set(c.client_id, (contentThisWeekByClient.get(c.client_id) ?? 0) + 1);
+      const clientId = c.campaigns?.client_id;
+      if (!clientId) continue;
+      contentThisWeekByClient.set(clientId, (contentThisWeekByClient.get(clientId) ?? 0) + 1);
     }
     const contentAllTimeByClient = new Map<string, number>();
     for (const c of contentsAllTime) {
-      contentAllTimeByClient.set(c.client_id, (contentAllTimeByClient.get(c.client_id) ?? 0) + 1);
+      const clientId = c.campaigns?.client_id;
+      if (!clientId) continue;
+      contentAllTimeByClient.set(clientId, (contentAllTimeByClient.get(clientId) ?? 0) + 1);
     }
 
     // Per-client external visit counts this week.
