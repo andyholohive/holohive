@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { DeliverableService } from '@/lib/deliverableService';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
@@ -221,14 +220,22 @@ export async function GET(request: Request) {
       const title = `${templateName} · ${clientName} · Wk of ${monLabel}`;
 
       try {
-        const { parentTask } = await DeliverableService.spawnFromTemplateUnassigned({
+        // [2026-06-16] Inlined spawn logic using the cron's service-role
+        // client. Previously called DeliverableService.spawnFromTemplateUnassigned,
+        // which reaches its own imported anon supabase client and gets
+        // blocked by RLS in unauthenticated cron context — all 4 Monday
+        // runs since launch failed with "Template not found". The
+        // service path stays for in-app UI calls; the cron uses this
+        // service-role variant.
+        const { parentTask } = await spawnTemplateAsServiceRole(supabase, {
           templateId: row.template_id,
           clientId: row.client_id,
           title,
           startDate: weekAnchorIso,
           createdBy: systemUserId,
           createdByName: systemUserName,
-          priority: 'medium',
+          templateName,
+          templateCategory: (await getTemplateCategory(supabase, row.template_id)) || 'client',
         });
 
         // Stamp the recurring row's last_fired_at so we don't dup later today
@@ -271,4 +278,144 @@ export async function GET(request: Request) {
     await finishRun('failed', { error: message }, message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// ─── Service-role spawn helpers ───────────────────────────────────────
+// Inlined replacement for DeliverableService.spawnFromTemplateUnassigned.
+// All reads/writes use the service-role client passed in so RLS doesn't
+// block the cron's unauthenticated context. Mirrors the service's shape
+// (parent task + deliverables row + per-step subtasks) so UI consumers
+// see no difference from manually-spawned deliverables.
+
+async function getTemplateCategory(
+  db: SupabaseClient,
+  templateId: string,
+): Promise<string | null> {
+  const { data } = await (db as any)
+    .from('deliverable_templates')
+    .select('category')
+    .eq('id', templateId)
+    .maybeSingle();
+  return (data as any)?.category ?? null;
+}
+
+type SpawnArgs = {
+  templateId: string;
+  clientId: string;
+  title: string;
+  startDate: string;        // YYYY-MM-DD
+  createdBy: string | null;
+  createdByName: string | null;
+  templateName: string;
+  templateCategory: string;  // 'client' | 'internal' | 'bd'
+};
+
+async function spawnTemplateAsServiceRole(
+  db: SupabaseClient,
+  args: SpawnArgs,
+): Promise<{ parentTask: { id: string } }> {
+  // 1. Pull the template's steps (service-role bypasses RLS).
+  const { data: steps, error: stepsErr } = await (db as any)
+    .from('deliverable_template_steps')
+    .select('id, step_name, step_order, description, estimated_duration_days, task_type')
+    .eq('template_id', args.templateId)
+    .order('step_order');
+  if (stepsErr) throw stepsErr;
+  if (!steps || steps.length === 0) {
+    throw new Error(`Template ${args.templateId} has no steps`);
+  }
+
+  // 2. Parent task — unassigned, in_progress.
+  const parentTaskType =
+    args.templateCategory === 'bd' ? 'Marketing & Sales' : 'Client Delivery';
+  const { data: parentTask, error: parentErr } = await (db as any)
+    .from('tasks')
+    .insert({
+      task_name: args.title,
+      task_type: parentTaskType,
+      frequency: 'one-time',
+      status: 'in_progress',
+      priority: 'medium',
+      client_id: args.clientId,
+      assigned_to: null,
+      assigned_to_name: null,
+      created_by: args.createdBy,
+      created_by_name: args.createdByName,
+      due_date: args.startDate,
+      description: `<p>Deliverable: ${args.templateName}</p><p><em>Auto-spawned by recurring cron.</em></p>`,
+      source: 'recurring_deliverable',
+      source_date: args.startDate,
+    })
+    .select('id')
+    .single();
+  if (parentErr) throw parentErr;
+
+  // 3. Compute target completion from cumulative step durations.
+  const totalDays = steps.reduce(
+    (sum: number, s: any) => sum + (s.estimated_duration_days || 0),
+    0,
+  );
+  const target = new Date(args.startDate + 'T00:00:00Z');
+  target.setUTCDate(target.getUTCDate() + totalDays);
+  const targetCompletion = target.toISOString().slice(0, 10);
+
+  // 4. Deliverable row (UI lookup key for the parent task's progress card).
+  await (db as any)
+    .from('deliverables')
+    .insert({
+      template_id: args.templateId,
+      parent_task_id: (parentTask as any).id,
+      client_id: args.clientId,
+      title: args.title,
+      status: 'active',
+      role_assignments: {},
+      start_date: args.startDate,
+      target_completion: targetCompletion,
+      metadata: {
+        template_name: args.templateName,
+        source: 'recurring_cron',
+        auto_spawned_at: new Date().toISOString(),
+      },
+      created_by: args.createdBy,
+    });
+
+  // 5. Sync parent's due_date to the computed target completion.
+  await (db as any)
+    .from('tasks')
+    .update({ due_date: targetCompletion })
+    .eq('id', (parentTask as any).id);
+
+  // 6. One subtask per step — all unassigned. Due date = startDate +
+  //    cumulative duration so a 3-day step starting on Mon shows due Thu.
+  let cumulativeDays = 0;
+  for (const step of steps as any[]) {
+    cumulativeDays += step.estimated_duration_days || 0;
+    const due = new Date(args.startDate + 'T00:00:00Z');
+    due.setUTCDate(due.getUTCDate() + cumulativeDays);
+    const dueDate = due.toISOString().slice(0, 10);
+    const { error: subErr } = await (db as any)
+      .from('tasks')
+      .insert({
+        task_name: `${step.step_order}. ${step.step_name}`,
+        parent_task_id: (parentTask as any).id,
+        task_type: step.task_type || parentTaskType,
+        frequency: 'one-time',
+        status: 'to_do',
+        priority: 'medium',
+        client_id: args.clientId,
+        assigned_to: null,
+        assigned_to_name: null,
+        created_by: args.createdBy,
+        created_by_name: args.createdByName,
+        due_date: dueDate,
+        description: step.description || '',
+        sort_order: step.step_order,
+        source: 'recurring_deliverable',
+        source_date: args.startDate,
+        source_ref: step.id,
+      });
+    if (subErr) throw subErr;
+  }
+
+  return { parentTask: { id: (parentTask as any).id } };
 }
