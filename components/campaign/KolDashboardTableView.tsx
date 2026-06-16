@@ -1192,6 +1192,41 @@ export function KolDashboardTableView({
                                     </a>
                                   )}
                                 </div>
+                                {/* [2026-06-16] HHP Campaign Dashboard § 2 GAP —
+                                    KOL activation-recency badge (distinct from
+                                    hh_status relationship lifecycle). Source:
+                                    campaign_kol_activation_status view.
+                                    Green Active / gray Last active / amber
+                                    Onboarded — see spec for tone rule. */}
+                                {(() => {
+                                  const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
+                                  const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
+                                  if (aw != null) {
+                                    return (
+                                      <div className="mt-1">
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          Active Week {aw}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  if (lw != null) {
+                                    return (
+                                      <div className="mt-1">
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                          Last active Week {lw}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className="mt-1">
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                        Onboarded
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <MultiSelect

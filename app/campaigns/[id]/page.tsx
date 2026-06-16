@@ -818,16 +818,37 @@ const CampaignDetailsPage = () => {
       // (including soft-deleted rows) for the Budget tab's payment
       // name lookup. Fetching both here keeps the two views in
       // lockstep after any add/delete/status change.
-      const [kols, allKols] = await Promise.all([
+      const [kols, allKols, activationRows] = await Promise.all([
         CampaignKOLService.getCampaignKOLs(campaign.id),
         CampaignKOLService.getCampaignKOLsWithDeleted(campaign.id),
+        // [2026-06-16] HHP Campaign Dashboard § 2 GAP — activation-recency
+        // status from the campaign_kol_activation_status view (latest
+        // confirmed / completed lineup per KOL). Joined client-side so
+        // the rest of the campaign_kols fetch shape stays unchanged.
+        (supabase as any)
+          .from('campaign_kol_activation_status')
+          .select('campaign_kol_id, active_week_number, last_active_week_number')
+          .eq('campaign_id', campaign.id),
       ]);
+      // Build the activation lookup so we can stamp each KOL row with
+      // its recency state. Map shape: campaign_kol_id → {active, last}.
+      const activationByCkId = new Map<string, { active: number | null; last: number | null }>();
+      for (const row of (activationRows?.data ?? []) as any[]) {
+        activationByCkId.set(row.campaign_kol_id, {
+          active: row.active_week_number ?? null,
+          last: row.last_active_week_number ?? null,
+        });
+      }
+      const decorate = (k: any) => {
+        const a = activationByCkId.get(k.id) ?? { active: null, last: null };
+        return { ...k, activation_active_week: a.active, activation_last_week: a.last };
+      };
       // If payments are loaded, map paid from sums; else set directly
       if (payments && payments.length > 0) {
         const sums = computePaymentSums(payments);
-        setCampaignKOLs(kols.map(k => ({ ...k, paid: sums[k.id] || 0 })));
+        setCampaignKOLs(kols.map(k => decorate({ ...k, paid: sums[k.id] || 0 })));
       } else {
-      setCampaignKOLs(kols);
+        setCampaignKOLs(kols.map(decorate));
       }
       // Build the payment-name lookup. Each campaign_kol id maps to
       // { name, removed } so the Budget table can render
