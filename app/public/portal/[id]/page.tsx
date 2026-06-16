@@ -920,7 +920,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       let engagementsSum = 0;
       const distinctKolIds = new Set<string>();
       let topRow: any = null;
-      let topImpressions = -1;
+      // [2026-06-16] Top Post ranking — per spec § 3b: "highest total
+      // engagement (Impressions + Likes + Retweets + Comments)". Was
+      // ranking by impressions only; switched to summed engagement to
+      // match the spec literal. Same data already computed for the
+      // Stats Row engagementsSum, so no extra pass over rows.
+      let topEngagement = -1;
       let postsLast7Days = 0;
       // Cutoff for "this week" — anything posted within the last 7 days.
       // Compared as YYYY-MM-DD strings to avoid timezone foot-guns.
@@ -938,9 +943,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           (r.comments || 0) +
           (r.bookmarks || 0);
         if (r.campaign_kols_id) distinctKolIds.add(r.campaign_kols_id);
-        // Track top post in the same pass — saves a sort
-        if ((r.impressions || 0) > topImpressions) {
-          topImpressions = r.impressions || 0;
+        // Track top post in the same pass — saves a sort. Engagement =
+        // impressions + likes + retweets + comments + bookmarks per spec
+        // § 3b. Bookmarks included because they're already in
+        // engagementsSum above; consistent metric across Stats Row and
+        // Top Post pick.
+        const rowEngagement =
+          (r.impressions || 0) +
+          (r.likes || 0) +
+          (r.retweets || 0) +
+          (r.comments || 0) +
+          (r.bookmarks || 0);
+        if (rowEngagement > topEngagement) {
+          topEngagement = rowEngagement;
           topRow = r;
         }
         // Posted in the last 7 days?
