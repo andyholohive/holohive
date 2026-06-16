@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, ListChecks, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, ListChecks, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -82,6 +82,24 @@ export function ThisWeekFeedWidget({
   const [rows, setRows] = useState<WeeklyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  // [2026-06-17] Per Andy: collapsible to keep the HQ page focused when
+  // the CM wants to drill into Tasks tabs below. Default = expanded
+  // (widget already auto-hides on quiet weeks). Preference persists in
+  // localStorage so reload + tab switches preserve the chosen state.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setCollapsed(window.localStorage.getItem('thisWeekFeedCollapsed') === '1');
+  }, []);
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('thisWeekFeedCollapsed', next ? '1' : '0');
+      }
+      return next;
+    });
+  };
 
   const weekOf = useMemo(() => mondayOfThisWeek(), []);
 
@@ -281,7 +299,12 @@ export function ThisWeekFeedWidget({
 
   return (
     <div className="border border-cream-200 rounded-lg bg-white overflow-hidden">
-      <div className="px-4 py-3 border-b border-cream-200 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        className={`w-full px-4 py-3 flex items-center gap-2 hover:bg-cream-50 transition-colors ${collapsed ? '' : 'border-b border-cream-200'}`}
+        aria-expanded={!collapsed}
+      >
         <ListChecks className="h-3.5 w-3.5 text-brand" />
         <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-700">
           This Week — Client Updates
@@ -289,8 +312,11 @@ export function ThisWeekFeedWidget({
         <span className="text-[10px] text-ink-warm-500 ml-auto tabular-nums">
           {loading ? '…' : `${pending.length} pending`}
         </span>
-      </div>
-      {loading ? (
+        {collapsed
+          ? <ChevronDown className="h-3.5 w-3.5 text-ink-warm-400" />
+          : <ChevronUp className="h-3.5 w-3.5 text-ink-warm-400" />}
+      </button>
+      {collapsed ? null : loading ? (
         <div className="p-3 space-y-2">
           {Array.from({ length: 2 }).map((_, i) => (
             <Skeleton key={i} className="h-10 rounded" />
