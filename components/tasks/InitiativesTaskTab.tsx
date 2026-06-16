@@ -38,9 +38,13 @@ type Milestone = {
 
 type Initiative = {
   id: string;
-  title: string;
-  owner: string | null;
-  owner_id: string | null;
+  // [2026-06-17] Field rename — schema uses `name`/`owner_user_id`, not
+  // `title`/`owner`. The previous query silently errored on the wrong
+  // columns and the tab always rendered the empty state. Detected during
+  // §15 Flow I run.
+  name: string;
+  owner_name: string | null;
+  owner_user_id: string | null;
   status: string;
   updated_at: string;
   milestones: Milestone[];
@@ -69,12 +73,26 @@ export function InitiativesTaskTab() {
   async function refresh() {
     setLoading(true);
     try {
+      // [2026-06-17] Resolve owner name via the users JOIN so the UI has
+      // a readable name without an extra round-trip. Schema fields are
+      // `name` + `owner_user_id` — `title`/`owner` don't exist.
       const { data: initsRaw } = await (supabase as any)
         .from('initiatives')
-        .select('id, title, owner, owner_id, status, updated_at')
+        .select('id, name, owner_user_id, status, updated_at, users:owner_user_id(name)')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false });
-      const inits = (initsRaw ?? []) as Array<Omit<Initiative, 'milestones'>>;
+      const inits = ((initsRaw ?? []) as Array<{
+        id: string; name: string; owner_user_id: string | null;
+        status: string; updated_at: string;
+        users: { name: string } | null;
+      }>).map(i => ({
+        id: i.id,
+        name: i.name,
+        owner_user_id: i.owner_user_id,
+        owner_name: i.users?.name ?? null,
+        status: i.status,
+        updated_at: i.updated_at,
+      })) as Array<Omit<Initiative, 'milestones'>>;
       if (inits.length === 0) {
         setInitiatives([]);
         return;
@@ -105,10 +123,23 @@ export function InitiativesTaskTab() {
     const current = initiative.milestones.find(m => m.name === initiative.status);
     const next = initiative.milestones.find(m => m.sort_order === (current?.sort_order ?? 0) + 1);
     if (!next) {
-      // Already at last gate → flip to Completed
+      // [2026-06-17] Two bugs fixed here:
+      //   1. Stamp the FINAL gate (Live) as completed when transitioning to
+      //      the terminal state. Previously the Live gate stayed at
+      //      completed=false even though the initiative was "done", so the
+      //      gate-count summary showed 5/6.
+      //   2. Write status='completed' (lowercase) — the StatusBadge mapping
+      //      checks lowercase, so the previous 'Completed' (capital C) read
+      //      as default neutral instead of success.
+      if (current) {
+        await (supabase as any)
+          .from('initiative_milestones')
+          .update({ completed: true, completed_date: new Date().toISOString().slice(0, 10) })
+          .eq('id', current.id);
+      }
       const { error } = await (supabase as any)
         .from('initiatives')
-        .update({ status: 'Completed', updated_at: new Date().toISOString() })
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
         .eq('id', initiative.id);
       if (error) toast({ title: 'Failed', description: error.message, variant: 'destructive' });
       else { toast({ title: 'Initiative completed' }); await refresh(); }
@@ -170,10 +201,10 @@ export function InitiativesTaskTab() {
               <TableRow key={i.id} className="border-cream-100">
                 <TableCell className="py-3 font-medium text-ink-warm-900">
                   <Link href={`/initiatives?id=${i.id}`} className="hover:text-brand">
-                    {i.title}
+                    {i.name}
                   </Link>
                 </TableCell>
-                <TableCell className="py-3 text-sm text-ink-warm-700">{i.owner || '—'}</TableCell>
+                <TableCell className="py-3 text-sm text-ink-warm-700">{i.owner_name || '—'}</TableCell>
                 <TableCell className="py-3">
                   <StatusBadge tone={tone}>
                     {i.status} {completedCount > 0 && `· ${completedCount}/${i.milestones.length}`}
