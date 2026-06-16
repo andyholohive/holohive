@@ -1227,8 +1227,21 @@ async function handleTaskCommand(chatId: string, message: any) {
       teamMembers: (roster || []) as any,
     });
   } catch (err: any) {
-    console.error('[Telegram /task] parse failed:', err);
-    await sendTelegramMessage(chatId, '⚠️ Couldn\'t parse that. Try being more specific.', 'HTML', threadId);
+    // [2026-06-16] Surface the underlying error class to make recurring
+    // failures (deprecated models, 401s, rate limits) debuggable from
+    // the chat instead of silently showing "Couldn't parse that".
+    console.error('[Telegram /task] parse failed:', err?.name, err?.status, err?.message, err);
+    const isAuth = err?.status === 401 || err?.status === 403;
+    const isRateLimit = err?.status === 429;
+    const isModelGone = err?.status === 404 || /not_found|deprecated|404/i.test(err?.message || '');
+    const hint = isAuth
+      ? 'Claude API auth issue — check ANTHROPIC_API_KEY.'
+      : isRateLimit
+        ? 'Claude API rate-limited. Try again in a minute.'
+        : isModelGone
+          ? 'Claude API model deprecated. Bot needs a model upgrade.'
+          : 'Try being more specific, or check Vercel logs.';
+    await sendTelegramMessage(chatId, `⚠️ Couldn't parse that. ${hint}`, 'HTML', threadId);
     return;
   }
 

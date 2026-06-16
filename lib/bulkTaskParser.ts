@@ -208,8 +208,11 @@ Rules:
   - If a handle doesn't match the roster, leave it in primary_assignee_handle / co_owner_handles AS-TYPED and add a warn issue ("Unresolved mention: @typo").
   - Always call submit_bulk_tasks exactly once. Never ask questions or skip the call.`;
 
+  // [2026-06-16] Upgraded from claude-sonnet-4-20250514 (deprecated,
+  // retires 2026-06-15) to claude-sonnet-4-6. Same call shape; no
+  // breaking changes for forced single-tool calls.
   const response = await claude.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     temperature: 0.2,
     system: systemPrompt,

@@ -46,13 +46,25 @@ export interface ClaudeToolResult {
   cost_usd: number;
 }
 
-export type ClaudeModel = 'claude-sonnet-4-20250514' | 'claude-opus-4-20250514' | 'claude-haiku-4-5-20251001';
+// [2026-06-16] Adding current Claude 4.x family. Legacy 20250514 IDs
+// retire 2026-06-15 — kept in the union as transitional callers
+// upgrade, but they should not be used for new code.
+export type ClaudeModel =
+  | 'claude-sonnet-4-6'
+  | 'claude-opus-4-8'
+  | 'claude-haiku-4-5'
+  | 'claude-sonnet-4-20250514'  // deprecated, retires 2026-06-15
+  | 'claude-opus-4-20250514'    // deprecated, retires 2026-06-15
+  | 'claude-haiku-4-5-20251001';
 
-// Approximate pricing per 1M tokens (as of 2025)
+// Approximate pricing per 1M tokens (per platform.claude.com/docs/en/pricing).
 const MODEL_PRICING: Record<ClaudeModel, { input: number; output: number }> = {
+  'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
+  'claude-opus-4-8': { input: 5.0, output: 25.0 },
+  'claude-haiku-4-5': { input: 1.0, output: 5.0 },
   'claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
   'claude-opus-4-20250514': { input: 15.0, output: 75.0 },
-  'claude-haiku-4-5-20251001': { input: 0.80, output: 4.0 },
+  'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0 },
 };
 
 function calculateCost(
@@ -78,7 +90,7 @@ export async function callClaude(
   }
 ): Promise<ClaudeResponse> {
   const claude = getClaudeClient();
-  const model = options?.model ?? 'claude-sonnet-4-20250514';
+  const model = options?.model ?? 'claude-sonnet-4-6';
 
   const response = await claude.messages.create({
     model,
@@ -127,7 +139,7 @@ export async function callClaudeWithTools(
   }
 ): Promise<ClaudeToolResult> {
   const claude = getClaudeClient();
-  const model = options?.model ?? 'claude-sonnet-4-20250514';
+  const model = options?.model ?? 'claude-sonnet-4-6';
   const maxSteps = options?.maxSteps ?? 10;
 
   const toolDefinitions = tools.map(({ name, description, input_schema }) => ({

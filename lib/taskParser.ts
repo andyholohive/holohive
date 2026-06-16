@@ -127,8 +127,14 @@ You are filling those four fields plus an optional description. Be conservative 
 
 Always call the submit_task tool exactly once. Don't ask questions; if something is unclear, fill what you can and note the gap in clarification_needed.`;
 
+  // [2026-06-16] Upgraded from claude-sonnet-4-20250514 (deprecated,
+  // retires 2026-06-15) to claude-sonnet-4-6 (current Sonnet). The
+  // legacy model was returning intermittent errors which the catch
+  // block at the call site surfaces as "Couldn't parse that".
+  // Sonnet 4.6 accepts the same temperature parameter; no other
+  // breaking changes for this call shape (single forced tool call).
   const response = await claude.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     temperature: 0.2,
     system: systemPrompt,
