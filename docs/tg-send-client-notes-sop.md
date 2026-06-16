@@ -11,14 +11,14 @@ When clicked, the HHP bot posts a formatted recap to the configured
 client TG group:
 
 ```
-🤝 Altura — sync recap
+🤝 Altura — Sync Recap
 06/14/2026
 
 Discussed launch timeline for Q3 campaign.
 Reviewed Tier-1 KOL list and confirmed budget allocation.
 ...
 
-Action items
+Action Items
 • Send Tier-1 brief by Wed (Holo Hive)
 • Lock Q3 campaign date by Fri (Holo Hive)
 • Confirm creative review SLA

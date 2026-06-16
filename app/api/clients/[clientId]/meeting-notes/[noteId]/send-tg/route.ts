@@ -116,11 +116,11 @@ export async function POST(
   const openItems = (note.action_items ?? []).filter(i => !i.is_done);
   const contentBlock = note.content ? `${esc(note.content)}\n` : '';
   const actionsBlock = openItems.length > 0
-    ? `\n<b>Action items</b>\n${openItems.map(i => `• ${esc(i.text)}${i.owner_client_side ? '' : ' <i>(Holo Hive)</i>'}`).join('\n')}`
+    ? `\n<b>Action Items</b>\n${openItems.map(i => `• ${esc(i.text)}${i.owner_client_side ? '' : ' <i>(Holo Hive)</i>'}`).join('\n')}`
     : '';
 
   const message =
-    `🤝 <b>${esc(clientName)} — sync recap</b>\n` +
+    `🤝 <b>${esc(clientName)} — Sync Recap</b>\n` +
     `<i>${esc(meetingDateFmt)}</i>\n\n` +
     contentBlock +
     actionsBlock;
