@@ -24,7 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ExternalLink, Pencil, Save, X } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Pencil, Save, X, Calendar as CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { MasterKOL, KOLService } from "@/lib/kolService";
 // [May 2026 KOL overhaul follow-up] The Deliverables tab now reads
 // directly from the campaign-side `contents` table (instead of the
@@ -1198,9 +1200,36 @@ function CallLogForm({
     <form onSubmit={handleSubmit} className="rounded-[14px] border border-cream-200 p-3 bg-cream-50 space-y-2">
       <div className="grid grid-cols-3 gap-2">
         <FormField label="Date *">
-          {/* TODO: migrate to DateField pattern (Popover + Calendar).
-              lint-conventions: disable-next-line no-input-type-date */}
-          <Input type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} className="h-8 text-xs focus-brand" />
+          {/* [2026-06-16] Canonical Popover + Calendar pattern per
+              CLAUDE.md (replaces the previous <Input type="date">). */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 w-full justify-start font-normal text-xs focus-brand"
+              >
+                <CalendarIcon className="mr-2 h-3 w-3" />
+                {callDate ? formatDate(callDate + 'T00:00:00') : 'Select date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+              <Calendar
+                mode="single"
+                selected={callDate ? new Date(callDate + 'T00:00:00') : undefined}
+                onSelect={(d) => {
+                  if (d) {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    setCallDate(`${y}-${m}-${day}`);
+                  }
+                }}
+                classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+              />
+            </PopoverContent>
+          </Popover>
         </FormField>
         <FormField label="Call Type">
           <Select value={callType} onValueChange={setCallType}>
