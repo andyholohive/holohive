@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
-import { extractAddressCandidate, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
+import { extractAddressCandidate, hasValidChecksumIfMixed, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
 
 export const dynamic = 'force-dynamic';
 
@@ -3543,6 +3543,22 @@ async function handleWalletCommand(chatId: string, args: string[], message: any)
       "That doesn't look like a valid wallet address.\n" +
         'Send <code>/wallet</code> followed by your Arbitrum address ' +
         '(starts with <code>0x</code>, 42 characters).',
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+  // § 5 v2 hardening (CLEANUP.1, 2026-06-17) — when a mixed-case address
+  // is submitted, verify its EIP-55 checksum. A mismatched checksum on
+  // mixed-case input is almost always a typo (a real wallet copy preserves
+  // the canonical case). All-lowercase / all-uppercase inputs pass through
+  // since they carry no checksum to verify.
+  if (!hasValidChecksumIfMixed(candidate)) {
+    await sendTelegramMessage(
+      chatId,
+      "That address has the right shape but its mixed-case checksum is off, " +
+        "which usually means a typo. Copy it again from your wallet and resend " +
+        "with <code>/wallet</code> — or paste it all-lowercase if you typed it manually.",
       'HTML',
       threadId,
     );
