@@ -47,8 +47,30 @@ type Initiative = {
   owner_user_id: string | null;
   status: string;
   updated_at: string;
+  category_tags: string[] | null;
   milestones: Milestone[];
 };
+
+/**
+ * Title Case the status field. Generic statuses are stored lowercase
+ * (`active`, `completed`, `parked`); gate names from the advance flow
+ * are stored capitalized (`Ideation`, `Ready for review`). This pass
+ * normalizes the legacy lowercase rows so the badge reads the same as
+ * a fresh advance.
+ */
+function formatStatusLabel(status: string): string {
+  if (!status) return '—';
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+/** Freshness badge mirroring /initiatives — 30d red, 14d amber, else green. */
+function staleTone(updatedAt: string): { tone: BadgeTone; label: string } {
+  const days = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 86_400_000);
+  const label = `${days}d`;
+  if (days >= 30) return { tone: 'danger', label };
+  if (days >= 14) return { tone: 'warning', label };
+  return { tone: 'success', label };
+}
 
 /** Map gate name → badge tone. Per Appendix: teal=current, gray=terminal. */
 function toneForGate(initiative: Initiative): BadgeTone {
@@ -78,12 +100,13 @@ export function InitiativesTaskTab() {
       // `name` + `owner_user_id` — `title`/`owner` don't exist.
       const { data: initsRaw } = await (supabase as any)
         .from('initiatives')
-        .select('id, name, owner_user_id, status, updated_at, users:owner_user_id(name)')
+        .select('id, name, owner_user_id, status, updated_at, category_tags, users:owner_user_id(name)')
         .is('deleted_at', null)
         .order('updated_at', { ascending: false });
       const inits = ((initsRaw ?? []) as Array<{
         id: string; name: string; owner_user_id: string | null;
         status: string; updated_at: string;
+        category_tags: string[] | null;
         users: { name: string } | null;
       }>).map(i => ({
         id: i.id,
@@ -92,6 +115,7 @@ export function InitiativesTaskTab() {
         owner_name: i.users?.name ?? null,
         status: i.status,
         updated_at: i.updated_at,
+        category_tags: i.category_tags,
       })) as Array<Omit<Initiative, 'milestones'>>;
       if (inits.length === 0) {
         setInitiatives([]);
@@ -184,19 +208,22 @@ export function InitiativesTaskTab() {
     <Card className="border-cream-200 overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-cream-50 hover:bg-cream-50">
-            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Initiative</TableHead>
-            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Owner</TableHead>
-            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Current Gate</TableHead>
-            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Last Updated</TableHead>
-            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500 text-right">Actions</TableHead>
+          <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
+            <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+            <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Owner</TableHead>
+            <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Tags</TableHead>
+            <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+            <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Freshness</TableHead>
+            <TableHead className="h-9 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {initiatives.map(i => {
             const tone = toneForGate(i);
             const completedCount = i.milestones.filter(m => m.completed).length;
-            const isTerminal = i.status === 'Completed' || i.status === 'Parked';
+            const isTerminal = i.status === 'completed' || i.status === 'Completed'
+              || i.status === 'parked' || i.status === 'Parked';
+            const stale = staleTone(i.updated_at);
             return (
               <TableRow key={i.id} className="border-cream-100">
                 <TableCell className="py-3 font-medium text-ink-warm-900">
@@ -205,13 +232,20 @@ export function InitiativesTaskTab() {
                   </Link>
                 </TableCell>
                 <TableCell className="py-3 text-sm text-ink-warm-700">{i.owner_name || '—'}</TableCell>
+                <TableCell className="py-3 text-xs text-ink-warm-700">
+                  {i.category_tags && i.category_tags.length > 0
+                    ? i.category_tags.map(t => (
+                        <span key={t} className="inline-block mr-1 mb-1 px-1.5 py-0.5 rounded bg-gray-100 text-ink-warm-700">{t}</span>
+                      ))
+                    : <span className="text-ink-warm-400">—</span>}
+                </TableCell>
                 <TableCell className="py-3">
-                  <StatusBadge tone={tone}>
-                    {i.status} {completedCount > 0 && `· ${completedCount}/${i.milestones.length}`}
+                  <StatusBadge tone={tone} size="sm" bordered withDot>
+                    {formatStatusLabel(i.status)} {completedCount > 0 && `· ${completedCount}/${i.milestones.length}`}
                   </StatusBadge>
                 </TableCell>
-                <TableCell className="py-3 text-xs text-ink-warm-500">
-                  {formatDate(i.updated_at)}
+                <TableCell className="py-3">
+                  <StatusBadge tone={stale.tone} size="sm" bordered withDot={stale.tone === 'danger' ? 'pulse' : true}>{stale.label}</StatusBadge>
                 </TableCell>
                 <TableCell className="py-3 text-right">
                   <div className="flex items-center gap-1 justify-end">
