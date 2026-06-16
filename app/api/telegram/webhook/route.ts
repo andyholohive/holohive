@@ -2223,20 +2223,29 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   }
 
   // Pull the KOL's active-campaign list via campaign_kols + campaigns.
-  // Active = campaign.status = 'Active' AND not archived AND start_date <= today.
+  // Active = campaign.status = 'Active' AND not archived AND start_date <= today
+  // AND (end_date IS NULL OR end_date >= today). The end_date guard added
+  // 2026-06-16 per spec GAP — KOLs on a finished campaign should not be
+  // able to submit content to it.
   const todayIso = new Date().toISOString().slice(0, 10);
   const { data: assignments } = await (supabaseAdmin as any)
     .from('campaign_kols')
-    .select('id, campaign:campaigns!inner(id, name, status, start_date, archived_at)')
+    .select('id, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at)')
     .eq('master_kol_id', caller.id)
     .is('deleted_at', null);
 
   const activeCampaigns = ((assignments ?? []) as Array<{
     id: string;
-    campaign: { id: string; name: string; status: string; start_date: string | null; archived_at: string | null };
+    campaign: { id: string; name: string; status: string; start_date: string | null; end_date: string | null; archived_at: string | null };
   }>)
     .map(a => a.campaign)
-    .filter(c => c && c.status === 'Active' && !c.archived_at && (!c.start_date || c.start_date <= todayIso));
+    .filter(c =>
+      c
+      && c.status === 'Active'
+      && !c.archived_at
+      && (!c.start_date || c.start_date <= todayIso)
+      && (!c.end_date || c.end_date >= todayIso)
+    );
 
   if (activeCampaigns.length === 0) {
     await sendTelegramMessage(

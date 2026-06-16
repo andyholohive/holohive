@@ -45,42 +45,64 @@ export function BudgetDashboardV2() {
   const isAdminOrOwner = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
 
   /** Type-segmented spend totals from payments. Per spec: every tile
-   *  filters on `type=content` unless stated; prize pool + internal stay
-   *  out of efficiency math. */
+   *  filters on Content only; Community Activation + Expenses stay out
+   *  of efficiency math.
+   *
+   *  Schema mapping (payment_category is text, real values are 'kol' |
+   *  'other'):
+   *    - 'kol' or campaign_kol_id present → Content
+   *    - 'other' with no campaign_kol_id → Expenses (internal)
+   *    - Community Activation = 0 until a third payment_category lands
+   *      (e.g. 'prize_pool'); this matches the spec's "Phase 2 placeholder"
+   *      framing.
+   */
   const totals = useMemo(() => {
-    const list = (payments ?? []) as Array<{ amount?: number; type?: string | null; payment_type?: string | null }>;
+    const list = (payments ?? []) as Array<{
+      amount?: number;
+      payment_category?: string | null;
+      campaign_kol_id?: string | null;
+    }>;
     let content = 0, activation = 0, internal = 0;
     for (const p of list) {
       const amount = Number(p.amount ?? 0);
-      // type field name varies in the schema; check both common keys
-      const t = (p.type ?? p.payment_type ?? 'content').toString().toLowerCase();
-      if (t.includes('prize') || t.includes('activation')) activation += amount;
-      else if (t.includes('internal') || t.includes('expense')) internal += amount;
-      else content += amount;
+      const cat = (p.payment_category ?? '').toString().toLowerCase();
+      if (cat === 'prize_pool' || cat === 'activation') {
+        activation += amount;
+      } else if (cat === 'kol' || p.campaign_kol_id) {
+        content += amount;
+      } else {
+        internal += amount;
+      }
     }
     return { content, activation, internal };
   }, [payments]);
 
-  const totalBudget = Number((campaign as any)?.budget ?? 0);
+  const totalBudget = Number((campaign as any)?.total_budget ?? 0);
   const remaining = totalBudget - totals.content - totals.activation - totals.internal;
   // Team/client view: fold Expenses into Remaining (hidden tile).
   const remainingForRole = isAdminOrOwner ? remaining : remaining + totals.internal;
 
-  /** Aggregate metrics from campaign_kols content rows for CPM + CPE. */
+  /** Aggregate metrics from campaign_kols content rows for CPM + CPE.
+   *  Billable-deliverable counting: rows sharing a multipost_group_id
+   *  collapse to 1 deliverable (per spec: Multipost=1, Complimentary=0). */
   const contentMetrics = useMemo(() => {
     const ck = (campaignKOLs ?? []) as Array<any>;
-    let totalViews = 0, totalReactions = 0, totalReplies = 0, totalReposts = 0, contentCount = 0;
+    let totalViews = 0, totalReactions = 0, totalReplies = 0, totalReposts = 0;
+    const standaloneCount = { n: 0 };
+    const multipostGroups = new Set<string>();
     for (const row of ck) {
       const contents = row?.contents ?? [];
       for (const c of contents) {
         if (c?.status === 'deleted') continue;
-        contentCount++;
+        if (c?.multipost_group_id) multipostGroups.add(c.multipost_group_id);
+        else standaloneCount.n++;
         totalViews += Number(c?.impressions ?? c?.views ?? 0);
         totalReactions += Number(c?.likes ?? c?.reactions ?? 0);
         totalReplies += Number(c?.comments ?? c?.replies ?? 0);
         totalReposts += Number(c?.retweets ?? c?.reposts ?? c?.forwards ?? 0);
       }
     }
+    const contentCount = standaloneCount.n + multipostGroups.size;
     const engagementSum = totalReactions + totalReplies + totalReposts;
     const cpm = totalViews > 0 ? (totals.content / totalViews) * 1000 : null;
     const cpe = engagementSum > 0 ? totals.content / engagementSum : null;

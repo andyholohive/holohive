@@ -1316,6 +1316,34 @@ export default function ClientsPage() {
     await refreshActionItems();
   };
 
+  /**
+   * [2026-06-16] Onboarding Overhaul § 5 Action Board auto-derive.
+   * Creates an HQ task linked to this action item so completion in
+   * /tasks propagates back via the propagate_task_to_milestone trigger.
+   * Only fires for court='ours' items (HH-side work); client-side items
+   * stay on the Action Board checklist.
+   */
+  const createTaskFromActionItem = async (item: ActionItem) => {
+    const { error } = await (supabase as any).from('tasks').insert({
+      task_name: item.text,
+      client_id: item.client_id,
+      client_action_item_id: item.id,
+      task_type: 'one_time',
+      status: 'not_started',
+      assigned_to: userProfile?.id || null,
+      assigned_to_name: userProfile?.name || null,
+      created_by: userProfile?.id || null,
+      created_by_name: userProfile?.name || null,
+    });
+    if (error) {
+      toast({ title: 'Failed to create task', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'HQ task created', description: `Linked to "${item.text}"` });
+    // Optimistically bump the count so the row flips to "1 HQ task" link.
+    setActionItemTaskCounts(prev => ({ ...prev, [item.id]: (prev[item.id] || 0) + 1 }));
+  };
+
   const deleteActionItem = async (id: string) => {
     await supabase.from('client_action_items').delete().eq('id', id);
     await refreshActionItems();
@@ -4981,6 +5009,21 @@ export default function ClientsPage() {
                               >
                                 <ListTodo className="h-3 w-3" />
                                 {actionItemTaskCounts[item.id]} HQ task{actionItemTaskCounts[item.id] === 1 ? '' : 's'}
+                              </button>
+                            )}
+                            {/* Onboarding § 5 Action Board auto-derive — only
+                                show for HH-side items with no task yet. The
+                                propagate_task_to_milestone trigger flips the
+                                action item + milestone when this task closes. */}
+                            {item.court === 'ours' && !actionItemTaskCounts[item.id] && (
+                              <button
+                                type="button"
+                                onClick={() => createTaskFromActionItem(item)}
+                                className="inline-flex items-center gap-1 px-2 h-6 rounded-full text-[10px] font-medium border border-cream-200 text-ink-warm-500 hover:bg-brand-light hover:text-brand transition-colors whitespace-nowrap flex-shrink-0"
+                                title="Create HQ task — completing it flips this item + rolls up the milestone"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Create HQ task
                               </button>
                             )}
                             <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" onClick={() => toggleActionItemHidden(item)}>

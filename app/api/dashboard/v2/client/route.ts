@@ -312,11 +312,15 @@ export async function GET(request: Request) {
     };
     const clientMetaById = new Map<string, ClientMeta>();
     for (const c of standardClients) {
-      const renewal = renewalToneFor(c.engagement_end_date, cfg.renewal_red_days, cfg.renewal_amber_days);
+      // [Stint+Period 2026-06-16] Prefer covered_through (latest period
+      // end_date per active stint) over the legacy engagement_end_date.
+      // F1 spec: alert reads from period coverage, not the frozen client field.
+      const renewalDate = c.covered_through ?? c.engagement_end_date;
+      const renewal = renewalToneFor(renewalDate, cfg.renewal_red_days, cfg.renewal_amber_days);
       clientMetaById.set(c.id, {
         name: c.name,
         logo_url: (c as any).logo_url ?? null,
-        renewal_tone: c.engagement_end_date ? renewal.tone : 'unknown',
+        renewal_tone: renewalDate ? renewal.tone : 'unknown',
       });
     }
     for (const c of adHocClients) {
@@ -352,7 +356,9 @@ export async function GET(request: Request) {
     // Build client health rows
     const clientHealth = standardClients.map(c => {
       const t = taskAgg.get(c.id) ?? { open: 0, overdue: 0, doneThisWeek: 0 };
-      const renewal = renewalToneFor(c.engagement_end_date, cfg.renewal_red_days, cfg.renewal_amber_days);
+      // [Stint+Period 2026-06-16] Same precedence as above — covered_through first.
+      const renewalDate = c.covered_through ?? c.engagement_end_date;
+      const renewal = renewalToneFor(renewalDate, cfg.renewal_red_days, cfg.renewal_amber_days);
       return {
         id: c.id,
         name: c.name,

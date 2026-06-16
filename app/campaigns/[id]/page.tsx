@@ -291,7 +291,8 @@ const CampaignDetailsPage = () => {
   const [kolVisibilityTab, setKolVisibilityTab] = useState<'active' | 'hidden'>('active');
 
   // Payments view toggle state
-  const [paymentViewMode, setPaymentViewMode] = useState<'table' | 'graph'>('table');
+  // paymentViewMode removed 2026-06-16 — Budget tab no longer has the
+  // Overview/Table toggle; Overview renders above the table permanently.
 
   // Information tab toggle state
   const [informationViewMode, setInformationViewMode] = useState<'overview' | 'metrics'>('overview');
@@ -807,7 +808,7 @@ const CampaignDetailsPage = () => {
       window.removeEventListener('scroll', updateStickyScrollbar);
       window.removeEventListener('resize', updateStickyScrollbar);
     };
-  }, [activeTab, kolViewMode, contentsViewMode, paymentViewMode]); // Re-check when switching tabs or view modes
+  }, [activeTab, kolViewMode, contentsViewMode]); // Re-check when switching tabs or view modes
 
   const fetchCampaignKOLs = async () => {
     if (!campaign) return;
@@ -2579,55 +2580,28 @@ const CampaignDetailsPage = () => {
 
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-4">
-              {/* Toolbar row: view-mode toggle on the left, Export +
-                  Record Payment on the right — merged onto one line. */}
-              <div className="mb-3 flex flex-row items-center justify-between gap-2">
-                  {/* View toggle — uses the Tabs primitive for
-                      consistency with the main tab strip + other
-                      v11 tabbed surfaces. */}
-                  <Tabs value={paymentViewMode} onValueChange={(v) => setPaymentViewMode(v as 'table' | 'graph')}>
-                    <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
-                      <TabsTrigger value="graph" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
-                        <BarChart3 className="h-4 w-4 mr-1.5" />
-                        Overview
-                      </TabsTrigger>
-                      <TabsTrigger value="table" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
-                        <TableIcon className="h-4 w-4 mr-1.5" />
-                        Table
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <div className="flex items-center gap-2">
-                  {/* Export CSV button lives inside the BudgetTableView
-                      component since the 2026-06-02 cleanup — only
-                      shows in Table view (Overview can't be exported). */}
-                  {/* Record Payment trigger — dialog body lives in
-                      `components/campaign/RecordPaymentDialog.tsx`
-                      since the 2026-06-02 structural pass. The button
-                      stays here so it remains part of the Budget tab
-                      toolbar layout. */}
+              {/* Toolbar row: Record Payment on the right. The
+                  Overview/Table tab toggle was removed 2026-06-16 per
+                  Jdot's Budget Dashboard spec — Overview now renders
+                  ABOVE the table as a permanent section, no toggle. */}
+              <div className="mb-3 flex flex-row items-center justify-end gap-2">
                   <Button variant="brand" size="sm" onClick={() => setIsAddingPayment(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Record Payment
                   </Button>
                   <RecordPaymentDialog ref={recordPaymentDialogRef} open={isAddingPayment} onOpenChange={setIsAddingPayment} />
-                  </div>
               </div>
-              {/* See KOL tab above for the CardContent → div rationale. */}
-              <div>
-                {/* View toggle moved to the toolbar row above. */}
+              <div className="space-y-6">
+                {/* Overview panel (BudgetDashboardV2) — renders above
+                    the budget table per Jdot's spec. Owns: 5-tile spend
+                    breakdown row, CPM/CPE/Cost-per-piece/Burn tiles,
+                    portfolio benchmark, Phase 2 funnel placeholder,
+                    rollover summary. */}
+                <BudgetDashboardV2 />
 
-                {/* Table View — extracted to
-                    `components/campaign/BudgetTableView.tsx` on
-                    2026-06-02. Owns its own sort + filter + selection
-                    + inline-edit + delete-dialog state. */}
-                {paymentViewMode === 'table' && <BudgetTableView />}
-
-                {/* Graph (Overview) View — extracted to
-                    `components/campaign/BudgetOverview.tsx` on
-                    2026-06-02. Read-only: 3-KPI hero + Regional
-                    Budget Summary grid + 4 recharts panels. */}
-                {paymentViewMode === 'graph' && <BudgetDashboardV2 />}
+                {/* Existing payment table — preserved as-is per spec
+                    "PRESERVE · x/x content paid tracker" feature. */}
+                <BudgetTableView />
               </div>
           </TabsContent>
 

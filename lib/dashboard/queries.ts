@@ -34,6 +34,14 @@ export interface StandardClient {
   is_whitelisted: boolean | null;
   /** v11: client logo for Dashboard / Client Health avatar tile. */
   logo_url: string | null;
+  /**
+   * [Stint+Period substrate, 2026-06-16] Covered-through date from
+   * client_coverage_status view = MAX(period.end_date) per active stint.
+   * Preferred over engagement_end_date for renewal-tone math — falls
+   * back when client has no stint yet. Full F1 migration (dropping
+   * engagement_end_date) lives in the CRM rebuild.
+   */
+  covered_through: string | null;
 }
 
 /**
@@ -57,7 +65,19 @@ export async function getStandardClients(
     .is('archived_at', null)
     .order('name');
   if (error || !data) return [];
-  return data as StandardClient[];
+  // [Stint+Period substrate] Join covered_through from the view so the
+  // renewal-tone math can prefer it over engagement_end_date.
+  const { data: coverage } = await (sb as any)
+    .from('client_coverage_status')
+    .select('client_id, covered_through, stint_status');
+  const coverageByClient = new Map<string, string | null>();
+  for (const row of (coverage ?? []) as Array<{ client_id: string; covered_through: string | null; stint_status: string }>) {
+    if (row.stint_status === 'active') coverageByClient.set(row.client_id, row.covered_through);
+  }
+  return (data as StandardClient[]).map(c => ({
+    ...c,
+    covered_through: coverageByClient.get(c.id) ?? null,
+  }));
 }
 
 /** Live ad-hoc clients — for the side-list "ad-hoc engagements" section.
