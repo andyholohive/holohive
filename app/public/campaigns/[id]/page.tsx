@@ -624,10 +624,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   }, [clientEmail, approvedEmails, approvedDomains]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // [2026-06-17] Showcase fix — fetchData also triggers on showcaseToken
+    // presence. Previously it gated solely on isAuthenticated, but the only
+    // place that flips isAuthenticated for showcase visitors is INSIDE
+    // fetchData (after the token-vs-row match). That was an unreachable
+    // path — the email gate stayed visible forever for showcase links.
+    if (isAuthenticated || showcaseToken) {
       fetchData();
     }
-  }, [campaignId, isAuthenticated]);
+  }, [campaignId, isAuthenticated, showcaseToken]);
 
   // Check if user is already authenticated via cache
   const checkCachedAuth = () => {
