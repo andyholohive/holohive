@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
+import { extractAddressCandidate, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
 
 export const dynamic = 'force-dynamic';
 
@@ -408,6 +409,17 @@ async function handleCommand(chatId: string, command: string, args: string[], me
   // bot today). See handleSubmitCommand for the flow + edge cases.
   if (cmd === 'submit') {
     await handleSubmitCommand(chatId, args, message);
+    return;
+  }
+
+  // [2026-06-16] /wallet <addr> — KOL payout-wallet capture per the
+  // HHP /wallet Command spec (Jdot v3). Fires in the KOL's group chat;
+  // resolves chat → KOL via telegram_chats.master_kol_id and writes
+  // master_kols.wallet. EIP-55 normalized. Per spec § 2.2 NOT gated
+  // against the team — whoever sends a valid address in a KOL's chat
+  // sets that KOL's wallet (settlement is trust-based).
+  if (cmd === 'wallet') {
+    await handleWalletCommand(chatId, args, message);
     return;
   }
 
@@ -1339,6 +1351,15 @@ async function handleCallbackQuery(cq: any) {
   // same regardless of which button was pressed.
   if (data.startsWith('bulk:')) {
     await handleBulkCallback(cq);
+    return;
+  }
+
+  // `wal:confirm:0xABC...` / `wal:cancel` — /wallet update prompt
+  // buttons (HHP /wallet Command spec § 7.2). Confirm carries the
+  // proposed new address inline so the callback is stateless. Cancel
+  // keeps the existing wallet.
+  if (data.startsWith('wal:')) {
+    await handleWalletCallback(cq);
     return;
   }
 
@@ -3465,6 +3486,193 @@ async function upsertThreadName(
       );
   } catch (err) {
     console.error('[Telegram Webhook] upsertThreadName failed:', err);
+  }
+}
+
+/* ─────────────────── /wallet — KOL Payout Wallet ───────────────── */
+/**
+ * `/wallet <0xAddress>` — KOL payout-wallet capture per HHP /wallet
+ * Command spec v3 (Jdot, 2026-06-15). Fires in a per-KOL group chat.
+ *
+ * Flow:
+ *   1. Resolve sender chat → KOL via telegram_chats.master_kol_id
+ *      (same JOIN pattern as /submit). If no link → § 7.4 soft error.
+ *   2. Extract first 0x-prefixed token from the message body. Tolerates
+ *      "/wallet 0xabc...123 thanks". If none / invalid → § 7.3 reject.
+ *   3. Normalize to EIP-55 checksum form.
+ *   4. Compare against master_kols.wallet:
+ *      - empty           → write directly, § 7.1 success.
+ *      - identical (case-insensitive) → § 7.2 "already saved" skip.
+ *      - different       → § 7.2 Confirm/Cancel prompt with the proposed
+ *                          address packed into the callback_data so the
+ *                          confirm step is stateless.
+ *
+ * Per spec § 2.2 the handler is NOT gated against team members — any
+ * valid address sent in a KOL's chat sets that KOL's wallet. Settlement
+ * remains trust-based.
+ */
+async function handleWalletCommand(chatId: string, args: string[], message: any) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
+
+  // Match logic § 6 — resolve chat → KOL via existing telegram_chats link
+  const { data: chatRow } = await (supabaseAdmin as any)
+    .from('telegram_chats')
+    .select('master_kol_id')
+    .eq('chat_id', chatId)
+    .maybeSingle();
+
+  const masterKolId: string | null = (chatRow as any)?.master_kol_id ?? null;
+  if (!masterKolId) {
+    // § 7.4 — chat not linked
+    await sendTelegramMessage(
+      chatId,
+      "This chat isn't linked to a KOL record yet, so the wallet wasn't saved. Flagging the team.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Validation § 5 — extract first candidate token + check shape
+  const body = args.join(' ');
+  const candidate = extractAddressCandidate(body);
+  if (!candidate || !isValidEvmAddress(candidate)) {
+    // § 7.3 — invalid address
+    await sendTelegramMessage(
+      chatId,
+      "That doesn't look like a valid wallet address.\n" +
+        'Send <code>/wallet</code> followed by your Arbitrum address ' +
+        '(starts with <code>0x</code>, 42 characters).',
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+  const newAddr = toChecksumAddress(candidate);
+
+  // Read existing wallet
+  const { data: kolRow } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('id, wallet')
+    .eq('id', masterKolId)
+    .maybeSingle();
+  const currentRaw: string | null = (kolRow as any)?.wallet ?? null;
+  const current = currentRaw && isValidEvmAddress(currentRaw)
+    ? toChecksumAddress(currentRaw)
+    : currentRaw;
+
+  // § 7.2 identical-skip
+  if (current && current.toLowerCase() === newAddr.toLowerCase()) {
+    await sendTelegramMessage(
+      chatId,
+      "That's already your saved payout wallet, nothing changed.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // § 7.1 first save
+  if (!current) {
+    await (supabaseAdmin as any)
+      .from('master_kols')
+      .update({ wallet: newAddr })
+      .eq('id', masterKolId);
+    await sendTelegramMessage(
+      chatId,
+      `<code>${escapeHtml(newAddr)}</code> has been saved as your payout wallet.`,
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // § 7.2 update — Confirm/Cancel prompt, new address carried in callback_data
+  // so the callback is stateless; spec's "superseded" rule is naturally
+  // satisfied because each new /wallet renders fresh buttons; the user only
+  // sees + taps the most recent prompt.
+  const text =
+    'Replace your saved payout wallet?\n' +
+    `Current: <code>${escapeHtml(current)}</code>\n` +
+    `New:&nbsp;&nbsp;&nbsp;&nbsp; <code>${escapeHtml(newAddr)}</code>`;
+  const buttons = [[
+    { text: '✅ Confirm', callback_data: `wal:confirm:${newAddr}` },
+    { text: '↩ Cancel', callback_data: `wal:cancel` },
+  ]];
+  await sendTelegramMessageWithButtons(chatId, text, buttons, threadId);
+}
+
+/**
+ * Handle `wal:confirm:<addr>` / `wal:cancel` button clicks from the
+ * § 7.2 update prompt. Stateless — Confirm carries the proposed address
+ * in the callback_data, so a stale callback just writes whatever its
+ * encoded address was. Cancel keeps the existing wallet.
+ */
+async function handleWalletCallback(cq: any) {
+  const data: string = cq.data || '';
+  const callbackId: string = cq.id;
+  const chatId = String(cq.message?.chat?.id || '');
+  const messageId: number | undefined = cq.message?.message_id;
+
+  // Resolve chat → KOL
+  const { data: chatRow } = await (supabaseAdmin as any)
+    .from('telegram_chats')
+    .select('master_kol_id')
+    .eq('chat_id', chatId)
+    .maybeSingle();
+  const masterKolId: string | null = (chatRow as any)?.master_kol_id ?? null;
+  if (!masterKolId) {
+    await answerCallbackQuery(callbackId, 'KOL link missing.');
+    return;
+  }
+
+  const { data: kolRow } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('wallet')
+    .eq('id', masterKolId)
+    .maybeSingle();
+  const currentRaw: string | null = (kolRow as any)?.wallet ?? null;
+  const current = currentRaw && isValidEvmAddress(currentRaw)
+    ? toChecksumAddress(currentRaw)
+    : currentRaw;
+
+  if (data === 'wal:cancel') {
+    await answerCallbackQuery(callbackId);
+    if (messageId) {
+      await editMessageText(
+        chatId,
+        messageId,
+        `No change. Your payout wallet is still <code>${escapeHtml(current || '—')}</code>.`,
+      );
+    } else {
+      await sendTelegramMessage(
+        chatId,
+        `No change. Your payout wallet is still <code>${escapeHtml(current || '—')}</code>.`,
+        'HTML',
+      );
+    }
+    return;
+  }
+
+  // wal:confirm:<addr>
+  const newAddrRaw = data.slice('wal:confirm:'.length);
+  if (!isValidEvmAddress(newAddrRaw)) {
+    await answerCallbackQuery(callbackId, 'Invalid address.');
+    return;
+  }
+  const newAddr = toChecksumAddress(newAddrRaw);
+
+  await (supabaseAdmin as any)
+    .from('master_kols')
+    .update({ wallet: newAddr })
+    .eq('id', masterKolId);
+
+  await answerCallbackQuery(callbackId);
+  const successText = `<code>${escapeHtml(newAddr)}</code> has been saved as your payout wallet.`;
+  if (messageId) {
+    await editMessageText(chatId, messageId, successText);
+  } else {
+    await sendTelegramMessage(chatId, successText, 'HTML');
   }
 }
 

@@ -64,6 +64,7 @@
     "eslint-config-next": "13.5.1",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.2.4",
+    "js-sha3": "^0.9.3",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.446.0",
     "mammoth": "^1.11.0",
