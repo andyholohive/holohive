@@ -97,7 +97,7 @@ export default function KOLsPage() {
   // users can still toggle them on without code changes.
   const defaultVisibleColumns = {
     name: true,
-    link: false,
+    link: true,
     platform: true,
     followers: true,
     region: true,
@@ -105,16 +105,20 @@ export default function KOLsPage() {
     projects: true,
     creator_type: true,
     niche: true,
+    // content_type + pricing (Pricing Tier) intentionally hidden — the
+    // toggle dropdown no longer exposes them either. Cells still render
+    // if a saved URL pre-dating this change has them on, but power
+    // users can't switch them on going forward.
     content_type: false,
-    deliverables: false,
+    deliverables: true,
     pricing: false,
-    latest_cost: false,
+    latest_cost: true,
     community: true,
     group_chat: true,
     in_house: true,
-    description: false,
-    wallet: false,
-    telegram: false,
+    description: true,
+    wallet: true,
+    telegram: true,
     // HHP Campaign Dashboard Spec § 4.3 (Tier 1) — per-KOL activation
     // participation aggregate column. On by default since activation
     // data is one of the few signals visible without a profile click.
@@ -2495,9 +2499,7 @@ export default function KOLsPage() {
                     projects: 'Projects',
                     creator_type: 'Creator Type',
                     niche: 'Niche',
-                    content_type: 'Content Type',
                     deliverables: 'Deliverables',
-                    pricing: 'Pricing Tier',
                     latest_cost: 'Pricing',
                     community: 'Community Founder',
                     group_chat: 'Group Chat',
