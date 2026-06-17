@@ -364,11 +364,13 @@ export default function PublicReportPage({ params }: { params: { id: string } })
         setCampaignKOLs(formattedKOLs as CampaignKOL[]);
       }
 
-      // Fetch contents
+      // Fetch contents (exclude pending_verification per TG Bot Phase 2 — public
+      // reports shouldn't surface bot-approved content until a human verifies).
       const { data: contentsData } = await supabasePublic
         .from('contents')
         .select('id, campaign_kols_id, activation_date, impressions, likes, retweets, comments, bookmarks')
-        .eq('campaign_id', campaignId);
+        .eq('campaign_id', campaignId)
+        .neq('status', 'pending_verification');
 
       if (contentsData) {
         setContents(contentsData as ContentItem[]);

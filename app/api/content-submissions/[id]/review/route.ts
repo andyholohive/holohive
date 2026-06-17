@@ -133,6 +133,10 @@ export async function POST(
       // content_submissions uses friendlier values ('X (Twitter)', 'tweet')
       // than the contents CHECK constraints accept ('X', 'Post'). Map
       // before inserting so the constraint passes.
+      // Spec Phase 2: bot-approved content lands at 'pending_verification', not 'posted'.
+      // Team flips to 'posted' (or deletes) via the Verify/Reject buttons on
+      // /campaigns content tab. This protects engagement totals + Top Post + budget
+      // from counting a row before a human eyeballs it.
       const { data: contentRow, error: contentErr } = await (adminClient as any)
         .from('contents')
         .insert({
@@ -141,7 +145,7 @@ export async function POST(
           content_link: sub.link,
           platform: mapSubmissionPlatformToContents(sub.platform),
           type: mapSubmissionTypeToContents(sub.content_type),
-          status: 'posted',
+          status: 'pending_verification',
           activation_date: nowIso.slice(0, 10),
         })
         .select('id')

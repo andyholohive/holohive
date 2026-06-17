@@ -988,6 +988,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       // client-side so the public page never sees them even though
       // the joined row is in the payload.
       try {
+        // Per TG Bot Content Submission Phase 2: hide pending_verification rows
+        // from the public showcase. Bot-approved content is waiting for a team
+        // member to flip it to 'posted' via /campaigns content tab before it
+        // surfaces to the client.
         const { data: contentData, error: contentError } = await supabasePublic
           .from('contents')
           .select(`
@@ -999,6 +1003,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             )
           `)
           .eq('campaign_id', actualCampaignId)
+          .neq('status', 'pending_verification')
           .order('created_at', { ascending: false });
 
         if (contentError) {

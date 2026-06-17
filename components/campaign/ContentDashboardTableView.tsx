@@ -27,6 +27,7 @@ import {
   FileText,
   Search,
   Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +83,11 @@ type ContentSortField =
 const contentStatusOptions = [
   { value: 'pending', label: 'Pending' },
   { value: 'scheduled', label: 'Scheduled' },
+  // [TG Bot Phase 2] Bot-approved, awaiting human verification. Inline
+  // Verify/Reject buttons render in the Actions column when a row is in
+  // this state. Hidden from public portal + showcase + reports + budget
+  // CPM/CPE; counts toward nothing until verified.
+  { value: 'pending_verification', label: 'Awaiting Verify' },
   { value: 'posted', label: 'Posted' },
 ];
 
@@ -441,6 +447,24 @@ export function ContentDashboardTableView() {
       toast({ title: 'Content deleted' });
     } catch (err) {
       console.error('Error deleting content:', err);
+    }
+  };
+
+  /** [TG Bot Phase 2] Flip a pending_verification row to 'posted'. Bot-approved
+   *  content only counts toward CPM/CPE/Top Post/portal feeds once a team
+   *  member has eyeballed it and clicked Verify. */
+  const handleVerifyContent = async (contentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('contents')
+        .update({ status: 'posted' } as any)
+        .eq('id', contentId);
+      if (error) throw error;
+      setContents((prev: any[]) => prev.map(c => c.id === contentId ? { ...c, status: 'posted' } : c));
+      toast({ title: 'Verified', description: 'Content now counts toward metrics.' });
+    } catch (err) {
+      console.error('Error verifying content:', err);
+      toast({ title: 'Verify failed', description: err instanceof Error ? err.message : 'Could not flip to posted', variant: 'destructive' });
     }
   };
 
@@ -1539,8 +1563,15 @@ export function ContentDashboardTableView() {
                         ) : (
                           filteredContents.map((content: any, index: number) => {
                           const kol = campaignKOLs.find((k: any) => k.id === content.campaign_kols_id);
+                          // [TG Bot Phase 2] Amber tint highlights rows that bot-approved
+                          // but a team member hasn't verified yet. Inline Verify button
+                          // sits in the Actions column.
+                          const isPendingVerify = content.status === 'pending_verification';
+                          const rowBg = isPendingVerify
+                            ? 'bg-amber-50/60'
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-cream-50');
                           return (
-                            <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                            <TableRow key={content.id} className={`${rowBg} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 px-4 py-2 overflow-hidden text-center text-ink-warm-700 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px' }}>
                                 <div className="flex items-center justify-center w-full h-full">
                                   {selectedContents.includes(content.id) ? (
@@ -1669,9 +1700,23 @@ export function ContentDashboardTableView() {
                                 {renderEditableContentCell(content.notes, 'notes', content)}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
-                                <Button size="sm" variant="outline" onClick={() => handleDeleteContent(content.id)}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  {content.status === 'pending_verification' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                      onClick={() => handleVerifyContent(content.id)}
+                                      title="Verify — flip to Posted and count toward metrics"
+                                    >
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                      Verify
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="outline" onClick={() => handleDeleteContent(content.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );

@@ -94,6 +94,11 @@ export function BudgetDashboardV2() {
       const contents = row?.contents ?? [];
       for (const c of contents) {
         if (c?.status === 'deleted') continue;
+        // Per TG Bot Content Submission Phase 2: pending_verification rows
+        // are bot-approved but not yet team-verified. Excluding them from
+        // CPM/CPE keeps cost-efficiency numbers from being skewed by
+        // unverified posts.
+        if (c?.status === 'pending_verification') continue;
         if (c?.multipost_group_id) multipostGroups.add(c.multipost_group_id);
         else standaloneCount.n++;
         totalViews += Number(c?.impressions ?? c?.views ?? 0);
