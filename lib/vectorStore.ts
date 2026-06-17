@@ -213,9 +213,9 @@ export class VectorStore {
       this.formatFollowers(kol.followers),
 
       // Creator categorization
-      kol.creator_type?.length ? `Creator Type: ${kol.creator_type.join(', ')}. This creator is a ${kol.creator_type.join(', ')}` : '',
+      kol.creator_types?.length ? `Creator Type: ${kol.creator_types.join(', ')}. This creator is a ${kol.creator_types.join(', ')}` : '',
       kol.content_type?.length ? `Content Focus: ${kol.content_type.join(', ')}. Creates content about ${kol.content_type.join(', ')}` : '',
-      kol.niche?.length ? `Niche: ${kol.niche.join(', ')}. Specializes in ${kol.niche.join(', ')}` : '',
+      kol.niche_tags?.length ? `Niche: ${kol.niche_tags.join(', ')}. Specializes in ${kol.niche_tags.join(', ')}` : '',
 
       // Services and pricing
       kol.deliverables?.length ? `Services: ${kol.deliverables.join(', ')}. Can deliver ${kol.deliverables.join(', ')}` : '',
@@ -225,14 +225,14 @@ export class VectorStore {
       // the composite formula.
 
       // Engagement features
-      kol.community ? 'Has active community, community engagement, audience interaction' : '',
+      kol.community_founder ? 'Has active community, community engagement, audience interaction' : '',
       kol.group_chat ? 'Has group chat, direct communication channel, telegram group' : '',
       kol.in_house ? `In-house status: ${kol.in_house}` : '',
 
       // Quality indicators — `rating` text removed (migration 071).
 
-      // Free-form description (most important for context)
-      kol.description ? `Description: ${kol.description}` : '',
+      // Free-form notes (most important for context)
+      kol.notes ? `Notes: ${kol.notes}` : '',
     ];
 
     return parts.filter(Boolean).join('. ');
@@ -248,14 +248,14 @@ export class VectorStore {
       region: kol.region,
       platform: kol.platform,
       followers: kol.followers,
-      creator_type: kol.creator_type,
+      creator_types: kol.creator_types,
       content_type: kol.content_type,
-      niche: kol.niche,
+      niche_tags: kol.niche_tags,
       deliverables: kol.deliverables,
       pricing: kol.pricing,
       // tier and rating removed from metadata — columns dropped in
       // migration 071. Search-result UI doesn't render these anymore.
-      community: kol.community,
+      community_founder: kol.community_founder,
       group_chat: kol.group_chat,
       in_house: kol.in_house,
     };

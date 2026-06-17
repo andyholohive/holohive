@@ -13,20 +13,28 @@ export interface MasterKOL {
   platform: string[] | null;
   followers: number | null;
   region: string | null;
-  community: boolean | null;
+  /** Spec-canonical name (HHP KOL DB Overhaul May '26). */
+  community_founder: boolean | null;
+  /** @deprecated Use `community_founder`. Kept while sync trigger mirrors both ways. */
+  community?: boolean | null;
   community_link: string | null;
   deliverables: string[] | null;
-  creator_type: string[] | null;
+  /** Spec-canonical name (HHP Creator Taxonomy May '26). Max 2. */
+  creator_types: string[] | null;
+  /** @deprecated Use `creator_types`. Kept while sync trigger mirrors both ways. */
+  creator_type?: string[] | null;
   content_type: string[] | null;
-  niche: string[] | null;
+  /** Spec-canonical name (HHP Creator Taxonomy May '26). 13 tags. */
+  niche_tags: string[] | null;
+  /** @deprecated Use `niche_tags`. Kept while sync trigger mirrors both ways. */
+  niche?: string[] | null;
   pricing: string | null;
   group_chat: boolean | null;
   in_house: string | null;
-  description: string | null;
-  /** Renamed alias per KOL DB Overhaul May '26. DB-level trigger keeps notes + description in sync; new code can read either. */
-  notes?: string | null;
-  /** Renamed alias per KOL DB Overhaul May '26. Same DB sync as notes. */
-  community_founder?: boolean | null;
+  /** Spec-canonical name (HHP KOL DB Overhaul May '26). */
+  notes: string | null;
+  /** @deprecated Use `notes`. Kept while sync trigger mirrors both ways. */
+  description?: string | null;
   wallet: string | null;
   projects_worked_together: string[] | null;
   created_at: string | null;
@@ -39,15 +47,23 @@ export interface CreateKOLData {
   platform?: string[];
   followers?: number;
   region?: MasterKOL['region'];
+  community_founder?: boolean;
+  /** @deprecated alias of community_founder */
   community?: boolean;
   community_link?: string | null;
   deliverables?: string[];
+  creator_types?: MasterKOL['creator_types'];
+  /** @deprecated alias of creator_types */
   creator_type?: MasterKOL['creator_type'];
   content_type?: MasterKOL['content_type'];
+  niche_tags?: string[];
+  /** @deprecated alias of niche_tags */
   niche?: string[];
   pricing?: MasterKOL['pricing'];
   group_chat?: boolean;
   in_house?: string | null;
+  notes?: string;
+  /** @deprecated alias of notes */
   description?: string;
   wallet?: string;
   projects_worked_together?: string[];
@@ -60,15 +76,23 @@ export interface UpdateKOLData {
   platform?: string[] | null;
   followers?: number | null;
   region?: string | null;
+  community_founder?: boolean | null;
+  /** @deprecated alias of community_founder */
   community?: boolean | null;
   community_link?: string | null;
   deliverables?: string[] | null;
+  creator_types?: string[] | null;
+  /** @deprecated alias of creator_types */
   creator_type?: string[] | null;
   content_type?: string[] | null;
+  niche_tags?: string[] | null;
+  /** @deprecated alias of niche_tags */
   niche?: string[] | null;
   pricing?: string | null;
   group_chat?: boolean | null;
   in_house?: string | null;
+  notes?: string | null;
+  /** @deprecated alias of notes */
   description?: string | null;
   wallet?: string | null;
   projects_worked_together?: string[] | null;
@@ -111,14 +135,14 @@ export class KOLService {
           platform: kolData.platform || [],
           followers: kolData.followers || null,
           region: kolData.region || null,
-          community: kolData.community || false,
+          community_founder: kolData.community_founder || false,
           community_link: kolData.community_link || null,
           deliverables: kolData.deliverables || [],
-          niche: kolData.niche || [],
+          niche_tags: kolData.niche_tags || [],
           pricing: kolData.pricing || null,
           group_chat: kolData.group_chat || false,
-          description: kolData.description || null,
-          creator_type: kolData.creator_type || null,
+          notes: kolData.notes || null,
+          creator_types: kolData.creator_types || null,
           content_type: kolData.content_type || null,
           in_house: kolData.in_house || null,
           projects_worked_together: kolData.projects_worked_together || []
@@ -168,10 +192,10 @@ export class KOLService {
       // Only reindex if meaningful fields changed
       const shouldReindex =
         updateData.name !== undefined ||
-        updateData.description !== undefined ||
+        updateData.notes !== undefined ||
         updateData.region !== undefined ||
         updateData.platform !== undefined ||
-        updateData.creator_type !== undefined ||
+        updateData.creator_types !== undefined ||
         updateData.content_type !== undefined ||
         updateData.deliverables !== undefined ||
         updateData.followers !== undefined ||

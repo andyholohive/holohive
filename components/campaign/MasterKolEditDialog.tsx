@@ -156,14 +156,14 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
         platform: kol.platform || [],
         followers: kol.followers,
         region: kol.region,
-        community: kol.community ?? false,
+        community_founder: kol.community_founder ?? false,
         deliverables: kol.deliverables || [],
-        creator_type: kol.creator_type || [],
+        creator_types: kol.creator_types || [],
         content_type: kol.content_type || [],
-        niche: kol.niche || [],
+        niche_tags: kol.niche_tags || [],
         pricing: kol.pricing,
         in_house: kol.in_house,
-        description: kol.description,
+        notes: kol.notes,
         wallet: kol.wallet,
       });
     } else {
@@ -292,21 +292,21 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label>Niches</Label>
+                <Label>Niche Tags</Label>
                 <DialogMultiSelect
-                  selected={masterKolForm.niche || []}
+                  selected={masterKolForm.niche_tags || []}
                   options={fieldOptions?.niches || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, niche: next }))}
-                  placeholder="Select niches..."
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, niche_tags: next }))}
+                  placeholder="Select niche tags..."
                 />
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label>Creator Type <span className="text-xs font-normal text-ink-warm-400">· max 2</span></Label>
+                <Label>Creator Types <span className="text-xs font-normal text-ink-warm-400">· max 2</span></Label>
                 <DialogMultiSelect
-                  selected={masterKolForm.creator_type || []}
+                  selected={masterKolForm.creator_types || []}
                   options={fieldOptions?.creatorTypes || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, creator_type: next }))}
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, creator_types: next }))}
                   placeholder="Select creator types..."
                   // HHP Creator Taxonomy Spec — max 2.
                   maxSelected={2}
@@ -347,10 +347,10 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
 
               <div className="flex items-center gap-3 col-span-2 py-1">
                 <Switch
-                  checked={!!masterKolForm.community}
-                  onCheckedChange={(v) => setMasterKolForm(f => ({ ...f, community: v }))}
+                  checked={!!masterKolForm.community_founder}
+                  onCheckedChange={(v) => setMasterKolForm(f => ({ ...f, community_founder: v }))}
                 />
-                <Label className="cursor-pointer">Community KOL</Label>
+                <Label className="cursor-pointer">Community Founder</Label>
               </div>
 
               <div className="space-y-1.5 col-span-2">
@@ -364,11 +364,11 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-description">Description</Label>
+                <Label htmlFor="mk-notes">Notes</Label>
                 <Textarea
-                  id="mk-description"
-                  value={masterKolForm.description || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, description: e.target.value || null }))}
+                  id="mk-notes"
+                  value={masterKolForm.notes || ''}
+                  onChange={(e) => setMasterKolForm(f => ({ ...f, notes: e.target.value || null }))}
                   rows={3}
                   className="focus-brand"
                 />

@@ -259,7 +259,7 @@ export async function searchKols(
   const hasArrayFilter = !!(args.creator_type || args.niche);
   let q = (supabase as any)
     .from('master_kols')
-    .select('id, name, region, followers, niche, creator_type, platform, link, in_house, archived_at')
+    .select('id, name, region, followers, niche_tags, creator_types, platform, link, in_house, archived_at')
     .is('archived_at', null)
     .ilike('name', `%${args.query}%`)
     .order('followers', { ascending: false, nullsFirst: false })
@@ -278,13 +278,13 @@ export async function searchKols(
   // partial-match contract. Filter in memory after the fetch.
   if (args.creator_type) {
     const t = args.creator_type.toLowerCase();
-    rows = rows.filter(r => Array.isArray(r.creator_type)
-      && r.creator_type.some((ct: string) => ct.toLowerCase().includes(t)));
+    rows = rows.filter(r => Array.isArray(r.creator_types)
+      && r.creator_types.some((ct: string) => ct.toLowerCase().includes(t)));
   }
   if (args.niche) {
     const t = args.niche.toLowerCase();
-    rows = rows.filter(r => Array.isArray(r.niche)
-      && r.niche.some((n: string) => n.toLowerCase().includes(t)));
+    rows = rows.filter(r => Array.isArray(r.niche_tags)
+      && r.niche_tags.some((n: string) => n.toLowerCase().includes(t)));
   }
 
   rows = rows.slice(0, args.limit);
@@ -307,11 +307,11 @@ export async function searchKols(
   };
 
   const lines = rows.map(k => {
-    const niches = Array.isArray(k.niche) && k.niche.length ? ` · ${k.niche.slice(0, 3).join('/')}` : '';
-    // Surface creator_type alongside niches so the caller sees both
+    const niches = Array.isArray(k.niche_tags) && k.niche_tags.length ? ` · ${k.niche_tags.slice(0, 3).join('/')}` : '';
+    // Surface creator_types alongside niches so the caller sees both
     // taxonomy fields without a follow-up get_kol_detail call.
-    const cts = Array.isArray(k.creator_type) && k.creator_type.length
-      ? ` · type:${k.creator_type.slice(0, 2).join('+')}`
+    const cts = Array.isArray(k.creator_types) && k.creator_types.length
+      ? ` · type:${k.creator_types.slice(0, 2).join('+')}`
       : '';
     const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
     // Emit the UUID so the caller can pivot to get_kol_detail without
@@ -1339,7 +1339,7 @@ export async function listTopKols(
   let q = (supabase as any)
     .from('master_kols')
     // tier and rating dropped from select (migration 071).
-    .select('id, name, region, followers, niche, platform, content_type, in_house, link, pricing')
+    .select('id, name, region, followers, niche_tags, platform, content_type, in_house, link, pricing')
     .is('archived_at', null)
     .order('followers', { ascending: false, nullsFirst: false })
     .limit(args.limit * 2); // over-fetch to allow client-side niche/platform filtering on array columns
@@ -1353,12 +1353,12 @@ export async function listTopKols(
   if (error) return `Error: ${error.message}`;
   let rows = (data || []) as any[];
 
-  // niche and platform are TEXT[] columns — filter client-side because
+  // niche_tags and platform are TEXT[] columns — filter client-side because
   // PostgREST array containment with ILIKE inside is awkward to express
   // safely. The over-fetch above absorbs the filter loss.
   if (args.niche) {
     const t = args.niche.toLowerCase();
-    rows = rows.filter(r => Array.isArray(r.niche) && r.niche.some((n: string) => n.toLowerCase().includes(t)));
+    rows = rows.filter(r => Array.isArray(r.niche_tags) && r.niche_tags.some((n: string) => n.toLowerCase().includes(t)));
   }
   if (args.platform) {
     const t = args.platform.toLowerCase();
@@ -1385,7 +1385,7 @@ export async function listTopKols(
   };
 
   const lines = rows.map(k => {
-    const niches = Array.isArray(k.niche) && k.niche.length ? ` · ${k.niche.slice(0, 3).join('/')}` : '';
+    const niches = Array.isArray(k.niche_tags) && k.niche_tags.length ? ` · ${k.niche_tags.slice(0, 3).join('/')}` : '';
     const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
     const inHouse = k.in_house ? ` · in-house: ${k.in_house}` : '';
     // tier/rating display removed (migration 071). Score will replace it
@@ -1429,19 +1429,19 @@ export async function getKolDetail(
   // the composite scoring formula ship.
   out.push(`**Region:** ${k.region || '—'}  ·  **Followers:** ${fmtFollowers(k.followers)}`);
   if (Array.isArray(k.platform) && k.platform.length) out.push(`**Platforms:** ${k.platform.join(', ')}`);
-  if (Array.isArray(k.niche) && k.niche.length) out.push(`**Niche:** ${k.niche.join(', ')}`);
+  if (Array.isArray(k.niche_tags) && k.niche_tags.length) out.push(`**Niche:** ${k.niche_tags.join(', ')}`);
   if (Array.isArray(k.content_type) && k.content_type.length) out.push(`**Content type:** ${k.content_type.join(', ')}`);
-  if (Array.isArray(k.creator_type) && k.creator_type.length) out.push(`**Creator type:** ${k.creator_type.join(', ')}`);
+  if (Array.isArray(k.creator_types) && k.creator_types.length) out.push(`**Creator type:** ${k.creator_types.join(', ')}`);
   if (Array.isArray(k.deliverables) && k.deliverables.length) out.push(`**Deliverables:** ${k.deliverables.join(', ')}`);
   if (k.pricing) out.push(`**Pricing:** ${k.pricing}`);
   if (k.in_house) out.push(`**In-house:** ${k.in_house}`);
   if (k.link) out.push(`**Link:** ${k.link}`);
   if (k.wallet) out.push(`**Wallet:** ${k.wallet}`);
-  if (k.community != null) out.push(`**Has community:** ${k.community ? 'yes' : 'no'}`);
+  if (k.community_founder != null) out.push(`**Has community:** ${k.community_founder ? 'yes' : 'no'}`);
   if (k.group_chat != null) out.push(`**Group chat:** ${k.group_chat ? 'yes' : 'no'}`);
-  if (k.description) {
+  if (k.notes) {
     out.push('');
-    out.push(`**Description:**  ${k.description}`);
+    out.push(`**Notes:**  ${k.notes}`);
   }
   return out.join('\n');
 }

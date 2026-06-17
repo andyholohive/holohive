@@ -25,15 +25,27 @@ export interface CampaignKOLWithDetails extends CampaignKOL {
     platform?: string[] | null;
     followers?: number | null;
     region?: string | null;
+    /** Spec-canonical (HHP KOL DB Overhaul). */
+    community_founder?: boolean | null;
+    /** @deprecated Use community_founder. */
     community?: boolean | null;
     content_type?: string[] | null;
+    /** Spec-canonical (HHP Creator Taxonomy). */
+    creator_types?: string[] | null;
+    /** @deprecated Use creator_types. */
     creator_type?: string[] | null;
+    /** Spec-canonical (HHP Creator Taxonomy). */
+    niche_tags?: string[] | null;
+    /** @deprecated Use niche_tags. */
     niche?: string[] | null;
     pricing?: string | null;
     standard_rate?: number | null;
     tier?: string | null;
     rating?: number | null;
     group_chat?: boolean | null;
+    /** Spec-canonical (HHP KOL DB Overhaul). */
+    notes?: string | null;
+    /** @deprecated Use notes. */
     description?: string | null;
     wallet?: string | null;
   };

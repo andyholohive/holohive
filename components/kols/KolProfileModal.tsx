@@ -209,15 +209,15 @@ function OverviewTab({
   onKolChanged?: (updated: MasterKOL) => void;
   score?: KolScoreResult | null;
 }) {
-  const [notes, setNotes] = useState(kol.description || "");
+  const [notes, setNotes] = useState(kol.notes || "");
   const [savingNotes, setSavingNotes] = useState(false);
   const { toast } = useToast();
 
   const saveNotes = async () => {
-    if (notes === (kol.description || "")) return;
+    if (notes === (kol.notes || "")) return;
     setSavingNotes(true);
     try {
-      const updated = await KOLService.updateKOL({ id: kol.id, description: notes });
+      const updated = await KOLService.updateKOL({ id: kol.id, notes });
       onKolChanged?.(updated);
       toast({ title: "Notes saved" });
     } catch (err) {
@@ -241,7 +241,7 @@ function OverviewTab({
         <Field
           label="Community Founder"
           value={
-            kol.community
+            kol.community_founder
               ? kol.community_link
                 ? <a href={kol.community_link} target="_blank" rel="noreferrer" className="text-brand hover:underline">Yes (link)</a>
                 : "Yes"

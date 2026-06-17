@@ -3899,10 +3899,12 @@ export type Database = {
         Row: {
           archived_at: string | null
           community: boolean | null
+          community_founder: boolean | null
           community_link: string | null
           content_type: string[] | null
           created_at: string | null
           creator_type: string[] | null
+          creator_types: string[] | null
           deliverables: string[] | null
           description: string | null
           followers: number | null
@@ -3912,21 +3914,26 @@ export type Database = {
           link: string | null
           name: string
           niche: string[] | null
+          niche_tags: string[] | null
+          notes: string | null
           platform: string[] | null
           pricing: string | null
           projects_worked_together: string[] | null
           region: string | null
           standard_rate: number | null
+          telegram_id: string | null
           updated_at: string | null
           wallet: string | null
         }
         Insert: {
           archived_at?: string | null
           community?: boolean | null
+          community_founder?: boolean | null
           community_link?: string | null
           content_type?: string[] | null
           created_at?: string | null
           creator_type?: string[] | null
+          creator_types?: string[] | null
           deliverables?: string[] | null
           description?: string | null
           followers?: number | null
@@ -3936,21 +3943,26 @@ export type Database = {
           link?: string | null
           name: string
           niche?: string[] | null
+          niche_tags?: string[] | null
+          notes?: string | null
           platform?: string[] | null
           pricing?: string | null
           projects_worked_together?: string[] | null
           region?: string | null
           standard_rate?: number | null
+          telegram_id?: string | null
           updated_at?: string | null
           wallet?: string | null
         }
         Update: {
           archived_at?: string | null
           community?: boolean | null
+          community_founder?: boolean | null
           community_link?: string | null
           content_type?: string[] | null
           created_at?: string | null
           creator_type?: string[] | null
+          creator_types?: string[] | null
           deliverables?: string[] | null
           description?: string | null
           followers?: number | null
@@ -3960,11 +3972,14 @@ export type Database = {
           link?: string | null
           name?: string
           niche?: string[] | null
+          niche_tags?: string[] | null
+          notes?: string | null
           platform?: string[] | null
           pricing?: string | null
           projects_worked_together?: string[] | null
           region?: string | null
           standard_rate?: number | null
+          telegram_id?: string | null
           updated_at?: string | null
           wallet?: string | null
         }
