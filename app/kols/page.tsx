@@ -73,6 +73,7 @@ export default function KOLsPage() {
     followersOperator: '>' as '>' | '<' | '=',
     region: [] as string[],
     creator_type: [] as string[],
+    niche: [] as string[],
     content_type: [] as string[],
     deliverables: [] as string[],
     pricing: [] as string[],
@@ -103,6 +104,7 @@ export default function KOLsPage() {
     score: true,
     projects: true,
     creator_type: true,
+    niche: true,
     content_type: true,
     deliverables: false,
     pricing: true,
@@ -2407,6 +2409,7 @@ export default function KOLsPage() {
                     followersOperator: '>',
                     region: [],
                     creator_type: [],
+                    niche: [],
                     content_type: [],
                     deliverables: [],
                     pricing: [],
@@ -2491,6 +2494,7 @@ export default function KOLsPage() {
                     score: 'Score',
                     projects: 'Projects',
                     creator_type: 'Creator Type',
+                    niche: 'Niche',
                     content_type: 'Content Type',
                     deliverables: 'Deliverables',
                     pricing: 'Pricing Tier',
@@ -2729,6 +2733,53 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     <FilterCountBadge count={filters.creator_type.length} />
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.niche && (
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Niche</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Niche</div>
+                          {(fieldOptions.niches || []).map((tag) => (
+                            <div
+                              key={tag}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const next = filters.niche.includes(tag)
+                                  ? filters.niche.filter(t => t !== tag)
+                                  : [...filters.niche, tag];
+                                setFilters(prev => ({ ...prev, niche: next }));
+                              }}
+                            >
+                              <Checkbox checked={filters.niche.includes(tag)} />
+                              <span className={`px-2 py-1 rounded-md text-xs font-medium ${getNicheColor(tag)}`}>{tag}</span>
+                            </div>
+                          ))}
+                          {filters.niche.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, niche: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <FilterCountBadge count={filters.niche.length} />
                   </div>
                 </TableHead>
               )}
@@ -3162,6 +3213,11 @@ export default function KOLsPage() {
                   {visibleColumns.creator_type && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                       <div>{renderEditableCell(kol.creator_type, 'creator_type', kol.id, 'multiselect')}</div>
+                  </TableCell>
+                  )}
+                  {visibleColumns.niche && (
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
+                      <div>{renderEditableCell(kol.niche, 'niche', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.content_type && (
@@ -3601,6 +3657,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.followers && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Followers</TableHead>}
             {visibleColumns.region && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Region</TableHead>}
             {visibleColumns.creator_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Creator Type</TableHead>}
+            {visibleColumns.niche && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Niche</TableHead>}
             {visibleColumns.content_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
             {visibleColumns.deliverables && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Deliverables</TableHead>}
             {visibleColumns.pricing && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
@@ -3631,6 +3688,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
               {visibleColumns.followers && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.region && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>}
               {visibleColumns.creator_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.niche && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-14 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /></div></TableCell>}
               {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
               {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
               {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
