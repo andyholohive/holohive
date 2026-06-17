@@ -4927,6 +4927,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          last_fired_at: string | null
           last_run_at: string | null
           last_run_result: Json | null
           name: string
@@ -4943,6 +4944,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          last_fired_at?: string | null
           last_run_at?: string | null
           last_run_result?: Json | null
           name: string
@@ -4959,6 +4961,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          last_fired_at?: string | null
           last_run_at?: string | null
           last_run_result?: Json | null
           name?: string

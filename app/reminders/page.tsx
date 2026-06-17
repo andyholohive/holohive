@@ -78,6 +78,7 @@ interface ReminderRule {
   params: Record<string, any>;
   is_active: boolean;
   last_run_at: string | null;
+  last_fired_at: string | null;
   last_run_result: { items_found?: number; message_sent?: boolean } | null;
   created_at: string;
   updated_at: string;
@@ -768,6 +769,12 @@ export default function RemindersPage() {
                           )})
                         </span>
                       )}
+                    </span>
+                  )}
+                  {rule.last_fired_at && rule.last_fired_at !== rule.last_run_at && (
+                    <span className="flex items-center gap-1" title="Last time the rule actually sent a message (vs just evaluating).">
+                      <CheckCircle className="h-3 w-3 text-emerald-500" />
+                      Last fired: {formatDateTime(rule.last_fired_at)}
                     </span>
                   )}
                   {rule.params.threshold_days && (

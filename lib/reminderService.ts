@@ -264,6 +264,18 @@ export async function runReminders(
           duration_ms: duration,
         });
 
+        // Per REM-FIX.1: stamp last_run_at on empty runs too so monitoring
+        // can tell "ran today, nothing to report" apart from "hasn't run".
+        // last_fired_at NOT touched here — only updates on actual fires.
+        await supabase
+          .from('reminder_rules' as any)
+          .update({
+            last_run_at: new Date().toISOString(),
+            last_run_result: { items_found: 0, message_sent: false },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', rule.id);
+
         continue;
       }
 
@@ -310,14 +322,22 @@ export async function runReminders(
         duration_ms: Date.now() - start,
       });
 
-      // Update rule's last_run
+      // Update rule's last_run + last_fired_at (per REM-FIX.1).
+      // last_run_at fires for both empty and non-empty branches now;
+      // last_fired_at tracks "last actual message sent" — only stamped
+      // here, in the non-empty + delivered branch.
+      const nowIso = new Date().toISOString();
+      const stampPatch: Record<string, any> = {
+        last_run_at: nowIso,
+        last_run_result: { items_found: result.items.length, message_sent: sent },
+        updated_at: nowIso,
+      };
+      if (sent && result.items.length > 0) {
+        stampPatch.last_fired_at = nowIso;
+      }
       await supabase
         .from('reminder_rules' as any)
-        .update({
-          last_run_at: new Date().toISOString(),
-          last_run_result: { items_found: result.items.length, message_sent: sent },
-          updated_at: new Date().toISOString(),
-        })
+        .update(stampPatch)
         .eq('id', rule.id);
     } catch (err: any) {
       const duration = Date.now() - start;
