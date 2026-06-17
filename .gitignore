@@ -35,3 +35,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .specstory/
+
+# Claude session working files — flow-test plans, scratch notes, etc.
+.flow-tests*
+.scratch*
