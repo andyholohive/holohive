@@ -1,4 +1,5 @@
 import { getClaudeClient } from './claude';
+import { senderNameTokens } from './telegramAssigneeResolver';
 
 /**
  * Parse a multi-task, multi-client batch message from /bulk into a
@@ -70,6 +71,15 @@ export interface BulkParseInput {
   teamMembers: Array<{ id: string; name: string; telegram_username: string | null }>;
   /** Preloaded client list — name+id pairs for fuzzy matching. */
   clients: Array<{ id: string; name: string }>;
+  /** Sender of the /bulk command — used to self-resolve assignees when
+   *  the user refers to themselves by name instead of @-handle
+   *  (e.g. "bolt do X" from BoltXBT). See TG-TASK.1. */
+  sender?: {
+    id: string;
+    name: string;
+    telegram_username: string | null;
+    first_name?: string | null;
+  };
 }
 
 const SUBMIT_BULK_TOOL = {
@@ -255,12 +265,29 @@ Rules:
     }
   }
 
+  // TG-TASK.1: self-reference fallback. Precompute the sender's name
+  // tokens once so we can match e.g. "bolt" → sender BoltXBT without
+  // forcing the user to type their own @handle.
+  const senderTokens = input.sender
+    ? senderNameTokens({
+        name: input.sender.name,
+        telegram_username: input.sender.telegram_username,
+        first_name: input.sender.first_name,
+      })
+    : [];
+
   const sections: ParsedBulkSection[] = (raw.sections || []).map(s => ({
     client_name: s.client_name,
     client_id: s.client_id,
     tasks: (s.tasks || []).map(t => {
       const handle = t.primary_assignee_handle?.toLowerCase().replace(/^@/, '') || null;
-      const resolved = handle ? handleToUser.get(handle) : null;
+      let resolved = handle ? handleToUser.get(handle) : null;
+      // Self-reference fallback — if the extracted handle didn't match
+      // anyone in the roster but matches a sender name token, treat it
+      // as self-assignment.
+      if (!resolved && handle && input.sender && senderTokens.includes(handle)) {
+        resolved = { id: input.sender.id, name: input.sender.name };
+      }
       return {
         task_name: t.task_name?.trim() || '(untitled task)',
         due_date: t.due_date || null,

@@ -1213,12 +1213,40 @@ async function handleTaskCommand(chatId: string, message: any) {
   // If the user forgot to tag, the parser will note it and the
   // preview will warn — but we still let them confirm-without-assignee
   // since some tasks are legitimately unassigned (research a thing).
-  const { resolveAssigneeFromMessage } = await import('@/lib/telegramAssigneeResolver');
-  const assignee = await resolveAssigneeFromMessage(
+  const { resolveAssigneeFromMessage, messageReferencesSender } = await import('@/lib/telegramAssigneeResolver');
+  let assignee = await resolveAssigneeFromMessage(
     supabaseAdmin,
     fullText,
     message.entities,
   );
+
+  // ── Self-reference fallback (TG-TASK.1) ─────────────────────────────
+  // If no @-tag matched but the user references themselves by name
+  // (e.g. "bolt do X" from BoltXBT), treat it as self-assignment instead
+  // of forcing them to re-send with their own @handle. Look up the
+  // sender's telegram_username once for the token-match check.
+  if (!assignee) {
+    const { data: senderRow } = await supabaseAdmin
+      .from('users')
+      .select('id, name, telegram_username')
+      .eq('telegram_id', fromUserId)
+      .maybeSingle();
+    if (
+      senderRow &&
+      messageReferencesSender(body, {
+        name: (senderRow as any).name,
+        telegram_username: (senderRow as any).telegram_username,
+        first_name: message.from?.first_name,
+      })
+    ) {
+      assignee = {
+        user_id: (senderRow as any).id,
+        name: (senderRow as any).name,
+        telegram_username: (senderRow as any).telegram_username,
+        matched_via: 'mention',
+      } as any;
+    }
+  }
 
   // ── Acknowledge while Claude works (1-2s typical) ──────────────
   await sendTelegramMessage(chatId, '🤔 Parsing task...', 'HTML', threadId);
@@ -1657,6 +1685,15 @@ async function handleBulkCommand(chatId: string, message: any) {
       .order('name'),
   ]);
 
+  // TG-TASK.1: load sender's telegram_username so the parser can
+  // resolve self-references ("bolt do X" from BoltXBT) without
+  // demanding @-tag.
+  const { data: senderRow } = await supabaseAdmin
+    .from('users')
+    .select('id, name, telegram_username')
+    .eq('telegram_id', fromUserId)
+    .maybeSingle();
+
   let parsed;
   try {
     const { parseBulkTasks } = await import('@/lib/bulkTaskParser');
@@ -1664,6 +1701,14 @@ async function handleBulkCommand(chatId: string, message: any) {
       body,
       teamMembers: (roster || []) as any,
       clients: (clientList || []) as any,
+      sender: senderRow
+        ? {
+            id: (senderRow as any).id,
+            name: (senderRow as any).name,
+            telegram_username: (senderRow as any).telegram_username,
+            first_name: message.from?.first_name,
+          }
+        : undefined,
     });
   } catch (err: any) {
     console.error('[Telegram /bulk] parse failed:', err);

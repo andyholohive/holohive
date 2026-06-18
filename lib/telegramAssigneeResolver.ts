@@ -93,3 +93,61 @@ export async function resolveAssigneeFromMessage(
 
   return null;
 }
+
+// ─── Self-reference fallback ─────────────────────────────────────────────
+//
+// When a user types `/task bolt do X` from their own account (BoltXBT), the
+// resolver above returns null because there's no @-tag entity. Without this
+// fallback the parser would demand `re-send with @BoltXBT explicitly tagged`
+// — annoying for the obvious self-assignment case.
+//
+// Strategy: build a small set of "tokens that mean this sender" from the
+// user's display name, telegram_username, and Telegram-provided first_name,
+// and check whether any token (≥3 chars) appears as a whole-word match in
+// the message body. Whole-word match avoids matching "ash" inside "cash"
+// when the user is named "Ash".
+
+export interface SenderHint {
+  /** users.name — the display name on file. */
+  name: string | null | undefined;
+  /** users.telegram_username — the @handle. */
+  telegram_username: string | null | undefined;
+  /** message.from.first_name from Telegram (often the friendly nickname). */
+  first_name?: string | null | undefined;
+}
+
+export function senderNameTokens(sender: SenderHint): string[] {
+  const candidates: Array<string | null | undefined> = [
+    sender.name,
+    sender.telegram_username,
+    sender.first_name,
+  ];
+  // Also try splitting CamelCase / snake_case / dash-case display names —
+  // "BoltXBT" → ["bolt", "xbt"], "DefiFarmer" → ["defi", "farmer"], etc.
+  // The 2-letter pieces ("XBT") are discarded by the length filter below.
+  if (sender.name) {
+    candidates.push(...sender.name.split(/[\s\-_]|(?=[A-Z])/g));
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of candidates) {
+    if (!c) continue;
+    const lower = c.toLowerCase().trim();
+    if (lower.length < 3) continue;
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    out.push(lower);
+  }
+  return out;
+}
+
+export function messageReferencesSender(messageText: string, sender: SenderHint): boolean {
+  const tokens = senderNameTokens(sender);
+  if (tokens.length === 0) return false;
+  const lower = messageText.toLowerCase();
+  return tokens.some((t) => {
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`\\b${escaped}\\b`, 'i');
+    return re.test(lower);
+  });
+}
