@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -146,6 +146,7 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
 
   const [masterKolForm, setMasterKolForm] = useState<Partial<MasterKOL>>({});
   const [savingMasterKol, setSavingMasterKol] = useState(false);
+  const [refreshingAvatar, setRefreshingAvatar] = useState(false);
 
   // Reset form whenever a new kol is passed in (i.e. dialog opens).
   useEffect(() => {
@@ -165,6 +166,7 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
         in_house: kol.in_house,
         notes: kol.notes,
         wallet: kol.wallet,
+        profile_picture_url: kol.profile_picture_url,
       });
     } else {
       setMasterKolForm({});
@@ -211,6 +213,66 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-1 grid gap-4 py-2">
+            {/* ─── Avatar + Refresh ─────────────────────────────────────
+                Per KOL-AVATAR.4. Tries Telegram first (durable storage URL),
+                falls through to X via unavatar.io. The cache-busted ?t=...
+                suffix on the URL forces the browser to show the new pic
+                immediately after refresh. */}
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-cream-100 border border-cream-200 flex items-center justify-center text-ink-warm-400 text-xs">
+                {masterKolForm.profile_picture_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={masterKolForm.profile_picture_url}
+                    alt={masterKolForm.name || 'KOL avatar'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  'No pic'
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!kol || refreshingAvatar}
+                onClick={async () => {
+                  if (!kol) return;
+                  setRefreshingAvatar(true);
+                  try {
+                    const res = await fetch(`/api/kols/${kol.id}/refresh-avatar`, {
+                      method: 'POST',
+                    });
+                    const json = await res.json();
+                    if (json?.ok && json?.url) {
+                      setMasterKolForm(f => ({ ...f, profile_picture_url: json.url }));
+                      toast({
+                        title: 'Avatar refreshed',
+                        description: `Source: ${json.source}`,
+                      });
+                    } else {
+                      toast({
+                        title: 'Could not refresh',
+                        description: json?.error || 'Unknown error',
+                        variant: 'destructive',
+                      });
+                    }
+                  } catch (err: any) {
+                    toast({
+                      title: 'Refresh failed',
+                      description: err?.message || 'Network error',
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setRefreshingAvatar(false);
+                  }
+                }}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshingAvatar ? 'animate-spin' : ''}`} />
+                {refreshingAvatar ? 'Refreshing...' : 'Refresh avatar'}
+              </Button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-2">
                 <Label htmlFor="mk-name">Name <RequiredAsterisk /></Label>

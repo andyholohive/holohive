@@ -230,6 +230,21 @@ function OverviewTab({
 
   return (
     <div className="space-y-4 text-sm">
+      {/* Profile picture (KOL-AVATAR.4). Falls back to a gray "No pic"
+          square when the KOL doesn't have one synced yet. Refresh happens
+          from the edit dialog, not here. */}
+      {kol.profile_picture_url && (
+        <div className="flex items-center gap-3">
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-cream-100 border border-cream-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={kol.profile_picture_url}
+              alt={kol.name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+      )}
       {/* Compact KOL summary — read-only here; editing happens in the
           /kols list inline. The point of this section is "is this the
           right KOL?", not "edit everything". */}

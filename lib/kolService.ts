@@ -37,6 +37,9 @@ export interface MasterKOL {
   description?: string | null;
   wallet: string | null;
   projects_worked_together: string[] | null;
+  /** Profile picture URL — Telegram avatar in our storage, or unavatar.io for X. Per KOL-AVATAR.* (2026-06-17). */
+  profile_picture_url?: string | null;
+  profile_picture_synced_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
