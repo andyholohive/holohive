@@ -323,9 +323,20 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
             <Card key={campaignKOL.id} className="crd-hover flex flex-col h-full">
               <CardHeader className="pb-2">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-14 h-14 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center mb-3 font-semibold text-base">
-                    {initials}
-                  </div>
+                  {/* Avatar — falls back to initials when profile_picture_url
+                      isn't synced yet. Per Andy 2026-06-18. */}
+                  {(campaignKOL.master_kol as any)?.profile_picture_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={(campaignKOL.master_kol as any).profile_picture_url}
+                      alt={campaignKOL.master_kol.name || 'KOL'}
+                      className="w-14 h-14 rounded-md object-cover border border-brand-light mb-3"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center mb-3 font-semibold text-base">
+                      {initials}
+                    </div>
+                  )}
                   <h3 className="display-serif text-base font-semibold text-ink-warm-900 tracking-tight">
                     {campaignKOL.master_kol.name}
                   </h3>

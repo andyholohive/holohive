@@ -28,7 +28,7 @@
  *     previous button-only iteration.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -227,7 +227,19 @@ export default function LineupsTab({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // ─── Initial load ────────────────────────────────────────────────
+  // ─── Initial load (single fetch — no double-flash) ───────────────
+  //
+  // Originally split across two useEffects (roster+list, then per-week
+  // full lineup), which made the tab appear to load twice when clicked.
+  // Now merged: we load everything serially, then derive the current
+  // week's full lineup in the same effect before setLoading(false).
+  //
+  // Dep is `campaignId` only — campaignStartDate may be a Date object
+  // created on parent renders, which would cause this effect to refire
+  // every time the parent updates anything. We snapshot it via ref.
+
+  const campaignStartDateRef = useRef(campaignStartDate);
+  campaignStartDateRef.current = campaignStartDate;
 
   useEffect(() => {
     (async () => {
@@ -239,8 +251,18 @@ export default function LineupsTab({
         ]);
         setAllLineups(lineups);
         setRoster(rosterRows);
-        const curr = currentWeekNumber(campaignStartDate) || 1;
-        setSelectedWeek(Math.max(1, Math.min(curr, totalWeeks)));
+        const curr = currentWeekNumber(campaignStartDateRef.current) || 1;
+        const week = Math.max(1, Math.min(curr, totalWeeks));
+        setSelectedWeek(week);
+        // Fetch the selected week's full lineup right here so loading
+        // stays true until both phases finish.
+        const existing = lineups.find(l => l.week_number === week);
+        if (existing) {
+          const full = await service.getLineupFull(existing.id);
+          setLineup(full);
+        } else {
+          setLineup(null);
+        }
       } catch (err: any) {
         toast({ title: 'Failed to load lineups', description: err?.message, variant: 'destructive' });
       } finally {
@@ -248,9 +270,9 @@ export default function LineupsTab({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignId, campaignStartDate]);
+  }, [campaignId]);
 
-  // ─── Load / create the selected week's lineup ─────────────────────
+  // ─── Switch weeks (no spinner — fires when user changes the week) ──
 
   useEffect(() => {
     if (loading) return;
@@ -268,7 +290,7 @@ export default function LineupsTab({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWeek, loading, allLineups]);
+  }, [selectedWeek, allLineups]);
 
   // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -307,10 +329,12 @@ export default function LineupsTab({
 
   async function handleAddAngle() {
     if (!lineup) return;
-    const nextLetter = String.fromCharCode(65 + lineup.angles.length);
+    // Per Andy 2026-06-18: number angles instead of lettering them.
+    // Naming is 1-indexed and follows the position the new angle will occupy.
+    const nextNumber = lineup.angles.length + 1;
     setBusy(true);
     try {
-      await service.createAngle(lineup.id, `Angle ${nextLetter}`, lineup.angles.length, currentUserId);
+      await service.createAngle(lineup.id, `Angle ${nextNumber}`, lineup.angles.length, currentUserId);
       await refreshLineup();
     } catch (err: any) {
       toast({ title: 'Failed to add angle', description: err?.message, variant: 'destructive' });
@@ -1420,6 +1444,9 @@ async function notifyTransition(
 // ─── Roster fetch with performance data ────────────────────────────
 
 async function fetchRosterWithPerformance(campaignId: string): Promise<RosterKol[]> {
+  // Hidden KOLs are intentionally excluded — they shouldn't appear in the
+  // lineup builder roster panel since hidden = "not part of this campaign
+  // in any user-facing sense." Per Andy 2026-06-18.
   const { data: kolRows, error: kErr } = await (supabase as any)
     .from('campaign_kols')
     .select(`
@@ -1427,6 +1454,7 @@ async function fetchRosterWithPerformance(campaignId: string): Promise<RosterKol
       master_kol:master_kols(id, name, link, followers, platform, region)
     `)
     .eq('campaign_id', campaignId)
+    .or('hidden.is.null,hidden.eq.false')
     .is('deleted_at', null);
   if (kErr) throw kErr;
 
