@@ -137,8 +137,82 @@ function fetchAvatarFromX(link: string | null | undefined): AvatarFetchResult {
 }
 
 /**
+ * Fetch a user-profile avatar via bot.getUserProfilePhotos. Used when we have
+ * master_kols.telegram_id (a personal user ID). Only works if the user has
+ * allowed bots to see profile photos via privacy settings — silently fails
+ * otherwise so the caller can fall back.
+ */
+async function fetchAvatarFromTelegramUser(
+  kolId: string,
+  telegramUserId: string,
+  supabaseAdmin: SupabaseClient,
+  botToken: string,
+): Promise<AvatarFetchResult> {
+  try {
+    const photosRes = await fetch(
+      `https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${telegramUserId}&limit=1`,
+    );
+    if (!photosRes.ok) {
+      return { success: false, source: 'telegram', url: null, error: `getUserProfilePhotos ${photosRes.status}` };
+    }
+    const photosJson = await photosRes.json();
+    const sizes = photosJson?.result?.photos?.[0];
+    if (!Array.isArray(sizes) || sizes.length === 0) {
+      return { success: false, source: 'telegram', url: null, error: 'user has no public profile photo' };
+    }
+    // Pick the largest size (last in the array).
+    const fileId = sizes[sizes.length - 1]?.file_id;
+    if (!fileId) {
+      return { success: false, source: 'telegram', url: null, error: 'no file_id in user photo' };
+    }
+
+    const fileRes = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+    if (!fileRes.ok) {
+      return { success: false, source: 'telegram', url: null, error: `getFile ${fileRes.status}` };
+    }
+    const fileJson = await fileRes.json();
+    const filePath = fileJson?.result?.file_path;
+    if (!filePath) {
+      return { success: false, source: 'telegram', url: null, error: 'no file_path' };
+    }
+
+    const photoRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+    if (!photoRes.ok) {
+      return { success: false, source: 'telegram', url: null, error: `download ${photoRes.status}` };
+    }
+    const bytes = await photoRes.arrayBuffer();
+
+    const objectKey = `${kolId}.jpg`;
+    const { error: upErr } = await supabaseAdmin.storage.from(BUCKET).upload(objectKey, bytes, {
+      contentType: 'image/jpeg',
+      upsert: true,
+    });
+    if (upErr) {
+      return { success: false, source: 'telegram', url: null, error: `upload ${upErr.message}` };
+    }
+
+    const { data: pub } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(objectKey);
+    return { success: true, source: 'telegram', url: `${pub.publicUrl}?t=${Date.now()}` };
+  } catch (err) {
+    return {
+      success: false,
+      source: 'telegram',
+      url: null,
+      error: err instanceof Error ? err.message : 'unknown',
+    };
+  }
+}
+
+/**
  * Top-level entry — try TG first (durable), fall through to X. Returns the
  * URL to persist on master_kols.profile_picture_url + the source for logging.
+ *
+ * Telegram precedence:
+ *   1. telegram_id (KOL's personal user ID) → getUserProfilePhotos.
+ *      Most direct path to the KOL's real avatar but needs their privacy
+ *      setting to allow bots to see profile photos.
+ *   2. group_chat_id (KOL's group chat in telegram_chats) → getChat photo.
+ *      The chat avatar — often the KOL's logo for a creator-styled group.
  */
 export async function refreshKolAvatar(
   kol: { id: string; telegram_id?: string | null; group_chat_id?: string | null; link?: string | null },
@@ -146,17 +220,19 @@ export async function refreshKolAvatar(
 ): Promise<AvatarFetchResult> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
-  // Prefer telegram_id (KOL's own channel) over group_chat_id (per-team chat).
-  // The personal channel has the KOL's actual avatar; the team chat is usually
-  // group-styled.
-  const chatId = kol.telegram_id || kol.group_chat_id;
-
-  if (chatId && botToken) {
-    const tg = await fetchAvatarFromTelegram(kol.id, chatId, supabaseAdmin, botToken);
-    if (tg.success) return tg;
-    // Telegram failed — fall through to X.
+  if (botToken) {
+    // (1) Personal user photo — most likely to be the KOL's real face/logo.
+    if (kol.telegram_id) {
+      const tgUser = await fetchAvatarFromTelegramUser(kol.id, kol.telegram_id, supabaseAdmin, botToken);
+      if (tgUser.success) return tgUser;
+    }
+    // (2) Group chat photo — fallback when the user blocks profile-pic access.
+    if (kol.group_chat_id) {
+      const tgChat = await fetchAvatarFromTelegram(kol.id, kol.group_chat_id, supabaseAdmin, botToken);
+      if (tgChat.success) return tgChat;
+    }
   }
 
-  // X fallback. Returns success=false silently if no X handle in the link.
+  // (3) X fallback. Silently fails if no X handle in the link.
   return fetchAvatarFromX(kol.link);
 }

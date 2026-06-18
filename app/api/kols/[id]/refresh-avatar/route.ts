@@ -44,22 +44,35 @@ export async function POST(
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // ── Load the KOL — need telegram_id + group_chat_id + link ───────
+  // ── Load the KOL ─────────────────────────────────────────────────
   const { data: kol, error: loadErr } = await (admin as any)
     .from('master_kols')
-    .select('id, telegram_id, group_chat_id, link, name')
+    .select('id, telegram_id, link, name')
     .eq('id', kolId)
     .maybeSingle();
   if (loadErr || !kol) {
     return NextResponse.json({ error: 'KOL not found' }, { status: 404 });
   }
 
+  // master_kols.telegram_id is the KOL's personal user_id (not a chat).
+  // Bot's getChat doesn't return a profile photo for user IDs — that needs
+  // getUserProfilePhotos and the user's privacy permission. We have better
+  // odds going through the group chat for the KOL, which lives in
+  // telegram_chats.
+  const { data: chatRow } = await (admin as any)
+    .from('telegram_chats')
+    .select('chat_id')
+    .eq('master_kol_id', kolId)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
   // ── Refresh ──────────────────────────────────────────────────────
   const result = await refreshKolAvatar(
     {
       id: kol.id,
       telegram_id: kol.telegram_id,
-      group_chat_id: kol.group_chat_id,
+      group_chat_id: (chatRow as any)?.chat_id || null,
       link: kol.link,
     },
     admin,

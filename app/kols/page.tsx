@@ -3211,7 +3211,18 @@ export default function KOLsPage() {
                   </TableCell>
                   {visibleColumns.name && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden sticky left-[48px] z-10`} style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>
-                      <div className="truncate flex items-center gap-1">
+                      <div className="truncate flex items-center gap-1.5">
+                        {/* Avatar chip — visible whenever profile_picture_url
+                            is synced. Cheap object-cover thumbnail on the
+                            left of the name. Per KOL-AVATAR.4 follow-up. */}
+                        {kol.profile_picture_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={kol.profile_picture_url}
+                            alt=""
+                            className="w-6 h-6 rounded-full object-cover flex-shrink-0 border border-cream-200"
+                          />
+                        )}
                         {(() => {
                           const isStale = kol.updated_at ?
                             (Date.now() - new Date(kol.updated_at).getTime()) > (90 * 24 * 60 * 60 * 1000) :
