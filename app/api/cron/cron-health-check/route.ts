@@ -52,6 +52,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   DELIVERABLE_RECURRENCE: 1,   // daily — HHP Deliverable Templates spec Template 2 Notes
   STINT_LAPSE_SWEEP: 1,        // daily — HHP Stint+Period F1 auto-stamp churn after grace
   DASHBOARD_ESCALATIONS: 1,    // daily 08:00 UTC — HHP Team Dashboard v2 escalations
+  KOL_AVATAR_REFRESH: 1,       // daily 05:00 UTC — KOL-AVATAR.10 staleness cron
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;
