@@ -230,10 +230,15 @@ export async function POST(
       const broadcastChatId = (chatSetting.data as any)?.value as string | undefined;
       const broadcastThreadId = (threadSetting.data as any)?.value as string | undefined;
       if (broadcastChatId) {
+        // Broadcast variant: shared chat, so "your review" → "review".
+        const broadcastText =
+          `<b>${campaign.name}</b>\n` +
+          `Week ${lineup.week_number} lineup proposed for review.\n\n` +
+          `<a href="${reviewLink}">Review on HHP</a>`;
         try {
           chatPosted = await TelegramService.sendToChat(
             broadcastChatId,
-            text,
+            broadcastText,
             'HTML',
             broadcastThreadId ? parseInt(broadcastThreadId, 10) : undefined,
           );
