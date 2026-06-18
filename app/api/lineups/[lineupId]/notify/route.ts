@@ -216,6 +216,33 @@ export async function POST(
       const skippedNoTg = approvers
         .filter(a => !a.telegramId)
         .map(a => a.userName);
+
+      // ─── Also broadcast to the global lineup-proposals chat ─────
+      // app_settings.lineup_proposal_chat_id (+ optional _thread_id).
+      // Per Andy 2026-06-19: approvers still get DMs (above) AND a
+      // copy goes to this shared chat for team-wide visibility.
+      let chatPosted: boolean | null = null;
+      let chatPostError: string | null = null;
+      const [chatSetting, threadSetting] = await Promise.all([
+        (supabase as any).from('app_settings').select('value').eq('key', 'lineup_proposal_chat_id').maybeSingle(),
+        (supabase as any).from('app_settings').select('value').eq('key', 'lineup_proposal_chat_thread_id').maybeSingle(),
+      ]);
+      const broadcastChatId = (chatSetting.data as any)?.value as string | undefined;
+      const broadcastThreadId = (threadSetting.data as any)?.value as string | undefined;
+      if (broadcastChatId) {
+        try {
+          chatPosted = await TelegramService.sendToChat(
+            broadcastChatId,
+            text,
+            'HTML',
+            broadcastThreadId ? parseInt(broadcastThreadId, 10) : undefined,
+          );
+        } catch (err: any) {
+          chatPosted = false;
+          chatPostError = err?.message || 'unknown';
+        }
+      }
+
       return NextResponse.json({
         ok: successCount > 0,
         recipient: results
@@ -225,6 +252,8 @@ export async function POST(
         sentCount: successCount,
         totalApprovers: approvers.length,
         skipped: skippedNoTg.length > 0 ? skippedNoTg : undefined,
+        chatPosted,
+        chatPostError,
       });
     }
 
