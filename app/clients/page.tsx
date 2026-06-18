@@ -5538,6 +5538,9 @@ export default function ClientsPage() {
                             <div className="space-y-2">
                               {weeklyV2ExecPlan.map((row, idx) => (
                                 <div key={row.id} className="grid grid-cols-12 gap-2 items-start bg-white border border-yellow-200 rounded-md p-2">
+                                  {/* Type column hidden per Andy 2026-06-19 —
+                                      deliverable_type stays null on new rows
+                                      and is no longer surfaced in Zone A. */}
                                   <Input
                                     value={row.description}
                                     onChange={(e) => {
@@ -5547,7 +5550,7 @@ export default function ClientsPage() {
                                     }}
                                     onBlur={() => contextModalClient && saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: weeklyV2ExecPlan })}
                                     placeholder="Task description"
-                                    className="focus-brand col-span-5 h-8"
+                                    className="focus-brand col-span-6 h-8"
                                     disabled={isLocked}
                                   />
                                   <Select
@@ -5593,25 +5596,6 @@ export default function ClientsPage() {
                                       />
                                     </PopoverContent>
                                   </Popover>
-                                  <Select
-                                    value={row.deliverable_type || ''}
-                                    onValueChange={(v) => {
-                                      const next = [...weeklyV2ExecPlan];
-                                      next[idx] = { ...row, deliverable_type: (v as DeliverableType) || null };
-                                      setWeeklyV2ExecPlan(next);
-                                      if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
-                                    }}
-                                    disabled={isLocked}
-                                  >
-                                    <SelectTrigger className="focus-brand col-span-1 h-8 text-xs px-1">
-                                      <SelectValue placeholder="Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {(Object.keys(DELIVERABLE_TYPE_LABELS) as DeliverableType[]).map(t => (
-                                        <SelectItem key={t} value={t}>{DELIVERABLE_TYPE_LABELS[t]}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
                                   {!isLocked && (
                                     <Button
                                       variant="ghost"
