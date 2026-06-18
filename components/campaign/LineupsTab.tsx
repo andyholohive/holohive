@@ -345,13 +345,36 @@ export default function LineupsTab({
 
   async function handleAddKolToAngle(angleId: string, kolId: string) {
     setBusy(true);
+    // Optimistic insert — drop the KOL into the angle's slot list
+    // immediately so the UI updates the instant the user releases the
+    // mouse. Real slot row replaces the temp one on server response;
+    // on error we full-refresh to revert.
+    const tempId = `temp-${Math.random().toString(36).slice(2)}`;
+    const angle = lineup?.angles.find(a => a.id === angleId);
+    const nextOrder = angle ? angle.slots.length : 0;
+    setLineup((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        angles: prev.angles.map(a => a.id === angleId
+          ? { ...a, slots: [...a.slots, { id: tempId, angle_id: angleId, kol_id: kolId, sort_order: nextOrder, status: 'pending' } as any] }
+          : a),
+      };
+    });
     try {
-      const angle = lineup?.angles.find(a => a.id === angleId);
-      const nextOrder = angle ? angle.slots.length : 0;
-      await service.addSlot(angleId, kolId, nextOrder, currentUserId);
-      await refreshLineup();
+      const slot = await service.addSlot(angleId, kolId, nextOrder, currentUserId);
+      setLineup((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          angles: prev.angles.map(a => a.id === angleId
+            ? { ...a, slots: a.slots.map(s => s.id === tempId ? (slot as any) : s) }
+            : a),
+        };
+      });
     } catch (err: any) {
       toast({ title: 'Failed to add KOL', description: err?.message, variant: 'destructive' });
+      await refreshLineup();
     } finally {
       setBusy(false);
     }
@@ -535,63 +558,113 @@ export default function LineupsTab({
   async function handleDragEnd(e: DragEndEvent) {
     setDraggingKolId(null);
     if (!lineup || !e.over) return;
-    const kolId = String(e.active.id);
+    const activeId = String(e.active.id);
     const overId = String(e.over.id);
+
+    // The dragged item is either a roster row (id = kolId) or an
+    // existing slot (id = `slot:<id>`). Resolve both to a kolId +
+    // an optional sourceSlot reference.
+    let kolId: string;
+    let sourceSlot: LineupFull['angles'][number]['slots'][number] | undefined;
+    if (activeId.startsWith('slot:')) {
+      const sourceSlotId = activeId.slice('slot:'.length);
+      sourceSlot = lineup.angles.flatMap(a => a.slots).find(s => s.id === sourceSlotId);
+      if (!sourceSlot) return;
+      kolId = sourceSlot.kol_id;
+    } else {
+      kolId = activeId;
+      sourceSlot = lineup.angles.flatMap(a => a.slots).find(s => s.kol_id === kolId);
+    }
 
     // Drop target is either `angle:<id>` (drop on angle to add) or
     // `slot:<id>` (drop on existing slot to reorder within angle).
     if (overId.startsWith('angle:')) {
       const angleId = overId.slice('angle:'.length);
-      // If kol is already in this angle, no-op.
       const angle = lineup.angles.find(a => a.id === angleId);
       if (!angle) return;
+      if (sourceSlot && sourceSlot.angle_id === angleId) return; // same angle, no-op
       if (angle.slots.some(s => s.kol_id === kolId)) return;
-      // If kol is in another angle, move it (remove + add).
-      const sourceSlot = lineup.angles
-        .flatMap(a => a.slots)
-        .find(s => s.kol_id === kolId);
       if (sourceSlot) {
-        // Move between angles: remove from source, add to target.
-        try {
-          await service.removeSlot(sourceSlot.id, currentUserId);
-        } catch { /* swallow */ }
+        await moveSlotBetweenAngles(sourceSlot, angleId);
+      } else {
+        await handleAddKolToAngle(angleId, kolId);
       }
-      await handleAddKolToAngle(angleId, kolId);
       return;
     }
 
     if (overId.startsWith('slot:')) {
       const targetSlotId = overId.slice('slot:'.length);
-      // Find which angle the target slot belongs to.
       const targetAngle = lineup.angles.find(a => a.slots.some(s => s.id === targetSlotId));
       if (!targetAngle) return;
-      const sourceSlot = lineup.angles
-        .flatMap(a => a.slots)
-        .find(s => s.kol_id === kolId);
       // Drag from roster to existing slot → add to that angle.
       if (!sourceSlot) {
         await handleAddKolToAngle(targetAngle.id, kolId);
         return;
       }
+      const src = sourceSlot;
       // Reorder within the same angle.
-      if (sourceSlot.angle_id === targetAngle.id) {
-        const oldIdx = targetAngle.slots.findIndex(s => s.id === sourceSlot.id);
+      if (src.angle_id === targetAngle.id) {
+        const oldIdx = targetAngle.slots.findIndex(s => s.id === src.id);
         const newIdx = targetAngle.slots.findIndex(s => s.id === targetSlotId);
         if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
         const reordered = arrayMove(targetAngle.slots, oldIdx, newIdx);
+        // Optimistic reorder — apply immediately, then persist.
+        setLineup((prev) => prev && {
+          ...prev,
+          angles: prev.angles.map(a => a.id === targetAngle.id
+            ? { ...a, slots: reordered.map((s, idx) => ({ ...s, sort_order: idx })) }
+            : a),
+        });
         try {
           await service.reorderSlots(targetAngle.id, reordered.map(s => s.id), currentUserId);
-          await refreshLineup();
         } catch (err: any) {
           toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' });
+          await refreshLineup();
         }
         return;
       }
-      // Drag across angles, dropping on a slot → treat as add to the target angle.
-      try {
-        await service.removeSlot(sourceSlot.id, currentUserId);
-      } catch { /* swallow */ }
-      await handleAddKolToAngle(targetAngle.id, kolId);
+      // Cross-angle drop on a slot → move to target angle.
+      await moveSlotBetweenAngles(src, targetAngle.id);
+    }
+  }
+
+  /** Move an existing slot from its current angle to another. Optimistic. */
+  async function moveSlotBetweenAngles(
+    sourceSlot: LineupFull['angles'][number]['slots'][number],
+    targetAngleId: string,
+  ) {
+    if (!lineup) return;
+    setBusy(true);
+    const targetAngle = lineup.angles.find(a => a.id === targetAngleId);
+    const nextOrder = targetAngle ? targetAngle.slots.length : 0;
+    const tempId = `temp-${Math.random().toString(36).slice(2)}`;
+    // Optimistic: remove from source, append to target.
+    setLineup((prev) => prev && {
+      ...prev,
+      angles: prev.angles.map(a => {
+        if (a.id === sourceSlot.angle_id) {
+          return { ...a, slots: a.slots.filter(s => s.id !== sourceSlot.id) };
+        }
+        if (a.id === targetAngleId) {
+          return { ...a, slots: [...a.slots, { ...sourceSlot, id: tempId, angle_id: targetAngleId, sort_order: nextOrder }] };
+        }
+        return a;
+      }),
+    });
+    try {
+      await service.removeSlot(sourceSlot.id, currentUserId);
+      const newSlot = await service.addSlot(targetAngleId, sourceSlot.kol_id, nextOrder, currentUserId);
+      setLineup((prev) => prev && {
+        ...prev,
+        angles: prev.angles.map(a => a.id === targetAngleId
+          ? { ...a, slots: a.slots.map(s => s.id === tempId ? (newSlot as any) : s) }
+          : a),
+      });
+    } catch (err: any) {
+      toast({ title: 'Move failed', description: err?.message, variant: 'destructive' });
+      await refreshLineup();
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1018,14 +1091,14 @@ function RosterRow({
   onAddToAngle: (angleId: string, kolId: string) => void;
 }) {
   // Roster rows are draggable so they can be dropped onto angles.
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  // No `transform` applied to the source — the DragOverlay portal
+  // renders the ghost. Applying transform here ALSO moves the source
+  // row in the scroll container, expanding its scrollHeight and
+  // making a scrollbar appear mid-drag.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: kol.id,
     disabled: !isEditable || alreadyIn,
   });
-
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform) }
-    : undefined;
 
   // Engagement rate = total engagements / total views, expressed as %.
   // Per Jdot 2026-06-11 — replaces the raw engagement count which
@@ -1037,7 +1110,6 @@ function RosterRow({
   return (
     <div
       ref={setNodeRef}
-      style={style}
       className={`px-3 py-2 hover:bg-cream-50/40 transition-colors ${alreadyIn ? 'opacity-50' : ''} ${isDragging ? 'opacity-30' : ''}`}
     >
       <div className="flex items-start gap-2">
