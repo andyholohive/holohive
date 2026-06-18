@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity, RefreshCw } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
 import { computeRosterScores, tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
 import type { KolDeliverable } from "@/lib/kolDeliverableService";
@@ -147,6 +147,8 @@ export default function KOLsPage() {
   const [newOptionValueBulk, setNewOptionValueBulk] = useState('');
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isSavingNewKOL, setIsSavingNewKOL] = useState(false);
+  // Bulk avatar refresh (super_admin only) — sits in the PageHeader actions.
+  const [bulkAvatarRunning, setBulkAvatarRunning] = useState(false);
   // 1. Add state for delete dialog (single KOL)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [kolToDelete, setKolToDelete] = useState<string | null>(null);
@@ -1714,16 +1716,64 @@ export default function KOLsPage() {
         kicker="Talent · KOLs"
         kickerDot="amber"
         actions={
-          <Button variant="brand" size="sm" onClick={handleAddNew} disabled={isSavingNewKOL}>
-            {isSavingNewKOL ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Add KOL
-              </>
+          <div className="flex items-center gap-2">
+            {userProfile?.role === 'super_admin' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (bulkAvatarRunning) return;
+                  if (!confirm('Refresh avatars for all ~424 active KOLs? Takes ~2 minutes.')) return;
+                  setBulkAvatarRunning(true);
+                  toast({ title: 'Refreshing avatars...', description: 'Iterating over the roster — this takes ~2 min.' });
+                  try {
+                    const res = await fetch('/api/admin/refresh-all-kol-avatars', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ delay_ms: 250 }),
+                    });
+                    const json = await res.json();
+                    if (json?.ok && json?.stats) {
+                      toast({
+                        title: 'Avatars refreshed',
+                        description: `${json.stats.telegram} from Telegram + ${json.stats.x} from X. ${json.stats.skipped} skipped.`,
+                      });
+                      // Reload to pick up new URLs.
+                      fetchKOLs();
+                    } else {
+                      toast({
+                        title: 'Bulk refresh failed',
+                        description: json?.error || 'Unknown error',
+                        variant: 'destructive',
+                      });
+                    }
+                  } catch (err: any) {
+                    toast({
+                      title: 'Network error',
+                      description: err?.message || 'Could not reach server',
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setBulkAvatarRunning(false);
+                  }
+                }}
+                disabled={bulkAvatarRunning}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${bulkAvatarRunning ? 'animate-spin' : ''}`} />
+                {bulkAvatarRunning ? 'Refreshing...' : 'Refresh avatars'}
+              </Button>
             )}
-          </Button>
+            <Button variant="brand" size="sm" onClick={handleAddNew} disabled={isSavingNewKOL}>
+              {isSavingNewKOL ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add KOL
+                </>
+              )}
+            </Button>
+          </div>
         }
       />
 
