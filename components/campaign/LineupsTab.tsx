@@ -160,6 +160,10 @@ export default function LineupsTab({
   const [roster, setRoster] = useState<RosterKol[]>([]);
   const [loading, setLoading] = useState(true);
   const [rosterSearch, setRosterSearch] = useState('');
+  // Roster sort key. Default = name A→Z to match the prior behavior.
+  // 'views' (campaign views, desc) lets CMs prioritize high-performing
+  // KOLs when picking the next angle.
+  const [rosterSort, setRosterSort] = useState<'name' | 'views' | 'engagement' | 'followers'>('name');
   const [busy, setBusy] = useState(false);
   // DnD overlay item — the KOL being dragged, for the ghost preview.
   const [draggingKolId, setDraggingKolId] = useState<string | null>(null);
@@ -202,14 +206,25 @@ export default function LineupsTab({
   }, [lineup]);
 
   const filteredRoster = useMemo(() => {
-    if (!rosterSearch.trim()) return roster;
-    const q = rosterSearch.toLowerCase();
-    return roster.filter(r =>
+    const q = rosterSearch.trim().toLowerCase();
+    const filtered = !q ? roster : roster.filter(r =>
       r.name.toLowerCase().includes(q) ||
       (r.region && r.region.toLowerCase().includes(q)) ||
       (r.platform && r.platform.some(p => p.toLowerCase().includes(q))),
     );
-  }, [roster, rosterSearch]);
+    const sorted = [...filtered];
+    if (rosterSort === 'name') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (rosterSort === 'views') {
+      sorted.sort((a, b) => (b.total_views || 0) - (a.total_views || 0));
+    } else if (rosterSort === 'engagement') {
+      const er = (k: RosterKol) => (k.total_views > 0 ? k.total_engagements / k.total_views : 0);
+      sorted.sort((a, b) => er(b) - er(a));
+    } else if (rosterSort === 'followers') {
+      sorted.sort((a, b) => (b.followers || 0) - (a.followers || 0));
+    }
+    return sorted;
+  }, [roster, rosterSearch, rosterSort]);
 
   /** Roster lookup by master_kol id — used by drag-to-drop. */
   const rosterById = useMemo(() => {
@@ -819,13 +834,24 @@ export default function LineupsTab({
                   {filteredRoster.length} of {roster.length}
                 </span>
               </div>
-              <div className="px-3 py-2 border-b border-cream-100 shrink-0">
+              <div className="px-3 py-2 border-b border-cream-100 shrink-0 flex items-center gap-2">
                 <Input
                   placeholder="Search by name or platform…"
                   value={rosterSearch}
                   onChange={(e) => setRosterSearch(e.target.value)}
-                  className="focus-brand h-9 text-sm"
+                  className="focus-brand h-9 text-sm flex-1"
                 />
+                <Select value={rosterSort} onValueChange={(v) => setRosterSort(v as typeof rosterSort)}>
+                  <SelectTrigger className="focus-brand h-9 w-[120px] text-xs shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Name A→Z</SelectItem>
+                    <SelectItem value="views">Views</SelectItem>
+                    <SelectItem value="engagement">Engagement</SelectItem>
+                    <SelectItem value="followers">Followers</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="overflow-y-auto flex-1 divide-y divide-cream-100">
                 {filteredRoster.length === 0 ? (
@@ -1452,9 +1478,12 @@ function AuditLogButton({
                       {formatDateTime(r.ts)}
                     </span>
                   </div>
-                  {r.details && (
-                    <p className="text-[11px] text-ink-warm-500 mt-0.5">{r.details}</p>
-                  )}
+                  <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                    <span className="text-ink-warm-700 font-medium">
+                      {r.actor_name || (r.actor ? 'Unknown user' : 'System')}
+                    </span>
+                    {r.details ? <> · {r.details}</> : null}
+                  </p>
                 </li>
               ))}
             </ul>

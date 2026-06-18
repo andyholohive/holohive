@@ -61,6 +61,9 @@ export type LineupActivityLogRow = {
   lineup_id: string;
   action: LineupActivityAction;
   actor: string | null;
+  /** Joined from `users.name` — null when the actor row is missing or
+      the system performed the action (cron, server-side). */
+  actor_name?: string | null;
   details: string | null;
   ts: string;
 };
@@ -585,13 +588,24 @@ export class LineupManagerService {
   // ── Activity log ─────────────────────────────────────────────────
 
   async getActivityLog(lineupId: string): Promise<LineupActivityLogRow[]> {
+    // Join the actor's display name so the popover can show who did
+    // what (instead of a UUID). RLS on users is permissive enough for
+    // signed-in teammates to read each other's name.
     const { data, error } = await (this.supabase as any)
       .from('lineup_activity_log')
-      .select('*')
+      .select('*, actor_user:users!lineup_activity_log_actor_fkey(name)')
       .eq('lineup_id', lineupId)
       .order('ts', { ascending: false });
     if (error) throw error;
-    return (data || []) as LineupActivityLogRow[];
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      lineup_id: r.lineup_id,
+      action: r.action,
+      actor: r.actor,
+      actor_name: r.actor_user?.name ?? null,
+      details: r.details,
+      ts: r.ts,
+    })) as LineupActivityLogRow[];
   }
 
   // ── TG group chat formatter (§ 7.2) ──────────────────────────────
