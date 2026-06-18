@@ -44,6 +44,15 @@ function extractXHandle(link: string | null | undefined): string | null {
   return null;
 }
 
+/** Pull a Telegram channel handle from a t.me/handle URL. */
+function extractTelegramChannelHandle(link: string | null | undefined): string | null {
+  if (!link) return null;
+  // Skip private join links (t.me/+abc, t.me/joinchat/abc) — they're invite
+  // tokens, not channel usernames, and bot.getChat won't resolve them.
+  const m = link.match(/t\.me\/(?!\+|joinchat\/)([\w_]+)/i);
+  return m ? m[1].replace(/\/$/, '') : null;
+}
+
 /**
  * Call Telegram bot.getChat → bot.getFile → download photo bytes →
  * upload to kol-avatars bucket. Returns the public Supabase URL.
@@ -204,21 +213,21 @@ async function fetchAvatarFromTelegramUser(
 }
 
 /**
- * Top-level entry — try TG first (KOL's actual face), fall through to X.
+ * Top-level entry — pick the right source for each KOL.
  *
- * Telegram precedence:
- *   1. telegram_id (KOL's personal user ID) → getUserProfilePhotos.
- *      Direct path to the KOL's real avatar. Requires the user's privacy
- *      setting to allow bots to see profile photos; falls through if not.
+ * Source precedence:
+ *   1. t.me/handle in master_kols.link → bot.getChat by @handle (KOL-AVATAR.9).
+ *      Works for ANY public channel without bot membership. Returns the
+ *      channel's photo, which is the KOL's brand avatar. Best result for
+ *      KOLs whose primary platform is Telegram.
+ *   2. x.com/handle in master_kols.link → unavatar.io passthrough URL.
+ *      Always-fresh redirect to the user's current X avatar.
+ *   3. telegram_id (KOL's personal user ID) → bot.getUserProfilePhotos.
+ *      Last resort — needs the user's "bots can see my photo" privacy
+ *      setting, which most users don't enable. Falls through to nothing.
  *
- * IMPORTANT — what we DON'T do anymore:
- *   The group_chat_id path (calling getChat on the KOL's per-team group
- *   chat) was originally a fallback, but every group chat the bot is in
- *   is titled "[Ops] Holo Hive <> X" and has the HoloHive logo as its
- *   avatar. So that path uploaded 39 identical HoloHive icons to our
- *   storage — useless. Dropped per KOL-AVATAR.8 (2026-06-18). If a KOL
- *   doesn't have telegram_id set or their privacy blocks bot access, we
- *   go straight to X.
+ * Group-chat photo path was dropped in KOL-AVATAR.8 — every team group
+ * chat shared the HoloHive logo, so it was useless.
  */
 export async function refreshKolAvatar(
   kol: { id: string; telegram_id?: string | null; link?: string | null },
@@ -226,11 +235,24 @@ export async function refreshKolAvatar(
 ): Promise<AvatarFetchResult> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
-  if (botToken && kol.telegram_id) {
-    const tgUser = await fetchAvatarFromTelegramUser(kol.id, kol.telegram_id, supabaseAdmin, botToken);
-    if (tgUser.success) return tgUser;
+  // (1) Public TG channel — most reliable for KOLs with a t.me link.
+  if (botToken) {
+    const tgChannelHandle = extractTelegramChannelHandle(kol.link);
+    if (tgChannelHandle) {
+      const tg = await fetchAvatarFromTelegram(kol.id, `@${tgChannelHandle}`, supabaseAdmin, botToken);
+      if (tg.success) return tg;
+    }
   }
 
-  // X fallback. Silently fails if no X handle in the link.
-  return fetchAvatarFromX(kol.link);
+  // (2) X via unavatar — covers the rest with an x.com/twitter.com link.
+  const x = fetchAvatarFromX(kol.link);
+  if (x.success) return x;
+
+  // (3) Last resort — try user photo if we have the telegram_id. Privacy
+  // restrictions usually block this, but it's worth one attempt.
+  if (botToken && kol.telegram_id) {
+    return fetchAvatarFromTelegramUser(kol.id, kol.telegram_id, supabaseAdmin, botToken);
+  }
+
+  return { success: false, source: 'none', url: null, error: 'no source available' };
 }
