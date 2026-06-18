@@ -60,6 +60,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 import { formatDateTime } from '@/lib/dateFormat';
 import {
   LineupManagerService,
@@ -178,6 +179,14 @@ export default function LineupsTab({
   const [unlockOpen, setUnlockOpen] = useState(false);
   // Delete whole lineup confirm
   const [deleteLineupOpen, setDeleteLineupOpen] = useState(false);
+  // Pick-ops-chat dialog state — opens when confirm fires but the
+  // campaign has no tg_ops_group_id set. Lets the user attach a chat
+  // inline and retry the confirm dispatch without leaving the tab.
+  const [pickOpsChatOpen, setPickOpsChatOpen] = useState(false);
+  const [pickOpsChatId, setPickOpsChatId] = useState<string>('');
+  const [pickOpsChatThreadId, setPickOpsChatThreadId] = useState<string>('');
+  const [pickOpsChatSaving, setPickOpsChatSaving] = useState(false);
+  const [pickOpsLineupId, setPickOpsLineupId] = useState<string | null>(null);
 
   // ─── Derived ──────────────────────────────────────────────────────
 
@@ -491,11 +500,52 @@ export default function LineupsTab({
           variant: 'destructive',
         });
       }
-      await notifyTransition(lineup.id, 'confirmed', toast);
+      const notifyResult = await notifyTransition(lineup.id, 'confirmed', toast, { silent: true });
+      // If the API skipped because the campaign has no ops chat
+      // configured, open the picker dialog so the user can set one
+      // without bouncing to /admin/telegram-comm. Per Andy 2026-06-19.
+      if (notifyResult.skipped && /tg_ops_group_id/.test(notifyResult.reason || '')) {
+        setPickOpsLineupId(lineup.id);
+        setPickOpsChatId('');
+        setPickOpsChatThreadId('');
+        setPickOpsChatOpen(true);
+      } else if (notifyResult.skipped) {
+        toast({ title: 'Notification skipped', description: notifyResult.reason || 'Bot dispatch not configured.' });
+      } else if (notifyResult.ok) {
+        toast({ title: 'Ops chat post sent', description: notifyResult.recipient ? `→ ${notifyResult.recipient}` : undefined });
+      } else if (notifyResult.error) {
+        toast({ title: 'Notification failed', description: notifyResult.error, variant: 'destructive' });
+      }
     } catch (err: any) {
       toast({ title: 'Confirm failed', description: err?.message, variant: 'destructive' });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function savePickedOpsChat() {
+    if (!pickOpsLineupId || !pickOpsChatId) return;
+    setPickOpsChatSaving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update({ tg_ops_group_id: pickOpsChatId })
+        .eq('id', campaignId);
+      if (error) throw error;
+      const result = await notifyTransition(pickOpsLineupId, 'confirmed', toast, { silent: true });
+      if (result.ok) {
+        toast({ title: 'Ops chat saved + post sent' });
+      } else if (result.skipped) {
+        toast({ title: 'Saved chat, but post skipped', description: result.reason });
+      } else {
+        toast({ title: 'Saved chat, but post failed', description: result.error || `HTTP ${result.status}`, variant: 'destructive' });
+      }
+      setPickOpsChatOpen(false);
+      setPickOpsLineupId(null);
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setPickOpsChatSaving(false);
     }
   }
 
@@ -1101,6 +1151,49 @@ export default function LineupsTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Pick ops chat dialog — confirm-time fallback when the
+          campaign has no tg_ops_group_id. Per Andy 2026-06-19. ─── */}
+      <Dialog open={pickOpsChatOpen} onOpenChange={(v) => { if (!v) setPickOpsChatOpen(false); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Pick an ops chat</DialogTitle>
+            <DialogDescription>
+              This campaign doesn&apos;t have an internal ops chat set yet, so
+              the confirm message has nowhere to land. Pick a chat below — it
+              saves on the campaign and posts the confirm message right after.
+            </DialogDescription>
+          </DialogHeader>
+          <ChatThreadPicker
+            chatId={pickOpsChatId}
+            threadId={pickOpsChatThreadId}
+            onChange={({ chatId: c, threadId: t }) => {
+              setPickOpsChatId(c);
+              setPickOpsChatThreadId(t);
+            }}
+            label="Ops chat"
+            disabled={pickOpsChatSaving}
+          />
+          <DialogFooter className="border-t border-cream-200 pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPickOpsChatOpen(false)}
+              disabled={pickOpsChatSaving}
+            >
+              Skip
+            </Button>
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={() => void savePickedOpsChat()}
+              disabled={pickOpsChatSaving || !pickOpsChatId}
+            >
+              {pickOpsChatSaving ? 'Saving…' : 'Save + post'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DndContext>
   );
 }
@@ -1496,11 +1589,21 @@ function AuditLogButton({
 
 // ─── TG notification dispatch ──────────────────────────────────────
 
+type NotifyResult = {
+  status: number;
+  ok?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  error?: string;
+  recipient?: string;
+};
+
 async function notifyTransition(
   lineupId: string,
   event: 'proposed' | 'confirmed' | 'unlocked',
   toast: (args: { title: string; description?: string; variant?: 'destructive' }) => void,
-): Promise<void> {
+  opts?: { silent?: boolean },
+): Promise<NotifyResult> {
   try {
     const res = await fetch(`/api/lineups/${lineupId}/notify`, {
       method: 'POST',
@@ -1508,20 +1611,22 @@ async function notifyTransition(
       body: JSON.stringify({ event }),
     });
     const json = await res.json().catch(() => ({}));
+    const result: NotifyResult = { status: res.status, ...json };
+    if (opts?.silent) return result;
     if (!res.ok) {
       toast({
         title: 'Notification failed',
         description: json?.error || `HTTP ${res.status}`,
         variant: 'destructive',
       });
-      return;
+      return result;
     }
     if (json?.skipped) {
       toast({
         title: 'Notification skipped',
         description: json.reason || 'Bot dispatch not configured for this event.',
       });
-      return;
+      return result;
     }
     if (json?.ok) {
       const label =
@@ -1533,12 +1638,14 @@ async function notifyTransition(
         description: json.recipient ? `→ ${json.recipient}` : undefined,
       });
     }
+    return result;
   } catch (err: any) {
     toast({
       title: 'Notification failed',
       description: err?.message || 'Network error',
       variant: 'destructive',
     });
+    return { status: 0, error: err?.message };
   }
 }
 
