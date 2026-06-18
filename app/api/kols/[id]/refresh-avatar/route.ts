@@ -54,27 +54,11 @@ export async function POST(
     return NextResponse.json({ error: 'KOL not found' }, { status: 404 });
   }
 
-  // master_kols.telegram_id is the KOL's personal user_id (not a chat).
-  // Bot's getChat doesn't return a profile photo for user IDs — that needs
-  // getUserProfilePhotos and the user's privacy permission. We have better
-  // odds going through the group chat for the KOL, which lives in
-  // telegram_chats.
-  const { data: chatRow } = await (admin as any)
-    .from('telegram_chats')
-    .select('chat_id')
-    .eq('master_kol_id', kolId)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-
   // ── Refresh ──────────────────────────────────────────────────────
+  // Per KOL-AVATAR.8: only telegram_id (user) + link (X). Group chat path
+  // dropped because every group chat shares the HoloHive logo as its photo.
   const result = await refreshKolAvatar(
-    {
-      id: kol.id,
-      telegram_id: kol.telegram_id,
-      group_chat_id: (chatRow as any)?.chat_id || null,
-      link: kol.link,
-    },
+    { id: kol.id, telegram_id: kol.telegram_id, link: kol.link },
     admin,
   );
 

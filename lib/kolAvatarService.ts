@@ -204,35 +204,33 @@ async function fetchAvatarFromTelegramUser(
 }
 
 /**
- * Top-level entry — try TG first (durable), fall through to X. Returns the
- * URL to persist on master_kols.profile_picture_url + the source for logging.
+ * Top-level entry — try TG first (KOL's actual face), fall through to X.
  *
  * Telegram precedence:
  *   1. telegram_id (KOL's personal user ID) → getUserProfilePhotos.
- *      Most direct path to the KOL's real avatar but needs their privacy
- *      setting to allow bots to see profile photos.
- *   2. group_chat_id (KOL's group chat in telegram_chats) → getChat photo.
- *      The chat avatar — often the KOL's logo for a creator-styled group.
+ *      Direct path to the KOL's real avatar. Requires the user's privacy
+ *      setting to allow bots to see profile photos; falls through if not.
+ *
+ * IMPORTANT — what we DON'T do anymore:
+ *   The group_chat_id path (calling getChat on the KOL's per-team group
+ *   chat) was originally a fallback, but every group chat the bot is in
+ *   is titled "[Ops] Holo Hive <> X" and has the HoloHive logo as its
+ *   avatar. So that path uploaded 39 identical HoloHive icons to our
+ *   storage — useless. Dropped per KOL-AVATAR.8 (2026-06-18). If a KOL
+ *   doesn't have telegram_id set or their privacy blocks bot access, we
+ *   go straight to X.
  */
 export async function refreshKolAvatar(
-  kol: { id: string; telegram_id?: string | null; group_chat_id?: string | null; link?: string | null },
+  kol: { id: string; telegram_id?: string | null; link?: string | null },
   supabaseAdmin: SupabaseClient,
 ): Promise<AvatarFetchResult> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
-  if (botToken) {
-    // (1) Personal user photo — most likely to be the KOL's real face/logo.
-    if (kol.telegram_id) {
-      const tgUser = await fetchAvatarFromTelegramUser(kol.id, kol.telegram_id, supabaseAdmin, botToken);
-      if (tgUser.success) return tgUser;
-    }
-    // (2) Group chat photo — fallback when the user blocks profile-pic access.
-    if (kol.group_chat_id) {
-      const tgChat = await fetchAvatarFromTelegram(kol.id, kol.group_chat_id, supabaseAdmin, botToken);
-      if (tgChat.success) return tgChat;
-    }
+  if (botToken && kol.telegram_id) {
+    const tgUser = await fetchAvatarFromTelegramUser(kol.id, kol.telegram_id, supabaseAdmin, botToken);
+    if (tgUser.success) return tgUser;
   }
 
-  // (3) X fallback. Silently fails if no X handle in the link.
+  // X fallback. Silently fails if no X handle in the link.
   return fetchAvatarFromX(kol.link);
 }

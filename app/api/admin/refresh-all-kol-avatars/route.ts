@@ -45,7 +45,10 @@ export async function POST(request: Request) {
     /* default knobs */
   }
 
-  // Load the roster — active non-archived only.
+  // Load the roster — active non-archived only. Per KOL-AVATAR.8 we no
+  // longer need the group_chat_id join — that path was returning the
+  // HoloHive logo on every chat. Now: telegram_id (user) → getUserProfilePhotos,
+  // else fall through to X.
   let query = (admin as any)
     .from('master_kols')
     .select('id, telegram_id, link, name')
@@ -54,23 +57,6 @@ export async function POST(request: Request) {
 
   const { data: kols, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Fetch group chat IDs in one query so we don't hit telegram_chats per row.
-  // master_kols.telegram_id is the KOL's personal user_id (not a chat); the
-  // group chat for the KOL lives in telegram_chats. Service prefers the
-  // group chat photo (getChat works) over the user's profile pic (which
-  // needs getUserProfilePhotos and the user's privacy permission).
-  const kolIds = (kols || []).map((k: any) => k.id);
-  const { data: chatRows } = await (admin as any)
-    .from('telegram_chats')
-    .select('master_kol_id, chat_id')
-    .in('master_kol_id', kolIds);
-  const chatByKolId = new Map<string, string>();
-  for (const r of (chatRows || []) as any[]) {
-    if (r.master_kol_id && r.chat_id && !chatByKolId.has(r.master_kol_id)) {
-      chatByKolId.set(r.master_kol_id, r.chat_id);
-    }
-  }
 
   const stats = {
     total: kols?.length ?? 0,
@@ -81,10 +67,7 @@ export async function POST(request: Request) {
   };
 
   for (const kol of (kols || []) as any[]) {
-    const result = await refreshKolAvatar(
-      { ...kol, group_chat_id: chatByKolId.get(kol.id) || null },
-      admin,
-    );
+    const result = await refreshKolAvatar(kol, admin);
     if (result.success && result.url) {
       await (admin as any)
         .from('master_kols')
