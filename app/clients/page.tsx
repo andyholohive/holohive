@@ -3915,18 +3915,11 @@ export default function ClientsPage() {
                                 {pendingClientTasks} on client
                               </span>
                             )}
-                            {/* Last visit — visual signal for stale portals.
-                                Rendered as muted ink-warm so it doesn't
-                                compete with the action chips above. */}
-                            <span
-                              className={`inline-flex items-center gap-1 ml-auto ${
-                                lastVisit ? 'text-ink-warm-500' : 'text-rose-600 font-medium'
-                              }`}
-                              title={lastVisit ? `Last portal visit: ${new Date(lastVisit).toLocaleString()}` : 'Client has never opened the portal'}
-                            >
-                              <Eye className="h-3 w-3" />
-                              {lastVisitLabel}
-                            </span>
+                            {/* Last-visit eye-icon date dropped per Andy
+                                2026-06-19 — duplicated the footer
+                                "Last visited: …" line which also carries
+                                the 30-day count and is the canonical
+                                stale-portal signal. */}
                           </div>
                         </div>
                       );
