@@ -45,6 +45,9 @@ type Initiative = {
   updated_at: string | null;
   linkedTaskCount: number;
   tone: 'red' | 'amber' | 'fresh';
+  /** Current uncompleted milestone (lowest sort_order) per TD §3.3.
+   *  null when the initiative has no milestones or all are done. */
+  currentGate: string | null;
 };
 type AdHocTask = {
   id: string;
@@ -481,6 +484,15 @@ export default function InternalTab() {
                       {i.tone === 'fresh' ? 'Active' : `Stale ${i.daysIdle}d`}
                     </StatusBadge>
                   </div>
+                  {/* Current gate badge per TD §3.3 — the lowest-sort_order
+                      milestone that isn't done yet. Hidden when no
+                      milestones are seeded for this initiative. */}
+                  {i.currentGate && (
+                    <p className="text-[11px] text-ink-warm-700 mb-1.5 truncate">
+                      <span className="text-[9px] uppercase tracking-[0.15em] text-ink-warm-400 font-semibold mr-1">Gate</span>
+                      {i.currentGate}
+                    </p>
+                  )}
                   <p className="text-[11px] text-ink-warm-500 mb-2">
                     {i.owner_name ? <span className="font-medium text-ink-warm-700">{i.owner_name}</span> : 'Unassigned'}
                     {' · '}

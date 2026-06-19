@@ -50,6 +50,7 @@ export async function GET() {
       adHocTasksRes,
       initiativesRes,
       initiativeLinkedTasksRes,
+      initiativeMilestonesRes,
       usersRes,
       mondayFormStatus,
     ] = await Promise.all([
@@ -77,6 +78,14 @@ export async function GET() {
         .from('tasks')
         .select('id, linked_initiative')
         .not('linked_initiative', 'is', null),
+      // [2026-06-19] Initiative milestones — used to compute the
+      // "current gate" badge per TD §3.3. The current gate is the
+      // lowest-sort_order row that isn't completed yet. Pulled in
+      // bulk and reduced per-initiative below.
+      (sb as any)
+        .from('initiative_milestones')
+        .select('initiative_id, name, sort_order, completed')
+        .order('sort_order', { ascending: true }),
       (sb as any)
         .from('users')
         .select('id, name, role, profile_photo_url'),
@@ -247,6 +256,17 @@ export async function GET() {
     // Initiative stale tones + denormalized owner name + linked tasks +
     // updated_at exposed so the dashboard card grid can render the
     // mockup's "Updated Nd ago" line without a follow-up join.
+    // [2026-06-19] Per-initiative current-gate map per TD §3.3.
+    // "Current gate" = lowest sort_order milestone that isn't done.
+    // The query above is already sorted ascending so we take the first
+    // not-completed row per initiative.
+    const currentGateByInitiative = new Map<string, string>();
+    for (const m of ((initiativeMilestonesRes.data ?? []) as any[])) {
+      if (m.completed) continue;
+      if (!currentGateByInitiative.has(m.initiative_id)) {
+        currentGateByInitiative.set(m.initiative_id, m.name);
+      }
+    }
     const initiatives = ((initiativesRes.data ?? []) as any[]).map(i => {
       const daysIdle = i.updated_at
         ? Math.floor((Date.now() - new Date(i.updated_at).getTime()) / 86_400_000)
@@ -266,6 +286,7 @@ export async function GET() {
         updated_at: i.updated_at,
         linkedTaskCount: linkedTaskCountByInitiative.get(i.id) ?? 0,
         tone,
+        currentGate: currentGateByInitiative.get(i.id) ?? null,
       };
     });
 
