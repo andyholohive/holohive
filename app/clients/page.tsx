@@ -3840,9 +3840,10 @@ export default function ClientsPage() {
                         return Math.max(1, Math.ceil((days + 1) / 7));
                       })();
 
-                      const pendingClientTasks = (clientActionItems[client.id] || []).filter(
+                      const pendingClientTaskItems = (clientActionItems[client.id] || []).filter(
                         i => i.court === 'yours' && !i.is_done && !i.is_hidden,
-                      ).length;
+                      );
+                      const pendingClientTasks = pendingClientTaskItems.length;
                       const openHqTasks = hqTaskCounts[client.id] || 0;
                       const lastVisit = portalAccessSummary[client.id]?.last_at;
                       const lastVisitLabel = lastVisit ? relativeTimeFromNow(lastVisit) : 'Never visited';
@@ -3905,15 +3906,37 @@ export default function ClientsPage() {
                             </button>
                             {/* Pending client task badge — only renders when
                                 there are pending items, so it stays out of
-                                the way when the client isn't blocking. */}
+                                the way when the client isn't blocking.
+                                Hover shows the actual items (per Andy
+                                2026-06-19). */}
                             {pendingClientTasks > 0 && (
-                              <span
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-medium"
-                                title={`${pendingClientTasks} unfinished client task${pendingClientTasks === 1 ? '' : 's'} on the active milestone`}
-                              >
-                                <Activity className="h-3 w-3" />
-                                {pendingClientTasks} on client
-                              </span>
+                              <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-medium cursor-help">
+                                      <Activity className="h-3 w-3" />
+                                      {pendingClientTasks} on client
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[320px] p-2.5 space-y-1.5">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-warm-500">
+                                      On client · {pendingClientTasks} unfinished
+                                    </p>
+                                    <ul className="space-y-1">
+                                      {pendingClientTaskItems.slice(0, 10).map(it => (
+                                        <li key={it.id} className="text-xs text-ink-warm-800 leading-snug">
+                                          · {it.text}
+                                        </li>
+                                      ))}
+                                      {pendingClientTaskItems.length > 10 && (
+                                        <li className="text-[11px] text-ink-warm-500 italic">
+                                          + {pendingClientTaskItems.length - 10} more
+                                        </li>
+                                      )}
+                                    </ul>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                             {/* Last-visit eye-icon date dropped per Andy
                                 2026-06-19 — duplicated the footer
