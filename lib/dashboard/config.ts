@@ -24,7 +24,12 @@ export interface DashboardConfig {
 }
 
 export const DASHBOARD_CONFIG_DEFAULTS: DashboardConfig = {
-  overdue_yellow_days: 3,
+  // 1 = anything past today's due date counts as overdue. Per Andy
+  // 2026-06-19 — dropped the prior 3-day grace ("if it's just
+  // overdue, it's overdue"). Affects the Layer 1 KPI count, the
+  // Workload table, the Overdue panel, and the §7 TG escalation DMs
+  // (which all read from this same threshold).
+  overdue_yellow_days: 1,
   overdue_red_days: 7,
   initiative_stale_amber_days: 14,
   initiative_stale_red_days: 30,
