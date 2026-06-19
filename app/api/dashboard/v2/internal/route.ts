@@ -85,14 +85,18 @@ export async function GET() {
 
     const openTasks = (tasksRes.data ?? []) as any[];
 
-    // Tasks completed this week — separate count query (smaller payload)
+    // Tasks completed this week — keep the rows (not just count) so we
+    // can roll up per-user completion counts for the workload table.
+    // Per Andy 2026-06-19 + TD § 3.2: workload card shows "completed
+    // this week" in place of the old Status badge.
     const completedThisWeekRes = await (sb as any)
       .from('tasks')
-      .select('id', { count: 'exact', head: true })
+      .select('id, assigned_to, assigned_to_name')
       .eq('status', 'complete')
       .gte('completed_at', weekStart);
 
-    const completedThisWeek = completedThisWeekRes.count ?? 0;
+    const completedThisWeekRows = (completedThisWeekRes.data ?? []) as any[];
+    const completedThisWeek = completedThisWeekRows.length;
     const openCount = openTasks.length;
 
     // KPI rollups
@@ -115,7 +119,7 @@ export async function GET() {
     for (const u of (usersRes.data ?? []) as any[]) {
       usersById.set(u.id, { name: u.name, photo: u.profile_photo_url || null });
     }
-    type WorkloadEntry = { id: string | null; name: string; photo: string | null; open: number; overdue: number };
+    type WorkloadEntry = { id: string | null; name: string; photo: string | null; open: number; overdue: number; completed: number };
     const perUser = new Map<string, WorkloadEntry>();
     for (const t of openTasks) {
       const key = t.assigned_to || t.assigned_to_name || 'unassigned';
@@ -127,6 +131,7 @@ export async function GET() {
         photo: user?.photo ?? null,
         open: 0,
         overdue: 0,
+        completed: 0,
       };
       cur.open += 1;
       if (overdueToneFor(t.due_date, t.status, cfg.overdue_yellow_days, cfg.overdue_red_days) !== 'none') {
@@ -134,7 +139,25 @@ export async function GET() {
       }
       perUser.set(key, cur);
     }
-    const workload = Array.from(perUser.values()).sort((a, b) => b.overdue - a.overdue || b.open - a.open);
+    // Roll completed-this-week counts back into the same per-user map.
+    // Users who only completed (no open) still get a row so their 7d
+    // throughput is visible. Keyed identically (id first, then name).
+    for (const t of completedThisWeekRows) {
+      const key = t.assigned_to || t.assigned_to_name || 'unassigned';
+      const display = t.assigned_to_name || 'Unassigned';
+      const user = t.assigned_to ? usersById.get(t.assigned_to) : null;
+      const cur = perUser.get(key) ?? {
+        id: t.assigned_to ?? null,
+        name: display,
+        photo: user?.photo ?? null,
+        open: 0,
+        overdue: 0,
+        completed: 0,
+      };
+      cur.completed += 1;
+      perUser.set(key, cur);
+    }
+    const workload = Array.from(perUser.values()).sort((a, b) => b.overdue - a.overdue || b.open - a.open || b.completed - a.completed);
     const escalations = workload.filter(w => w.overdue >= cfg.person_escalation_threshold);
 
     // [2026-06-11] Per-initiative linked task counts. Pre-aggregate

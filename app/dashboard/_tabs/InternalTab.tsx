@@ -25,7 +25,7 @@ import {
   Users, ListTodo, AlertCircle, CheckCircle2, Flame, Compass, ClipboardCheck,
 } from 'lucide-react';
 
-type WorkloadRow = { id: string | null; name: string; photo: string | null; open: number; overdue: number };
+type WorkloadRow = { id: string | null; name: string; photo: string | null; open: number; overdue: number; completed: number };
 type Initiative = {
   id: string;
   name: string;
@@ -251,33 +251,29 @@ export default function InternalTab() {
               <TableHeader>
                 <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Teammate</TableHead>
-                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Open</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">To Do</TableHead>
                   <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Overdue</TableHead>
-                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Completed (7d)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.workload.map(w => {
-                  const isEscalation = w.overdue >= data.thresholds.person_escalation_threshold;
-                  return (
-                    <TableRow key={w.id ?? w.name} className="border-cream-100 row-accent cursor-pointer">
-                      <TableCell className="py-3.5 px-5"><NameWithAvatar name={w.name} photo={w.photo} /></TableCell>
-                      <TableCell className="py-3.5 px-5 text-right tabular-nums">{w.open}</TableCell>
-                      <TableCell className={`py-3 text-right tabular-nums ${w.overdue > 0 ? 'text-rose-600 font-semibold' : 'text-ink-warm-700'}`}>
-                        {w.overdue}
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        {isEscalation ? (
-                          <StatusBadge tone="danger" size="sm" bordered withDot="pulse">Escalation</StatusBadge>
-                        ) : w.overdue > 0 ? (
-                          <StatusBadge tone="warning" size="sm" bordered withDot>Has overdue</StatusBadge>
-                        ) : (
-                          <StatusBadge tone="success" size="sm" bordered withDot>Clear</StatusBadge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {/* Per Andy + TD §3.2/§12 (2026-06-19): Status column
+                    replaced with Completed (7d). Escalation/clear signal
+                    is already legible from the rose Overdue cell + the
+                    dedicated "Attention" card to the right. Open header
+                    label updated to "To Do" to match TD §3.2. */}
+                {data.workload.map(w => (
+                  <TableRow key={w.id ?? w.name} className="border-cream-100 row-accent cursor-pointer">
+                    <TableCell className="py-3.5 px-5"><NameWithAvatar name={w.name} photo={w.photo} /></TableCell>
+                    <TableCell className="py-3.5 px-5 text-right tabular-nums">{w.open}</TableCell>
+                    <TableCell className={`py-3 text-right tabular-nums ${w.overdue > 0 ? 'text-rose-600 font-semibold' : 'text-ink-warm-700'}`}>
+                      {w.overdue}
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
+                      {w.completed}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
