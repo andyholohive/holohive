@@ -2184,7 +2184,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   </div>
 
                   <ul className="space-y-3">
-                    {thisWeekItems
+                    {/* Sort by status per Andy 2026-06-19: pending items
+                        first (current focus), done items grouped at the
+                        bottom (already-crossed-out so the eye glides
+                        past). Stable sort within each group preserves
+                        the source order from the feed. */}
+                    {[...thisWeekItems]
+                      .sort((a, b) => {
+                        const rank = (s: ThisWeekItem['status']) => s === 'done' ? 1 : 0;
+                        return rank(a.status) - rank(b.status);
+                      })
                       .map((it, i) => (
                         <li key={`now-${i}`} className="flex items-center gap-3">
                           <span
