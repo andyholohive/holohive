@@ -29,9 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 function fmtMoney(n: number): string {
   if (!Number.isFinite(n)) return '$0';
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
-  return `$${Math.round(n).toLocaleString()}`;
+  return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
 function fmtPct(n: number): string {
@@ -147,14 +145,14 @@ export function BudgetDashboardV2() {
           icon={Eye}
           label="Content Spend"
           value={fmtMoney(totals.content)}
-          sub="Efficiency tile denominator"
+          sub="KOL content payments"
           accent="sky"
         />
         <KpiCard
           icon={Activity}
           label="Activation"
           value={fmtMoney(totals.activation)}
-          sub="Out of efficiency math"
+          sub="Prize pools & activations"
           accent="purple"
         />
         {isAdminOrOwner && (
