@@ -3876,11 +3876,24 @@ export default function ClientsPage() {
                               <span className="font-semibold text-ink-warm-700">
                                 {weekN != null ? `Week ${weekN}` : 'Engagement live'}
                               </span>
-                              {ctx?.start_date && (
-                                <span className="text-xs text-ink-warm-500">
-                                  Started {formatDate(new Date(ctx.start_date + 'T00:00:00'))}
-                                </span>
-                              )}
+                              {/* Date range. Start date prefers the client_context
+                                  value (what the team sees in the modal), falling
+                                  back to clients.engagement_start_date. End date
+                                  reads clients.engagement_end_date; if null, the
+                                  engagement is open-ended → "ongoing". Per Andy
+                                  2026-06-19. */}
+                              {(() => {
+                                const startRaw = ctx?.start_date || (client as any).engagement_start_date;
+                                if (!startRaw) return null;
+                                const start = formatDate(new Date(startRaw + 'T00:00:00'));
+                                const endRaw = (client as any).engagement_end_date as string | null | undefined;
+                                const end = endRaw ? formatDate(new Date(endRaw + 'T00:00:00')) : 'ongoing';
+                                return (
+                                  <span className="text-xs text-ink-warm-500 tabular-nums">
+                                    {start} – {end}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           )}
 
