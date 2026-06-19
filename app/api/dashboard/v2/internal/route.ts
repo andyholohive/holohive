@@ -97,6 +97,45 @@ export async function GET() {
 
     const completedThisWeekRows = (completedThisWeekRes.data ?? []) as any[];
     const completedThisWeek = completedThisWeekRows.length;
+
+    // ─── Week-over-week deltas for Layer 1 KPI trend arrows ──────
+    // Per HHP Initiative Feature Checklist vF (TD §2.3 · HHP-C §6):
+    // "all live from HQ with trend arrows". We compare each metric
+    // to the same window shifted back 7 days.
+    //   - completedThisWeekPrev: tasks completed [weekStart-7d, weekStart)
+    //   - openTasksPrev:         tasks that were not completed as of weekStart
+    //                            (i.e. created on/before, with no completed_at
+    //                            yet or completed_at >= weekStart)
+    //   - overduePrev:           tasks where due_date < weekStart that were
+    //                            still open at weekStart
+    // No snapshot table needed — HQ tasks are authoritative and the
+    // relevant fields (created_at / completed_at / due_date) are
+    // immutable post-hoc.
+    const weekStartDate = new Date(weekStart);
+    const prevWeekStart = new Date(weekStartDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const weekStartDateStr = weekStart.slice(0, 10);
+    const [completedPrevRes, openPrevRes, overduePrevRes] = await Promise.all([
+      (sb as any)
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'complete')
+        .gte('completed_at', prevWeekStart)
+        .lt('completed_at', weekStart),
+      (sb as any)
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .lte('created_at', weekStart)
+        .or(`completed_at.is.null,completed_at.gte.${weekStart}`),
+      (sb as any)
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .lte('created_at', weekStart)
+        .or(`completed_at.is.null,completed_at.gte.${weekStart}`)
+        .lt('due_date', weekStartDateStr),
+    ]);
+    const completedPrev = completedPrevRes.count ?? 0;
+    const openPrev = openPrevRes.count ?? 0;
+    const overduePrev = overduePrevRes.count ?? 0;
     const openCount = openTasks.length;
 
     // KPI rollups
@@ -110,6 +149,13 @@ export async function GET() {
     const totalThisWeek = completedThisWeek + openCount;
     const completionRate = totalThisWeek > 0
       ? Math.round((completedThisWeek / totalThisWeek) * 100)
+      : 0;
+    // Prior completion rate uses the same shape: completedPrev /
+    // (completedPrev + openPrev). openPrev is "open as of weekStart",
+    // which is the right denominator for the comparable window.
+    const totalPrev = completedPrev + openPrev;
+    const completionRatePrev = totalPrev > 0
+      ? Math.round((completedPrev / totalPrev) * 100)
       : 0;
 
     // Workload + escalations: per-user open + overdue counts
@@ -208,6 +254,13 @@ export async function GET() {
         overdueRed: overdueRed.length,
         completedThisWeek,
         completionRate,
+        // Week-over-week deltas for the trend arrows on Layer 1.
+        // `null` indicates we couldn't form a comparable prior — UI
+        // suppresses the arrow rather than rendering 0.
+        openTasksDelta: openCount - openPrev,
+        overdueDelta: overdue.length - overduePrev,
+        completedThisWeekDelta: completedThisWeek - completedPrev,
+        completionRateDelta: completionRate - completionRatePrev,
       },
       workload,
       escalations,

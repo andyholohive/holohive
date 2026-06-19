@@ -77,6 +77,12 @@ type InternalPayload = {
     overdueRed: number;
     completedThisWeek: number;
     completionRate: number;
+    // Week-over-week deltas — feed the trend arrows on each KPI card
+    // per HHP Initiative Feature Checklist vF (TD §2.3).
+    openTasksDelta: number;
+    overdueDelta: number;
+    completedThisWeekDelta: number;
+    completionRateDelta: number;
   };
   workload: WorkloadRow[];
   escalations: WorkloadRow[];
@@ -187,6 +193,12 @@ export default function InternalTab() {
             via the Health table's row count + ad-hoc side list. Promoted
             "Completed this week" from a sub-line on Tasks to its own card. */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Trend arrows per HHP Initiative Feature Checklist vF
+              (TD §2.3 · HHP-C §6): "all live from HQ with trend arrows".
+              Green up = good for Active / Completed / Completion Rate;
+              for Overdue the polarity flips so up = red. Flat is
+              always neutral. Computed in the API by comparing this 7d
+              window to the prior 7d. */}
           <KpiCard
             icon={ListTodo}
             label="Active Tasks"
@@ -194,6 +206,7 @@ export default function InternalTab() {
             sub="to-do"
             accent="sky"
             topAccent
+            trend={{ delta: data.kpis.openTasksDelta, upIsGood: false }}
           />
           <KpiCard
             icon={AlertCircle}
@@ -202,6 +215,7 @@ export default function InternalTab() {
             sub={`${data.kpis.overdueRed} red · ${data.kpis.overdueTasks - data.kpis.overdueRed} yellow`}
             accent={data.kpis.overdueRed > 0 ? 'rose' : 'amber'}
             topAccent
+            trend={{ delta: data.kpis.overdueDelta, upIsGood: false }}
           />
           <KpiCard
             icon={CheckCircle2}
@@ -210,6 +224,7 @@ export default function InternalTab() {
             sub="this week"
             accent="emerald"
             topAccent
+            trend={{ delta: data.kpis.completedThisWeekDelta, upIsGood: true }}
           />
           <KpiCard
             icon={Compass}
@@ -218,6 +233,11 @@ export default function InternalTab() {
             sub="completed / total"
             accent="brand"
             topAccent
+            trend={{
+              delta: data.kpis.completionRateDelta,
+              upIsGood: true,
+              label: `${data.kpis.completionRateDelta > 0 ? '+' : ''}${data.kpis.completionRateDelta}pp`,
+            }}
           />
         </div>
       </div>

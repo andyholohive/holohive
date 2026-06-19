@@ -68,6 +68,24 @@ const ACCENT_TOP: Record<KpiAccent, string> = {
   purple:  'bg-purple-500',
 };
 
+/**
+ * Week-over-week trend signal. Color convention per HHP Initiative
+ * Feature Checklist vF: green up, neutral flat, red down — but for
+ * metrics where "up = bad" (e.g. Overdue), set `upIsGood: false` to
+ * flip the polarity (up = red, down = green). Flat is always neutral.
+ */
+export interface KpiTrend {
+  /** Signed delta vs prior period (e.g. +5, -3, 0). */
+  delta: number;
+  /** Optional explicit direction override. Derived from delta otherwise. */
+  direction?: 'up' | 'down' | 'flat';
+  /** When true (default), up = green. Set false for Overdue and friends. */
+  upIsGood?: boolean;
+  /** Override the rendered label after the arrow (e.g. "+8 vs last 7d").
+   *  Defaults to a signed number. */
+  label?: string;
+}
+
 interface KpiCardProps {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -79,9 +97,33 @@ interface KpiCardProps {
   /** v11: render a 2px colored top stripe in the accent color.
    *  Off by default (existing pages keep their current look). */
   topAccent?: boolean;
+  /** Optional WoW trend chip. Rendered inline next to the big number. */
+  trend?: KpiTrend;
 }
 
-export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray', topAccent = false }: KpiCardProps) {
+function TrendChip({ trend }: { trend: KpiTrend }) {
+  const dir: 'up' | 'down' | 'flat' =
+    trend.direction ?? (trend.delta > 0 ? 'up' : trend.delta < 0 ? 'down' : 'flat');
+  const upIsGood = trend.upIsGood ?? true;
+  const tone =
+    dir === 'flat'
+      ? 'text-ink-warm-400'
+      : (dir === 'up') === upIsGood
+        ? 'text-emerald-600'
+        : 'text-rose-600';
+  const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '→';
+  const label =
+    trend.label ??
+    (dir === 'flat' ? '0' : `${trend.delta > 0 ? '+' : ''}${trend.delta}`);
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium tabular-nums ${tone}`}>
+      <span aria-hidden>{arrow}</span>
+      {label}
+    </span>
+  );
+}
+
+export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray', topAccent = false, trend }: KpiCardProps) {
   // v11: no hover effect — KPI cards are display-only, not interactive.
   // The Card-style hover (border + lift) would falsely imply clickability.
   return (
@@ -89,22 +131,21 @@ export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray', topAcc
       {topAccent && (
         <span className={`absolute top-0 left-4 right-4 h-[2px] rounded-b ${ACCENT_TOP[accent]}`} aria-hidden />
       )}
-      {/* v11: label + icon on top row, big number below, sub at bottom.
-          This gives the value the full card width to breathe (mockup
-          pattern) and lets labels stay on one line at narrow widths
-          since they no longer share horizontal space with the icon. */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.18em] truncate flex-1">{label}</p>
         <div className={`h-8 w-8 rounded-md flex items-center justify-center shrink-0 border ${ACCENT_TILE[accent]}`}>
           <Icon className="h-3.5 w-3.5" />
         </div>
       </div>
-      <p
-        className="text-[28px] font-semibold text-ink-warm-900 tabular-nums leading-none"
-        style={{ letterSpacing: '-0.03em' }}
-      >
-        {value}
-      </p>
+      <div className="flex items-baseline gap-2">
+        <p
+          className="text-[28px] font-semibold text-ink-warm-900 tabular-nums leading-none"
+          style={{ letterSpacing: '-0.03em' }}
+        >
+          {value}
+        </p>
+        {trend && <TrendChip trend={trend} />}
+      </div>
       {sub && <p className="text-xs text-ink-warm-500 mt-2">{sub}</p>}
     </div>
   );
