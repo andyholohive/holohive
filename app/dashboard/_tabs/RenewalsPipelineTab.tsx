@@ -150,8 +150,8 @@ export default function RenewalsPipelineTab() {
           />
           <KpiCard
             icon={Clock}
-            label="Avg Engagement"
-            value={`${data.retention.avgEngagementWeeks} wk`}
+            label="Average Engagement"
+            value={`${data.retention.avgEngagementWeeks} week${data.retention.avgEngagementWeeks === 1 ? '' : 's'}`}
             sub={`across ${data.retention.activeClients} active client${data.retention.activeClients === 1 ? '' : 's'}`}
             accent="brand"
             topAccent

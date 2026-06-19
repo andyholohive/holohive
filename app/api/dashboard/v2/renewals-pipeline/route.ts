@@ -37,7 +37,7 @@ export async function GET() {
     const sb = adminSupabase();
     const cfg = await getDashboardConfig();
 
-    const [clients, pipeline, retentionRaw, contentTotalRaw] = await Promise.all([
+    const [clients, pipeline, retentionRaw, contentTotalRaw, activeStintsRaw] = await Promise.all([
       getStandardClients(sb),
       getPipelineSnapshot(),
       // [2026-06-11] Retention metrics — spec § 5.1.
@@ -55,6 +55,15 @@ export async function GET() {
         .from('contents')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'posted'),
+      // [2026-06-19] Active client_stints — used to anchor Average
+      // Engagement to the current stint per TD §5.1 "anchors to the
+      // stint, fixing multi-term blur". For clients with no active
+      // stint row yet (un-migrated), the math falls back to
+      // engagement_start_date so we don't lose them from the average.
+      (sb as any)
+        .from('client_stints')
+        .select('client_id, start_date')
+        .eq('status', 'active'),
     ]);
 
     // Build renewal entries — only those with an end_date set (ad-hoc
@@ -118,14 +127,21 @@ export async function GET() {
     const denomRet = activeCountRet + churnedCountRet;
     const clientRetentionPct = denomRet > 0 ? Math.round((activeCountRet / denomRet) * 100) : 100;
 
-    // Avg engagement weeks — across CURRENT active clients only. If
-    // there's no start date, skip the row from the average.
+    // Avg engagement weeks — anchored to the CURRENT active stint per
+    // TD §5.1 ("anchors to the stint, fixing multi-term blur"). For
+    // clients without an active stint row yet, fall back to
+    // engagement_start_date so the metric remains meaningful during
+    // the migration. Skip rows where neither is available.
+    const stintStartByClient = new Map<string, string>();
+    for (const s of ((activeStintsRaw.data ?? []) as Array<{ client_id: string; start_date: string }>)) {
+      if (s.client_id && s.start_date) stintStartByClient.set(s.client_id, s.start_date);
+    }
     const weekSpans = retentionRows
-      .filter(c => c.engagement_status === 'active' && c.engagement_start_date)
-      .map(c => {
-        const start = new Date(
-          c.engagement_start_date + (c.engagement_start_date!.includes('T') ? '' : 'T00:00:00Z'),
-        );
+      .filter(c => c.engagement_status === 'active')
+      .map(c => stintStartByClient.get(c.id) ?? c.engagement_start_date ?? null)
+      .filter((s): s is string => s != null)
+      .map(s => {
+        const start = new Date(s + (s.includes('T') ? '' : 'T00:00:00Z'));
         const ms = Date.now() - start.getTime();
         return ms > 0 ? Math.floor(ms / (7 * 86_400_000)) : 0;
       });
