@@ -208,12 +208,18 @@ export default function InternalTab() {
             topAccent
             trend={{ delta: data.kpis.openTasksDelta, upIsGood: false }}
           />
+          {/* Per Andy 2026-06-19: drop the "N red · M yellow" sub-line
+              and the rose-vs-amber accent flip. Overdue is overdue —
+              the days-overdue distinction lives in the per-task tone
+              on the workload + Attention surfaces; the KPI card just
+              needs the count. Accent kept rose so any value > 0 stays
+              legible at a glance, but constant across thresholds. */}
           <KpiCard
             icon={AlertCircle}
             label="Overdue"
             value={data.kpis.overdueTasks}
-            sub={`${data.kpis.overdueRed} red · ${data.kpis.overdueTasks - data.kpis.overdueRed} yellow`}
-            accent={data.kpis.overdueRed > 0 ? 'rose' : 'amber'}
+            sub="past due"
+            accent="rose"
             topAccent
             trend={{ delta: data.kpis.overdueDelta, upIsGood: false }}
           />
