@@ -83,13 +83,18 @@ export function ThisWeekFeedWidget({
   const [loading, setLoading] = useState(true);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   // [2026-06-17] Per Andy: collapsible to keep the HQ page focused when
-  // the CM wants to drill into Tasks tabs below. Default = expanded
-  // (widget already auto-hides on quiet weeks). Preference persists in
-  // localStorage so reload + tab switches preserve the chosen state.
-  const [collapsed, setCollapsed] = useState(false);
+  // the CM wants to drill into Tasks tabs below.
+  // [2026-06-19] Per Andy: default = collapsed so the page lands on
+  // the Tasks list, not the weekly feed. Users who explicitly expanded
+  // get their preference restored from localStorage.
+  const [collapsed, setCollapsed] = useState(true);
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setCollapsed(window.localStorage.getItem('thisWeekFeedCollapsed') === '1');
+    const saved = window.localStorage.getItem('thisWeekFeedCollapsed');
+    // Only override the collapsed default when the user has explicitly
+    // expanded (saved === '0'). Unset → keep default (collapsed).
+    if (saved === '0') setCollapsed(false);
+    else setCollapsed(true);
   }, []);
   const toggleCollapsed = () => {
     setCollapsed(prev => {
