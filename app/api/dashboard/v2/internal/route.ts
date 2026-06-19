@@ -56,7 +56,7 @@ export async function GET() {
       getStandardClients(sb),
       (sb as any)
         .from('tasks')
-        .select('id, status, due_date, assigned_to, assigned_to_name, completed_at, is_ad_hoc, client_id')
+        .select('id, task_name, status, due_date, assigned_to, assigned_to_name, completed_at, is_ad_hoc, client_id')
         .neq('status', 'complete'),
       (sb as any)
         .from('tasks')
@@ -206,6 +206,33 @@ export async function GET() {
     const workload = Array.from(perUser.values()).sort((a, b) => b.overdue - a.overdue || b.open - a.open || b.completed - a.completed);
     const escalations = workload.filter(w => w.overdue >= cfg.person_escalation_threshold);
 
+    // ─── Overdue panel per TD §3.2 ───────────────────────────────────
+    // Task-level list sorted by days-overdue desc. Spec wording:
+    // "Overdue panel (sorted by days overdue descending, active clients
+    // only, Inactive/Test excluded)". getStandardClients already returns
+    // the active non-archived non-ad-hoc set; we use it as the allowlist
+    // here. Orphan tasks (no client_id) are kept too so they aren't lost.
+    const clientNameById = new Map<string, string>();
+    for (const c of standardClients) clientNameById.set(c.id, c.name);
+    const overdueWithClient = overdue.filter(
+      t => !t.client_id || clientNameById.has(t.client_id),
+    );
+    const overduePanel = overdueWithClient
+      .map(t => {
+        const due = t.due_date ? new Date(t.due_date) : null;
+        const daysOverdue = due ? Math.floor((Date.now() - due.getTime()) / 86_400_000) : 0;
+        return {
+          id: t.id as string,
+          task_name: (t.task_name as string) || '(no name)',
+          client_id: (t.client_id as string | null) ?? null,
+          client_name: t.client_id ? (clientNameById.get(t.client_id) ?? null) : null,
+          assignee_name: (t.assigned_to_name as string | null) ?? null,
+          due_date: (t.due_date as string | null) ?? null,
+          daysOverdue,
+        };
+      })
+      .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
     // [2026-06-11] Per-initiative linked task counts. Pre-aggregate
     // once for the whole map below.
     const linkedTaskCountByInitiative = new Map<string, number>();
@@ -264,6 +291,7 @@ export async function GET() {
       },
       workload,
       escalations,
+      overdueTasks: overduePanel,
       initiatives,
       adHocWork: {
         recentCount: adHocOpen.length,

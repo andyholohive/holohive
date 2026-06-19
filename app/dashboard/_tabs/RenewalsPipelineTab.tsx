@@ -36,6 +36,10 @@ type Renewal = {
   slug: string | null;
   engagement_start_date: string | null;
   engagement_end_date: string | null;
+  /** Week number since engagement_start_date — continuous, doesn't
+   *  reset on renewal (matches the §4.1 Client Health column rule).
+   *  null when no start date is set. Per TD §5.2. */
+  weekNumber: number | null;
   tone: RenewalTone;
   daysLeft: number | null;
 };
@@ -230,6 +234,9 @@ export default function RenewalsPipelineTab() {
             <TableHeader>
               <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
+                {/* Week column per TD §5.2 — continuous since engagement
+                    start (matches the Client Health Week column rule). */}
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Week</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Started</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Ends</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Days left</TableHead>
@@ -246,6 +253,9 @@ export default function RenewalsPipelineTab() {
                     >
                       {r.name}
                     </Link>
+                  </TableCell>
+                  <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
+                    {r.weekNumber != null ? `W${r.weekNumber}` : <span className="text-ink-warm-400">—</span>}
                   </TableCell>
                   <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">
                     {r.engagement_start_date

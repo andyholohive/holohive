@@ -26,6 +26,15 @@ import {
 } from 'lucide-react';
 
 type WorkloadRow = { id: string | null; name: string; photo: string | null; open: number; overdue: number; completed: number };
+type OverdueTaskRow = {
+  id: string;
+  task_name: string;
+  client_id: string | null;
+  client_name: string | null;
+  assignee_name: string | null;
+  due_date: string | null;
+  daysOverdue: number;
+};
 type Initiative = {
   id: string;
   name: string;
@@ -86,6 +95,7 @@ type InternalPayload = {
   };
   workload: WorkloadRow[];
   escalations: WorkloadRow[];
+  overdueTasks: OverdueTaskRow[];
   initiatives: Initiative[];
   adHocWork: { recentCount: number; recent: AdHocTask[] };
   mondayForm: MondayFormStatus;
@@ -305,33 +315,49 @@ export default function InternalTab() {
           )}
         </Card>
 
+        {/* Overdue panel per TD §3.2: task-level list sorted by days
+            overdue desc. Active clients only — orphans/test/inactive
+            are filtered in the API via the standardClients allowlist.
+            Replaces the prior per-person Attention card; per-person
+            escalation signal is still legible from the rose-coloured
+            Overdue column on the workload table to the left. */}
         <Card className="border-cream-200 overflow-hidden">
           <CardHeaderEditorial
             icon={Flame}
             iconClassName="text-rose-500"
-            title="Attention"
-            subtitle={`Above ${data.thresholds.person_escalation_threshold} overdue`}
+            title="Attention Required"
+            subtitle={`${data.overdueTasks.length} overdue · sorted by days overdue`}
           />
 
-          {data.escalations.length === 0 ? (
+          {data.overdueTasks.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 icon={CheckCircle2}
-                title="No escalations"
-                description="Everyone's under threshold."
+                title="Nothing overdue"
+                description="Active client tasks are all on time."
               />
             </div>
           ) : (
-            <ul className="divide-y divide-cream-100">
-              {data.escalations.map(e => (
-                <li key={e.id ?? e.name} className="px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-ink-warm-900">{e.name}</div>
-                    <div className="text-xs text-ink-warm-500 tabular-nums">{e.overdue} overdue · {e.open} open</div>
+            <ul className="divide-y divide-cream-100 max-h-[420px] overflow-y-auto">
+              {data.overdueTasks.slice(0, 20).map(t => (
+                <li key={t.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-ink-warm-900 truncate">{t.task_name}</div>
+                    <div className="text-[11px] text-ink-warm-500 truncate">
+                      {t.client_name ? <Link href={`/clients/${t.client_id}`} className="hover:text-brand">{t.client_name}</Link> : <span className="italic">No client</span>}
+                      {t.assignee_name ? <> · {t.assignee_name}</> : null}
+                    </div>
                   </div>
-                  <StatusBadge tone="danger" size="sm" bordered withDot="pulse">Escalate</StatusBadge>
+                  <span className={`text-xs font-semibold tabular-nums shrink-0 ${t.daysOverdue >= data.thresholds.overdue_red_days ? 'text-rose-600' : 'text-amber-700'}`}>
+                    {t.daysOverdue}d
+                  </span>
                 </li>
               ))}
+              {data.overdueTasks.length > 20 && (
+                <li className="px-4 py-2 text-[11px] text-ink-warm-500 italic">
+                  + {data.overdueTasks.length - 20} more — open /tasks?status=overdue for full list
+                </li>
+              )}
             </ul>
           )}
         </Card>
@@ -389,10 +415,13 @@ export default function InternalTab() {
                     )}
                   </div>
                 </div>
+                {/* "No submission" label per TD §6: visible to everyone
+                    when deadline has passed and member hasn't filed.
+                    Replaces the prior "Late" wording to match spec. */}
                 {e.submitted ? (
                   <StatusBadge tone="success" size="sm" bordered withDot>Submitted</StatusBadge>
                 ) : e.isLate ? (
-                  <StatusBadge tone="danger" size="sm" bordered withDot="pulse">Late</StatusBadge>
+                  <StatusBadge tone="danger" size="sm" bordered withDot="pulse">No submission</StatusBadge>
                 ) : (
                   <StatusBadge tone="neutral" size="sm" bordered withDot>Pending</StatusBadge>
                 )}

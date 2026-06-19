@@ -63,12 +63,21 @@ export async function GET() {
     const renewals = withEnd
       .map(c => {
         const t = renewalToneFor(c.engagement_end_date, cfg.renewal_red_days, cfg.renewal_amber_days);
+        // Week number per TD §5.2 — continuous since engagement_start_date,
+        // doesn't reset on renewal (matches the §4.1 Client Health rule).
+        let weekNumber: number | null = null;
+        if (c.engagement_start_date) {
+          const start = new Date(c.engagement_start_date + (c.engagement_start_date.includes('T') ? '' : 'T00:00:00Z'));
+          const weeks = Math.floor((Date.now() - start.getTime()) / (7 * 86_400_000));
+          weekNumber = weeks >= 0 ? weeks + 1 : null;
+        }
         return {
           id: c.id,
           name: c.name,
           slug: c.slug,
           engagement_start_date: c.engagement_start_date,
           engagement_end_date: c.engagement_end_date,
+          weekNumber,
           tone: t.tone,
           daysLeft: t.daysLeft,
         };
