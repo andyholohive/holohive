@@ -270,60 +270,10 @@ export default function RenewalsPipelineTab() {
         )}
       </Card>
 
-      {/* Forward look + missing end dates */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="border-cream-200 overflow-hidden">
-          <CardHeaderEditorial
-            icon={Calendar}
-            title="Next 90 Days"
-            subtitle="Renewals due by month"
-          />
-
-          {data.renewals.upcomingMonths.length === 0 ? (
-            <div className="p-6">
-              <EmptyState icon={Calendar} title="Quiet quarter" description="Nothing renewing in 90 days." />
-            </div>
-          ) : (
-            <ul className="divide-y divide-cream-100">
-              {data.renewals.upcomingMonths.map(m => (
-                <li key={m.month} className="px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-ink-warm-900">{formatMonth(m.month)}</span>
-                  <span className="text-sm tabular-nums text-ink-warm-700">{m.count}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card className="lg:col-span-2 border-cream-200 overflow-hidden">
-          <CardHeaderEditorial
-            icon={AlertCircle}
-            iconClassName="text-amber-500"
-            title="Clients Without an End Date"
-            subtitle="Won't fire renewal alerts — set end_date or flag ad-hoc"
-          />
-
-          {data.renewals.clientsWithoutEndDate.length === 0 ? (
-            <div className="p-6">
-              <EmptyState icon={Calendar} title="All set" description="Every standard client has an end date." />
-            </div>
-          ) : (
-            <ul className="divide-y divide-cream-100">
-              {data.renewals.clientsWithoutEndDate.map(c => (
-                <li key={c.id} className="px-4 py-3 flex items-center justify-between">
-                  <Link
-                    href={`/clients/${c.id}`}
-                    className="text-sm font-medium text-ink-warm-900 hover:text-brand transition-colors"
-                  >
-                    {c.name}
-                  </Link>
-                  <span className="text-xs text-amber-700 font-medium">Set end date</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+      {/* "Next 90 Days" + "Clients Without an End Date" cards hidden
+          per Andy 2026-06-19. Both surfaces still produce data on the
+          API side (data.renewals.upcomingMonths,
+          data.renewals.clientsWithoutEndDate) but no longer render. */}
       </div>
 
       {/* ── 03 Pipeline ─────────────────────────────────────────────── */}
