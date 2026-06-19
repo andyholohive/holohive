@@ -1558,7 +1558,7 @@ export default function ClientsPage() {
   };
 
   // Context CRUD
-  const openContextModal = (client: ClientWithAccess) => {
+  const openContextModal = (client: ClientWithAccess, initialTab: string = 'context') => {
     const ctx = clientContexts[client.id];
     const crmAccount = getLinkedCRMAccount(client.id);
 
@@ -1567,7 +1567,15 @@ export default function ClientsPage() {
     const crmStartDate = crmAccount?.closed_at || crmAccount?.qualified_at || crmAccount?.created_at;
 
     setContextModalClient(client);
-    setContextModalTab('context');
+    setContextModalTab(initialTab);
+    // Action Board / Weekly Update do their own lazy loads on mount
+    // via the Tabs onValueChange handler — fire equivalent loaders
+    // here so deep-linking from the client card works on first paint.
+    if (initialTab === 'actionboard') {
+      seedMilestones(client.id);
+    } else if (initialTab === 'weekly-update') {
+      loadWeeklyV2Row(client.id, weeklyV2Week);
+    }
     setContextForm({
       engagement_type: ctx?.engagement_type || '',
       scope: crmAccount ? crmScope : (ctx?.scope || ''),
@@ -3923,26 +3931,28 @@ export default function ClientsPage() {
                         </div>
                       );
                     })()}
-                    {/* [Responsive cleanup, May 2026] flex-wrap with
-                        flex-1 + min-w-0 so the two campaign buttons sit
-                        side-by-side when there's room and stack neatly
-                        on cramped widths. Without flex-wrap they were
-                        overflowing the card right edge at the lg
-                        breakpoint where each card is ~320px wide. */}
-                    {(client.campaign_count || 0) > 0 ? (
-                      <div className="flex gap-2 flex-wrap">
+                    {/* Per Andy 2026-06-19: campaign-row simplified to
+                        View Campaigns + View Portal. Add Campaign dropped
+                        (rarely used from the client card; campaign-create
+                        still reachable from /campaigns). When the client
+                        has no campaigns yet, the View Campaigns button
+                        is hidden and View Portal takes the full row. */}
+                    <div className="flex gap-2 flex-wrap">
+                      {(client.campaign_count || 0) > 0 && (
                         <Button variant="outline" size="sm" className="flex-1 min-w-[120px]" onClick={() => router.push(`/campaigns?clientId=${client.id}`)}>
                           View Campaigns
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1 min-w-[120px]" onClick={() => router.push(`/campaigns?add=1&clientId=${client.id}`)}>
-                          Add Campaign
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm" className="w-full" onClick={() => router.push(`/campaigns?add=1&clientId=${client.id}`)}>
-                        Add Campaign
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={(client.campaign_count || 0) > 0 ? "flex-1 min-w-[120px]" : "w-full"}
+                        onClick={() => router.push(`/public/portal/${client.id}`)}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                        <span className="truncate">View Portal</span>
                       </Button>
-                    )}
+                    </div>
                     {/* Client Portal row — three flat buttons (no kebab).
                         Updates + Notes were hidden per the May 22, 2026
                         audit because the features had ~zero usage
@@ -3996,28 +4006,44 @@ export default function ClientsPage() {
                           </div>
                         );
                       })()}
+                      {/* Per Andy 2026-06-19: Edit Portal split into 3
+                          deep-link buttons (Context / Action Board /
+                          Weekly Update) that open the modal pre-selected
+                          to that tab. Visit log stays. The little
+                          green "Set up" dot now sits on the Context
+                          button since that's the one that surfaces the
+                          form whose presence the dot signals. */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button
                           variant="outline"
                           size="sm"
                           className="flex-1 min-w-[110px] px-2"
-                          onClick={() => router.push(`/public/portal/${client.id}`)}
+                          onClick={() => openContextModal(client, 'context')}
+                          title="Open the Context tab"
                         >
-                          <ExternalLink className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                          <span className="truncate">Open Portal</span>
+                          <Pencil className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                          <span className="truncate">Context</span>
+                          {clientContexts[client.id] && (
+                            <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Set up" />
+                          )}
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           className="flex-1 min-w-[110px] px-2"
-                          onClick={() => openContextModal(client)}
-                          title="Edit client portal context + action board"
+                          onClick={() => openContextModal(client, 'actionboard')}
+                          title="Open the Action Board tab"
                         >
-                          <Pencil className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                          <span className="truncate">Edit Portal</span>
-                          {clientContexts[client.id] && (
-                            <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Set up" />
-                          )}
+                          <span className="truncate">Action Board</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 min-w-[110px] px-2"
+                          onClick={() => openContextModal(client, 'weekly-update')}
+                          title="Open the Weekly Update tab"
+                        >
+                          <span className="truncate">Weekly Update</span>
                         </Button>
                         {(() => {
                           const lastVisitAt = portalAccessSummary[client.id]?.last_at;
