@@ -429,7 +429,10 @@ export default function ClientsPage() {
   // open. Engagement is the same metric the portal's auto-pick uses
   // so the CM can quickly see "why did it auto-pick THIS one" and
   // override if needed.
-  const [topPostPickerOpen, setTopPostPickerOpen] = useState(false);
+  // Expand-to-all toggle for the Zone C inline list. Default false so
+  // CMs see the auto top-3; opening the toggle reveals up to 30 (the
+  // fetch cap) for the rare case where the right post sits further down.
+  const [topPostShowAll, setTopPostShowAll] = useState(false);
   const [topPostCandidates, setTopPostCandidates] = useState<Array<{
     id: string; kol_name: string; platform: string | null; content_link: string | null;
     impressions: number; likes: number; comments: number; retweets: number; engagements: number;
@@ -1575,6 +1578,9 @@ export default function ClientsPage() {
       seedMilestones(client.id);
     } else if (initialTab === 'weekly-update') {
       loadWeeklyV2Row(client.id, weeklyV2Week);
+      // Zone C inline candidates — load alongside the v2 row so the
+      // top-3 list is ready when the tab paints (no extra click).
+      fetchTopPostCandidates(client.id);
     }
     setContextForm({
       engagement_type: ctx?.engagement_type || '',
@@ -2070,14 +2076,29 @@ export default function ClientsPage() {
   const fetchTopPostCandidates = async (clientId: string) => {
     setTopPostCandidatesLoading(true);
     try {
+      // Two-step fetch: first the client's campaign IDs, then posted
+      // content filtered by campaign_id IN (...). Mirrors the portal's
+      // fetchTopPost pattern. The previous embedded `campaigns!inner`
+      // filter (`.eq('campaigns.client_id', clientId)`) returned 0 rows
+      // in practice even when 22 posted rows existed — PostgREST
+      // embedded filters on hop-2 relations are unreliable here.
+      const { data: campaignRows, error: campErr } = await (supabase as any)
+        .from('campaigns')
+        .select('id')
+        .eq('client_id', clientId);
+      if (campErr) throw campErr;
+      const campaignIds = (campaignRows || []).map((c: any) => c.id);
+      if (campaignIds.length === 0) {
+        setTopPostCandidates([]);
+        return;
+      }
       const { data, error } = await (supabase as any)
         .from('contents')
         .select(`
           id, platform, content_link, impressions, likes, comments, retweets, bookmarks, notes, activation_date,
-          campaign_kols!inner ( master_kols!inner ( name ) ),
-          campaigns!inner ( client_id )
+          campaign_kols!inner ( master_kols!inner ( name ) )
         `)
-        .eq('campaigns.client_id', clientId)
+        .in('campaign_id', campaignIds)
         .eq('status', 'posted')
         .order('activation_date', { ascending: false })
         .limit(60);
@@ -2105,8 +2126,13 @@ export default function ClientsPage() {
   };
 
   const pinTopPost = async (clientId: string, contentId: string) => {
-    await saveWeeklyV2(clientId, weeklyV2Week, { top_post_override: { content_id: contentId } });
-    setTopPostPickerOpen(false);
+    // Toggle behavior: if this content is already pinned, treat the
+    // click as an unpin (back to auto-pick). Lets the inline top-3
+    // list act as both the picker and the clear control.
+    const isAlreadyPinned = weeklyV2Row?.top_post_override?.content_id === contentId;
+    await saveWeeklyV2(clientId, weeklyV2Week, {
+      top_post_override: isAlreadyPinned ? null : { content_id: contentId },
+    });
   };
 
   const clearTopPostOverride = async (clientId: string) => {
@@ -4099,94 +4125,9 @@ export default function ClientsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Zone C — Top Post Override Picker.
-            Opened from the Weekly Update tab's "Pin a different post"
-            button. Shows the client's posted content sorted by
-            engagement; user picks one and it's saved on the v2 row's
-            top_post_override. */}
-        <Dialog open={topPostPickerOpen} onOpenChange={setTopPostPickerOpen}>
-          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-amber-500" />
-                Pin Top Post — {contextModalClient?.name}
-              </DialogTitle>
-              <DialogDescription>
-                Pick the post you want to feature on the portal this week. Sorted by total engagement.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto px-1">
-              {topPostCandidatesLoading ? (
-                <div className="space-y-2 py-4">
-                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-md" />)}
-                </div>
-              ) : topPostCandidates.length === 0 ? (
-                <div className="py-8 text-center text-sm text-ink-warm-500">
-                  No posted content yet for this client.
-                </div>
-              ) : (
-                <div className="space-y-2 py-2">
-                  {topPostCandidates.map((c, idx) => {
-                    const isPinned = weeklyV2Row?.top_post_override?.content_id === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => contextModalClient && pinTopPost(contextModalClient.id, c.id)}
-                        className={`w-full text-left p-3 rounded-md border transition-colors ${
-                          isPinned
-                            ? 'bg-amber-50 border-amber-300'
-                            : 'bg-white border-cream-200 hover:bg-cream-50'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-ink-warm-900">{c.kol_name}</span>
-                              {c.platform && (
-                                <span className="text-[10px] uppercase tracking-wider text-ink-warm-500">{c.platform}</span>
-                              )}
-                              {idx === 0 && !isPinned && (
-                                <StatusBadge tone="brand" size="sm" bordered>Auto-pick</StatusBadge>
-                              )}
-                              {isPinned && (
-                                <StatusBadge tone="warning" size="sm" bordered withDot>Pinned</StatusBadge>
-                              )}
-                            </div>
-                            {c.notes && (
-                              <p className="text-xs text-ink-warm-700 line-clamp-2 italic">{c.notes}</p>
-                            )}
-                            <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
-                              <span>{c.impressions.toLocaleString()} views</span>
-                              <span>{c.likes.toLocaleString()} likes</span>
-                              <span>{c.retweets.toLocaleString()} RT</span>
-                              <span>{c.comments.toLocaleString()} cmt</span>
-                            </div>
-                          </div>
-                          {c.content_link && (
-                            <a
-                              href={c.content_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs text-brand hover:text-brand-dark shrink-0"
-                              title="Open post"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-              <Button variant="outline" onClick={() => setTopPostPickerOpen(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Zone C top-post picker Dialog removed 2026-06-19 — the picker
+            now renders inline inside the Weekly Update tab's Zone C
+            block. See `topPostCandidates` rendering in that section. */}
 
         {/* Access Log Dialog — read-only audit of who has visited the
             public portal. Sourced from portal_access_log; admin-only
@@ -4729,6 +4670,10 @@ export default function ClientsPage() {
                 // open. Each tab switch reloads the row in case
                 // another team member edited it in the meantime.
                 loadWeeklyV2Row(contextModalClient.id, weeklyV2Week);
+                // Zone C inline candidates — keep these in sync with
+                // the v2 row reload so freshly-posted content shows up
+                // without an extra refresh.
+                fetchTopPostCandidates(contextModalClient.id);
               }
             }} className="flex-1 flex flex-col min-h-0">
               {/* Popup tab chrome aligned with the other in-popup tab
@@ -5772,53 +5717,128 @@ export default function ClientsPage() {
                       </div>
 
                       {/* ─── Section 4: Zone C — Top Post Review ────
-                          Auto-pick by default, with an override picker
-                          for the CM to pin a specific post if the
-                          auto-pick isn't the best representative of
-                          the week. Pinned id is saved on
-                          top_post_override; the portal reads it and
-                          swaps in that post when rendering. */}
+                          Per Andy 2026-06-19: render the top-3 candidate
+                          posts inline (was a separate Dialog popup before)
+                          so the CM can scan engagement + pin without a
+                          context switch. Each row is click-to-pin /
+                          click-again-to-unpin; the portal still reads a
+                          single content_id off top_post_override so the
+                          pinned row wins. "Show more" expands to ~30
+                          candidates for the edge case where the auto top-3
+                          aren't representative. */}
                       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div>
                             <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone C · Top Post (client-facing)</p>
                             <p className="text-xs text-emerald-800/80">
                               {weeklyV2Row?.top_post_override
-                                ? 'Pinned post — overrides the auto-pick on the portal.'
-                                : 'Auto-selected by Content Dashboard (highest engagement).'}
+                                ? 'Pinned post overrides the auto-pick on the portal. Click again to unpin.'
+                                : 'Top 3 by engagement. Click any row to pin it as this week’s feature.'}
                             </p>
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          {topPostShowAll && (
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="text-xs h-8 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
-                              onClick={() => {
-                                if (!contextModalClient) return;
-                                setTopPostPickerOpen(true);
-                                fetchTopPostCandidates(contextModalClient.id);
-                              }}
+                              variant="ghost"
+                              className="text-xs h-8 text-emerald-900 hover:bg-emerald-100"
+                              onClick={() => setTopPostShowAll(false)}
                             >
-                              {weeklyV2Row?.top_post_override ? 'Change pinned post' : 'Pin a different post'}
+                              Show top 3
                             </Button>
-                            {weeklyV2Row?.top_post_override && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-xs h-8 text-emerald-900 hover:bg-emerald-100"
-                                onClick={() => contextModalClient && clearTopPostOverride(contextModalClient.id)}
-                              >
-                                Clear
-                              </Button>
-                            )}
-                          </div>
+                          )}
                         </div>
-                        {weeklyV2Row?.top_post_override && (
-                          <div className="bg-white border border-emerald-200 rounded-md p-2 text-xs text-emerald-900">
-                            <span className="font-medium">Pinned content_id:</span>{' '}
-                            <span className="font-mono text-[11px] text-emerald-700">{weeklyV2Row.top_post_override.content_id}</span>
+
+                        {topPostCandidatesLoading ? (
+                          <div className="space-y-2">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                              <Skeleton key={i} className="h-16 w-full rounded-md" />
+                            ))}
                           </div>
-                        )}
+                        ) : topPostCandidates.length === 0 ? (
+                          <div className="bg-white border border-emerald-200 rounded-md p-4 text-center text-xs text-emerald-800/70">
+                            No posted content yet this week for this client.
+                          </div>
+                        ) : (() => {
+                          // Pinned row floats to the top regardless of
+                          // engagement rank, so the CM sees their override
+                          // even if it sits at position 14 by raw engagement.
+                          const pinnedId = weeklyV2Row?.top_post_override?.content_id || null;
+                          const baseSlice = topPostShowAll
+                            ? topPostCandidates
+                            : topPostCandidates.slice(0, 3);
+                          const pinnedRow = pinnedId
+                            ? topPostCandidates.find(c => c.id === pinnedId)
+                            : null;
+                          const rows = pinnedRow && !baseSlice.some(c => c.id === pinnedId)
+                            ? [pinnedRow, ...baseSlice]
+                            : baseSlice;
+                          return (
+                            <div className="space-y-2">
+                              {rows.map((c, idx) => {
+                                const isPinned = pinnedId === c.id;
+                                return (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => contextModalClient && pinTopPost(contextModalClient.id, c.id)}
+                                    className={`w-full text-left p-3 rounded-md border transition-colors ${
+                                      isPinned
+                                        ? 'bg-amber-50 border-amber-300'
+                                        : 'bg-white border-emerald-200 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                          <span className="text-xs font-semibold text-ink-warm-900">{c.kol_name}</span>
+                                          {c.platform && (
+                                            <span className="text-[10px] uppercase tracking-wider text-ink-warm-500">{c.platform}</span>
+                                          )}
+                                          {idx === 0 && !isPinned && !pinnedId && (
+                                            <StatusBadge tone="brand" size="sm" bordered>Auto-pick</StatusBadge>
+                                          )}
+                                          {isPinned && (
+                                            <StatusBadge tone="warning" size="sm" bordered withDot>Pinned</StatusBadge>
+                                          )}
+                                        </div>
+                                        {c.notes && (
+                                          <p className="text-xs text-ink-warm-700 line-clamp-2 italic">{c.notes}</p>
+                                        )}
+                                        <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
+                                          <span>{c.impressions.toLocaleString()} views</span>
+                                          <span>{c.likes.toLocaleString()} likes</span>
+                                          <span>{c.retweets.toLocaleString()} RT</span>
+                                          <span>{c.comments.toLocaleString()} cmt</span>
+                                        </div>
+                                      </div>
+                                      {c.content_link && (
+                                        <a
+                                          href={c.content_link}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="text-xs text-brand hover:text-brand-dark shrink-0"
+                                          title="Open post"
+                                        >
+                                          <ExternalLink className="h-3.5 w-3.5" />
+                                        </a>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                              {!topPostShowAll && topPostCandidates.length > 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTopPostShowAll(true)}
+                                  className="w-full text-xs text-emerald-900 hover:bg-emerald-100 rounded-md py-1.5 transition-colors"
+                                >
+                                  Show {Math.min(topPostCandidates.length - 3, 27)} more candidates
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </>
                   )}
