@@ -2073,6 +2073,162 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </div>
               )}
             </CardContent>
+            {/* ── Your Campaigns merged inline per Andy 2026-06-19 ──
+                When the advanced section gate is on, render the full
+                Your Campaigns header + search + tabs + list as a second
+                section inside this same Card. Border-top separates it
+                from the Active Campaign hero above. The standalone
+                Your Campaigns Card lower on the page is suppressed in
+                this branch so the content doesn't double-render. */}
+            {showAdvancedSections && (
+              <div className="border-t border-gray-100">
+                <div className="bg-white px-6 sm:px-8 pt-6 pb-4 border-b border-gray-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <CardTitle className="text-lg font-bold text-gray-900">Your Campaigns</CardTitle>
+                    <div className="relative w-full sm:w-72">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search campaigns..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 focus-brand rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <CardContent className="p-6">
+                  <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-6">
+                    <TabsList className="bg-gray-100 p-1 rounded-lg">
+                      <TabsTrigger value="all" className="rounded-md px-4 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm cursor-pointer">All ({stats.total})</TabsTrigger>
+                      <TabsTrigger value="active" className="rounded-md px-4 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm cursor-pointer">Active ({stats.active + stats.planning})</TabsTrigger>
+                      <TabsTrigger value="completed" className="rounded-md px-4 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm cursor-pointer">Completed ({stats.completed})</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  {loading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-36 bg-gray-100 rounded-xl"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredCampaigns.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Megaphone className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No campaigns found</h3>
+                      <p className="text-gray-500">
+                        {searchTerm ? 'Try a different search term.' : 'No campaigns match the selected filter.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredCampaigns.map((campaign, index) => {
+                        const statusBorderColor = campaign.status === 'Active'
+                          ? 'border-l-green-500'
+                          : campaign.status === 'Planning'
+                          ? 'border-l-blue-500'
+                          : campaign.status === 'Paused'
+                          ? 'border-l-yellow-500'
+                          : 'border-l-gray-400';
+                        return (
+                          <div
+                            key={campaign.id}
+                            className={`group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden border-l-4 ${statusBorderColor}`}
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            <div className="p-5">
+                              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-brand transition-colors">
+                                      {campaign.name}
+                                    </h3>
+                                    <Badge className={`${getStatusBadge(campaign.status)} font-medium px-2.5 py-0.5 cursor-default pointer-events-none`}>
+                                      {campaign.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 mb-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="p-1 bg-gray-100 rounded">
+                                        <Calendar className="h-3.5 w-3.5 text-gray-500" />
+                                      </div>
+                                      <span>{formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}</span>
+                                    </div>
+                                    {campaign.total_budget && (
+                                      <div className="flex items-center gap-2">
+                                        <div className="p-1 bg-gray-100 rounded">
+                                          <DollarSign className="h-3.5 w-3.5 text-gray-500" />
+                                        </div>
+                                        <span className="font-medium text-gray-700">{formatCurrency(campaign.total_budget)}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <div className="p-1 bg-gray-100 rounded">
+                                        <Users className="h-3.5 w-3.5 text-gray-500" />
+                                      </div>
+                                      <span>{campaign.kol_count} KOLs</span>
+                                    </div>
+                                  </div>
+                                  {campaign.content_count > 0 && (
+                                    <div className="flex items-center gap-6 text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <Eye className="h-4 w-4 text-brand" />
+                                        <span className="text-gray-600">
+                                          <span className="font-semibold text-gray-900">{formatNumber(campaign.total_impressions)}</span> impressions
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                                        <span className="text-gray-600">
+                                          <span className="font-semibold text-gray-900">{formatNumber(campaign.total_engagement)}</span> engagement
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-lg border-gray-200 hover:border-brand transition-colors"
+                                    onClick={() => {
+                                      const url = campaign.slug
+                                        ? `/public/campaigns/${campaign.slug}`
+                                        : `/public/campaigns/${campaign.id}`;
+                                      window.open(url, '_blank');
+                                    }}
+                                  >
+                                    <ExternalLink className="h-4 w-4 mr-1.5" />
+                                    View Campaign
+                                  </Button>
+                                  {campaign.share_report_publicly && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        const url = campaign.slug
+                                          ? `/public/reports/${campaign.slug}`
+                                          : `/public/reports/${campaign.id}`;
+                                        window.open(url, '_blank');
+                                      }}
+                                      className="rounded-lg bg-gradient-to-r from-brand to-[#2d6570] hover:from-[#2d6570] hover:to-[#1d4a52] shadow-md hover:shadow-lg transition-all"
+                                    >
+                                      <FileText className="h-4 w-4 mr-1.5" />
+                                      View Report
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </div>
+            )}
           </Card>
         )}
 
@@ -3319,8 +3475,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Campaigns Section — discovery & tracker only */}
-        {showAdvancedSections && <Card id="section-campaigns" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
+        {/* Campaigns Section — discovery & tracker only.
+            Suppressed when the Active Campaign hero is rendered (Campaign
+            Live mode), since this content is now merged inline above
+            per Andy 2026-06-19. Kept for non-Campaign-Live paths so
+            clients without an active campaign still see their list. */}
+        {showAdvancedSections && !(isCampaignLiveMode && activeCampaign) && <Card id="section-campaigns" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
           <CardHeader className="bg-white border-b border-gray-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-lg font-bold text-gray-900">Your Campaigns</CardTitle>
