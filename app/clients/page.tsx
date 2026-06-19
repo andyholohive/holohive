@@ -3917,40 +3917,11 @@ export default function ClientsPage() {
                               <ListTodo className="h-3 w-3" />
                               {openHqTasks} HQ task{openHqTasks === 1 ? '' : 's'}
                             </button>
-                            {/* Pending client task badge — only renders when
-                                there are pending items, so it stays out of
-                                the way when the client isn't blocking.
-                                Hover shows the actual items (per Andy
-                                2026-06-19). */}
-                            {pendingClientTasks > 0 && (
-                              <TooltipProvider delayDuration={150}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-medium cursor-help">
-                                      <Activity className="h-3 w-3" />
-                                      {pendingClientTasks} on client
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-[320px] p-2.5 space-y-1.5">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-warm-500">
-                                      On client · {pendingClientTasks} unfinished
-                                    </p>
-                                    <ul className="space-y-1">
-                                      {pendingClientTaskItems.slice(0, 10).map(it => (
-                                        <li key={it.id} className="text-xs text-ink-warm-800 leading-snug">
-                                          · {it.text}
-                                        </li>
-                                      ))}
-                                      {pendingClientTaskItems.length > 10 && (
-                                        <li className="text-[11px] text-ink-warm-500 italic">
-                                          + {pendingClientTaskItems.length - 10} more
-                                        </li>
-                                      )}
-                                    </ul>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
+                            {/* "N on client" pill hidden per Andy 2026-06-19.
+                                Client-court action items remain visible in
+                                the Action Board tab inside the Context modal;
+                                the card-row pill was redundant signal that
+                                cluttered the activity strip. */}
                             {/* Last-visit eye-icon date dropped per Andy
                                 2026-06-19 — duplicated the footer
                                 "Last visited: …" line which also carries
