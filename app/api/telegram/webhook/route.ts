@@ -1662,7 +1662,8 @@ async function handleBulkCommand(chatId: string, message: any) {
       chatId,
       'Usage: <code>/bulk</code> followed by a weekly-rollout-style block.\n\n' +
       'Each client section starts with the client name on its own line, then bullet lines like:\n' +
-      '<code>• May 19 - @yano write the OST recap brief</code>',
+      '<code>• May 19 - @yano write the OST recap brief</code>\n\n' +
+      '✨ On confirm, every client-linked task is also pre-filled into that client\'s Zone A (Execution Plan) for this week, ready for the CM to submit.',
       'HTML',
       threadId,
     );
@@ -1876,6 +1877,17 @@ async function handleBulkCallback(cq: any) {
 
   const createdIds: string[] = [];
   const failures: Array<{ task_name: string; error: string }> = [];
+  // Track each successful insert alongside its parsed source so we can
+  // pre-fill Zone A below (per Andy 2026-06-19). Keyed list, not a map,
+  // since multiple tasks can have the same name within one bulk.
+  type CreatedForZoneA = {
+    taskId: string;
+    clientId: string;
+    task_name: string;
+    primary_assignee_id: string | null;
+    due_date: string | null;
+  };
+  const createdForZoneA: CreatedForZoneA[] = [];
 
   for (const section of sections) {
     const clientId: string | null = section.client_id || null;
@@ -1917,6 +1929,15 @@ async function handleBulkCallback(cq: any) {
         continue;
       }
       createdIds.push(created.id);
+      if (clientId) {
+        createdForZoneA.push({
+          taskId: created.id,
+          clientId,
+          task_name: t.task_name,
+          primary_assignee_id: t.primary_assignee_id || null,
+          due_date: t.due_date || null,
+        });
+      }
 
       // Fire the assignment DM if this task has an assignee. Same
       // inline path /task uses — service-role write, dedupe via
@@ -1929,11 +1950,103 @@ async function handleBulkCallback(cq: any) {
 
   await (supabaseAdmin as any).from('pending_bulk_tasks').delete().eq('id', pendingId);
 
+  // ─── Pre-fill Zone A (Execution Plan) per client per Andy 2026-06-19 ──
+  // For every client-linked task we just created, append a Zone A row
+  // to that client's client_weekly_updates row for this Monday-anchored
+  // week. CMs see the new rows next time they open the Weekly Update
+  // tab and can edit/submit without retyping.
+  //
+  // Guardrails:
+  //   • Skip clients whose Zone A is already locked (submitted_at set)
+  //     so we don't overwrite the CM's signed-off plan.
+  //   • Use a stable id format — bulk:<task uuid> — so re-runs of the
+  //     same /bulk command don't duplicate rows (we dedupe below).
+  //   • Row payload mirrors the Zone A UI shape:
+  //       { id, description, assignee_id, due_date, deliverable_type }
+  const zoneAByClient = new Map<string, Array<{ id: string; description: string; assignee_id: string | null; due_date: string | null; deliverable_type: null }>>();
+  for (const c of createdForZoneA) {
+    const arr = zoneAByClient.get(c.clientId) ?? [];
+    arr.push({
+      id: `bulk:${c.taskId}`,
+      description: String(c.task_name || '').trim(),
+      assignee_id: c.primary_assignee_id,
+      due_date: c.due_date,
+      deliverable_type: null,
+    });
+    zoneAByClient.set(c.clientId, arr);
+  }
+  // Compute this Monday in YYYY-MM-DD (matches client_weekly_updates.week_of).
+  const today = new Date();
+  const dow = today.getUTCDay() || 7;
+  const monday = new Date(today);
+  monday.setUTCDate(today.getUTCDate() - (dow - 1));
+  monday.setUTCHours(0, 0, 0, 0);
+  const weekOf = monday.toISOString().slice(0, 10);
+
+  let zoneAUpdatedClients = 0;
+  let zoneALockedClients = 0;
+  let zoneAAddedRows = 0;
+  for (const [clientId, rows] of zoneAByClient) {
+    if (rows.length === 0) continue;
+    // Fetch existing row for (client_id, week_of), if any.
+    const { data: existingRow } = await (supabaseAdmin as any)
+      .from('client_weekly_updates')
+      .select('id, execution_plan, execution_plan_submitted_at')
+      .eq('client_id', clientId)
+      .eq('week_of', weekOf)
+      .maybeSingle();
+
+    if (existingRow?.execution_plan_submitted_at) {
+      zoneALockedClients++;
+      continue;
+    }
+
+    // Dedupe by id so re-running the same /bulk doesn't double-add.
+    const existingPlan: any[] = Array.isArray(existingRow?.execution_plan) ? existingRow.execution_plan : [];
+    const existingIds = new Set(existingPlan.map(r => r?.id).filter(Boolean));
+    const fresh = rows.filter(r => !existingIds.has(r.id));
+    if (fresh.length === 0) continue;
+    const nextPlan = [...existingPlan, ...fresh];
+
+    if (existingRow) {
+      const { error: upErr } = await (supabaseAdmin as any)
+        .from('client_weekly_updates')
+        .update({ execution_plan: nextPlan, updated_at: new Date().toISOString() })
+        .eq('id', existingRow.id);
+      if (upErr) {
+        console.error('[Telegram /bulk] Zone A update failed:', upErr);
+        continue;
+      }
+    } else {
+      const { error: insErr } = await (supabaseAdmin as any)
+        .from('client_weekly_updates')
+        .insert({
+          client_id: clientId,
+          week_of: weekOf,
+          execution_plan: nextPlan,
+          created_by: (clicker as any).id,
+        });
+      if (insErr) {
+        console.error('[Telegram /bulk] Zone A insert failed:', insErr);
+        continue;
+      }
+    }
+    zoneAUpdatedClients++;
+    zoneAAddedRows += fresh.length;
+  }
+
   // Compose outcome message. Successes are the headline; failures
   // get itemized so the user can re-submit just the broken rows.
   const lines: string[] = [];
   lines.push(`✅ <b>Created ${createdIds.length} task${createdIds.length === 1 ? '' : 's'}</b>`);
   lines.push(`<i>by ${escapeHtml((clicker as any).name)}</i>`);
+  if (zoneAAddedRows > 0) {
+    lines.push('');
+    lines.push(`✨ <b>Zone A pre-filled</b> · ${zoneAAddedRows} row${zoneAAddedRows === 1 ? '' : 's'} across ${zoneAUpdatedClients} client${zoneAUpdatedClients === 1 ? '' : 's'} for week of ${weekOf}`);
+  }
+  if (zoneALockedClients > 0) {
+    lines.push(`<i>(${zoneALockedClients} client${zoneALockedClients === 1 ? '' : 's'} skipped — Zone A already submitted for this week)</i>`);
+  }
   if (failures.length > 0) {
     lines.push('');
     lines.push(`⚠️ <b>${failures.length} failed:</b>`);
