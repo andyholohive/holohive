@@ -5743,7 +5743,7 @@ export default function ClientsPage() {
                               className="text-xs h-8 text-emerald-900 hover:bg-emerald-100"
                               onClick={() => setTopPostShowAll(false)}
                             >
-                              Show top 3
+                              Show Top 3
                             </Button>
                           )}
                         </div>
@@ -5763,12 +5763,20 @@ export default function ClientsPage() {
                           // engagement rank, so the CM sees their override
                           // even if it sits at position 14 by raw engagement.
                           const pinnedId = weeklyV2Row?.top_post_override?.content_id || null;
-                          const baseSlice = topPostShowAll
-                            ? topPostCandidates
-                            : topPostCandidates.slice(0, 3);
                           const pinnedRow = pinnedId
                             ? topPostCandidates.find(c => c.id === pinnedId)
                             : null;
+                          // Collapsed view stays at exactly 3 rows total.
+                          // If a pinned post sits outside the top 3, it floats
+                          // to position #1 and we drop the bottom of the slice
+                          // so we don't accidentally render 4. Expanded view
+                          // shows the full candidate list either way.
+                          const baseSlice = topPostShowAll
+                            ? topPostCandidates
+                            : topPostCandidates.slice(
+                                0,
+                                pinnedRow && !topPostCandidates.slice(0, 3).some(c => c.id === pinnedId) ? 2 : 3,
+                              );
                           const rows = pinnedRow && !baseSlice.some(c => c.id === pinnedId)
                             ? [pinnedRow, ...baseSlice]
                             : baseSlice;
@@ -5805,10 +5813,10 @@ export default function ClientsPage() {
                                           <p className="text-xs text-ink-warm-700 line-clamp-2 italic">{c.notes}</p>
                                         )}
                                         <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
-                                          <span>{c.impressions.toLocaleString()} views</span>
-                                          <span>{c.likes.toLocaleString()} likes</span>
-                                          <span>{c.retweets.toLocaleString()} RT</span>
-                                          <span>{c.comments.toLocaleString()} cmt</span>
+                                          <span>{c.impressions.toLocaleString()} Views</span>
+                                          <span>{c.likes.toLocaleString()} Likes</span>
+                                          <span>{c.retweets.toLocaleString()} Reposts</span>
+                                          <span>{c.comments.toLocaleString()} Comments</span>
                                         </div>
                                       </div>
                                       {c.content_link && (
