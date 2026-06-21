@@ -2259,8 +2259,11 @@ export default function ClientsPage() {
     // active or inactive) — when the user picks the Ad-hoc tab we show
     // every is_ad_hoc client regardless of active state, matching the
     // mental model of "show me the ad-hoc bucket."
+    // Per Andy 2026-06-19: Active tab excludes ad-hoc clients so the
+    // bucket reads as ongoing engagements only. Ad-hoc clients still
+    // surface under the dedicated Ad-hoc tab.
     const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'active' && client.is_active) ||
+      (statusFilter === 'active' && client.is_active && !(client as any).is_ad_hoc) ||
       (statusFilter === 'inactive' && !client.is_active) ||
       (statusFilter === 'adhoc' && !!(client as any).is_ad_hoc);
 
@@ -2274,7 +2277,7 @@ export default function ClientsPage() {
     : true;
   const statusCounts = {
     all:      clientsWithStatus.filter(c => inPartnerScope(c)).length,
-    active:   clientsWithStatus.filter(c => c.is_active && inPartnerScope(c)).length,
+    active:   clientsWithStatus.filter(c => c.is_active && !(c as any).is_ad_hoc && inPartnerScope(c)).length,
     inactive: clientsWithStatus.filter(c => !c.is_active && inPartnerScope(c)).length,
     adhoc:    clientsWithStatus.filter(c => !!(c as any).is_ad_hoc && inPartnerScope(c)).length,
   };
