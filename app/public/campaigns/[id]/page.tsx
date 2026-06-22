@@ -7,6 +7,7 @@ import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,6 +22,17 @@ import {
   computeImpressionsByDateCumulative,
   computeImpressionsByPlatform,
 } from '@/lib/contentMetrics';
+
+/** Public KOL Dashboard Cards view tone map. Mirrors the internal
+ *  KolDashboardCardsView's KOL_STATUS_TONES so the StatusBadge color
+ *  per hh_status reads the same across both surfaces. */
+const KOL_STATUS_TONES: Record<string, BadgeTone> = {
+  Curated:    'info',
+  Contacted:  'purple',
+  Interested: 'warning',
+  Onboarded:  'warning',
+  Concluded:  'success',
+};
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -1179,6 +1191,34 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const contentLineData = computeImpressionsByDateCumulative(contents, fmtDate);
   const contentPieData = computeImpressionsByPlatform(contents);
 
+  // KOL Performance Leaderboard data — moved from the KOL Dashboard
+  // Overview into the Content Dashboard Overview per Andy 2026-06-19.
+  // Aggregates `contents` per campaign_kol_id and joins back to
+  // `kols`; KOLs without content stay in the list at the bottom so the
+  // client can see who's been activated vs who's posted.
+  const leaderboardByKol = new Map<string, { contentCount: number; views: number; engagements: number }>();
+  for (const c of contents) {
+    const key = c.campaign_kols_id;
+    if (!key) continue;
+    const cur = leaderboardByKol.get(key) || { contentCount: 0, views: 0, engagements: 0 };
+    cur.contentCount += 1;
+    cur.views += c.impressions || 0;
+    cur.engagements += (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0);
+    leaderboardByKol.set(key, cur);
+  }
+  const leaderboardRows = kols
+    .map(k => ({
+      kol: k,
+      stats: leaderboardByKol.get(k.id) || { contentCount: 0, views: 0, engagements: 0 },
+    }))
+    .sort((a, b) => b.stats.views - a.stats.views);
+  const totalLeaderboardViews = leaderboardRows.reduce((sum, r) => sum + r.stats.views, 0);
+  const leaderboardFmt = (n: number): string => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+    return n.toLocaleString();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1375,16 +1415,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   const totalContentLive = contents.length;
                   const totalEngagements = Array.from(byKol.values()).reduce((sum, s) => sum + s.engagements, 0);
 
-                  // Each leaderboard row pairs a kol with its stats.
-                  // KOLs without any content still show up at the
-                  // bottom so the client can see who's been activated
-                  // vs. who's posted.
-                  const rows = kols
-                    .map(k => ({
-                      kol: k,
-                      stats: byKol.get(k.id) || { contentCount: 0, views: 0, engagements: 0 },
-                    }))
-                    .sort((a, b) => b.stats.views - a.stats.views);
+                  // The full kol×stats join + sort lives in the
+                  // Content Dashboard Overview now (moved 2026-06-19).
+                  // The stat strip below only needs the aggregate
+                  // totals, which we compute from byKol above.
 
                   const formatNum = (n: number): string => {
                     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
@@ -1415,92 +1449,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         ))}
                       </div>
 
-                      {/* Leaderboard table */}
-                      <Card className="border border-gray-200 overflow-hidden">
-                        <CardHeader className="border-b border-gray-100 bg-gray-50/60">
-                          <CardTitle className="text-base font-semibold text-gray-900">
-                            KOL Performance Leaderboard
-                          </CardTitle>
-                          <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                          {rows.length === 0 ? (
-                            <div className="p-8 text-center text-sm text-gray-500">
-                              No KOLs activated yet.
-                            </div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead className="bg-gray-50/80 text-[10px] uppercase tracking-wider text-gray-500">
-                                  <tr>
-                                    <th className="text-left py-2.5 px-4 w-12">#</th>
-                                    <th className="text-left py-2.5 px-4">KOL</th>
-                                    <th className="text-right py-2.5 px-4 w-24">Content</th>
-                                    <th className="text-right py-2.5 px-4 w-28">Views</th>
-                                    <th className="text-right py-2.5 px-4 w-32">Engagements</th>
-                                    <th className="text-left py-2.5 px-4 w-[28%]">Share of Views</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {rows.map((r, idx) => {
-                                    const sharePct = totalCampaignViews > 0
-                                      ? (r.stats.views / totalCampaignViews) * 100
-                                      : 0;
-                                    return (
-                                      <tr key={r.kol.id} className="border-t border-gray-100 hover:bg-gray-50/40">
-                                        <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
-                                        <td className="py-3 px-4">
-                                          <div className="font-medium text-gray-900 truncate">
-                                            {maskedKolName(r.kol.master_kol.name, idx)}
-                                          </div>
-                                          {/* Platform stays visible even when handles are
-                                              masked — knowing "this KOL was X-native" is
-                                              category-level, not identity. */}
-                                          {r.kol.master_kol.platform && r.kol.master_kol.platform.length > 0 && (
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">
-                                              {r.kol.master_kol.platform.join(' · ')}
-                                            </div>
-                                          )}
-                                          {/* Section 5 — profile note. Truncated to
-                                              one line so the leaderboard row doesn't
-                                              grow tall when notes are long. */}
-                                          {!mask.kolHandles && r.kol.profile_note && (
-                                            <div className="text-[11px] text-gray-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
-                                              {r.kol.profile_note}
-                                            </div>
-                                          )}
-                                        </td>
-                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">
-                                          {r.stats.contentCount}
-                                        </td>
-                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900">
-                                          {formatNum(r.stats.views)}
-                                        </td>
-                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">
-                                          {formatNum(r.stats.engagements)}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                          <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                                              <div
-                                                className="h-full bg-brand"
-                                                style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
-                                              />
-                                            </div>
-                                            <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">
-                                              {sharePct.toFixed(1)}%
-                                            </span>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
+                      {/* Leaderboard table moved to Content Dashboard
+                          Overview per Andy 2026-06-19. The KOL
+                          Dashboard Overview now shows just the stat
+                          strip above. */}
                     </div>
                   );
                 })()}
@@ -1910,99 +1862,111 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                 )}
 
                 {/* Cards View */}
+                {/* KOL Dashboard Cards — re-styled 2026-06-19 to mirror
+                    the internal KolDashboardCardsView (brand-soft
+                    avatar tile + display-serif name + StatusBadge tone
+                    + mono KV labels). Showcase masking + share_kol_notes
+                    gate kept; profile_picture_url honored when not
+                    masked. */}
                 {kolViewMode === 'cards' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {kols.map((item, index) => (
-                      <Card key={item.id} className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader className="pb-4">
-                          <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
-                              <span className="text-white font-bold text-xl">
-                                {(mask.kolHandles ? `#${index + 1}` : item.master_kol.name.charAt(0).toUpperCase()).toString()}
-                              </span>
-                            </div>
-                            <div className="mb-2">
-                              <h3 className="font-semibold text-gray-900 text-lg">
+                    {kols.map((item, index) => {
+                      const masked = mask.kolHandles;
+                      const initials = masked
+                        ? `#${index + 1}`
+                        : (item.master_kol.name || '?').split(' ').map((w: string) => w.charAt(0).toUpperCase()).join('').slice(0, 2);
+                      const tone: BadgeTone = item.hh_status
+                        ? (KOL_STATUS_TONES[item.hh_status] ?? 'neutral')
+                        : 'neutral';
+                      const contentCount = contents.filter(c => c.campaign_kols_id === item.id).length;
+                      const avatar = !masked ? ((item.master_kol as any)?.profile_picture_url as string | null | undefined) : null;
+                      return (
+                        <Card key={item.id} className="crd-hover flex flex-col h-full">
+                          <CardHeader className="pb-2">
+                            <div className="flex flex-col items-center text-center">
+                              {/* Avatar — profile_picture_url when present
+                                  (Andy 2026-06-19), brand-soft initials
+                                  block otherwise. Showcase mask renders
+                                  "#N" as the initials. */}
+                              {avatar ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={avatar}
+                                  alt={item.master_kol.name || 'KOL'}
+                                  className="w-14 h-14 rounded-md object-cover border border-brand-light mb-3"
+                                />
+                              ) : (
+                                <div className="w-14 h-14 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center mb-3 font-semibold text-base">
+                                  {initials}
+                                </div>
+                              )}
+                              <h3 className="display-serif text-base font-semibold text-ink-warm-900 tracking-tight">
                                 {maskedKolName(item.master_kol.name, index)}
                               </h3>
-                              {/* Region kept — geographic distribution is
-                                  category-level evidence, not identity. */}
-                              <p className="text-sm text-gray-500">{item.master_kol.region || 'No region'}</p>
-                              {/* Section 5 — client-facing profile note. */}
-                              {!mask.kolHandles && item.profile_note && (
-                                <p className="text-xs text-gray-500 italic mt-1.5 leading-snug">
+                              <p className="text-xs text-ink-warm-500 mt-0.5">
+                                {item.master_kol.region || 'No region'}
+                              </p>
+                              {!masked && item.profile_note && (
+                                <p className="text-[11px] text-ink-warm-500 italic mt-1.5 leading-snug">
                                   {item.profile_note}
                                 </p>
                               )}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {(item.master_kol.platform || []).map((platform: string) => (
-                                <span key={platform} className="flex items-center justify-center h-6 w-6" title={platform}>
-                                  {getPlatformIcon(platform)}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {/* Followers */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Followers</span>
-                            <span className="font-medium text-gray-900">
-                              {item.master_kol.followers ? formatFollowers(item.master_kol.followers) : '-'}
-                            </span>
-                          </div>
-
-                          {/* Status */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Status</span>
-                            <Badge className={getStatusColor(item.hh_status || 'curated')}>
-                              {item.hh_status || 'No status'}
-                            </Badge>
-                          </div>
-
-                          {/* Content Types */}
-                          {Array.isArray(item.master_kol.content_type) && item.master_kol.content_type.length > 0 && (
-                            <div>
-                              <span className="text-sm text-gray-600 block mb-2">Content Types</span>
-                              <div className="flex flex-wrap gap-1">
-                                {item.master_kol.content_type.map((type: string, idx: number) => (
-                                  <span key={idx} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
-                                    {type}
+                              <div className="mt-2 flex items-center gap-2">
+                                <StatusBadge tone={tone} size="sm" bordered>
+                                  {item.hh_status || 'No status'}
+                                </StatusBadge>
+                                {(item.master_kol.platform || []).length > 0 && (
+                                  <span className="flex items-center gap-1 text-ink-warm-500">
+                                    {(item.master_kol.platform || []).map((platform: string) => (
+                                      <span key={platform} className="flex items-center justify-center h-4 w-4" title={platform}>
+                                        {getPlatformIcon(platform)}
+                                      </span>
+                                    ))}
                                   </span>
-                                ))}
+                                )}
                               </div>
                             </div>
-                          )}
-
-                          {/* View Profile Link — hidden in showcase
-                              mode when handles are masked (else the
-                              link defeats the mask). */}
-                          {!mask.kolHandles && item.master_kol.link && (
-                            <div className="pt-2 border-t border-gray-100">
-                              <a
-                                href={item.master_kol.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                              >
-                                View Profile →
-                              </a>
+                          </CardHeader>
+                          <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Followers</span>
+                                <span className="font-medium text-ink-warm-900 tabular-nums">
+                                  {item.master_kol.followers ? formatFollowers(item.master_kol.followers) : '—'}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Content</span>
+                                <span className="font-medium text-ink-warm-900 tabular-nums">{contentCount}</span>
+                              </div>
                             </div>
-                          )}
 
-                          {/* Notes */}
-                          {campaign?.share_kol_notes && item.notes && (
-                            <div className="pt-2 border-t border-gray-100">
-                              <span className="text-sm text-gray-600 block mb-1">Notes</span>
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.notes}</p>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
+                            {campaign?.share_kol_notes && item.notes && (
+                              <div className="mt-3 pt-3 border-t border-cream-100">
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Notes</span>
+                                <p className="text-sm text-ink-warm-900 mt-1 line-clamp-2">{item.notes}</p>
+                              </div>
+                            )}
+
+                            {!masked && item.master_kol.link && (
+                              <div className="mt-auto pt-3 border-t border-cream-100">
+                                <a
+                                  href={item.master_kol.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark mono"
+                                >
+                                  View Profile
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                     {kols.length === 0 && (
-                      <div className="col-span-full text-center py-8 text-gray-500">
+                      <div className="col-span-full text-center py-8 text-ink-warm-500">
                         No KOLs in this campaign.
                       </div>
                     )}
@@ -3260,6 +3224,83 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           </div>
                         </div>
                       </div>
+
+                      {/* ── KOL Performance Leaderboard ─────────────
+                          Moved from KOL Dashboard Overview into the
+                          Content Dashboard Overview per Andy
+                          2026-06-19. Sorted by views desc; unactivated
+                          KOLs sink to the bottom so the client sees
+                          activation gap at a glance. */}
+                      <Card className="border border-gray-200 overflow-hidden">
+                        <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+                          <CardTitle className="text-base font-semibold text-gray-900">KOL Performance Leaderboard</CardTitle>
+                          <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          {leaderboardRows.length === 0 ? (
+                            <div className="p-8 text-center text-sm text-gray-500">No KOLs activated yet.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50/80 text-[10px] uppercase tracking-wider text-gray-500">
+                                  <tr>
+                                    <th className="text-left py-2.5 px-4 w-12">#</th>
+                                    <th className="text-left py-2.5 px-4">KOL</th>
+                                    <th className="text-right py-2.5 px-4 w-24">Content</th>
+                                    <th className="text-right py-2.5 px-4 w-28">Views</th>
+                                    <th className="text-right py-2.5 px-4 w-32">Engagement</th>
+                                    <th className="text-left py-2.5 px-4 w-[28%]">Share of Views</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {leaderboardRows.map((r, idx) => {
+                                    const sharePct = totalLeaderboardViews > 0 ? (r.stats.views / totalLeaderboardViews) * 100 : 0;
+                                    const avatar = (r.kol.master_kol as any)?.profile_picture_url as string | null | undefined;
+                                    return (
+                                      <tr key={r.kol.id} className="border-t border-gray-100 hover:bg-gray-50/40">
+                                        <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
+                                        <td className="py-3 px-4">
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            {avatar ? (
+                                              <img src={avatar} alt={r.kol.master_kol.name} className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+                                            ) : (
+                                              <div className="h-7 w-7 rounded-full bg-gray-100 flex-shrink-0" />
+                                            )}
+                                            <div className="min-w-0">
+                                              <div className="font-medium text-gray-900 truncate">{maskedKolName(r.kol.master_kol.name, idx)}</div>
+                                              {r.kol.master_kol.platform && r.kol.master_kol.platform.length > 0 && (
+                                                <div className="text-[10px] text-gray-500 uppercase tracking-wider truncate">
+                                                  {r.kol.master_kol.platform.join(' · ')}
+                                                </div>
+                                              )}
+                                              {!mask.kolHandles && r.kol.profile_note && (
+                                                <div className="text-[11px] text-gray-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
+                                                  {r.kol.profile_note}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{r.stats.contentCount}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900">{leaderboardFmt(r.stats.views)}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{leaderboardFmt(r.stats.engagements)}</td>
+                                        <td className="py-3 px-4">
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                              <div className="h-full bg-brand" style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }} />
+                                            </div>
+                                            <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     </div>
                   )}
                 </CardContent>

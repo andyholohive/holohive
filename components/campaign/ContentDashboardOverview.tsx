@@ -28,7 +28,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Bookmark, Eye, Heart, MessageSquare, Repeat2 } from 'lucide-react';
+import { Activity, Bookmark, Eye, Heart, MessageSquare, Repeat2 } from 'lucide-react';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { BRAND_DARK_HEX, BRAND_HEX, getPlatformIcon } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
@@ -44,25 +44,77 @@ const fmt = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString();
 
 export function ContentDashboardOverview() {
-  const { contents } = useCampaignDetail();
+  const { contents, campaignKOLs } = useCampaignDetail();
 
   const totals = computeContentTotals(contents);
   const engagementRate = computeEngagementRate(contents);
   const lineData = computeImpressionsByDateCumulative(contents, formatDate);
   const pieData = computeImpressionsByPlatform(contents);
 
+  // ─── KOL Performance Leaderboard ─────────────────────────────────
+  // Per Andy 2026-06-19: pull the leaderboard out of the public KOL
+  // Overview and make it Content Dashboard furniture in both views.
+  // Aggregates `contents` per campaign_kol_id and joins back to
+  // campaignKOLs so we can show name, platform, and (when present)
+  // profile picture. Hidden KOLs (is_hidden) drop out so the
+  // leaderboard reflects only client-visible roster, matching how
+  // the public showcase already filters.
+  type LeaderboardRow = {
+    id: string;
+    name: string;
+    platform: string[] | null;
+    avatar: string | null;
+    contentCount: number;
+    views: number;
+    engagements: number;
+  };
+  const byKol = new Map<string, { contentCount: number; views: number; engagements: number }>();
+  for (const c of contents) {
+    const key = c.campaign_kols_id;
+    if (!key) continue;
+    const cur = byKol.get(key) || { contentCount: 0, views: 0, engagements: 0 };
+    cur.contentCount += 1;
+    cur.views += c.impressions || 0;
+    cur.engagements += (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0);
+    byKol.set(key, cur);
+  }
+  const leaderboardRows: LeaderboardRow[] = campaignKOLs
+    .filter((ck: any) => !ck.is_hidden)
+    .map((ck: any) => {
+      const stats = byKol.get(ck.id) || { contentCount: 0, views: 0, engagements: 0 };
+      return {
+        id: ck.id,
+        name: ck.master_kol?.name || 'Unknown KOL',
+        platform: ck.master_kol?.platform ?? null,
+        avatar: ck.master_kol?.profile_picture_url ?? null,
+        contentCount: stats.contentCount,
+        views: stats.views,
+        engagements: stats.engagements,
+      };
+    })
+    .sort((a, b) => b.views - a.views);
+  const totalLeaderboardViews = leaderboardRows.reduce((sum, r) => sum + r.views, 0);
+  const formatCompact = (n: number): string => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+    return n.toLocaleString();
+  };
+
   return (
     <div className="space-y-6">
-      {/* Hero KPI strip — Views / Replies / Shares / Reactions / Saves.
-          Platform-native vocab per Andy 2026-06-19. Icons: Eye = views,
-          MessageSquare = replies, Repeat2 = shares, Heart = reactions,
-          Bookmark = saves. */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard icon={Eye}            label="Views"     value={fmt(totals.views)}     accent="brand"   />
-        <KpiCard icon={MessageSquare}  label="Replies"   value={fmt(totals.replies)}   accent="sky"     />
-        <KpiCard icon={Repeat2}        label="Shares"    value={fmt(totals.shares)}    accent="purple"  />
-        <KpiCard icon={Heart}          label="Reactions" value={fmt(totals.reactions)} accent="rose"    />
-        <KpiCard icon={Bookmark}       label="Saves"     value={fmt(totals.saves)}     accent="emerald" />
+      {/* Hero KPI strip — Views / Replies / Shares / Reactions /
+          Engagement / Saves. Platform-native vocab per Andy 2026-06-19.
+          "Engagement" added 2026-06-19 to match the public view's
+          6-card layout (Reactions + Replies + Shares + Saves rollup).
+          Icons: Eye = views, MessageSquare = replies, Repeat2 = shares,
+          Heart = reactions, Activity = engagement, Bookmark = saves. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <KpiCard icon={Eye}            label="Views"      value={fmt(totals.views)}      accent="brand"   />
+        <KpiCard icon={MessageSquare}  label="Replies"    value={fmt(totals.replies)}    accent="sky"     />
+        <KpiCard icon={Repeat2}        label="Shares"     value={fmt(totals.shares)}     accent="purple"  />
+        <KpiCard icon={Heart}          label="Reactions"  value={fmt(totals.reactions)}  accent="rose"    />
+        <KpiCard icon={Activity}       label="Engagement" value={fmt(totals.engagement)} accent="amber"   />
+        <KpiCard icon={Bookmark}       label="Saves"      value={fmt(totals.saves)}      accent="emerald" />
       </div>
 
       {/* Average Engagement Rate — single-stat panel. */}
@@ -170,6 +222,77 @@ export function ContentDashboardOverview() {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      {/* ── KOL Performance Leaderboard ────────────────────────────
+          Pulled from the public KOL Overview into the Content
+          Dashboard so the "who drove the results?" view lives
+          alongside the metrics it summarizes. Sorted by views desc;
+          unactivated KOLs sink to the bottom. */}
+      <div className="bg-white rounded-[14px] border border-cream-200 shadow-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-cream-200">
+          <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">KOL Performance Leaderboard</h3>
+          <p className="text-xs text-ink-warm-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
+        </div>
+        {leaderboardRows.length === 0 ? (
+          <div className="p-8 text-center text-sm text-ink-warm-500">No KOLs activated yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-cream-50/60 text-[10px] uppercase tracking-wider text-ink-warm-500">
+                <tr>
+                  <th className="text-left py-2.5 px-4 w-12">#</th>
+                  <th className="text-left py-2.5 px-4">KOL</th>
+                  <th className="text-right py-2.5 px-4 w-24">Content</th>
+                  <th className="text-right py-2.5 px-4 w-28">Views</th>
+                  <th className="text-right py-2.5 px-4 w-32">Engagement</th>
+                  <th className="text-left py-2.5 px-4 w-[28%]">Share of Views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboardRows.map((r, idx) => {
+                  const sharePct = totalLeaderboardViews > 0 ? (r.views / totalLeaderboardViews) * 100 : 0;
+                  return (
+                    <tr key={r.id} className="border-t border-cream-100 hover:bg-cream-50/40">
+                      <td className="py-3 px-4 text-ink-warm-500 tabular-nums font-medium">{idx + 1}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {r.avatar ? (
+                            <img src={r.avatar} alt={r.name} className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="h-7 w-7 rounded-full bg-cream-100 flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-ink-warm-900 truncate">{r.name}</div>
+                            {r.platform && r.platform.length > 0 && (
+                              <div className="text-[10px] text-ink-warm-500 uppercase tracking-wider truncate">
+                                {r.platform.join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-ink-warm-700">{r.contentCount}</td>
+                      <td className="py-3 px-4 text-right tabular-nums font-medium text-ink-warm-900">{formatCompact(r.views)}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-ink-warm-700">{formatCompact(r.engagements)}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-cream-100 overflow-hidden">
+                            <div
+                              className="h-full"
+                              style={{ backgroundColor: BRAND_HEX, width: `${Math.max(2, Math.min(100, sharePct))}%` }}
+                            />
+                          </div>
+                          <span className="text-[11px] text-ink-warm-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
