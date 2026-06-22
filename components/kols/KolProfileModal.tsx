@@ -602,18 +602,18 @@ function ContentDeliverableRowView({
           {!editing ? (
             <div className="mt-2 grid grid-cols-5 gap-2 text-xs">
               <Stat label="Impressions" value={row.impressions} />
-              <Stat label="Retweets" value={row.retweets} />
+              <Stat label="Shares" value={row.retweets} />
               <Stat label="Likes" value={row.likes} />
               <Stat label="Comments" value={row.comments} />
-              <Stat label="Bookmarks" value={row.bookmarks} />
+              <Stat label="Saves" value={row.bookmarks} />
             </div>
           ) : (
             <div className="mt-2 grid grid-cols-5 gap-2">
               <NumField label="Impressions" value={impressions} onChange={setImpressions} />
-              <NumField label="Retweets" value={retweets} onChange={setRetweets} />
+              <NumField label="Shares" value={retweets} onChange={setRetweets} />
               <NumField label="Likes" value={likes} onChange={setLikes} />
               <NumField label="Comments" value={comments} onChange={setComments} />
-              <NumField label="Bookmarks" value={bookmarks} onChange={setBookmarks} />
+              <NumField label="Saves" value={bookmarks} onChange={setBookmarks} />
             </div>
           )}
 

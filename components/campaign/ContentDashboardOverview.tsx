@@ -59,9 +59,9 @@ export function ContentDashboardOverview() {
                               = likes, Bookmark = bookmarks. */}
                           <KpiCard icon={Eye}            label="Impressions" value={fmt(totalImpressions)} accent="brand"   />
                           <KpiCard icon={MessageSquare}  label="Comments"    value={fmt(totalComments)}    accent="sky"     />
-                          <KpiCard icon={Repeat2}        label="Retweets"    value={fmt(totalRetweets)}    accent="purple"  />
+                          <KpiCard icon={Repeat2}        label="Shares"      value={fmt(totalRetweets)}    accent="purple"  />
                           <KpiCard icon={Heart}          label="Likes"       value={fmt(totalLikes)}       accent="rose"    />
-                          <KpiCard icon={Bookmark}       label="Bookmarks"   value={fmt(totalBookmarks)}   accent="emerald" />
+                          <KpiCard icon={Bookmark}       label="Saves"       value={fmt(totalBookmarks)}   accent="emerald" />
                         </div>
                       );
                     })()}
@@ -86,7 +86,7 @@ export function ContentDashboardOverview() {
                         );
                       })()}
                       <p className="text-xs text-ink-warm-500 mt-3">
-                        ER = <span className="mono">(Likes + Comments + Retweets + Bookmarks) / Impressions</span>
+                        ER = <span className="mono">(Likes + Comments + Shares + Saves) / Impressions</span>
                       </p>
                     </div>
 

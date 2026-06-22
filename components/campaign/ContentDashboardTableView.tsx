@@ -629,9 +629,9 @@ export function ContentDashboardTableView() {
                         <SelectItem value="activation_date">Activation Date</SelectItem>
                         <SelectItem value="impressions">Impressions</SelectItem>
                         <SelectItem value="likes">Likes</SelectItem>
-                        <SelectItem value="retweets">Retweets</SelectItem>
+                        <SelectItem value="retweets">Shares</SelectItem>
                         <SelectItem value="comments">Comments</SelectItem>
-                        <SelectItem value="bookmarks">Bookmarks</SelectItem>
+                        <SelectItem value="bookmarks">Saves</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -905,7 +905,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Retweets</span>
+                              <span>Shares</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -914,7 +914,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Retweets</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Shares</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.retweets_operator}
@@ -1013,7 +1013,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Bookmarks</span>
+                              <span>Saves</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1022,7 +1022,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Bookmarks</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Saves</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.bookmarks_operator}
@@ -1354,7 +1354,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Retweets</span>
+                              <span>Shares</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1363,7 +1363,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Retweets</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Shares</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.retweets_operator}
@@ -1462,7 +1462,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Bookmarks</span>
+                              <span>Saves</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1471,7 +1471,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Bookmarks</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Saves</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.bookmarks_operator}
