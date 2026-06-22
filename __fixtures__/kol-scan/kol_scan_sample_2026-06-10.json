@@ -1,0 +1,1934 @@
+[
+  {
+    "id": "26ee69cd-93b9-450b-8eab-e2bcd0b847cb",
+    "name": "동타니 (Dongtani)",
+    "link": "https://t.me/cheerupdongtani",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 889,
+    "pricing": null,
+    "niche_tags": [
+      "NFT/Gaming",
+      "Airdrop",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Native"
+    ],
+    "style_summary": "Personal diary voice with a signature hamster emoji, mixing numbered how-to steps for events with transparent monthly income recaps (966만원 May report). Playful and self-deprecating, jokes about getting liquidated, and leans on farming slang like 쌀먹 and 폐지줍기. Medium-length posts that always end with a personal take.",
+    "audience_summary": "A small but tight community of Korean reward farmers and Web3 gamers chasing small-ticket events, his monthly earnings recap pulled 4.4K views against a usual 250.",
+    "brief_angle_hint": "Give him a hands-on participation campaign with farmable rewards he can grind alongside his readers, and note he is openly hunting gaming sponsorships like MapleStory N."
+  },
+  {
+    "id": "47fcb267-6246-430e-b890-8accaf5db5a5",
+    "name": "폐지줍는 츄카피 (Chukapikachu)",
+    "link": "https://t.me/chukapikachu",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 10752,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "Neobank",
+      "L1/L2",
+      "AI"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Curator"
+    ],
+    "style_summary": "Rapid-fire event listings in a fixed template: clover emoji headline, gift emoji reward list, numbered participation steps, then deadline and winner-announcement dates. A dozen plus posts per day with friendly nudges like 고고 and 줍줍, and every post is immediately actionable. Crypto is a minority of the feed next to bank quizzes and coupon drops.",
+    "audience_summary": "Korean app-tech reward hunters who farm gift cards, bank quizzes, and point events daily, quiz events with large winner counts get forwarded 20 to 40 times.",
+    "brief_angle_hint": "Package the campaign as a dead-simple quiz or check-in with small guaranteed Korean-friendly prizes like coffee coupons and he will slot it straight into his template."
+  },
+  {
+    "id": "8e46fe1a-a743-49b8-a52d-b4bc944552d0",
+    "name": "Ilhyun",
+    "link": "https://t.me/cryptofamily_ilhyun",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15160,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "DeFi",
+      "Trading"
+    ],
+    "creator_types": [
+      "Native",
+      "Educator"
+    ],
+    "style_summary": "Alternates between multi-paragraph reflective essays on investing psychology and visceral one-line trade reactions, profanity included. When he covers a mechanism he rebuilds it step by step with numbered flows, his own yield math, and explorer links. Keeps a recurring diary format and openly dissects his own mistakes and losses.",
+    "audience_summary": "A loyal base built over five years that reads him for judgment and honesty rather than signals. Personal essays and Hyperliquid deep dives pull 6K to 10K views with heavy forwarding.",
+    "brief_angle_hint": "Hand him the raw mechanism and numbers and let him form his own honest take, he will not read a hype script."
+  },
+  {
+    "id": "f709764a-386e-4b1f-88c2-82737fecfdbf",
+    "name": "EWL",
+    "link": "https://t.me/ewlreads",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 3964,
+    "pricing": "<$200",
+    "niche_tags": [
+      "DeFi",
+      "L1/L2",
+      "Trading",
+      "RWA",
+      "AI"
+    ],
+    "creator_types": [
+      "Tracker",
+      "Analyst"
+    ],
+    "style_summary": "Alternates between one-line market quips and structured deep dives that break protocols down with numbered sections, arrow bullets and hard numbers like reserve ratios and APY. He revisits earlier calls, re-checking Altura weeks after first covering it, and verifies claims himself onchain, linking dashboards like Hyperdash. Tone is conversational Korean with emoji, but the substance is research grade.",
+    "audience_summary": "Onchain-native Korean DeFi readers who want verified mechanics rather than headlines. Views sit around 700 to 1,000 and spike when he covers wallet drama or AI-adjacent stories, his Nous psyche post hit 4.3k views.",
+    "brief_angle_hint": "Give him real protocol mechanics and onchain proof points to dig into, he does the verification himself and his readers expect that."
+  },
+  {
+    "id": "8dc83eda-c6c8-48fd-b084-398563cb82ca",
+    "name": "머니보틀 (Money Bottle)",
+    "link": "https://t.me/moneybottle",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15285,
+    "pricing": null,
+    "niche_tags": [
+      "Macro",
+      "Trading",
+      "Meme/Degen"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Rapid-fire one and two line shitposts, often several per day, built around Korean stock slang like 마샌하삼 for the memory semiconductor trade. Reacts to breaking policy and geopolitical headlines with a sarcastic punchline instead of analysis. Almost never writes long form.",
+    "audience_summary": "Korean retail investors riding the memory chip supercycle (Samsung, Hynix, Micron) who also follow real estate and bonus culture. They spike hardest on policy scoops, the bonus regulation post hit 12K views, roughly 5x his norm.",
+    "brief_angle_hint": "Treat him as a meme amplifier for Korean stock bro culture, give him one punchy hook he can shitpost about rather than a feature list."
+  },
+  {
+    "id": "b949e9b8-2640-4915-b1c3-18fbea31055b",
+    "name": "오빚갚 (Debt50)",
+    "link": "https://t.me/Debt50mwon",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 4665,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Airdrop",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Rapid deal alerts written in unpolished slang (쌀먹, 폐지줍기, 개혜자) with emoji markers and no formatting fuss. Mixes blunt personal P&L confessions, including a near 300M won ADL scare, with first-come event links and IPO subscription notes. His signature is a numbered checklist of must-do farming tasks.",
+    "audience_summary": "Hardcore Korean yield and freebie farmers, both salarymen and full-timers, who act fast on first-come offers. Forward counts jump on anything that is free money with a deadline.",
+    "brief_angle_hint": "Frame it as free money with a deadline so it slots straight into his daily must-do checklist."
+  },
+  {
+    "id": "a3d5db49-c3a0-4c77-bf92-f90ce538e376",
+    "name": "Jeth",
+    "link": "https://t.me/jethchoice",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 1962,
+    "pricing": "<$200",
+    "niche_tags": [
+      "NFT/Gaming",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Tracker"
+    ],
+    "style_summary": "Game-guide posts in chatty Korean with emoji bullets, mission lists, coupon codes and concrete farming numbers like weekly MapleStory Universe earnings and reward tier tables. Writes from his own playthroughs, sharing tier results, guild recruitment and VPN setup workarounds. Posting is sparse, roughly monthly, but detailed whenever a game campaign is live.",
+    "audience_summary": "Korean web3 gamers and 쌀먹 profit hunters around MapleStory Universe, Immutable titles and web3 MMOs. Game economy news travels best, the Chronoforge shutdown recap hit 2k views versus a roughly 300-view norm.",
+    "brief_angle_hint": "Best fit for gaming clients, give him early access so he can grind the game himself and publish a step-by-step earning guide."
+  },
+  {
+    "id": "e65616e8-d1af-49f4-a3cf-8364ac074d3e",
+    "name": "작업일지 (Kim)",
+    "link": "https://t.me/kimmm2kim",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 2347,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Airdrop",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Native",
+      "Tracker"
+    ],
+    "style_summary": "Daily numbered 오늘할일 work-log entries that mix gym sets with farming tasks in the same list. Totally raw diary tone with profanity, stress eating, and honest losses, plus exact account counts, position sizes, and leverage like 1000불 x 10배 across 20 accounts. He has tracked the same Variational competition grind almost daily for two weeks, adjusting tactics as he goes.",
+    "audience_summary": "A small hardcore group of perp DEX and airdrop farmers who copy his multi-account setups. They engage with specific efficiency numbers and unvarnished P&L, with views steady at 600 to 1000 despite only 2,347 subscribers.",
+    "brief_angle_hint": "Only bring him things he can actually farm or trade himself, with real numbers, and let him grind it in public through his daily log."
+  },
+  {
+    "id": "2f69bd20-89a2-4992-bb1f-78744d47f3e8",
+    "name": "1mpal",
+    "link": "https://t.me/web3progamer",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 6812,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "AI",
+      "Airdrop",
+      "NFT/Gaming"
+    ],
+    "creator_types": [
+      "Educator",
+      "Onboarder"
+    ],
+    "style_summary": "Writes like a maker's lab journal: medium length posts marked with ✍ and 🐧 that document his own AI video experiments, with numbered production steps, tool links, and honest postmortems covering failures and copyright lessons. Even his crypto posts are playbooks, like a seven step Abstract XP farming routine. Playful, self aware otaku humor throughout.",
+    "audience_summary": "Korean AI creators and Web3 point farmers. Practical tool and farming guides travel far at 3K plus views with 35 to 53 forwards, while personal diary posts settle around 500 views.",
+    "brief_angle_hint": "Get the product into his hands and let him publish a hands on walkthrough with his own creations instead of a scripted plug."
+  },
+  {
+    "id": "237ea793-8189-4b28-872b-2a08d284d9b4",
+    "name": "Degen Guy",
+    "link": "https://t.me/justdegenguy",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8323,
+    "pricing": null,
+    "niche_tags": [
+      "AI",
+      "Trading",
+      "L1/L2",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Short punchy first-person posts written like chat messages, full of self-deprecating degen humor and trailing dots. He tests things himself, from Claude Fable 5 token costs to the Metamask Ondo trading challenge, then reports back with concrete prize and benchmark numbers in simple lists. Rarely longer than a few short paragraphs, often a single line.",
+    "audience_summary": "Korean retail degens who care more about AI model wars and small smart-money plays than chart talk. His hands-on AI posts pull 4300 to 5600 views against a roughly 1000 view baseline.",
+    "brief_angle_hint": "Give him something he can personally try and react to honestly, ideally with a clear prize or perk his readers can grab too."
+  },
+  {
+    "id": "83bfddd4-873e-40c3-9a26-f0d7fcde59a9",
+    "name": "크립토마카세 (cryptomacase)",
+    "link": "https://t.me/cryptomacase",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 11288,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Airdrop",
+      "Meme/Degen"
+    ],
+    "creator_types": [
+      "Native",
+      "Onboarder"
+    ],
+    "style_summary": "Chatty and heavily emoji laden, swinging between one line bear market wailing and numbered step by step guides for free reward events she calls 쌀먹. Self deprecating humor with lots of 😭 and 😰, ellipses, and personal meetup recaps where project explainers are folded into stories about food and dopamine.",
+    "audience_summary": "Korean retail degens riding out the downturn who love her humor and free reward hunts; market memes and consumer warnings go viral (9k views on a Trump post, 5.6k on a card fraud warning) while event guides hold around 1k.",
+    "brief_angle_hint": "Let her frame the campaign as a fun free win she personally tried and joke about, not polished marketing copy."
+  },
+  {
+    "id": "fdc6d198-5072-4c40-bbf8-a2601cfee508",
+    "name": "호프의 스터디 (YapHope)",
+    "link": "https://t.me/YAPHOPE",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 3033,
+    "pricing": null,
+    "niche_tags": [
+      "AI",
+      "Airdrop",
+      "Trading",
+      "L1/L2",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Visionary"
+    ],
+    "style_summary": "Writes like a professional event host, posting structured briefs with dates, reward tables, and 참여 방법 for the X Spaces and meetups they moderate. Original 호프칼럼 columns build multi-paragraph theses on airdrop economics and agentic payments, connecting projects to bigger AI and market trends. Playful but information-dense, with hackathons pitched as a way to grind back trading losses.",
+    "audience_summary": "Seoul-based builders, event-goers, and studious airdrop farmers who use the channel as a study group. Views are modest at roughly 300 to 500 but event and reward posts forward heavily, 13 to 14 forwards each.",
+    "brief_angle_hint": "Give them a stage, an AMA, panel, or explainer column will get far more energy than a plain promotional post."
+  },
+  {
+    "id": "00e86b85-a0d5-47be-9ef7-92094c43d097",
+    "name": "Cow Farm",
+    "link": "https://t.me/c0wfarm",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 13024,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Stream-of-consciousness trade diary posted several times a day, mostly short bursts of Korean slang with ㅋㅋ and self-deprecating jokes about accidental wins. Shares exact position sizes and PnL openly (20 contracts, 천만원 profits, a 45억 Naver buy) and recounts entries and exits in real time. Almost no links or charts, just raw talk.",
+    "audience_summary": "Hardcore Korean leverage traders who follow his live futures, kimchi premium, and cross-market plays spanning crypto and Korean equities. They spike hardest on market shock moments, his KOSPI night futures limit-down post hit 11.5K views versus a 2-3K baseline.",
+    "brief_angle_hint": "Pitch him something he can actually trade or test with his own money right away, like an exchange feature or live trading event, not a tech explainer."
+  },
+  {
+    "id": "7dfe3780-f3fd-48ff-9154-869c882a5176",
+    "name": "Crypto Judy",
+    "link": "https://t.me/lovejudylee",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 16841,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Regulation",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Curator"
+    ],
+    "style_summary": "Machine-gun cadence with 20 plus posts in a single day, mostly one-line reactions, pasted headlines, or full news article dumps. Swings freely between Korean political scandals, daily life chatter with her 잡쥬 community, and sudden market alerts framed with rows of warning emoji. Tone is intimate group-chat Korean that addresses readers directly.",
+    "audience_summary": "A broad Korean community that treats the channel like a live group chat covering politics, life, and markets in one stream. Viral scandal posts pull 1,800 to 2,400 views and up to 50 forwards, well above her crypto items.",
+    "brief_angle_hint": "Pitch her topics that feel like hot gossip her chat will react to, a punchy human story rather than a formal write-up."
+  },
+  {
+    "id": "c5c3540a-3149-4262-9214-319879c6aa8f",
+    "name": "SOLful",
+    "link": "https://t.me/SOLful_hodl_life",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 1809,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Ethereum",
+      "DeFi",
+      "Infra/DePIN"
+    ],
+    "creator_types": [
+      "Analyst",
+      "Educator"
+    ],
+    "style_summary": "Professional researcher voice in polite 존댓말, writing paragraph-form commentary on EIP pipelines, Lido governance votes, and validator economics instead of price calls. Runs an ongoing EIP tracking series and references colleagues and their firm's research. Posts are sparse, sometimes weeks apart, and openly skeptical of sensational headlines.",
+    "audience_summary": "A small technical readership of Ethereum researchers, validators, and industry insiders. Routine posts draw around 300 views while the firm's funding announcement traveled much further at 1,816 views.",
+    "brief_angle_hint": "Pitch a genuine technical deep-dive they can dissect as a researcher, anything that smells like shilling will not fit this channel."
+  },
+  {
+    "id": "2b6cbb06-4068-4416-a4d8-8e6b476f796a",
+    "name": "인생코인 (InsaneCoin)",
+    "link": "http://t.me/lnsanecoin",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 7014,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "Minimal link-drop style, usually one casual line plus an X post or exchange notice. Sprinkles in personal trading confessions like rebuying what he just sold with a ㅎㅎㅈㅅ shrug, and chatty emoji-heavy event recaps. Posting is infrequent and very short.",
+    "audience_summary": "Korean degens who follow for quick pointers to drama, listings, and referral plays. The ZachXBT drop did 3,533 views, roughly double his usual 1,300 to 1,900 range.",
+    "brief_angle_hint": "Keep the ask light, one link-worthy hook or an event invite beats long-form content for this channel."
+  },
+  {
+    "id": "35e5e3b0-e7a0-4dc1-8e53-5d6910e127b7",
+    "name": "변창호 (BChoSN)",
+    "link": "https://t.me/BChoSN",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 24840,
+    "pricing": null,
+    "niche_tags": [
+      "Macro",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "Fires off dozens of one-to-three-line posts a day, usually a headline plus a single sardonic comment. Mixes Korean political scandals, corporate news, and crypto items in the same stream, linking source articles as 원문. Drops a compact numbered summary when he covers a farming product he uses himself.",
+    "audience_summary": "A large general Korean crypto audience that uses him as a fast news ticker with attitude. Engagement spikes hard on political and big-company drama (3K to 5.5K views) versus roughly 1K on DeFi posts.",
+    "brief_angle_hint": "Feed him one sharp newsworthy fact he can fire off with his own cynical one-liner rather than a long script."
+  },
+  {
+    "id": "b609c349-b1e0-4e4a-8f3d-664af254a912",
+    "name": "University of Crypto",
+    "link": "https://t.me/officialunivercityofcrypto",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 22893,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Live wire format, mostly single-line real-time updates, including literal on-the-ground reporting from Seoul protest and election sites with citizen interviews. Occasional longer takes use checkmark bullets to argue a point, like the ballot shortage breakdown. Market posts are bare price level callouts.",
+    "audience_summary": "Politically engaged Korean crypto holders who use the channel as a breaking news wire. Field reporting massively outperforms market posts, the protest supply run hit 10K views versus 3-5K elsewhere.",
+    "brief_angle_hint": "The channel is in news mode right now, so hook any brief to a timely Korea-relevant news angle rather than product features."
+  },
+  {
+    "id": "9b79a11b-f63f-44ee-8004-e05e5dd75f4a",
+    "name": "밍쓰의 크립토 이벤트 창고 (Mings)",
+    "link": "https://t.me/MingsBog",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 2913,
+    "pricing": null,
+    "niche_tags": [
+      "Airdrop",
+      "Trading",
+      "AI"
+    ],
+    "creator_types": [
+      "Native",
+      "Onboarder"
+    ],
+    "style_summary": "Raw stream-of-consciousness diary in very short posts, joking about stock losses, failed freebies, and openly begging for sponsors. Drops 앱테크 event links with quick practical notes like multi-account tips and card pickup logistics, but never formats anything. The appeal is unfiltered honesty rather than structure.",
+    "audience_summary": "A small loyal group of Korean freebie hunters and retail investors who read it like a friend's group chat. Views sit around 220 to 650 with freebie links forwarding best.",
+    "brief_angle_hint": "Skip the polish and let them present it like a freebie find they personally tested, honest pros and cons included."
+  },
+  {
+    "id": "21cc3be6-918a-46ab-87da-9063317d5dec",
+    "name": "크립토메이지 (CryptocurrencyMage)",
+    "link": "https://t.me/cryptocurrencymage",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 9205,
+    "pricing": null,
+    "niche_tags": [
+      "AI",
+      "DeFi",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Scout",
+      "Educator"
+    ],
+    "style_summary": "Long-form polite Korean breakdowns of English-language AI news and hands-on tool tests, walking through the reasoning step by step and ending with his own verdict. Shares practical setup instructions and full example prompts for readers running bots. Minimal emoji and no fixed template.",
+    "audience_summary": "Tech-curious Korean crypto users, builders and bot operators, who want frontier AI developments translated and field-tested, practical guides like his Claude Fable setup post earn the most forwards (22).",
+    "brief_angle_hint": "Ideal for AI x crypto products where he can get hands-on access and explain what the tool actually does, skip pure hype or price talk."
+  },
+  {
+    "id": "b35cbd16-1244-4e9b-9434-beea23e1a8a9",
+    "name": "Myu's Research",
+    "link": "https://t.me/myu_moonyu",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 7468,
+    "pricing": "<$200",
+    "niche_tags": [
+      "NFT/Gaming",
+      "AI",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Educator"
+    ],
+    "style_summary": "Hands-on builder voice with a signature trailing comma tic (,,), bouncing between one-line jokes and detailed numbered registration guides. Shares his own research docs, game design templates and bots, then pushes readers with lines like 다 알려줬다 이걸 안해. Builds tools live and documents the process.",
+    "audience_summary": "Korean web3 gamers and side-project builders chasing creator prize pools like the $60K MapleStory Vibe Camp. How-to and resource posts get forwarded heavily (up to 34 forwards) despite modest view counts.",
+    "brief_angle_hint": "Give him something to build or play with hands-on, like a creator contest or early tool access, and he will produce his own guides around it."
+  },
+  {
+    "id": "9f1092f4-8e53-4a79-b305-35c816f9f72d",
+    "name": "피린이 (foreverNFT)",
+    "link": "https://t.me/forevernft",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 12417,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "Trading",
+      "RWA",
+      "Macro"
+    ],
+    "creator_types": [
+      "Curator",
+      "Onboarder"
+    ],
+    "style_summary": "High-volume checklist posts with checkmark and emoji headers, short bullet blocks, and a closing one-line personal read marked with a pen emoji. Nearly every opportunity post ends with concrete participation steps, referral links and deadlines. Friendly polite Korean with light hype balanced by DYOR caveats.",
+    "audience_summary": "Korean airdrop hunters and points farmers scanning for the next event, plus retail traders following his macro calendars. Farming content earns outsized shares, the airdrop tier list pulled 30 forwards and the edgeX compensation notice 2k views.",
+    "brief_angle_hint": "Frame the campaign as a concrete farmable opportunity with steps, points and a deadline he can publish as a checklist."
+  },
+  {
+    "id": "34299181-5428-4ea2-9094-c60c76638242",
+    "name": "크립토 메이드 (Cryptomade)",
+    "link": "https://t.me/crypt0made",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 7350,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "RWA"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Native"
+    ],
+    "style_summary": "Short buddy-feed posts mixing daily running logs, freebie alerts, and the odd political note, all in casual slang (쌀먹, ㄱㅇㄷ) with light self-banter. Switches to numbered step-by-step guides when an event is farmable, like the Magikarp run card claim. Little data, few links.",
+    "audience_summary": "Korean readers who follow him as a lifestyle feed with freebie alerts on top, his motivational post and Magikarp card price posts traveled furthest at 4.2K and 2.4K views.",
+    "brief_angle_hint": "Best fit is lifestyle-crossover activations like move-to-earn, IRL runs, or easy freebies, and he is openly asking for an Ondo-style sponsorship."
+  },
+  {
+    "id": "ba8ff55d-7cb9-4f77-b226-277cb5740f47",
+    "name": "Chiko",
+    "link": "https://t.me/chikointhebox",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15476,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Very short sardonic takes, usually one to three lines with no links or data, reacting to listings and market pain in real time. Heavy gallows humor, he even apologizes when his own picks like PRL blow up. Posts irregularly but every post lands a punchline.",
+    "audience_summary": "Korean Upbit and Bithumb retail traders who enjoy dark humor about listings and losses, his Polymarket legal warning was his biggest hit at 9.1K views and 65 forwards.",
+    "brief_angle_hint": "Keep the brief loose and meme-friendly with an exchange or listing angle he can riff on honestly, because he will roast anything that smells like a forced shill."
+  },
+  {
+    "id": "ee6e4dfc-6b9b-45de-bc32-d5a8d069c4d5",
+    "name": "코인소년 (Coinboys)",
+    "link": "https://t.me/coinboys",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15820,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Trading",
+      "Airdrop",
+      "L1/L2",
+      "AI",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Curator",
+      "Analyst"
+    ],
+    "style_summary": "High-volume structured news briefs with numbered sections, bullet data points full of percentages, closing with a short personal read and a promise to follow up after key prints. Covers macro releases, ETF flows, KOSPI, and reward events in the same polite-casual voice. Consistent multi-post daily cadence.",
+    "audience_summary": "Korean retail who use the channel as a one-stop daily market feed across crypto and Korean equities, posts hold a steady 900 to 1,300 views and his scam-DM warning spiked to 1.8K.",
+    "brief_angle_hint": "Feed him concrete numbers, dates, and a calendar hook so he can run the campaign as one of his tidy numbered briefings inside the daily feed."
+  },
+  {
+    "id": "8a5ae01c-17b1-444c-bac5-c185405ffe85",
+    "name": "마인부우 (minebuu)",
+    "link": "https://t.me/minebuu_cryptoball",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 10720,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "DeFi",
+      "Ethereum",
+      "Trading"
+    ],
+    "creator_types": [
+      "Analyst",
+      "Tracker"
+    ],
+    "style_summary": "Alternates short news drops with dense analytical breakdowns of token mechanics, quoting exact fees, FDV figures and auction rules like Cap's Uniswap CCA structure. Frequently links X posts and Dune dashboards, and follows the same projects (Railgun, Cap, MetaMask, Lighter) across multiple posts with updated takes. Tone is casual Korean with dry humor, but the substance is research grade.",
+    "audience_summary": "DeFi-native Korean readers who want to understand how protocols and token sales actually work before entering. Highest engagement lands on contested market events like the Polymarket UMA dispute (5.7K views) and regulatory catalysts.",
+    "brief_angle_hint": "Give him real protocol mechanics and numbers to unpack, he sells depth not hype."
+  },
+  {
+    "id": "638c1a4f-c8a5-4445-9782-2835cc99db76",
+    "name": "호시탐탐 크립토 (tamtamcyrpto)",
+    "link": "https://t.me/tamtamcrypto",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 3898,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "NFT/Gaming"
+    ],
+    "creator_types": [
+      "Native",
+      "Onboarder"
+    ],
+    "style_summary": "Short, chatty, emoji heavy posts that read like quick group chat reactions, often one or two lines ending in a rhetorical question and playful spellings like 해보세용. Mixes personal market takes on tickers like $HYPE, $LABS and $SLX with trading card price talk and event announcements that include step by step participation instructions and Google forms.",
+    "audience_summary": "Korean retail traders and trading card collectors who come for casual takes and free stuff. Giveaway and whitelist posts clearly outperform, with the Renaiss KCCF ticket post hitting 21 forwards versus near zero on normal posts.",
+    "brief_angle_hint": "Hook him with an event, giveaway, or perk his readers can claim, then let him talk about it in his own jokey voice."
+  },
+  {
+    "id": "c93cc413-d277-43eb-8a03-d1761eb8d019",
+    "name": "Manbull",
+    "link": "https://t.me/justicekingsman",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 16009,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "AI",
+      "L1/L2",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Stream-of-consciousness Korean with 음.., ellipses, and ㅋㅋㅋ, reacting fast to rumors, listings, and whale moves. He shares his own listing snipe trades with real P&L and does back-of-envelope valuation math on deals like the Echo Venice AI round. Sponsored ties are disclosed plainly, like his Bithumb supporters tag.",
+    "audience_summary": "Korean traders hunting exchange listing plays and market-moving rumors. His Saylor sold BTC rumor post hit 11,774 views, roughly 8x baseline, so the audience shows up for drama with trade implications.",
+    "brief_angle_hint": "Lead with the tradeable hook, a listing, a number, or a tool his readers can use today, and leave room for his unfiltered opinion."
+  },
+  {
+    "id": "f62efce6-6c00-4df7-be14-581dd9491da1",
+    "name": "Fire Ant",
+    "link": "https://t.me/fireant_crypto",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 33292,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Macro",
+      "Trading",
+      "DeFi",
+      "AI",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "Rapid-fire posting that mixes one-line jokes and community banter with pin-emoji news summaries and a formatted daily market briefing covering ETF flows, open interest and the Coinbase premium. Condenses long sources like Arthur Hayes essays into numbered three-point takeaways with a blunt verdict. Constant self-deprecating humor and direct talk to subscribers like a group chat host.",
+    "audience_summary": "A large mainstream Korean crypto crowd reading him for both laughs and quick market context. Campaign posts travel hardest, his Aligned video campaign hit 5.5k views and 106 forwards versus a roughly 2k baseline.",
+    "brief_angle_hint": "Let him turn the brief into a community campaign with prizes and his own jokes instead of handing him polished ad copy."
+  },
+  {
+    "id": "4687bdb1-be84-4364-a9e4-2d686288d053",
+    "name": "종명이의 딸깍 (Jh)",
+    "link": "https://t.me/jh_6598",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8637,
+    "pricing": null,
+    "niche_tags": [
+      "AI",
+      "Trading",
+      "L1/L2",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Scout",
+      "Curator"
+    ],
+    "style_summary": "Alternates between multi-paragraph Korean digests of English sources like Arkham reports and SemiAnalysis posts and rapid one-line jokes with heavy ㅋㅋㅋ. Analytical posts end in soft hedges like 될듯? rather than hard calls, and he often credits tips from foreign friends while linking the original X post or Etherscan tx. Posts many times a day across AI, market drama, and community giveaways.",
+    "audience_summary": "Korean crypto natives who want AI and DeAI narratives decoded early plus live drama commentary. Views sit steady around 500 to 1100 with jokes and drama often outperforming the research posts.",
+    "brief_angle_hint": "Hand him solid source material with a fresh AI angle and let him digest it into his own casual take instead of giving him finished copy."
+  },
+  {
+    "id": "063a753b-959b-499d-b64b-fc7ff924f6d7",
+    "name": "시팡이 공부방 (SipangE)",
+    "link": "https://t.me/sipangE",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 4834,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "AI"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Tracker"
+    ],
+    "style_summary": "Cheerful campaign diary with double exclamation marks, posting near daily about the same one or two sponsored campaigns, sharing his own leaderboard rank and rallying support. Breaks rewards and participation into simple numbered steps and condenses AMAs into tidy takeaways. Pure 쌀먹 framing on every event.",
+    "audience_summary": "A small but engaged group of Korean reward hunters who follow him into points campaigns and free-entry prediction events. Detailed reward-structure posts draw the most attention within a 300-700 view band.",
+    "brief_angle_hint": "Structure the deal as a multi-week points or leaderboard campaign he can diary about daily, he thrives on sustained sponsored pushes."
+  },
+  {
+    "id": "1132f575-c97c-49e8-9afa-f231df3a38ed",
+    "name": "코인하는 해달 (SeaOtter)",
+    "link": "https://t.me/seaotterbtc",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 30224,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Airdrop",
+      "Meme/Degen",
+      "L1/L2",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Native",
+      "Onboarder"
+    ],
+    "style_summary": "Quick market color in a joking voice, scolding BTC for coupling with Nasdaq only on the way down, with trailing ellipses and playful asides. Formats small reward events neatly in brackets with conditions, deadlines and a 찍먹 recommendation. Everything stays short and snackable.",
+    "audience_summary": "Korean traders watching US markets, Korean stocks, kimchi premium and crypto at once, with an appetite for easy reward events. Memes travel furthest, the top meme post hit 11.7K views and 62 forwards.",
+    "brief_angle_hint": "Hand him a fun low-effort event with a clear prize he can pitch as a quick 찍먹 between market banter."
+  },
+  {
+    "id": "0ac0faa9-2408-47d6-8ffa-602978673a49",
+    "name": "㈜ 청년열정마라두바이쫀득민트초코손맛푸드 (Mincho)",
+    "link": "https://t.me/minchoisfuture",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 14840,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "AI",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Quick wry one to three line reactions full of wordplay like 하2닉스, 3성전자, and 업빗썸, with ironic emoji. Covers listings, yields, and market moves in real time and likes exposing fine print, like the actual 2,000 dollar cap on the Binance USD1 bonus. Keeps his own KOSPI and crypto positions visible without formal analysis.",
+    "audience_summary": "Korean traders straddling KOSPI semiconductor names and crypto who enjoy his sarcasm. Stock surge posts and listing notes do 1,300 to 2,300 views, his strongest range.",
+    "brief_angle_hint": "Give him one concrete perk or catch to call out, since his readers trust him to spot the fine print."
+  },
+  {
+    "id": "113e75ec-e77d-40e0-ba65-5d56dcfc7265",
+    "name": "Crypto sea",
+    "link": "http://t.me/crypt0_sea",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 16349,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "RWA",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Native",
+      "Tracker"
+    ],
+    "style_summary": "Unpolished position diaries in plain prose, sharing entries, exits, and misses honestly, from a month of CARDS accumulation to escaping a dump and closing SpaceX longs. Switches to a formal numbered format with ✅ headers only for big TGE or event announcements. Trader slang like 하따 and 익절 throughout.",
+    "audience_summary": "Active Korean traders who copy his niche plays in tokenized cards, pre-IPO perps, and exchange gap trades, his IPO gap walkthrough drew 46 forwards, well above his norm.",
+    "brief_angle_hint": "Let him take a real position or test the product first, since his channel only converts when he can talk about it as his own trade."
+  },
+  {
+    "id": "27a5115f-cb35-4994-b0ba-4707b08de652",
+    "name": "백호의 코인갤러리 (Baekobaeko)",
+    "link": "https://t.me/baekobaeko",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8363,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Meme/Degen"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Almost everything is a one or two line shout, ticker calls like 마이크론 $1,000 돌파 ㅊㅊ, dark loss humor, and 사람살려. Shares FM Korea, YouTube, and news links with a single reaction line and almost never writes structured analysis. Several posts a day across stocks, crypto, and whatever is funny.",
+    "audience_summary": "Korean retail traders riding the semiconductor supercycle with one foot still in crypto degen plays. Reaction-bait travels best, the BTC short survivor story hit 2,329 views and 40 forwards.",
+    "brief_angle_hint": "Keep it to one sharp punchline and a screenshot they can riff on, long talking points will get compressed to one line anyway."
+  },
+  {
+    "id": "98067a03-8870-4f46-ba70-bac53554dac5",
+    "name": "Murphy",
+    "link": "https://t.me/murphybus",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 20684,
+    "pricing": "$1K-2K",
+    "niche_tags": [
+      "DeFi",
+      "Neobank",
+      "AI"
+    ],
+    "creator_types": [
+      "Tracker",
+      "Visionary"
+    ],
+    "style_summary": "Warm conversational long form with emoji section markers, following the same projects (Tria, Altura) week after week and updating his read each time. Digs into where yield actually comes from with concrete figures, like Altura's 17.5% APR split across funding fees and physical gold RWA. Weaves in personal essays on AI, his semiconductor bet and life, which builds unusual reader trust.",
+    "audience_summary": "Loyal Korean crypto veterans who value his track record and candor over alpha speed. His personal reflections outperform project posts, pulling 4-5K views.",
+    "brief_angle_hint": "Let him actually use the product first and run a multi-week I have been using this series instead of a one-off shill."
+  },
+  {
+    "id": "3ceea6ca-c42d-4bd5-99e3-dd0b2c983d4e",
+    "name": "함가재공 (investmenttech)",
+    "link": "https://t.me/investmenttech",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 17066,
+    "pricing": null,
+    "niche_tags": [
+      "Airdrop",
+      "Trading",
+      "Macro"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Curator"
+    ],
+    "style_summary": "Two fixed formats: a long daily 크립토 주요 뉴스 Top 10 digest dense with price levels, percentages and scenario analysis, and DOKDO campaign posts built from checkmark blocks with dates, reward pools, required codes and click links. Highly instructional, he repeats must-do steps like campaign code entry and account linking so readers do not lose rewards. Occasionally breaks format for personal political commentary.",
+    "audience_summary": "Korean campaign farmers plugged into the DOKDO quest ecosystem plus daily news skimmers. Campaign and off-topic posts vastly outperform the news digests, a protest post hit 8.4k views and the gifticon roundup 5.2k versus roughly 200 for daily news.",
+    "brief_angle_hint": "Structure it as a DOKDO-style leaderboard campaign with codes, deadlines and clear rewards, that is the machinery his channel runs on."
+  },
+  {
+    "id": "b111321d-e0c1-49db-9854-525806ef77c6",
+    "name": "바밀이야 (Bananamilkrich)",
+    "link": "https://t.me/Bananamilkrich",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 9169,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Macro"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "A raw first-person leverage trading diary written in one-to-three-line bursts of trader slang, ㅋㅋ laughter, and exclamation marks. He live-posts longs going wrong, begs the market for mercy, then turns the loss into a self-deprecating lesson. Occasionally drops blunt one-line trading maxims and Korean stock or FX asides.",
+    "audience_summary": "Retail leverage traders who relate to the P&L rollercoaster and read him for entertainment plus direction sense. Candid loss confessions and market calls pull his highest views.",
+    "brief_angle_hint": "Let him talk in first person as if he aped in himself, anything corporate or scripted will stick out instantly."
+  },
+  {
+    "id": "2569d1b5-756e-49f5-be79-2d047d55ecfd",
+    "name": "싸이버트럭 (Cybertruck)",
+    "link": "https://t.me/cybertruck666",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 10377,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Trading",
+      "Macro",
+      "Meme/Degen",
+      "AI",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Stream of consciousness degen diary mixing one line sarcasm with longer confessional trade posts, like admitting he cut losses and went over 90 percent cash. Heavy Korean slang, dark humor about the industry, zero formatting, and rapid fire posts that jump between coins, Korean chip stocks, funding rates, and even song recommendations.",
+    "audience_summary": "Hardened Korean degen traders who play both perps and Samsung or Hynix stocks; they reward honesty and cynicism, with his June long short playbook hitting 1.8k views and 24 forwards.",
+    "brief_angle_hint": "Give him total freedom to roast and riff on the product in his own voice, because anything scripted will look fake to his readers instantly."
+  },
+  {
+    "id": "463ad06d-1047-49d1-81f9-07fac85a2709",
+    "name": "크립토하는 라쿤 (KoonCrypto)",
+    "link": "https://t.me/Kooncrypto",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 12068,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "NFT/Gaming",
+      "Airdrop",
+      "Trading",
+      "L1/L2",
+      "AI"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Curator"
+    ],
+    "style_summary": "Runs two registers, tidy emoji-bullet digests of macro and market sources (Axios, Wintermute, X stock chatter) and warm casual community posts full of ㅋㅋ. Every event post comes with a numbered participation step list, and giveaways like Pokemon plush raffles and coffee forms for the 라쿤방 are a signature ritual.",
+    "audience_summary": "Korean retail investors who straddle KOSPI stocks and crypto and show up hardest for freebies and AMAs. The ZAMA AMA post pulled 67 forwards and giveaway posts routinely beat news posts on views.",
+    "brief_angle_hint": "Pair the campaign with a giveaway or AMA the 라쿤방 can pile into, prizes are the activation lever here."
+  },
+  {
+    "id": "d8a0e4c4-9c90-45f3-aea0-d2466ce92e9e",
+    "name": "Defi Farmer",
+    "link": "https://t.me/BSC_Farmer_KR",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 21586,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "RWA",
+      "DeFi",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Educator"
+    ],
+    "style_summary": "Announcement-board channel for his YouTube presence: short farmer-emoji posts pointing to live streams, event recaps, and TV appearances rather than written analysis. Original content lives on video (삼프로TV RWA explainer, Consensus field reports), with the Telegram feed acting as the schedule and link hub.",
+    "audience_summary": "Korean retail viewers who follow him on YouTube for accessible fundamentals and RWA education; the Telegram channel reaches them as a notification layer.",
+    "brief_angle_hint": "Pitch him video-first: a live stream segment or explainer episode will land far better than asking for native Telegram posts."
+  },
+  {
+    "id": "803c17cc-0690-486d-bc15-87ec85cfa404",
+    "name": "BQ",
+    "link": "https://t.me/BQTelegram",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 10744,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Meme/Degen",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Posts read like a group chat monologue: single words, sighs, and slangy quips separated by daily date divider lines. Longer posts are rare and usually a betting odds link with a quick take. Heavy playful misspelling and zero formal structure.",
+    "audience_summary": "A small banter-driven crowd that checks in for daily market mood, Coinbase premium watching, and World Cup betting talk. They engage with referral link sharing and casual reactions rather than analysis.",
+    "brief_angle_hint": "Keep it tiny and casual, give him one fun line or odds angle he can riff on, never a long brief."
+  },
+  {
+    "id": "966b8db0-8620-4e77-9b77-a365142ee5c3",
+    "name": "희단 (heedan)",
+    "link": "https://t.me/heedan22",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8499,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Trading",
+      "Airdrop",
+      "NFT/Gaming"
+    ],
+    "creator_types": [
+      "Native",
+      "Onboarder"
+    ],
+    "style_summary": "Diary-style posts in playful internet Korean (쑵니다, 야르, ㄱㄱ) recounting his own contest winnings, prize unboxings, farming results and hedging dilemmas on positions like $LAB. Does quick back-of-envelope math, converting Pacifica points into an implied FDV, and invites readers to push back. Promo posts stay short with participation steps and a verdict grounded in having actually tried the product.",
+    "audience_summary": "Young Korean degen farmers who come for first-person farming math and event freebies. His Pacifica points valuation hit 10.4k views and 45 forwards against a roughly 500-view baseline, the alpha math is what travels.",
+    "brief_angle_hint": "Give him hands-on access and a reward he can personally grind and show off, first-person experience is his whole format."
+  },
+  {
+    "id": "d83217a9-49c3-415c-b42d-1e724abacfa5",
+    "name": "코인맵핵 (centurywhale)",
+    "link": "https://t.me/centurywhale",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 17261,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Infra/DePIN"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Native"
+    ],
+    "style_summary": "Alternates between structured AMA announcements with reward tiers and 참여방법 steps, and one-line chart quips comparing tickers like HYPE and DRAM. Occasionally drops a long explainer with emoji section headers and a one-line closing verdict. Most posts are terse and reactive.",
+    "audience_summary": "Korean retail who join his chat room AMAs for token rewards plus chart watchers tracking Upbit price action, reward posts travel far more than market quips (54 forwards on the EigenCloud AMA).",
+    "brief_angle_hint": "He is set up to host paid AMAs with token rewards in his own chat room, so build the brief around a live community event instead of plain posts."
+  },
+  {
+    "id": "0f545815-daaf-4cf8-929c-bbcadd73d44d",
+    "name": "코블린 (Cobling)",
+    "link": "https://t.me/cobling",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 6472,
+    "pricing": null,
+    "niche_tags": [
+      "RWA",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Tracker",
+      "Analyst"
+    ],
+    "style_summary": "Runs a fixed daily series, Canton Daily, with $CC price, burn-to-mint ratio, then a bulleted Twitter news roundup with source links on every item. Dense institutional detail (validators, CIPs, repo volumes, ETF filings) delivered with dry wit and slang verdicts like 노잼 and ㅇㄱㅈ. Occasional short takes on other chains and random trivia.",
+    "audience_summary": "$CC holders and RWA-narrative followers who rely on him as their daily Canton digest, baseline views are modest at 350 to 450 but off-series posts like Gnoland break out to 5x that.",
+    "brief_angle_hint": "He is built for long-running single-project coverage, so pitch a retained daily or weekly tracking series rather than a one-off post."
+  },
+  {
+    "id": "a0aa13de-d154-44f0-a95d-64d0425f6ccb",
+    "name": "신기술은 돈이 된다 (tlsrltnf)",
+    "link": "https://t.me/tlsrltnf",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 23031,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Trading",
+      "Macro",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Fires off extremely short, unformatted one liners in blunt Korean slang, often with profanity, reacting in real time to FX moves and market events. Occasionally drops a longer practical breakdown such as his crypto card fee math comparing Bybit, OKX and KAST. Minimal formatting, reads like a trader's raw group chat, with offline tips like restaurant lists thrown in between.",
+    "audience_summary": "A large 23K Korean retail audience that uses the channel as a real time market pulse. Panic FX posts spike hard, with the 1557 won post passing 10K views and 45 forwards, and practical fee or cashback tips also travel well.",
+    "brief_angle_hint": "Skip the marketing language and hand him a concrete user benefit with real numbers he can sanity check himself, like fees or cashback."
+  },
+  {
+    "id": "d1569c44-23e3-470d-93f9-7ecced81a2b4",
+    "name": "매실남 (Waitstudy)",
+    "link": "https://t.me/waitstudy",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 19573,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Macro",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Rapid fire posts that are often just a ticker, a price, or a single wry sentence, posted many times a day across crypto, Korean stocks, and market news. Signature habits include kimchi premium and FX quotes, contrarian reads on YouTube doomers calling bottoms, and hard number breakdowns like MSTR and BitMine average prices and dollar losses. States his own positions plainly, such as holding spot Zcash.",
+    "audience_summary": "Korean traders who straddle crypto and the domestic stock market and check him as a sentiment pulse. Engagement is consistent at around 2K views per post with healthy forwards on the data heavy posts.",
+    "brief_angle_hint": "He will not write hype, so feed him one sharp number or contrarian data point that fits a two line post."
+  },
+  {
+    "id": "6fd8c8e5-e708-427a-a55c-8cab1882c81f",
+    "name": "갱생코인 (Gensen Coin)",
+    "link": "https://t.me/gensencoin",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 14286,
+    "pricing": null,
+    "niche_tags": [
+      "Meme/Degen",
+      "NFT/Gaming",
+      "AI"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Mostly one-line gut reactions in raw degen Korean, heavy on ㅋㅋ, slang and occasional profanity, fired off several times a day. Sponsored or serious posts switch to structured intros with feature bullets and a frank verdict, he openly called the airdrop angle weak inside a paid OndoPerps post. Also drops K-pop and entertainment business news like tripleS and Modhaus finances alongside crypto.",
+    "audience_summary": "Degen Korean traders who treat the channel as a live group-chat feed, with one-liners pulling 1.6k to 2k views. K-pop x crypto crossover items get shared most, the tripleS debt post drew 21 forwards.",
+    "brief_angle_hint": "Keep it loose and let him react in his own voice with honest caveats, anything scripted will read as fake to this crowd."
+  },
+  {
+    "id": "dfb50eea-af7e-4a88-b545-c0db447b88de",
+    "name": "로우나의 코인방 (Rowna)",
+    "link": "https://t.me/Rowna999",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 14053,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Macro",
+      "Airdrop",
+      "L1/L2",
+      "AI"
+    ],
+    "creator_types": [
+      "Native",
+      "Tracker"
+    ],
+    "style_summary": "First-person market diary with emoji headlines, sharing real positions including liquidations and stop-outs with profanity-tinged candor. Tracks the same names over weeks (GRVT, Babylon, Bithumb listings) and updates the thesis each time, and sponsored Bithumb posts always carry a clean supporter disclosure. Practical guides like the Pokemon Run card farm come with steps and timing advice.",
+    "audience_summary": "Active Korean traders obsessed with Upbit and Bithumb listing timing, the kimchi discount, and farmable events. Actionable posts spike hard, the Pokemon Run guide hit 2,008 views with 25 forwards and the OpenSea roadmap joke hit 3,652 views.",
+    "brief_angle_hint": "Frame the brief around a listing or money angle they can take a personal position on, this crowd trusts the first-person trade diary voice."
+  },
+  {
+    "id": "b37058d5-4f49-4af2-a02b-ab436e5c37b7",
+    "name": "크립토폴유 (cryptoforu)",
+    "link": "https://t.me/cryptoforu12",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8447,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "RWA",
+      "NFT/Gaming",
+      "Airdrop",
+      "Trading"
+    ],
+    "creator_types": [
+      "Tracker",
+      "Onboarder"
+    ],
+    "style_summary": "Writes in a fixed promo template: a fire emoji headline, checkbox section headers, and dense bullet lists of project stats, sale terms, and reward tiers. Posts are mid length and information packed, always closing with a short casual nudge like 참고하세요 or a one line personal take. The same projects get re-promoted across weeks with updated milestones.",
+    "audience_summary": "Korean retail event hunters and NFT or RWA holders, especially around the Punkvism community, who come for sale terms, listing news, and reward events. Engagement is steady at roughly 1.2k to 1.4k views per post with little variance.",
+    "brief_angle_hint": "Give him a concrete event or reward mechanic with clear numbers and he will turn it into his usual checklist post and keep reposting updates over the campaign."
+  },
+  {
+    "id": "5b85236e-20ae-4db6-b41d-b8f04d0300a3",
+    "name": "We Crypto Together",
+    "link": "https://t.me/WeCryptoTogether",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 50910,
+    "pricing": "$1K-2K",
+    "niche_tags": [
+      "Trading",
+      "Airdrop",
+      "Macro",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Rapid-fire one-liners soaked in Korean degen slang (쌀먹, 유배, 멘징) with running gags about staying in exile abroad until BTC recovers. Longer posts smuggle real analysis inside jokes, like framing Upbit BTC-market listings as prison sentences with minimum terms, or walking through unlock-date funding-rate plays. Posts several times a day.",
+    "audience_summary": "One of the larger Korean degen communities at 50K subs with 4,000 to 9,000 views per post. Forwards spike on farming lists and unlock warnings (76 and 36 forwards), showing readers act on the alpha behind the jokes.",
+    "brief_angle_hint": "Hand them meme-able material plus a farming or listing hook, the message lands through jokes rather than formal copy."
+  },
+  {
+    "id": "4db8d654-03c7-4b0b-9fbe-a369322d3384",
+    "name": "요블이 세상살이 (Yobeul)",
+    "link": "https://t.me/yobeullyANN",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 23069,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "NFT/Gaming",
+      "Airdrop",
+      "AI"
+    ],
+    "creator_types": [
+      "Tracker",
+      "Onboarder"
+    ],
+    "style_summary": "Alert style posts with emoji headers, ⏰ deadlines, and 📌 links, broken into short scannable lines. Follows the same projects across weeks, like Renaiss, MegaETH and GRVT, posting updates, his own redemption test results, and links back to his earlier posts. Drops into chatty collector talk about Pokemon and One Piece cards between alpha posts.",
+    "audience_summary": "Korean airdrop farmers and tokenized trading card collectors, a 23K sub base that forwards deadline and event posts heavily, 15 to 26 forwards on Beacon, Binance NFT and Pokemon posts.",
+    "brief_angle_hint": "Give him a dated event, deadline, or reward his readers can act on, plus something he can personally test and report back on."
+  },
+  {
+    "id": "f3f92fa3-4aeb-44e5-953b-40abe20b4212",
+    "name": "쿱크립토 (kookookoob)",
+    "link": "https://t.me/kookookoob",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 17863,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Curator",
+      "Scout"
+    ],
+    "style_summary": "Short sardonic news drops, often a single line plus an X link or exchange notice, with mocking ㅋㅋㅋ commentary on misbehaving projects. When he goes long he translates English research like the Wintermute weekly into clean structured Korean. Uses Korean Telegram shorthand like 받) for forwarded items.",
+    "audience_summary": "A large Korean trader base treating him as a fast alert feed for listings, airdrops, and scandal. The Mythos release rumor hit 5,000 views and every Humanity drama post cleared 2,200.",
+    "brief_angle_hint": "He suits breaking-news style drops, so give him one sharp scoop or announcement he can post with a snarky one-liner."
+  },
+  {
+    "id": "e090b178-27a0-4882-9322-b881a705a27f",
+    "name": "JerrY Alpha",
+    "link": "https://t.me/jerryalpha",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 6034,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "Meme/Degen",
+      "Trading"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Sporadic one-liner degen commentary between long quiet stretches, mostly reacting to airdrop claims and listing pumps in casual slang with heavy ㄷㄷ-style reactions. The channel is forward-dominated; original posts are quick personal takes, not structured content.",
+    "audience_summary": "Airdrop hunters and degen traders who track claim windows and exchange listings; they read him for fast reactions, not analysis.",
+    "brief_angle_hint": "Use him as an amplifier with a ready-made forwardable asset and a claim or listing hook, not as an original content producer."
+  },
+  {
+    "id": "7f09302b-09ed-4623-a247-c544fb97e2f9",
+    "name": "MBM",
+    "link": "https://t.me/mbmweb3",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 23688,
+    "pricing": "$1K-2K",
+    "niche_tags": [
+      "Trading",
+      "NFT/Gaming",
+      "Macro",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "Posts many times a day, mixing one-line market headlines (Saylor buys, ETF flows, circuit breakers) with personal TCG collection updates on One Piece and Pokemon boxes. Project reviews follow a fixed orange-bullet template with a hands-on 직접 해보니 section before a casual verdict. Slangy and personal, with greetings like 엠모닝 keeping the channel chatty.",
+    "audience_summary": "Korean crypto traders who are also deep in the Pokemon and One Piece card flip wave. They respond to fast headlines and concrete collectible plays, with views steady around 700 to 1,600.",
+    "brief_angle_hint": "Lead with something he can physically try or unbox, a hands-on angle will always beat an abstract narrative pitch."
+  },
+  {
+    "id": "3f5f9c47-b9b2-4f9f-8898-ebca2f21c786",
+    "name": "도파민 연구소 (dopamine)",
+    "link": "https://t.me/dopamineonchain",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 5093,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Macro"
+    ],
+    "creator_types": [
+      "Analyst",
+      "Tracker"
+    ],
+    "style_summary": "Publishes a daily per coin CVD data series describing whale versus retail flows, key volume shelf levels, and liquidation map warnings, each capped with a short emotional one liner after a 👉 arrow. Methodical and numbers first but never stiff, with occasional longer pieces on indicators like the CryptoQuant bubble map and listing tokenomics breakdowns.",
+    "audience_summary": "Active Korean futures and spot traders who check his BTC, ETH, and SOL flow reads before trading; views sit at a modest 300 to 800 but spike past 3k when he covers live drama like pump.fun.",
+    "brief_angle_hint": "Best fit is a product with real on chain or market data he can fold into his daily data series and judge with his own numbers."
+  },
+  {
+    "id": "2e4ded11-4f01-4a28-8c9d-9218cfa29d22",
+    "name": "코백남 (Cobacknamannounce)",
+    "link": "https://t.me/cobacknamannounce",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 19486,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "Trading",
+      "Meme/Degen",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Curator",
+      "Onboarder"
+    ],
+    "style_summary": "Template-driven curation: checkmark headline, 요약👀 bullet summary, a one-line personal verdict under ✍️, and arrow links to participate. Posts many times a day across events, listings, and news with casual slang like 쌀먹. Often adds proof he tried things himself, like dropping $200 on Bonkuji card packs.",
+    "audience_summary": "Reward-focused Korean retail who skim his bullet summaries and click through to farm events, holding steady 1K to 1.6K views with forwards spiking on easy-money events like MemeMax.",
+    "brief_angle_hint": "Hand him a clean event package with bullet-point facts, rewards, and a participation link he can drop into his summary format, an easy-money hook works best."
+  },
+  {
+    "id": "2089cfff-8b95-47b4-b58a-35686a18678c",
+    "name": "킬베로스 (KillberosDAO)",
+    "link": "https://t.me/killberosDAO",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15841,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "Telegraphic news ticker format: a headline, two or three indented bullets with ↳ arrows, and a ✅ link, usually under 50 words. Between flashes he drops raw one-line position confessions like catching the ZEC knife at 300. Symbols like ✅ and » do most of the formatting work.",
+    "audience_summary": "Korean traders who use the channel as a fast feed for exchange notices and listing windows. The Binance Samsung/SK Hynix futures listing hit 10,339 views and 76 forwards, and 가두리 deposit-halt notices also overperform.",
+    "brief_angle_hint": "Feed him crisp announcement-style facts he can fire off in his ticker format, the shorter and more concrete the better."
+  },
+  {
+    "id": "3d4f8448-c1ac-4539-aa50-bc84c6792478",
+    "name": "21M포밍",
+    "link": "https://t.me/vc_21m",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8163,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Native",
+      "Onboarder"
+    ],
+    "style_summary": "Alternates between two registers: raw one line market venting with slang and crying emoticons, and clean structured event posts with checkmark headers, reward tiers, and numbered 참여 방법 steps. Exchange campaigns and project breakdowns get tidy bullet formatting while personal posts stay loose and self deprecating, including jokes about ETH pumping whenever he is hospitalized.",
+    "audience_summary": "Korean retail traders who farm exchange events and rewards. His relatable venting posts pull the highest views at 1.8K to 3K, while event posts sit lower but convert through clear participation steps.",
+    "brief_angle_hint": "Frame the campaign as a participation event with clear rewards and simple steps, and leave room for him to joke around it."
+  },
+  {
+    "id": "6f8ca38e-1e3d-4f6e-bd99-8baf520655bf",
+    "name": "잼민123 (Mujammin)",
+    "link": "https://t.me/mujammin123",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 27111,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Airdrop",
+      "Trading",
+      "Meme/Degen",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Native"
+    ],
+    "style_summary": "Switches between slangy degen one-liners about his own positions and tidy event writeups with green bullet emoji, deadlines, prize pools and numbered participation steps. Frames small campaigns as 기본 소득 (basic income) plays anyone should grab. Candid about wins, losses and mood swings.",
+    "audience_summary": "Korean event farmers and perp traders hunting low-effort rewards across exchanges and new DEXs. Event callouts and market mood posts both hold a steady 2-4K views.",
+    "brief_angle_hint": "Pitch the campaign as easy basic income with clear steps and a real prize pool, then let him sell it in his own slang."
+  },
+  {
+    "id": "2245672a-de99-49a1-a7fa-bb29d90b61c3",
+    "name": "Buy LOW Sell HIGH",
+    "link": "https://t.me/billair1",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 6603,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Nothing but micro one-liners, sarcastic quips reacting to market moves and other people's trades, like TP 0$은 이좌식아 and 산다할아버지마저 팔면 어떡해. No links, no data, no structure, just heckling the market in group-chat Korean. Output is sparse, a few quips a week.",
+    "audience_summary": "Trading-focused lurkers who come for the sarcasm, holding a steady 700 to 1,400 views per quip despite the tiny posting volume.",
+    "brief_angle_hint": "A formal brief will bounce off, hand them one meme-worthy moment they can roast or cheer in a single line."
+  },
+  {
+    "id": "efa876ac-30fa-41f7-a65c-c53e437c8af8",
+    "name": "GemHive",
+    "link": "https://t.me/GemHive",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 23591,
+    "pricing": null,
+    "niche_tags": [
+      "Airdrop",
+      "Macro",
+      "Trading",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "Chatty community voice with deliberate cute misspellings, jumping between giveaway link chains, market quips, and personal life posts in the same day. Structured posts use emoji bullet scaffolding for narrative, token info, and news breakdowns. Coin calls always include his own small position size and a DYOR warning.",
+    "audience_summary": "A nicknamed community (젬붕이) that actively joins his link-sharing chains and small gift events. They respond to interactive giveaways and his casual market chatter more than deep research.",
+    "brief_angle_hint": "Run it as a community event with small instant rewards and let him keep his playful voice and personal position note."
+  },
+  {
+    "id": "3901aca2-82e9-4ea2-88af-f331d12d3db4",
+    "name": "머니그리드 (moneygrid)",
+    "link": "https://t.me/moneygrid",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 11584,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Very short off-the-cuff one-liners about positions, listings and daily life, written like chat messages with heavy slang (따리, 본전띠기). Occasionally posts a practical heads-up with deadlines and official links, like the WLFI unlock note with a scam warning. Mixes crypto with K-stocks, games and freebie events.",
+    "audience_summary": "Casual Korean retail traders who play exchange listings and enjoy light lifestyle content. Non-crypto fun posts (Magikarp running event, Jensen Huang restaurant review) pull 4K+ views, several times his crypto one-liners.",
+    "brief_angle_hint": "Keep it short and personal, a casual I am trying this myself post with a simple reward hook fits better than a structured brief."
+  },
+  {
+    "id": "0a383eec-54b5-4aac-af45-8c8b4c671169",
+    "name": "코인갤러리 (Dogeland)",
+    "link": "https://t.me/dogeland01",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 21853,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Trading",
+      "Meme/Degen"
+    ],
+    "creator_types": [
+      "Curator",
+      "Analyst"
+    ],
+    "style_summary": "Alternates between structured data briefs with emoji section headers, bullet stats, and a closing personal Comment, and bare one line jokes or community banter. Data posts carry specific price levels and dollar figures, while his commentary is blunt, telling readers to stick to Bitcoin and calling out token scams by name.",
+    "audience_summary": "A large general Korean coin community with gallery forum energy; data briefs hold 1k to 2k views while jokes and drama spike to 6k to 10k, so the crowd is there for humor and scandal as much as data.",
+    "brief_angle_hint": "Give him one solid data angle he can brief properly and leave room for his blunt closing take, ideally with something genuinely shareable or funny."
+  },
+  {
+    "id": "f81ee8c4-4f3a-4294-895a-dd73b860eb10",
+    "name": "에어드랍코리아 (airdrop_kor)",
+    "link": "https://t.me/airdrop_kor",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 22199,
+    "pricing": null,
+    "niche_tags": [
+      "Airdrop",
+      "DeFi",
+      "NFT/Gaming"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Curator"
+    ],
+    "style_summary": "Deal-hunter format, emoji headline, compact bullets on what it is, then a blunt personal verdict and a participation link. Compares yields across venues in tidy roundups (USD1 at 6 to 14 percent across Binance, Lorenzo, Bybit, Dolomite) and shares hands-on results like breaking even on card packs. Heavy casual slang like ㄹㄱㄹㄱ keeps it friendly.",
+    "audience_summary": "Korean airdrop farmers and freebie hunters with a baseline around 1,000 views who mobilize massively for claimable rewards. The EigenCloud AMA post hit 9,802 views and 70 forwards.",
+    "brief_angle_hint": "Turn the campaign into a claimable checklist or hosted AMA with rewards, this audience moves when there is something to collect."
+  },
+  {
+    "id": "5083e9cb-ad02-45be-ba9e-bbbc21f31f58",
+    "name": "T.A Crypto",
+    "link": "https://t.me/yul_papa",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 9387,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Posts very sparsely, mostly one line sarcastic jabs like asking readers if they really thought they would dodge a 50 percent drawdown, plus shared YouTube Shorts with a quick blunt comment. Political clips and a scam warning for fellow channel admins appear alongside the market talk. Despite the T.A Crypto name there is no chart analysis in the recent feed.",
+    "audience_summary": "Korean crypto chat regulars from the channel admin circle who respond to his blunt humor, with the market jab pulling 2.5K views against roughly 1K elsewhere.",
+    "brief_angle_hint": "Posting is too sparse to carry a campaign arc, so keep any ask to a single low effort drop and confirm he is active first."
+  },
+  {
+    "id": "8f5c0ecf-7e12-42a3-971f-4fc76b4dcafe",
+    "name": "골드카우 (Cryptogoldcow)",
+    "link": "https://t.me/cryptogoldcow",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 2249,
+    "pricing": null,
+    "niche_tags": [
+      "Airdrop",
+      "NFT/Gaming",
+      "Meme/Degen"
+    ],
+    "creator_types": [
+      "Native",
+      "Tracker"
+    ],
+    "style_summary": "Posts read like a personal farming diary: weekly Abstract XP score updates with a short bullet routine, plus honest profit and loss notes including small losses. Very short posts, minimal formatting, and frequent off topic asides about football, movies, and daily life.",
+    "audience_summary": "A small loyal group of Abstract grinders and casual airdrop farmers who copy his weekly routine; views are modest and steady at around 200 to 400 per post.",
+    "brief_angle_hint": "Have him actually use the product and log it inside his weekly grind updates, since his readers follow what he personally farms rather than ads."
+  },
+  {
+    "id": "4e12806d-6e96-43ea-a406-6bfe4da5e180",
+    "name": "Enjoy My Hobby",
+    "link": "https://t.me/enjoymyhobby",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 51589,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Macro",
+      "DeFi"
+    ],
+    "creator_types": [
+      "Curator",
+      "Analyst"
+    ],
+    "style_summary": "News desk format with emoji section headers, bullet data summaries, and a closing 원문 source link, usually finished with one short personal opinion line. Coverage runs from CPI tables and tax notices to AI model benchmarks and exploit alerts, and some posts are labeled as intern produced content, signaling a team operation rather than a solo diary.",
+    "audience_summary": "A large mainstream Korean crypto audience using the channel as a daily cross market news feed; posts hold a steady 2.5k to 3.5k views with sentiment jokes spiking to 6.5k.",
+    "brief_angle_hint": "Treat them like a newsroom and hand over a fact rich announcement they can slot straight into their digest format with a source link."
+  },
+  {
+    "id": "88d56722-10ff-4056-90c8-1280716fab85",
+    "name": "부의길목에서 (stay news)",
+    "link": "https://t.me/stay_news",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8805,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro"
+    ],
+    "creator_types": [
+      "Curator"
+    ],
+    "style_summary": "Runs a fixed daily format: a dated morning news digest with square bullet items, each a two sentence summary of a headline plus its implication. Tone is neutral newswire Korean, then he occasionally breaks format with blunt one line reactions like telling readers to go vote. Posts are long but formulaic rather than analytical.",
+    "audience_summary": "Readers treat this as a quick morning briefing on Korean politics, geopolitics, and markets rather than a crypto channel. Engagement is modest and steady at around 300 to 500 views with few forwards.",
+    "brief_angle_hint": "This is a news digest channel, so pitch newsworthy announcement material that can slot into his morning roundup rather than promo copy."
+  },
+  {
+    "id": "e349490d-2e08-4c0b-bffb-0310c76be2eb",
+    "name": "CoinFluencer P2E&NFT",
+    "link": "https://t.me/hjwnews",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15005,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "AI",
+      "Neobank",
+      "NFT/Gaming",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Tracker",
+      "Curator"
+    ],
+    "style_summary": "Digest-format posts with emoji headers, checkmark bullets and a one-line takeaway, often closing with his own progress numbers like Tria season levels and points. Follows the same projects across months and seasons (Tria, CROSS, Q402) and updates the thesis each time. Mixes hype phrasing like 꽁돈 혜자 with genuinely structural breakdowns of tokenomics, burn mechanics and APR.",
+    "audience_summary": "Korean reward farmers and P2E or NFT holders chasing card cashback, staking APR and event yield, with steady 2k to 3k views. AI agent payment infra posts hold the same readership, so technical infra content lands fine here.",
+    "brief_angle_hint": "Show him a reward loop he can follow season after season, he keeps coming back to projects that keep paying him."
+  },
+  {
+    "id": "a445b5d4-260e-49bf-ba70-6da7ec198c3b",
+    "name": "Cube",
+    "link": "https://t.me/cubestudy1557",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 9166,
+    "pricing": null,
+    "niche_tags": [
+      "Trading",
+      "Macro",
+      "L1/L2"
+    ],
+    "creator_types": [
+      "Native"
+    ],
+    "style_summary": "Short conversational takes with star emoji headlines, trailing ellipses, and rhetorical questions that think out loud about crashes, reverse premium, and stock picks. Occasionally drops a quick list of names he likes but mostly posts punchy sentiment reads rather than structured analysis.",
+    "audience_summary": "Korean retail traders tracking the KRW reverse premium, crash levels, and exchange listing rumors; freebie posts and crash commentary pull his highest views at around 1k.",
+    "brief_angle_hint": "Keep the ask light and reactive so he can comment on it in his own thinking out loud style instead of running a long formatted brief."
+  },
+  {
+    "id": "12419208-b2c7-49ee-9548-297836a60aac",
+    "name": "알파스쿨 (AlphaSchool)",
+    "link": "https://t.me/AlphaSchool77",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 13023,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Airdrop",
+      "RWA",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Onboarder",
+      "Curator"
+    ],
+    "style_summary": "Nearly every post is a templated event card built from emoji bullet lists covering event period, rewards, and participation steps. She opens mornings with a signature 알스모닝 greeting and posts daily quiz answers for followers. Tone is warm and chatty, with the occasional one-line market outburst dropped between event posts.",
+    "audience_summary": "Readers are reward hunters who farm quizzes, airdrops, and gift coupon events and want exact instructions. Forwards cluster on easy-entry airdrop and whitelist posts.",
+    "brief_angle_hint": "Package the campaign as an event with clear rewards and she will turn it into her step-by-step checklist format."
+  },
+  {
+    "id": "92e31e0c-4c33-48e9-8a91-8f87df424bb8",
+    "name": "아크의 프리미엄 코인정보방 (Board the ARk)",
+    "link": "https://t.me/Board_the_Ark",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 12580,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading"
+    ],
+    "creator_types": [
+      "Curator"
+    ],
+    "style_summary": "Premium-style info room that operates almost entirely on forwards from other channels; original text posts are rare one-liners. Channel structure suggests a curation service for subscribers rather than a personal voice.",
+    "audience_summary": "Subscribers who treat the channel as a filtered feed of trading info aggregated from other Korean crypto channels.",
+    "brief_angle_hint": "Treat as a distribution node: give him a finished post to forward rather than expecting original takes."
+  },
+  {
+    "id": "87b6e434-4bec-4b3d-86c8-923af4d0ea15",
+    "name": "열충",
+    "link": "https://t.me/yeolchoongNotice",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 7686,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Trading"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Streams one liners all day like a trader thinking out loud, from CPI consensus numbers and VIX alerts to KOSPI banter, with 레전드 used as a verbal tic in half the posts. No links or formatting, frequent chat moderation asides, and personal entries like saying he bought because an indicator held. Reads as live desk company rather than composed posts.",
+    "audience_summary": "Korean day traders focused on US macro prints and Samsung and SK Hynix. Views are modest at around 300 but the feed works as real time company during volatile sessions, and this crowd is openly lukewarm on crypto.",
+    "brief_angle_hint": "Straight crypto promo will clash here, so tie any ask to a tradeable market moment or keep the placement expectations light."
+  },
+  {
+    "id": "46630a04-ffa0-47c2-b8b8-8a79f9bfbfa8",
+    "name": "KLAY",
+    "link": "https://t.me/Jenti_DeFi",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 15095,
+    "pricing": "$500-1K",
+    "niche_tags": [
+      "Airdrop",
+      "NFT/Gaming",
+      "Neobank"
+    ],
+    "creator_types": [
+      "Scout",
+      "Onboarder"
+    ],
+    "style_summary": "Friendly hands-on reviewer tone with aegyo spellings, checkmark feature lists, and numbered participation steps ending in links. She tests products herself before writing, flagging 내돈내산 purchases and personal app walkthroughs. Between project posts she runs daily Korean news link roundups and one-word mood reactions.",
+    "audience_summary": "Korean retail users who discover under-the-radar overseas projects through her intros and join the events and meetups she promotes. Participation hooks and meetup posts draw her strongest forwards.",
+    "brief_angle_hint": "Let her actually try the product and attach a participation event, a first-person walkthrough beats a fact sheet."
+  },
+  {
+    "id": "75a1c233-d504-4917-951f-2c83c0747b32",
+    "name": "나백이의코인라이프 (ysytop)",
+    "link": "https://t.me/ysytop2",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 8062,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Macro",
+      "Meme/Degen"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Salty, casual stream of short posts mixing relayed crypto Twitter alpha from Ansem, ZachXBT and Arthur Hayes with his own gut reads, slang, and ㅋㅋ self mockery. When he shares a position, like the Freedom250 Solana memecoin, he includes the contract address, admits he aped small, and tacks on a DYOR disclaimer. Netflix reviews and birthday posts sit right next to token unlock warnings.",
+    "audience_summary": "Korean degen traders who want a fast mixed feed of CT highlights, macro headlines, and honest small punts. Views run 100 to 1000 and the tone keeps it feeling like a friend's channel rather than a research desk.",
+    "brief_angle_hint": "He shills like a friend, so hand him a genuine catalyst or narrative he can casually ape into with a DYOR rather than polished talking points."
+  },
+  {
+    "id": "9605e3fb-bfa7-48f8-8f43-cace864ef07a",
+    "name": "에어드랍ATM (Bounty_atm)",
+    "link": "https://t.me/bounty_atm",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 27354,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Trading",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Native",
+      "Curator"
+    ],
+    "style_summary": "Short punchy market notes broken into stacked one-line fragments, full of wordplay and meme humor. He posts his own entries and stop-losses with exact price levels and support zones, and links sources with a bare 출처. Event posts are quick heads-ups urging followers to grab freebies before they run out.",
+    "audience_summary": "Retail alt traders and freebie hunters who want fast market color with a laugh. Forwards rise on dramatic price moves and actionable missions.",
+    "brief_angle_hint": "Give him a quick-payoff freebie or mission hook that fits his airdrop ATM brand and let him joke about it."
+  },
+  {
+    "id": "0cb10a2b-d723-4550-8800-9223c04baf45",
+    "name": "1Minute",
+    "link": "https://t.me/nftimagod",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 19062,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Trading",
+      "AI"
+    ],
+    "creator_types": [
+      "Curator",
+      "Native"
+    ],
+    "style_summary": "News clipping format with short headline-style summaries of Korean policy, macro and market stories, capped with one snarky line. Posts several times a day across stocks, crypto and consumer deals, rarely more than a few sentences. Likes cautionary trading anecdotes like the Hynix leveraged fat finger episode.",
+    "audience_summary": "Korean retail investors straddling stocks and crypto who want a fast daily read on macro, semiconductors and market mishaps. Engagement is remarkably flat (1.3-1.7K views) across topics, suggesting a habitual daily readership.",
+    "brief_angle_hint": "Frame the project as a newsworthy story he can clip into his daily feed with one sharp take."
+  },
+  {
+    "id": "47eb054d-df2c-49b6-a683-744caa0f8fec",
+    "name": "뀨의Daily웹3",
+    "link": "http://t.me/ggyuweb3",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 6851,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "NFT/Gaming"
+    ],
+    "creator_types": [
+      "Curator",
+      "Onboarder"
+    ],
+    "style_summary": "Runs a near-daily templated 마켓 브리핑 with emoji section headers for Korean stocks, global macro and a Web3 section, written in tidy bullets and capped with a personal closing comment. Off-template posts flip to a cutesy casual register with playful spellings and ㅋㅋ for meetup recaps, esports chatter and event promos. Crypto sits alongside KOSPI, Samsung and FX levels rather than leading.",
+    "audience_summary": "Korean retail readers who want one combined daily snapshot of stocks, FX and crypto, a habitual readership holding steady at 600 to 780 views with almost no forwards.",
+    "brief_angle_hint": "Slot the project into her daily briefing format or an in-person event recap rather than asking for a standalone technical thread."
+  },
+  {
+    "id": "6d2257b5-3721-4f4a-a3c2-30b187adcb46",
+    "name": "막돈방 (lastmoneyalpha)",
+    "link": "https://t.me/lastmoneyalpha",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 11191,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Trading"
+    ],
+    "creator_types": [
+      "Curator",
+      "Onboarder"
+    ],
+    "style_summary": "Runs a fixed-template 아침 브리핑 every morning with emoji section headers for weather, global economy, Korean economy, and crypto, each item a tidy two-line bullet. Between digests he fires off ultra-short BTC despair jokes and hiking and ramen photos. Sponsored earn posts follow a consistent recipe of APY figures, trust checklists, and 참여하기 links.",
+    "audience_summary": "Korean retail investors who read him like a morning paper spanning KOSPI, macro, and crypto. Briefings and capitulation humor hold a steady 1,000 to 1,500 views, and the audience acts on simple yield offers with clear steps.",
+    "brief_angle_hint": "Package the campaign as a clean earn opportunity with simple numbers and a join link he can drop straight into his usual template."
+  },
+  {
+    "id": "a6cf78b6-d526-47e2-ad27-060ae6a568d2",
+    "name": "크립토파즈 (cryptopaz0)",
+    "link": "https://t.me/cryptopaz0",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 12570,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Macro",
+      "Trading"
+    ],
+    "creator_types": [
+      "Analyst",
+      "Curator"
+    ],
+    "style_summary": "Runs a clean news digest format: checkmark headline, sectioned bullet summaries with small emoji markers, and a closing Source link. Tone is dry and neutral with almost no personal voice, translating global market news, exchange product specs, and indicator data into compact Korean briefs.",
+    "audience_summary": "Korean investors who use the channel as a quick institutional news feed; views are remarkably flat at 1.2k to 1.5k per post regardless of topic, suggesting habitual daily readers.",
+    "brief_angle_hint": "Hand over clean facts, numbers, and a source link because it will run as a neutral news brief, so the announcement itself has to carry the excitement."
+  },
+  {
+    "id": "06bf096f-9443-41a7-a508-323600327af1",
+    "name": "KORypto",
+    "link": "https://t.me/KORypto_Announce",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 7538,
+    "pricing": "$200-500",
+    "niche_tags": [
+      "Neobank",
+      "DeFi",
+      "Airdrop"
+    ],
+    "creator_types": [
+      "Native",
+      "Tracker"
+    ],
+    "style_summary": "Alternates between throwaway one-liners like 사람 살려 and structured project breakdowns with bullet lists. When covering a project he defines jargon in plain Korean (explains what an SDK is) and closes with a wry personal aside about farming to pay for cat food. Self-deprecating degen humor sits on top of genuinely organized event details.",
+    "audience_summary": "Small retail crowd of Korean airdrop farmers and yield hunters skimming for the next task. Engagement is modest at 200 to 900 views, with the strongest response on farming quips and exchange events.",
+    "brief_angle_hint": "Give him one clear farmable hook with simple steps and let him wrap it in his usual broke-degen jokes."
+  },
+  {
+    "id": "577a78fa-3839-4a46-b42d-7ecd03dbb7c9",
+    "name": "ETH Apple",
+    "link": "https://x.com/eth_apple",
+    "platform": [
+      "X"
+    ],
+    "region": "Korea",
+    "followers": 191000,
+    "pricing": "$500-1K",
+    "niche_tags": [],
+    "creator_types": [],
+    "style_summary": null,
+    "audience_summary": null,
+    "brief_angle_hint": null
+  },
+  {
+    "id": "7c2b1fd5-e1cf-4f5f-b1e5-2a7a02ace601",
+    "name": "EmperorCoin",
+    "link": "https://t.me/emperorcoin",
+    "platform": [
+      "Telegram"
+    ],
+    "region": "Korea",
+    "followers": 39686,
+    "pricing": null,
+    "niche_tags": [],
+    "creator_types": [],
+    "style_summary": "No organic posts were available in the input file, so writing style cannot be assessed.",
+    "audience_summary": "Cannot be inferred without post content; the channel shows 39,689 subscribers but no recent organic posts were captured.",
+    "brief_angle_hint": "Pull fresh channel content before briefing this KOL since there is no content signal to steer by yet."
+  },
+  {
+    "id": "80c32538-3058-4bb3-9063-bc4b349bd470",
+    "name": "JohnKing",
+    "link": "https://x.com/johnking_eth",
+    "platform": [
+      "X"
+    ],
+    "region": "Korea",
+    "followers": 31500,
+    "pricing": null,
+    "niche_tags": [],
+    "creator_types": [],
+    "style_summary": null,
+    "audience_summary": null,
+    "brief_angle_hint": null
+  },
+  {
+    "id": "d7076318-84cd-4c61-8993-9f79157b6307",
+    "name": "ANDY",
+    "link": "http://x.com/0xndy",
+    "platform": [
+      "X"
+    ],
+    "region": "Korea",
+    "followers": 3,
+    "pricing": null,
+    "niche_tags": [],
+    "creator_types": [],
+    "style_summary": null,
+    "audience_summary": null,
+    "brief_angle_hint": null
+  }
+]
