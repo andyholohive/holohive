@@ -1603,6 +1603,84 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           </div>
                         </div>
                       </div>
+
+                      {/* ── KOL Performance Leaderboard ─────────────
+                          Lives on the KOL Dashboard Overview per Andy
+                          2026-06-19 — was briefly in the Content
+                          Dashboard Overview; moved back. Sorted by
+                          views desc; unactivated KOLs sink to the
+                          bottom so the client sees the activation
+                          gap at a glance. */}
+                      <Card className="border border-gray-200 overflow-hidden">
+                        <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+                          <CardTitle className="text-base font-semibold text-gray-900">KOL Performance Leaderboard</CardTitle>
+                          <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          {leaderboardRows.length === 0 ? (
+                            <div className="p-8 text-center text-sm text-gray-500">No KOLs activated yet.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-50/80 text-[10px] uppercase tracking-wider text-gray-500">
+                                  <tr>
+                                    <th className="text-left py-2.5 px-4 w-12">#</th>
+                                    <th className="text-left py-2.5 px-4">KOL</th>
+                                    <th className="text-right py-2.5 px-4 w-24">Content</th>
+                                    <th className="text-right py-2.5 px-4 w-28">Views</th>
+                                    <th className="text-right py-2.5 px-4 w-32">Engagement</th>
+                                    <th className="text-left py-2.5 px-4 w-[28%]">Share of Views</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {leaderboardRows.map((r, idx) => {
+                                    const sharePct = totalLeaderboardViews > 0 ? (r.stats.views / totalLeaderboardViews) * 100 : 0;
+                                    const avatar = (r.kol.master_kol as any)?.profile_picture_url as string | null | undefined;
+                                    return (
+                                      <tr key={r.kol.id} className="border-t border-gray-100 hover:bg-gray-50/40">
+                                        <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
+                                        <td className="py-3 px-4">
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            {avatar ? (
+                                              <img src={avatar} alt={r.kol.master_kol.name} className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+                                            ) : (
+                                              <div className="h-7 w-7 rounded-full bg-gray-100 flex-shrink-0" />
+                                            )}
+                                            <div className="min-w-0">
+                                              <div className="font-medium text-gray-900 truncate">{maskedKolName(r.kol.master_kol.name, idx)}</div>
+                                              {r.kol.master_kol.platform && r.kol.master_kol.platform.length > 0 && (
+                                                <div className="text-[10px] text-gray-500 uppercase tracking-wider truncate">
+                                                  {r.kol.master_kol.platform.join(' · ')}
+                                                </div>
+                                              )}
+                                              {!mask.kolHandles && r.kol.profile_note && (
+                                                <div className="text-[11px] text-gray-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
+                                                  {r.kol.profile_note}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{r.stats.contentCount}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900">{leaderboardFmt(r.stats.views)}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{leaderboardFmt(r.stats.engagements)}</td>
+                                        <td className="py-3 px-4">
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                              <div className="h-full bg-brand" style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }} />
+                                            </div>
+                                            <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     </div>
                   );
                 })()}
@@ -3375,82 +3453,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </div>
 
-                      {/* ── KOL Performance Leaderboard ─────────────
-                          Moved from KOL Dashboard Overview into the
-                          Content Dashboard Overview per Andy
-                          2026-06-19. Sorted by views desc; unactivated
-                          KOLs sink to the bottom so the client sees
-                          activation gap at a glance. */}
-                      <Card className="border border-gray-200 overflow-hidden">
-                        <CardHeader className="border-b border-gray-100 bg-gray-50/60">
-                          <CardTitle className="text-base font-semibold text-gray-900">KOL Performance Leaderboard</CardTitle>
-                          <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                          {leaderboardRows.length === 0 ? (
-                            <div className="p-8 text-center text-sm text-gray-500">No KOLs activated yet.</div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead className="bg-gray-50/80 text-[10px] uppercase tracking-wider text-gray-500">
-                                  <tr>
-                                    <th className="text-left py-2.5 px-4 w-12">#</th>
-                                    <th className="text-left py-2.5 px-4">KOL</th>
-                                    <th className="text-right py-2.5 px-4 w-24">Content</th>
-                                    <th className="text-right py-2.5 px-4 w-28">Views</th>
-                                    <th className="text-right py-2.5 px-4 w-32">Engagement</th>
-                                    <th className="text-left py-2.5 px-4 w-[28%]">Share of Views</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {leaderboardRows.map((r, idx) => {
-                                    const sharePct = totalLeaderboardViews > 0 ? (r.stats.views / totalLeaderboardViews) * 100 : 0;
-                                    const avatar = (r.kol.master_kol as any)?.profile_picture_url as string | null | undefined;
-                                    return (
-                                      <tr key={r.kol.id} className="border-t border-gray-100 hover:bg-gray-50/40">
-                                        <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
-                                        <td className="py-3 px-4">
-                                          <div className="flex items-center gap-2.5 min-w-0">
-                                            {avatar ? (
-                                              <img src={avatar} alt={r.kol.master_kol.name} className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
-                                            ) : (
-                                              <div className="h-7 w-7 rounded-full bg-gray-100 flex-shrink-0" />
-                                            )}
-                                            <div className="min-w-0">
-                                              <div className="font-medium text-gray-900 truncate">{maskedKolName(r.kol.master_kol.name, idx)}</div>
-                                              {r.kol.master_kol.platform && r.kol.master_kol.platform.length > 0 && (
-                                                <div className="text-[10px] text-gray-500 uppercase tracking-wider truncate">
-                                                  {r.kol.master_kol.platform.join(' · ')}
-                                                </div>
-                                              )}
-                                              {!mask.kolHandles && r.kol.profile_note && (
-                                                <div className="text-[11px] text-gray-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
-                                                  {r.kol.profile_note}
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </td>
-                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{r.stats.contentCount}</td>
-                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900">{leaderboardFmt(r.stats.views)}</td>
-                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{leaderboardFmt(r.stats.engagements)}</td>
-                                        <td className="py-3 px-4">
-                                          <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                                              <div className="h-full bg-brand" style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }} />
-                                            </div>
-                                            <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
                     </div>
                   )}
                 </CardContent>
