@@ -45,7 +45,12 @@ import {
   type KolChannelSnapshot,
   type CreateKolChannelSnapshotInput,
 } from "@/lib/kolChannelSnapshotService";
-import { tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
+// kolScoringEngine is the legacy May 2026 5-dim model. KolScoreResult
+// type stays here for the OverviewTab prop signature (parent /kols page
+// still computes the legacy score). Doc 2's two-score model lives in
+// kolScoreService — fetched fresh inside ScoreBreakdownTab.
+import type { KolScoreResult } from "@/lib/kolScoringEngine";
+import { ScoreBreakdownTab } from "./ScoreBreakdownTab";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/dateFormat";
@@ -122,8 +127,9 @@ export function KolProfileModal({
           {/* v11 tab chrome — cream-100 base + warm hairline + the
               active-state shadow-card so the lift matches /clients,
               /team, and the parent /kols toolbar. */}
-          <TabsList className="grid w-full grid-cols-4 bg-cream-100 p-1 h-auto border border-cream-200 shrink-0">
+          <TabsList className="grid w-full grid-cols-5 bg-cream-100 p-1 h-auto border border-cream-200 shrink-0">
             <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="score" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Score</TabsTrigger>
             <TabsTrigger value="deliverables" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Deliverables</TabsTrigger>
             <TabsTrigger value="snapshots" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Snapshots</TabsTrigger>
             <TabsTrigger value="calls" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Call Logs</TabsTrigger>
@@ -131,6 +137,10 @@ export function KolProfileModal({
 
           <TabsContent value="overview" className="mt-4 flex-1 overflow-y-auto px-1">
             <OverviewTab kol={kol} onKolChanged={onKolChanged} score={score} />
+          </TabsContent>
+
+          <TabsContent value="score" className="mt-4 flex-1 overflow-y-auto px-1">
+            <ScoreBreakdownTab kolId={kol.id} />
           </TabsContent>
 
           <TabsContent value="deliverables" className="mt-4 flex-1 overflow-y-auto px-1">
@@ -265,36 +275,10 @@ function OverviewTab({
         />
         <Field label="Group Chat" value={kol.group_chat ? "Yes" : "No"} />
         <Field label="Pricing" value={kol.pricing || "—"} />
-        <Field
-          label="Score"
-          value={
-            score?.score != null ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="font-semibold">{score.score}</span>
-                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${tierForScore(score.score).classes}`}>
-                  {tierForScore(score.score).label}
-                </span>
-              </span>
-            ) : (
-              <span className="text-ink-warm-400" title={score?.reason || undefined}>
-                {score?.reason ? "Insufficient data" : "—"}
-              </span>
-            )
-          }
-        />
       </Card>
-
-      {/* Per-dimension breakdown — only when a score exists. Helps the
-          team understand WHY a KOL scored a given number. */}
-      {score?.score != null && score.dimensions && (
-        <Card className="grid grid-cols-5 gap-2 p-3">
-          <DimensionBar label="Engagement" value={score.dimensions.engagement_quality} />
-          <DimensionBar label="Reach" value={score.dimensions.reach_efficiency} />
-          <DimensionBar label="Channel" value={score.dimensions.channel_health} />
-          <DimensionBar label="Growth" value={score.dimensions.growth_trajectory} />
-          <DimensionBar label="Activation" value={score.dimensions.activation_impact} />
-        </Card>
-      )}
+      {/* Score field + per-dim breakdown moved to the dedicated Score
+          tab per Jdot Q8 (modal-with-tabs). Single source of truth — no
+          stale-prop-vs-fresh-fetch drift between Overview and Score. */}
 
       {/* Notes field — editable here. The /kols list also exposes this
           as the "Notes" column, but inline-editing a textarea in a
