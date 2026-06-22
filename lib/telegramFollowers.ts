@@ -16,8 +16,8 @@
  * require either bot-membership-as-admin (not realistic for KOL
  * channels) or a paid analytics vendor (TGStat etc.) — explicitly
  * deferred until/if the team needs them. The Score formula's Channel
- * Health dimension just stays null in the meantime; kolScoringEngine
- * redistributes its weight to the active dimensions.
+ * Health dimension just stays null in the meantime; kolScoreService
+ * renormalizes the weights across the surviving dimensions.
  */
 
 /**

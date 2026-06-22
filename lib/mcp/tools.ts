@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { computeRosterScores, tierForScore } from '@/lib/kolScoringEngine';
+import { getKolScore as getKolScoreFromService } from '@/lib/kolScoreService';
 import { mcpAuthStorage } from '@/lib/mcp/context';
 
 /**
@@ -1740,61 +1740,45 @@ export async function getKolScore(
   supabase: SupabaseClient,
   args: { kol_id: string },
 ): Promise<string> {
-  // Score requires roster-wide normalization (each dimension is min-max
-  // scaled across the whole population). So a per-KOL request still
-  // pulls everyone's data. ~200-500ms typical at <500 KOLs — acceptable
-  // for an MCP call.
-  const [kolsRes, delivRes, snapRes] = await Promise.all([
-    (supabase as any).from('master_kols').select('id, name').is('archived_at', null),
-    (supabase as any).from('kol_deliverables').select('*').limit(2000),
-    (supabase as any)
-      .from('kol_channel_snapshots')
-      .select('*')
-      .gte('snapshot_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)),
-  ]);
+  // Score requires roster-wide normalization (Channel dims min-max
+  // across the whole roster, Campaign dims across aggregated campaign
+  // data). The service handles all the fetching + grouping.
+  const { data: target, error: kolErr } = await (supabase as any)
+    .from('master_kols')
+    .select('id, name')
+    .eq('id', args.kol_id)
+    .is('archived_at', null)
+    .single();
+  if (kolErr) return `KOL not found: ${args.kol_id}`;
 
-  if (kolsRes.error) return `Error: ${kolsRes.error.message}`;
-  const kols = (kolsRes.data || []) as Array<{ id: string; name: string }>;
-  const target = kols.find((k) => k.id === args.kol_id);
-  if (!target) return `KOL not found: ${args.kol_id}`;
-
-  // Group deliverables + snapshots by kol_id for the scoring engine.
-  const delivByKol = new Map<string, any[]>();
-  for (const d of (delivRes.data || []) as any[]) {
-    if (!delivByKol.has(d.kol_id)) delivByKol.set(d.kol_id, []);
-    delivByKol.get(d.kol_id)!.push(d);
-  }
-  const snapByKol = new Map<string, any[]>();
-  for (const s of (snapRes.data || []) as any[]) {
-    if (!snapByKol.has(s.kol_id)) snapByKol.set(s.kol_id, []);
-    snapByKol.get(s.kol_id)!.push(s);
-  }
-
-  const roster = kols.map((k) => ({
-    kol_id: k.id,
-    deliverables: delivByKol.get(k.id) || [],
-    snapshots: snapByKol.get(k.id) || [],
-  }));
-  const scores = computeRosterScores(roster);
-  const result = scores.get(args.kol_id);
+  const result = await getKolScoreFromService(supabase, args.kol_id);
   if (!result) return `Score not computed for ${target.name} (${args.kol_id}).`;
 
+  const { blended, channel, campaign } = result;
   const out: string[] = [];
   out.push(`## Score for ${target.name}`);
   out.push('');
-  if (result.score == null) {
-    out.push(`**Score:** Insufficient data`);
-    if (result.reason) out.push(`*${result.reason}*`);
+  out.push(`**Displayed:** ${Math.round(blended.displayed)}/100 · Tier ${blended.tier}`);
+  out.push(`**Channel Score:** ${Math.round(blended.channel)} (60% weight when activated, else 100%)`);
+  if (blended.activated && blended.campaign != null) {
+    out.push(`**Campaign Performance:** ${Math.round(blended.campaign)} (40% weight, activated at ${campaign?.deliverableCount ?? '?'}+ deliverables)`);
   } else {
-    const tier = tierForScore(result.score);
-    out.push(`**Composite:** ${result.score}/100 · Tier ${tier.label}`);
+    out.push(`**Campaign Performance:** Not activated — needs 3+ logged deliverables.`);
+  }
+  if (blended.lowConfidence) out.push(`*⚠ Low-confidence: latest snapshot flagged low organic volume.*`);
+  out.push('');
+  out.push('**Channel Score breakdown (0-100, normalized vs roster):**');
+  out.push(`  · Engagement Quality   (30%): ${Math.round(channel.engagementQuality)}`);
+  out.push(`  · Reach Efficiency     (25%): ${Math.round(channel.reachEfficiency)}`);
+  out.push(`  · Discussion Engagement (15%): ${channel.discussionEngagement == null ? '— (no linked discussion group)' : Math.round(channel.discussionEngagement)}`);
+  out.push(`  · Channel Health       (15%): ${Math.round(channel.channelHealth)}`);
+  out.push(`  · Growth Trajectory    (15%): ${channel.growthTrajectory == null ? '— (needs 2nd monthly snapshot)' : Math.round(channel.growthTrajectory)}`);
+  if (campaign) {
     out.push('');
-    out.push('**Per-dimension breakdown (0-100, normalized vs roster):**');
-    out.push(`  · Engagement Quality:  ${result.dimensions.engagement_quality ?? '—'}`);
-    out.push(`  · Reach Efficiency:    ${result.dimensions.reach_efficiency ?? '—'}`);
-    out.push(`  · Channel Health:      ${result.dimensions.channel_health ?? '—'}`);
-    out.push(`  · Growth Trajectory:   ${result.dimensions.growth_trajectory ?? '—'}`);
-    out.push(`  · Activation Impact:   ${result.dimensions.activation_impact ?? '—'}`);
+    out.push('**Campaign Performance breakdown:**');
+    out.push(`  · Activation Impact         (50%): ${Math.round(campaign.activationImpact)}`);
+    out.push(`  · Sponsored Engagement Lift (30%): ${Math.round(campaign.sponsoredEngagementLift)}`);
+    out.push(`  · Sponsored Reach           (20%): ${Math.round(campaign.sponsoredReach)}`);
   }
   return out.join('\n');
 }

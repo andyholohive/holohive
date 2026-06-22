@@ -31,9 +31,7 @@ import { MasterKOL, KOLService } from "@/lib/kolService";
 // [May 2026 KOL overhaul follow-up] The Deliverables tab now reads
 // directly from the campaign-side `contents` table (instead of the
 // orphan kol_deliverables table). KolDeliverableService is still used
-// by lib/kolScoringEngine + MCP tools — those are out of scope for
-// this change and stay pointed at the old source until separately
-// migrated.
+// by MCP tools — those are out of scope for this change.
 import {
   KolCallLogService,
   CALL_TYPES,
@@ -45,11 +43,6 @@ import {
   type KolChannelSnapshot,
   type CreateKolChannelSnapshotInput,
 } from "@/lib/kolChannelSnapshotService";
-// kolScoringEngine is the legacy May 2026 5-dim model. KolScoreResult
-// type stays here for the OverviewTab prop signature (parent /kols page
-// still computes the legacy score). Doc 2's two-score model lives in
-// kolScoreService — fetched fresh inside ScoreBreakdownTab.
-import type { KolScoreResult } from "@/lib/kolScoringEngine";
 import { ScoreBreakdownTab } from "./ScoreBreakdownTab";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -81,11 +74,8 @@ interface KolProfileModalProps {
   onClose: () => void;
   /** Called when KOL data was edited (e.g. notes) so parent can refresh. */
   onKolChanged?: (updated: MasterKOL) => void;
-  /** Pre-computed score from the parent's roster-wide normalization.
-   *  Optional — if absent the Overview tab shows a placeholder. */
-  score?: KolScoreResult | null;
   /** Bumped by the parent when snapshots/deliverables change so the
-   *  parent can re-run computeRosterScores. Optional callback. */
+   *  parent can re-fetch the score. Optional callback. */
   onMetricsChanged?: () => void;
 }
 
@@ -94,7 +84,6 @@ export function KolProfileModal({
   isOpen,
   onClose,
   onKolChanged,
-  score,
   onMetricsChanged,
 }: KolProfileModalProps) {
   if (!kol) return null;
@@ -136,7 +125,7 @@ export function KolProfileModal({
           </TabsList>
 
           <TabsContent value="overview" className="mt-4 flex-1 overflow-y-auto px-1">
-            <OverviewTab kol={kol} onKolChanged={onKolChanged} score={score} />
+            <OverviewTab kol={kol} onKolChanged={onKolChanged} />
           </TabsContent>
 
           <TabsContent value="score" className="mt-4 flex-1 overflow-y-auto px-1">
@@ -213,11 +202,9 @@ function RowSkeleton({ stats = 5, notes = true }: { stats?: number; notes?: bool
 function OverviewTab({
   kol,
   onKolChanged,
-  score,
 }: {
   kol: MasterKOL;
   onKolChanged?: (updated: MasterKOL) => void;
-  score?: KolScoreResult | null;
 }) {
   const [notes, setNotes] = useState(kol.notes || "");
   const [savingNotes, setSavingNotes] = useState(false);

@@ -15,9 +15,23 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity, RefreshCw } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
-import { computeRosterScores, tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
-import type { KolDeliverable } from "@/lib/kolDeliverableService";
-import type { KolChannelSnapshot } from "@/lib/kolChannelSnapshotService";
+// [2026-06-22] Migrated off lib/kolScoringEngine (legacy May 2026 5-dim
+// model) to Jdot's TG Addendum two-score model. Score data now comes
+// from /api/kols/scores which runs the new compute server-side against
+// the full roster; client-side roster compute went away with it.
+import type { ScoreResult, Tier } from "@/lib/kolScoreService";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+// Tier badge styling for the Score column. Bands are absolute per Doc 2 §5.
+// Mirrors the palette used inside ScoreBreakdownTab — keep in sync if
+// either side changes.
+const TIER_CLASSES: Record<Tier, string> = {
+  S: 'bg-amber-100 text-amber-800 border-amber-300',
+  A: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  B: 'bg-sky-100 text-sky-800 border-sky-300',
+  C: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  D: 'bg-rose-100 text-rose-800 border-rose-300',
+};
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -160,15 +174,13 @@ export default function KOLsPage() {
   // Houses the Deliverables and Call Logs sections per Phase 2 spec.
   const [profileModalKol, setProfileModalKol] = useState<MasterKOL | null>(null);
 
-  // Phase 3: composite Score per KOL, computed from deliverables +
-  // snapshots in bulk and normalized across the roster. We pull the
-  // raw rows once on mount and recompute when either side changes.
-  // ScoreMap shape: kol.id → KolScoreResult (with .score being
-  // null when below the deliverables threshold).
-  const [scoreMap, setScoreMap] = useState<Map<string, KolScoreResult>>(new Map());
-  // Bumped whenever the modal reports a deliverable or snapshot
-  // change — triggers a refetch + recompute. Cheap because the bulk
-  // queries are small (at <500 KOLs, total payload ~few hundred KB).
+  // Doc 2 two-score model: blended displayed score + tier per KOL,
+  // computed server-side at /api/kols/scores with cross-roster min-max
+  // normalization. Score is always present (never "Insufficient data"
+  // — Channel-only when activation < 3 deliverables per Doc 2 §5).
+  const [scoreMap, setScoreMap] = useState<Map<string, ScoreResult>>(new Map());
+  // Bumped by the modal when a deliverable/snapshot edit invalidates
+  // the score — triggers a refetch.
   const [scoreRefreshNonce, setScoreRefreshNonce] = useState(0);
 
   // Sticky scrollbar state
@@ -505,60 +517,33 @@ export default function KOLsPage() {
     fetchProjectsPerKol();
   }, []);
 
-  // Score recomputation effect — runs on initial mount and whenever
-  // the modal bumps scoreRefreshNonce (i.e. a deliverable or snapshot
-  // was added/deleted). Scoped pull (last 12 months of snapshots,
-  // last 1000 deliverables) so we never page-load megabytes.
+  // Score-fetch effect — pulls the full Doc-2 two-score breakdown for
+  // every roster KOL from /api/kols/scores. Server computes against
+  // the entire master_kols roster (Channel dims need cross-roster
+  // min-max normalization, can't score one KOL in isolation), so the
+  // batch call is mandatory not an optimization.
+  // Doesn't depend on `kols` — the API already fans out to every
+  // non-archived KOL; pagination on the client doesn't change which
+  // scores we need cached. scoreRefreshNonce is the only invalidator.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [delivRes, snapRes] = await Promise.all([
-          (supabase as any)
-            .from("kol_deliverables")
-            .select("*")
-            .order("date_posted", { ascending: false })
-            .limit(2000),
-          (supabase as any)
-            .from("kol_channel_snapshots")
-            .select("*")
-            .gte("snapshot_date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
-            .order("snapshot_date", { ascending: false }),
-        ]);
+        const res = await fetch('/api/kols/scores', { credentials: 'include' });
+        if (!res.ok) throw new Error(`scores fetch ${res.status}`);
+        const json = await res.json();
         if (cancelled) return;
-
-        // Group by kol_id for the scoring engine. Build maps once
-        // rather than filtering per KOL inside the loop.
-        const delivByKol = new Map<string, KolDeliverable[]>();
-        for (const d of (delivRes.data || []) as KolDeliverable[]) {
-          if (!delivByKol.has(d.kol_id)) delivByKol.set(d.kol_id, []);
-          delivByKol.get(d.kol_id)!.push(d);
+        const map = new Map<string, ScoreResult>();
+        for (const [kolId, score] of Object.entries(json.scores ?? {})) {
+          map.set(kolId, score as ScoreResult);
         }
-        const snapByKol = new Map<string, KolChannelSnapshot[]>();
-        for (const s of (snapRes.data || []) as KolChannelSnapshot[]) {
-          if (!snapByKol.has(s.kol_id)) snapByKol.set(s.kol_id, []);
-          snapByKol.get(s.kol_id)!.push(s);
-        }
-
-        // Build the roster input. We score every KOL, even ones with
-        // zero data — they get score=null with "Insufficient data"
-        // rather than disappearing from the map.
-        const roster = kols.map((k) => ({
-          kol_id: k.id,
-          deliverables: delivByKol.get(k.id) || [],
-          snapshots: snapByKol.get(k.id) || [],
-        }));
-
-        const scores = computeRosterScores(roster);
-        if (!cancelled) setScoreMap(scores);
+        setScoreMap(map);
       } catch (err) {
-        console.error("Failed to compute KOL scores:", err);
+        console.error("Failed to fetch KOL scores:", err);
       }
     })();
     return () => { cancelled = true; };
-    // kols is a dep so we recompute when the list changes (filter,
-    // pagination, edit). scoreRefreshNonce is the modal's signal.
-  }, [kols, scoreRefreshNonce]);
+  }, [scoreRefreshNonce]);
 
   // Debounce search term for performance (300ms delay)
   useEffect(() => {
@@ -3317,24 +3302,45 @@ export default function KOLsPage() {
                     </div>
                   </TableCell>
                   )}
-                  {/* Score: composite (0-100) with tier badge, computed
-                      by computeRosterScores. Shows "—" with a tooltip
-                      reason when below the 3-deliverables threshold. */}
+                  {/* Score: Doc 2 two-score blended display. Hover →
+                      Channel/Campaign split per Jdot Q6c. Tier from
+                      result.blended.tier (absolute bands S 85+ / A 70 /
+                      B 50 / C 30 / D below). Distinct color treatment
+                      when Campaign data is present (blended ≠ Channel
+                      composite) per Doc 2 §5. */}
                   {visibleColumns.score && (() => {
                     const result = scoreMap.get(kol.id);
                     return (
                       <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
-                        {result?.score != null ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold text-ink-warm-900">{result.score}</span>
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${tierForScore(result.score).classes}`}>
-                              {tierForScore(result.score).label}
-                            </span>
-                          </div>
+                        {result ? (
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="inline-flex items-center gap-1.5 cursor-default">
+                                  <span className={`text-sm font-semibold tabular-nums ${result.blended.activated ? 'text-brand-dark' : 'text-ink-warm-900'}`}>
+                                    {Math.round(result.blended.displayed)}
+                                  </span>
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${TIER_CLASSES[result.blended.tier]}`}>
+                                    {result.blended.tier}
+                                  </span>
+                                  {result.blended.lowConfidence && <span className="text-[9px] text-amber-700" title="Low organic volume">⚠</span>}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="text-xs">
+                                <div>Channel {Math.round(result.blended.channel)}</div>
+                                {result.blended.activated && result.blended.campaign != null && (
+                                  <div>Campaign {Math.round(result.blended.campaign)}</div>
+                                )}
+                                {!result.blended.activated && (
+                                  <div className="text-ink-warm-400 mt-0.5">Channel-only (needs 3+ deliverables for Campaign Performance)</div>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
                           <div
                             className="text-xs text-ink-warm-400"
-                            title={result?.reason || "Score requires deliverables data."}
+                            title="Score loading..."
                           >
                             —
                           </div>
@@ -3561,12 +3567,10 @@ export default function KOLsPage() {
           setKols((prev) => prev.map((k) => (k.id === updated.id ? updated : k)));
           setProfileModalKol(updated);
         }}
-        // Pass through the pre-computed score so the Overview tab can
-        // show the composite + per-dimension breakdown without
-        // re-fetching everything.
-        score={profileModalKol ? scoreMap.get(profileModalKol.id) : null}
-        // When a deliverable or snapshot changes inside the modal,
-        // bump the nonce so the parent refetches + recomputes scores.
+        // Score breakdown lives on the modal's own Score tab — it
+        // fetches /api/kols/[id]/score directly, no need to thread the
+        // value through. Modal still notifies us on snapshot/deliverable
+        // edits so /kols can refresh its Score column.
         onMetricsChanged={() => setScoreRefreshNonce((n) => n + 1)}
       />
 
