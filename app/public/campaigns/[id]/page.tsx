@@ -1461,15 +1461,67 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                   return (
                     <div className="space-y-6">
-                      {/* KPI strip — Total KOLs / Avg Followers /
-                          Unique Platforms / Regions. Uses the shared
-                          KpiCard primitive so the strip reads with the
-                          same rhythm as the internal view. */}
-                      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}        accent="brand"   />
-                        <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowersFmt}  accent="sky"     />
-                        <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'} value={platformSet.size} accent="emerald" />
-                        <KpiCard icon={Flag}      label={regionSet.size === 1 ? 'Region' : 'Regions'} value={regionSet.size} accent="purple"  />
+                      {/* KPI cards — gradient brand icon block to
+                          mirror the public Content Dashboard
+                          Overview's card style per Andy 2026-06-19.
+                          Same Card / CardHeader / CardContent rhythm
+                          + sentence-style label + text-2xl value. */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                              <p className="text-sm text-gray-600">Total KOLs</p>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{totalKols}</div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                              <p className="text-sm text-gray-600">Avg Followers</p>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{avgFollowersFmt}</div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                              <p className="text-sm text-gray-600">{platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'}</p>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{platformSet.size}</div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                              <p className="text-sm text-gray-600">{regionSet.size === 1 ? 'Region' : 'Regions'}</p>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{regionSet.size}</div>
+                          </CardContent>
+                        </Card>
                       </div>
 
                       {/* Charts row — Platform Distribution +
