@@ -601,18 +601,18 @@ function ContentDeliverableRowView({
               forwards) plus contents-native bonus metrics. */}
           {!editing ? (
             <div className="mt-2 grid grid-cols-5 gap-2 text-xs">
-              <Stat label="Impressions" value={row.impressions} />
+              <Stat label="Views" value={row.impressions} />
               <Stat label="Shares" value={row.retweets} />
-              <Stat label="Likes" value={row.likes} />
-              <Stat label="Comments" value={row.comments} />
+              <Stat label="Reactions" value={row.likes} />
+              <Stat label="Replies" value={row.comments} />
               <Stat label="Saves" value={row.bookmarks} />
             </div>
           ) : (
             <div className="mt-2 grid grid-cols-5 gap-2">
-              <NumField label="Impressions" value={impressions} onChange={setImpressions} />
+              <NumField label="Views" value={impressions} onChange={setImpressions} />
               <NumField label="Shares" value={retweets} onChange={setRetweets} />
-              <NumField label="Likes" value={likes} onChange={setLikes} />
-              <NumField label="Comments" value={comments} onChange={setComments} />
+              <NumField label="Reactions" value={likes} onChange={setLikes} />
+              <NumField label="Replies" value={comments} onChange={setComments} />
               <NumField label="Saves" value={bookmarks} onChange={setBookmarks} />
             </div>
           )}

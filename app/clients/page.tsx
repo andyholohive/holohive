@@ -5817,9 +5817,9 @@ export default function ClientsPage() {
                                         )}
                                         <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
                                           <span>{c.impressions.toLocaleString()} Views</span>
-                                          <span>{c.likes.toLocaleString()} Likes</span>
+                                          <span>{c.likes.toLocaleString()} Reactions</span>
                                           <span>{c.retweets.toLocaleString()} Shares</span>
-                                          <span>{c.comments.toLocaleString()} Comments</span>
+                                          <span>{c.comments.toLocaleString()} Replies</span>
                                         </div>
                                       </div>
                                       {c.content_link && (

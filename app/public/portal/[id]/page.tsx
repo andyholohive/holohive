@@ -2428,7 +2428,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   100% of valid content_link rows are X or Telegram. */}
               <TopPostEmbed url={topPost.contentLink} notes={topPost.notes} />
 
-              {/* 3 stats horizontal — spec is explicit about Views/Likes/Replies labels */}
+              {/* 3 stats horizontal — Views/Reactions/Replies per the
+                  Andy 2026-06-19 platform-native vocab decision (spec
+                  originally said "Likes" but UI standard is now
+                  "Reactions" everywhere). */}
               <div className="grid grid-cols-3 gap-6">
                 <div>
                   <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.impressions)}</p>
@@ -2436,7 +2439,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.likes)}</p>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mt-0.5">Likes</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mt-0.5">Reactions</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.comments)}</p>
@@ -3676,7 +3679,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                 <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tier</th>
                                 <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Content</th>
-                                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Impressions</th>
+                                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Views</th>
                                 <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Engagement</th>
                               </tr>
                             </thead>

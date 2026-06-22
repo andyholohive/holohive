@@ -627,10 +627,10 @@ export function ContentDashboardTableView() {
                         <SelectItem value="type">Type</SelectItem>
                         <SelectItem value="status">Status</SelectItem>
                         <SelectItem value="activation_date">Activation Date</SelectItem>
-                        <SelectItem value="impressions">Impressions</SelectItem>
-                        <SelectItem value="likes">Likes</SelectItem>
+                        <SelectItem value="impressions">Views</SelectItem>
+                        <SelectItem value="likes">Reactions</SelectItem>
                         <SelectItem value="retweets">Shares</SelectItem>
-                        <SelectItem value="comments">Comments</SelectItem>
+                        <SelectItem value="comments">Replies</SelectItem>
                         <SelectItem value="bookmarks">Saves</SelectItem>
                       </SelectContent>
                     </Select>
@@ -797,7 +797,7 @@ export function ContentDashboardTableView() {
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Impressions</span>
+                              <span>Views</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -806,7 +806,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Impressions</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Views</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.impressions_operator}
@@ -851,7 +851,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Likes</span>
+                              <span>Reactions</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -860,7 +860,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Likes</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Reactions</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.likes_operator}
@@ -959,7 +959,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Comments</span>
+                              <span>Replies</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -968,7 +968,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Comments</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Replies</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.comments_operator}
@@ -1246,7 +1246,7 @@ export function ContentDashboardTableView() {
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Impressions</span>
+                              <span>Views</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1255,7 +1255,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Impressions</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Views</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.impressions_operator}
@@ -1300,7 +1300,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Likes</span>
+                              <span>Reactions</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1309,7 +1309,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Likes</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Reactions</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.likes_operator}
@@ -1408,7 +1408,7 @@ export function ContentDashboardTableView() {
                           </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Comments</span>
+                              <span>Replies</span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1417,7 +1417,7 @@ export function ContentDashboardTableView() {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Comments</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Replies</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.comments_operator}

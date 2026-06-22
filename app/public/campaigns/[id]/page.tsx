@@ -15,6 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '@/lib/dateFormat';
+import {
+  computeContentTotals,
+  computeEngagementRate,
+  computeImpressionsByDateCumulative,
+  computeImpressionsByPlatform,
+} from '@/lib/contentMetrics';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -1163,6 +1169,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       </div>
     );
   }
+
+  // Content Dashboard math layer — shared with the internal Content
+  // Dashboard via lib/contentMetrics. Computed once per render so the
+  // KPI cards, value-anchor, ER panel, line chart and pie chart all
+  // read the same numbers without redundant per-card reduces.
+  const contentTotals = computeContentTotals(contents);
+  const contentEngagementRate = computeEngagementRate(contents);
+  const contentLineData = computeImpressionsByDateCumulative(contents, fmtDate);
+  const contentPieData = computeImpressionsByPlatform(contents);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -2971,7 +2986,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     </>
                   )}
 
-                  {/* Overview View - Metrics */}
+                  {/* Overview View - Metrics. Math layer (totals,
+                      engagementRate, chart series) comes from
+                      `lib/contentMetrics`, shared with the internal
+                      Content Dashboard. JSX stays public-specific
+                      (gradient Card + sentence labels + value-anchor
+                      line + showcase mask). */}
                   {contentViewMode === 'overview' && (
                     <div className="space-y-6">
                       {/* Metrics Cards */}
@@ -2983,21 +3003,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">
-                                {(() => {
-                                  const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                  return totalViews === 1 ? 'Total View' : 'Total Views';
-                                })()}
-                              </p>
+                              <p className="text-sm text-gray-600">{contentTotals.views === 1 ? 'Total View' : 'Total Views'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                return totalViews.toLocaleString();
-                              })()}
-                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{contentTotals.views.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3008,21 +3018,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">
-                                {(() => {
-                                  const totalReplies = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                                  return totalReplies === 1 ? 'Total Reply' : 'Total Replies';
-                                })()}
-                              </p>
+                              <p className="text-sm text-gray-600">{contentTotals.replies === 1 ? 'Total Reply' : 'Total Replies'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalReplies = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                                return totalReplies.toLocaleString();
-                              })()}
-                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{contentTotals.replies.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3033,21 +3033,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">
-                                {(() => {
-                                  const totalShares = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                                  return totalShares === 1 ? 'Total Share' : 'Total Shares';
-                                })()}
-                              </p>
+                              <p className="text-sm text-gray-600">{contentTotals.shares === 1 ? 'Total Share' : 'Total Shares'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalShares = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                                return totalShares.toLocaleString();
-                              })()}
-                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{contentTotals.shares.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3058,21 +3048,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">
-                                {(() => {
-                                  const totalReactions = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                                  return totalReactions === 1 ? 'Total Reaction' : 'Total Reactions';
-                                })()}
-                              </p>
+                              <p className="text-sm text-gray-600">{contentTotals.reactions === 1 ? 'Total Reaction' : 'Total Reactions'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalReactions = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                                return totalReactions.toLocaleString();
-                              })()}
-                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{contentTotals.reactions.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3083,23 +3063,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">
-                                {(() => {
-                                  const totalEngagements = contents.reduce((sum, content) =>
-                                    sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                                  return totalEngagements === 1 ? 'Total Engagement' : 'Total Engagements';
-                                })()}
-                              </p>
+                              <p className="text-sm text-gray-600">{contentTotals.engagement === 1 ? 'Total Engagement' : 'Total Engagements'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalEngagements = contents.reduce((sum, content) =>
-                                  sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                                return totalEngagements.toLocaleString();
-                              })()}
-                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{contentTotals.engagement.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3110,21 +3078,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">
-                                {(() => {
-                                  const totalSaves = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                                  return totalSaves === 1 ? 'Total Save' : 'Total Saves';
-                                })()}
-                              </p>
+                              <p className="text-sm text-gray-600">{contentTotals.saves === 1 ? 'Total Save' : 'Total Saves'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalSaves = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                                return totalSaves.toLocaleString();
-                              })()}
-                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{contentTotals.saves.toLocaleString()}</div>
                           </CardContent>
                         </Card>
                       </div>
@@ -3137,7 +3095,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           mask is on (Section 10: "Hidden automatically
                           in showcase mode when budget is hidden"). */}
                       {!mask.budget && campaign?.total_budget && campaign.total_budget > 0 && (() => {
-                        const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                        const totalViews = contentTotals.views;
                         if (totalViews === 0) return null;
                         // 57945 → "57.9K", 1245000 → "1.2M". Spec
                         // example uses "57.9K" so we match that
@@ -3165,15 +3123,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-3xl font-bold text-gray-900">
-                            {(() => {
-                              const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                              const totalEngagements = contents.reduce((sum, content) => 
-                                sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                              const engagementRate = totalViews > 0 ? (totalEngagements / totalViews) * 100 : 0;
-                              return `${engagementRate.toFixed(2)}%`;
-                            })()}
-                          </div>
+                          <div className="text-3xl font-bold text-gray-900">{contentEngagementRate.toFixed(2)}%</div>
                           <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Reactions + Replies + Shares + Saves) / Views</p>
                         </CardContent>
                       </Card>
@@ -3190,33 +3140,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="h-96">
                             <ResponsiveContainer width="100%" height="100%">
                               <LineChart
-                                data={(() => {
-                                  // Group content by activation date and sum impressions
-                                  const impressionsByDate = contents.reduce((acc, content) => {
-                                    if (content.activation_date) {
-                                      const date = content.activation_date;
-                                      if (!acc[date]) {
-                                        acc[date] = 0;
-                                      }
-                                      acc[date] += content.impressions || 0;
-                                    }
-                                    return acc;
-                                  }, {} as Record<string, number>);
-
-                                  // Sort by date and calculate cumulative impressions
-                                  const sortedEntries = Object.entries(impressionsByDate).sort(([dateA], [dateB]) =>
-                                    new Date(dateA).getTime() - new Date(dateB).getTime()
-                                  ) as [string, number][];
-
-                                  let cumulativeViews = 0;
-                                  return sortedEntries.map(([date, impressions]) => {
-                                    cumulativeViews += impressions;
-                                    return {
-                                      date: fmtDate(date),
-                                      impressions: cumulativeViews
-                                    };
-                                  });
-                                })()}
+                                data={contentLineData}
                                 margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -3273,22 +3197,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart margin={{ top: 20, right: 80, bottom: 20, left: 80 }}>
                                 <Pie
-                                  data={(() => {
-                                    const platformViews = contents.reduce((acc, content) => {
-                                      const platform = content.platform || 'Unknown';
-                                      if (!acc[platform]) {
-                                        acc[platform] = 0;
-                                      }
-                                      acc[platform] += content.impressions || 0;
-                                      return acc;
-                                    }, {} as Record<string, number>);
-
-                                    return Object.entries(platformViews).map(([platform, impressions]) => ({
-                                      platform,
-                                      impressions,
-                                      name: platform
-                                    }));
-                                  })()}
+                                  data={contentPieData}
                                   cx="50%"
                                   cy="50%"
                                   labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
@@ -3317,21 +3226,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   outerRadius={100}
                                   dataKey="impressions"
                                 >
-                                  {(() => {
-                                    const platformViews = contents.reduce((acc, content) => {
-                                      const platform = content.platform || 'Unknown';
-                                      if (!acc[platform]) {
-                                        acc[platform] = 0;
-                                      }
-                                      acc[platform] += content.impressions || 0;
-                                      return acc;
-                                    }, {} as Record<string, number>);
-
+                                  {contentPieData.map((_, index) => {
                                     const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
-                                    return Object.entries(platformViews).map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                                    ));
-                                  })()}
+                                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                                  })}
                                 </Pie>
                                 <Tooltip
                                   contentStyle={{
@@ -3343,9 +3241,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     padding: '12px 16px',
                                     fontWeight: '500'
                                   }}
-                                  formatter={(value: number, name: string, props: any) => {
-                                    const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                    const percentage = totalViews > 0 ? ((value / totalViews) * 100).toFixed(1) : 0;
+                                  formatter={(value: number) => {
+                                    const percentage = contentTotals.views > 0 ? ((value / contentTotals.views) * 100).toFixed(1) : 0;
                                     return [
                                       `${value.toLocaleString()} (${percentage}%)`,
                                       'Views'
