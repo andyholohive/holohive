@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { KpiCard } from '@/components/ui/kpi-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -168,6 +169,10 @@ type CampaignKOL = {
     region: string | null;
     content_type: string[] | null;
     creator_type: string[] | null;
+    /** Avatar — synced from X / TG by the KOL-avatar cron. May be
+     *  null when the KOL has no public avatar or the cron hasn't run
+     *  for that row yet. */
+    profile_picture_url: string | null;
   };
 };
 
@@ -982,7 +987,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           // one-line bio per KOL per campaign. Different from notes
           // (internal/team) and from master_kol.notes (per-KOL global).
           // Renders as a new "Profile" column on the KOL Dashboard.
-          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, profile_note, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
+          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, profile_note, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type, profile_picture_url)`)
           .eq('campaign_id', actualCampaignId)
           .or('hidden.is.null,hidden.eq.false')
           .order('created_at', { ascending: false });
@@ -1395,64 +1400,157 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     2 of the KOL Database Overhaul lands). Sorted
                     views-desc so the highest performer is row 1. */}
                 {kolViewMode === 'overview' && (() => {
-                  // ─── Aggregate ──────────────────────────────────
-                  type Stats = { contentCount: number; views: number; engagements: number };
-                  const byKol = new Map<string, Stats>();
-                  for (const c of contents) {
-                    const key = c.campaign_kols_id;
-                    if (!key) continue;
-                    const s = byKol.get(key) || { contentCount: 0, views: 0, engagements: 0 };
-                    s.contentCount += 1;
-                    s.views += c.impressions || 0;
-                    s.engagements +=
-                      (c.likes || 0) +
-                      (c.comments || 0) +
-                      (c.retweets || 0) +
-                      (c.bookmarks || 0);
-                    byKol.set(key, s);
-                  }
-                  const totalCampaignViews = Array.from(byKol.values()).reduce((sum, s) => sum + s.views, 0);
-                  const totalContentLive = contents.length;
-                  const totalEngagements = Array.from(byKol.values()).reduce((sum, s) => sum + s.engagements, 0);
+                  // Public KOL Dashboard Overview — mirrors the internal
+                  // KolDashboardOverview (4 KpiCards + 2 bar charts) per
+                  // Andy 2026-06-19. Source: components/campaign/
+                  // KolDashboardOverview.tsx. Hidden KOLs already
+                  // filtered out by the public fetch
+                  // (.or('hidden.is.null,hidden.eq.false')) so we use
+                  // `kols` directly.
+                  const dashboardKOLs = kols;
 
-                  // The full kol×stats join + sort lives in the
-                  // Content Dashboard Overview now (moved 2026-06-19).
-                  // The stat strip below only needs the aggregate
-                  // totals, which we compute from byKol above.
+                  const totalKols = dashboardKOLs.length;
+                  const avgFollowersFmt = (() => {
+                    if (dashboardKOLs.length === 0) return '0';
+                    const total = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
+                    return formatFollowers(Math.round(total / dashboardKOLs.length));
+                  })();
+                  const platformSet = new Set<string>();
+                  dashboardKOLs.forEach(kol => (kol.master_kol.platform || []).forEach(p => platformSet.add(p)));
+                  const regionSet = new Set<string>();
+                  dashboardKOLs.forEach(kol => { if (kol.master_kol.region) regionSet.add(kol.master_kol.region); });
 
-                  const formatNum = (n: number): string => {
-                    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-                    if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
-                    return n.toLocaleString();
+                  const platformChartData = (() => {
+                    const counts: Record<string, number> = {};
+                    dashboardKOLs.forEach(kol => {
+                      (kol.master_kol.platform || []).forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+                    });
+                    return Object.entries(counts).map(([platform, count]) => ({ platform, count }));
+                  })();
+                  const regionChartData = (() => {
+                    const counts: Record<string, number> = {};
+                    dashboardKOLs.forEach(kol => {
+                      if (kol.master_kol.region) counts[kol.master_kol.region] = (counts[kol.master_kol.region] || 0) + 1;
+                    });
+                    return Object.entries(counts).map(([region, count]) => ({ region, count }));
+                  })();
+
+                  const platformColor = (platform: string): string => {
+                    if (platform === 'X') return '#000000';
+                    if (platform === 'Telegram') return '#0088cc';
+                    return '#3e8692';
+                  };
+                  const regionColor = (region: string): string => {
+                    if (region === 'China') return '#de2910';
+                    if (region === 'Korea') return '#cd2e3a';
+                    if (region === 'Vietnam') return '#da251d';
+                    if (region === 'Turkey') return '#e30a17';
+                    if (region === 'Philippines') return '#0038a8';
+                    if (region === 'Brazil') return '#009c3b';
+                    if (region === 'Global') return '#1e40af';
+                    if (region === 'SEA') return '#059669';
+                    return '#3e8692';
+                  };
+                  const chartTooltipStyle = {
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    fontSize: '14px',
                   };
 
                   return (
                     <div className="space-y-6">
-                      {/* Stat strip — Total KOLs · Content Posted ·
-                          Views · Engagements. Compact horizontal
-                          card row vs the old 4-up grid; less visual
-                          noise and the leaderboard does the heavy
-                          storytelling below. */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {[
-                          { label: 'Total KOLs', value: kols.length },
-                          { label: 'Content Posted', value: totalContentLive },
-                          { label: 'Total Views', value: formatNum(totalCampaignViews) },
-                          { label: 'Total Engagements', value: formatNum(totalEngagements) },
-                        ].map(stat => (
-                          <Card key={stat.label} className="border border-gray-200">
-                            <CardContent className="p-4">
-                              <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">{stat.label}</p>
-                              <p className="text-2xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
-                            </CardContent>
-                          </Card>
-                        ))}
+                      {/* KPI strip — Total KOLs / Avg Followers /
+                          Unique Platforms / Regions. Uses the shared
+                          KpiCard primitive so the strip reads with the
+                          same rhythm as the internal view. */}
+                      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}        accent="brand"   />
+                        <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowersFmt}  accent="sky"     />
+                        <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'} value={platformSet.size} accent="emerald" />
+                        <KpiCard icon={Flag}      label={regionSet.size === 1 ? 'Region' : 'Regions'} value={regionSet.size} accent="purple"  />
                       </div>
 
-                      {/* Leaderboard table moved to Content Dashboard
-                          Overview per Andy 2026-06-19. The KOL
-                          Dashboard Overview now shows just the stat
-                          strip above. */}
+                      {/* Charts row — Platform Distribution +
+                          Region Distribution. Bar charts mirror
+                          the internal KolDashboardOverview. */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Distribution of KOLs by Platform</h3>
+                              <p className="text-sm text-ink-warm-500 mt-1">Breakdown of KOLs by social platform</p>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={platformChartData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis
+                                  dataKey="platform"
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={({ x, y, payload }: any) => (
+                                    <g transform={`translate(${x},${y})`}>
+                                      {payload.value === 'X' ? (
+                                        <text x={0} y={0} dy={16} textAnchor="middle" fill="#000000" fontSize={14} fontWeight="bold">𝕏</text>
+                                      ) : payload.value === 'Telegram' ? (
+                                        <g>
+                                          <svg x={-8} y={0} width={16} height={16} viewBox="0 0 24 24" fill="#0088cc">
+                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
+                                          </svg>
+                                        </g>
+                                      ) : (
+                                        <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={12}>{payload.value}</text>
+                                      )}
+                                    </g>
+                                  )}
+                                />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                                <Tooltip
+                                  contentStyle={chartTooltipStyle}
+                                  formatter={(value: number) => [value, 'Count']}
+                                  labelFormatter={(label: string) => `Platform: ${label}`}
+                                />
+                                <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                                  {platformChartData.map(entry => (
+                                    <Cell key={`cell-${entry.platform}`} fill={platformColor(entry.platform)} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">KOLs by Region</h3>
+                              <p className="text-sm text-ink-warm-500 mt-1">Geographic distribution of KOLs</p>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={regionChartData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis dataKey="region" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                                <Tooltip
+                                  contentStyle={chartTooltipStyle}
+                                  formatter={(value: number) => [value, 'Count']}
+                                  labelFormatter={(label: string) => `Region: ${label}`}
+                                />
+                                <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                                  {regionChartData.map(entry => (
+                                    <Cell key={`cell-${entry.region}`} fill={regionColor(entry.region)} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
