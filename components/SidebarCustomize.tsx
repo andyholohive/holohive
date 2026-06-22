@@ -70,41 +70,46 @@ export type NavItemDef = {
  * Bookmarks section is gated on the same registry. If you re-enable
  * such an item in Sidebar.tsx, add it back here. */
 export const NAV_REGISTRY: NavItemDef[] = [
-  // Priority Dashboard at the very top — company-operating view that
-  // anyone in the team can open for visibility (added 2026-05-07).
-  { href: '/dashboard', label: 'Dashboard', icon: Compass, section: 'Top', notForGuest: true },
-  { href: '/initiatives', label: 'Initiatives', icon: Target, section: 'Top', notForGuest: true },
+  // Pinned — HQ + Dashboard. Top-of-sidebar always-visible bucket
+  // (2026-06-19 reorg).
+  { href: '/tasks', label: 'HQ', icon: ListTodo, section: 'Pinned', notForGuest: true },
+  { href: '/dashboard', label: 'Dashboard', icon: Compass, section: 'Pinned', notForGuest: true },
 
-  { href: '/team', label: 'Team', icon: Shield, section: 'People', notForGuest: true },
-  { href: '/clients', label: 'Clients', icon: Users, section: 'People', pageKey: '/clients' },
+  // Clients — Clients + Campaigns + Delivery Logs.
+  { href: '/clients', label: 'Clients', icon: Users, section: 'Clients', pageKey: '/clients' },
+  { href: '/campaigns', label: 'Campaigns', icon: Megaphone, section: 'Clients', pageKey: '/campaigns' },
+  { href: '/delivery-logs', label: 'Delivery Logs', icon: ClipboardList, section: 'Clients', pageKey: '/delivery-logs' },
 
+  // KOLs — KOLs + Lists (Campaigns moved to Clients).
   { href: '/kols', label: 'KOLs', icon: Crown, section: 'KOLs', pageKey: '/kols' },
   { href: '/lists', label: 'Lists', icon: List, section: 'KOLs', pageKey: '/lists' },
-  { href: '/campaigns', label: 'Campaigns', icon: Megaphone, section: 'KOLs', pageKey: '/campaigns' },
 
-  { href: '/crm/sales-pipeline', label: 'Sales', icon: Target, section: 'CRM', pageKey: '/crm/sales-pipeline' },
-  { href: '/intelligence', label: 'Intelligence', icon: Radar, section: 'CRM', pageKey: '/intelligence' },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3, section: 'CRM', pageKey: '/analytics' },
-  { href: '/crm/network', label: 'Network', icon: Handshake, section: 'CRM', pageKey: '/crm/network' },
-  { href: '/crm/contacts', label: 'Contacts', icon: UserPlus, section: 'CRM', pageKey: '/crm/contacts' },
-  { href: '/crm/submissions', label: 'Submissions', icon: Inbox, section: 'CRM', pageKey: '/crm/submissions' },
-  { href: '/crm/meetings', label: 'Meetings', icon: Calendar, section: 'CRM', pageKey: '/crm/meetings' },
-  { href: '/crm/telegram', label: 'TG Chats', icon: MessageSquare, section: 'CRM', requiredRole: 'super_admin' },
+  // Sales / CRM — pipeline + relationship surfaces only.
+  { href: '/crm/sales-pipeline', label: 'Sales', icon: Target, section: 'Sales / CRM', pageKey: '/crm/sales-pipeline' },
+  { href: '/crm/network', label: 'Network', icon: Handshake, section: 'Sales / CRM', pageKey: '/crm/network' },
+  { href: '/crm/contacts', label: 'Contacts', icon: UserPlus, section: 'Sales / CRM', pageKey: '/crm/contacts' },
+  { href: '/intelligence', label: 'Intelligence', icon: Radar, section: 'Sales / CRM', pageKey: '/intelligence' },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3, section: 'Sales / CRM', pageKey: '/analytics' },
 
-  { href: '/tasks', label: 'HQ', icon: ListTodo, section: 'Workspace' },
-  { href: '/reminders', label: 'Reminders', icon: Bell, section: 'Workspace' },
+  // Resources — Templates, SOPs, Initiatives, Team, Expenses, Links.
+  { href: '/templates', label: 'Templates', icon: MessageSquare, section: 'Resources', notForGuest: true },
+  { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Resources', requiredRole: 'admin' },
+  { href: '/initiatives', label: 'Initiatives', icon: Target, section: 'Resources', notForGuest: true },
+  { href: '/team', label: 'Team', icon: Shield, section: 'Resources', notForGuest: true },
+  // [Expenses v1, 2026-05-29] Super-admin only.
+  { href: '/expenses', label: 'Expenses', icon: DollarSign, section: 'Resources', requiredRole: 'super_admin' },
+  { href: '/links', label: 'Links', icon: Link2, section: 'Resources', pageKey: '/links' },
 
-  { href: '/delivery-logs', label: 'Delivery Logs', icon: ClipboardList, section: 'Documents', pageKey: '/delivery-logs' },
-  { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Documents', requiredRole: 'admin' },
-  { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Documents', requiredRole: 'admin' },
-  { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Documents', requiredRole: 'admin' },
-  { href: '/expenses', label: 'Expenses', icon: DollarSign, section: 'Documents', requiredRole: 'super_admin' },
-  { href: '/links', label: 'Links', icon: Link2, section: 'Documents', pageKey: '/links' },
-  // Templates + SOPs moved into the HQ sub-nav (under Workspace) so
-  // all task-adjacent surfaces sit under one parent. Customize/bookmark
-  // groups them under "Workspace" to match.
-  { href: '/templates', label: 'Templates', icon: MessageSquare, section: 'Workspace', notForGuest: true },
-  { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Workspace', requiredRole: 'admin' },
+  // Measurement — Mindshare + Wallet Analytics. Admin-only.
+  { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Measurement', requiredRole: 'admin' },
+  { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Measurement', requiredRole: 'admin' },
+
+  // Logistics — Reminders + Submissions + Meetings + TG Chats + Forms.
+  { href: '/reminders', label: 'Reminders', icon: Bell, section: 'Logistics' },
+  { href: '/crm/submissions', label: 'Submissions', icon: Inbox, section: 'Logistics', pageKey: '/crm/submissions' },
+  { href: '/crm/meetings', label: 'Meetings', icon: Calendar, section: 'Logistics', pageKey: '/crm/meetings' },
+  { href: '/crm/telegram', label: 'TG Chats', icon: MessageSquare, section: 'Logistics', requiredRole: 'super_admin' },
+  { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Logistics', requiredRole: 'admin' },
 
   // Admin Tools — combines Field Options + Claude MCP into one tabbed
   // page at /admin. Original routes (/admin/field-options, /mcp) still
@@ -113,9 +118,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/admin', label: 'Admin Tools', icon: Sliders, section: 'Admin', notForGuest: true },
   { href: '/admin/changelog', label: 'Changelog', icon: Sparkles, section: 'Admin', requiredRole: 'super_admin' },
   // [2026-06-08] Archive promoted out of the Admin Tools tabs to its
-  // own sidebar entry — see Sidebar.tsx for the rationale. Registered
-  // as the last Admin entry so bookmarks + customize show it in the
-  // same position it renders in the sidebar.
+  // own sidebar entry — see Sidebar.tsx for the rationale.
   { href: '/archive', label: 'Archive', icon: Archive, section: 'Admin', notForGuest: true },
 ];
 

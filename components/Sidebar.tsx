@@ -252,12 +252,14 @@ export default function Sidebar({ children }: SidebarProps) {
     // Section path-prefix registry. Keep in sync with CollapsibleSection
     // `id` values + the NavItems rendered inside each section.
     const SECTION_PREFIXES: Record<string, string[]> = {
-      people:    ['/team', '/clients'],
-      kols:      ['/kols', '/lists', '/campaigns'],
-      workspace: ['/tasks', '/templates', '/sops', '/reminders'],
-      crm:       ['/crm/', '/intelligence', '/analytics'],
-      documents: ['/delivery-logs', '/mindshare', '/wallets', '/forms', '/expenses', '/links'],
-      admin:     ['/admin'],
+      pinned:      ['/tasks', '/dashboard'],
+      clients:     ['/clients', '/campaigns', '/delivery-logs'],
+      kols:        ['/kols', '/lists'],
+      crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
+      resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
+      measurement: ['/mindshare', '/wallets'],
+      logistics:   ['/reminders', '/crm/submissions', '/crm/meetings', '/crm/telegram', '/forms'],
+      admin:       ['/admin', '/archive'],
     };
 
     // Find which section (if any) owns the current path.
@@ -472,25 +474,25 @@ export default function Sidebar({ children }: SidebarProps) {
    */
   const SECTION_LABELS: Record<string, string> = {
     bookmarks: 'Bookmarks',
-    people: 'People',
+    pinned: 'Pinned',
+    clients: 'Clients',
     kols: 'KOLs',
-    workspace: 'Workspace',
-    crm: 'CRM',
-    communication: 'Communication',
-    documents: 'Documents',
+    crm: 'Sales / CRM',
+    resources: 'Resources',
+    measurement: 'Measurement',
+    logistics: 'Logistics',
     admin: 'Admin',
-    finance: 'Finance',
   };
   const SECTION_HUES: Record<string, string> = {
     bookmarks: 'bg-amber-500',
-    people: 'bg-sky-500',
+    pinned: 'bg-amber-500',
+    clients: 'bg-sky-500',
     kols: 'bg-violet-500',
-    workspace: 'bg-amber-500',
     crm: 'bg-violet-500',
-    communication: 'bg-emerald-500',
-    documents: 'bg-sky-500',
+    resources: 'bg-amber-500',
+    measurement: 'bg-emerald-500',
+    logistics: 'bg-sky-500',
     admin: 'bg-rose-500',
-    finance: 'bg-emerald-500',
   };
 
   const CollapsibleSection = ({
@@ -630,18 +632,6 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               )} */}
 
-              {/* Priority Dashboard — top of sidebar (above bookmarks
-                  even). Company-operating view; anyone with non-guest
-                  access can open it. Added 2026-05-07.
-                  Initiatives admin sits with it — drives the dashboard's
-                  Initiative Tracker card. */}
-              {!guestHideAlways && (
-                <div className="space-y-2">
-                  <NavItem href="/dashboard" icon={Compass} label="Dashboard" />
-                  <NavItem href="/initiatives" icon={Target} label="Initiatives" />
-                </div>
-              )}
-
               {/* Bookmarks — user-pinned items at the top. Renders only
                   when the user has bookmarked anything. Each item is
                   filtered through isItemAvailable so a user who lost
@@ -673,115 +663,108 @@ export default function Sidebar({ children }: SidebarProps) {
                 );
               })()}
 
-              {/* People Section */}
-              {!guestHideSection(['/clients']) && (
-                <CollapsibleSection id="people" icon={User}>
-                  {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
-                  {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
-                </CollapsibleSection>
-              )}
-
-              {/* KOLs Section */}
-              {!guestHideSection(['/kols', '/lists', '/campaigns']) && (
-                <CollapsibleSection id="kols" icon={Crown}>
-                  {!guestHide('/kols') && <NavItem href="/kols" icon={Crown} label="KOLs" />}
-                  {!guestHide('/lists') && <NavItem href="/lists" icon={List} label="Lists" />}
-                  {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
-                </CollapsibleSection>
-              )}
-
-              {/* Workspace Section — [2026-06-05] moved above CRM
-                  per Andy. Task-management surfaces (HQ / Templates /
-                  SOPs / Reminders) get higher priority in the sidebar
-                  than CRM since the team lives in HQ day-to-day.
-                  [2026-06-15] /daily-standup retired with the legacy
-                  dashboard. */}
-              {!guestHideSection(['/tasks']) && (
-                <CollapsibleSection id="workspace" icon={Briefcase}>
+              {/* Pinned Section — HQ + Dashboard. Replaces the old
+                  Dashboard/Initiatives top group; HQ promoted out of
+                  Workspace per the 2026-06-19 sidebar reorg. HQ's
+                  sub-nav (All Tasks / Deliverables / Automations)
+                  renders directly below it when the user is on an
+                  HQ child route. */}
+              {!guestHideAlways && (
+                <CollapsibleSection id="pinned" icon={Star}>
                   <NavItem href="/tasks" icon={ListTodo} label="HQ" />
-                  {/* HQ sub-nav — visible only when expanded AND on an HQ
-                      child route. Templates (msg) + SOPs were promoted in
-                      from the Documents section so all task-adjacent
-                      surfaces live under one parent. The visibility
-                      condition includes /templates + /sops so the sub-nav
-                      stays open while navigating between them. */}
-                  {!isSidebarCollapsed && (pathname.startsWith('/tasks') || pathname === '/templates' || pathname === '/sops') && (
+                  {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
                     <div className="pl-6 space-y-0.5">
                       <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
-                      {/* "My Dashboard" sub-nav removed 2026-06-03 — the
-                          personal view was merged into /dashboard as the
-                          first tab, so it now sits under the main
-                          Dashboard sidebar item (not HQ). The old route
-                          /tasks/my-dashboard still works via a redirect
-                          so existing bookmarks/Telegram links don't 404. */}
                       <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
-                      {!guestHideAlways && <SubNavItem href="/templates" icon={MessageSquare} label="Templates" exact />}
                       {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                        <>
-                          <SubNavItem href="/sops" icon={BookOpen} label="SOPs" exact />
-                          {/* "Admin Overview" sub-nav removed 2026-06-03 —
-                              the page was killed per Jdot's Priority
-                              Dashboard v2 spec; its three sections
-                              (Overall Stats / Tasks per Member / Tasks
-                              per Client) all live richer on /dashboard
-                              under the Internal Success + Client Success
-                              tabs. The old route /tasks/admin still works
-                              via a redirect for bookmarks/SOP links. */}
-                          <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
-                          {/* "Task Templates" + "Deliverable Templates" sub-nav
-                              entries removed 2026-06-03 — both consolidated
-                              into /templates as the "Tasks" + "Deliverables"
-                              tabs. The unified "Templates" sub-nav above
-                              (visible to non-guests) is the single entry
-                              point now. Old routes /tasks/templates and
-                              /tasks/deliverables/templates still work via
-                              redirects so bookmarks/SOP links don't 404. */}
-                        </>
+                        <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
                       )}
                     </div>
                   )}
-                  <NavItem href="/reminders" icon={Bell} label="Reminders" />
+                  <NavItem href="/dashboard" icon={Compass} label="Dashboard" />
                 </CollapsibleSection>
               )}
 
-              {/* CRM Section */}
-              {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && (
+              {/* Clients Section — Clients + Campaigns + Delivery Logs.
+                  Per the 2026-06-19 reorg: Campaigns moved out of the
+                  KOLs section, Delivery Logs out of Documents, Team
+                  out (now under Resources). */}
+              {!guestHideSection(['/clients', '/campaigns', '/delivery-logs']) && (
+                <CollapsibleSection id="clients" icon={Users}>
+                  {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
+                  {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
+                  {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
+                </CollapsibleSection>
+              )}
+
+              {/* KOLs Section — just KOLs + Lists; Campaigns moved to
+                  the Clients section. */}
+              {!guestHideSection(['/kols', '/lists']) && (
+                <CollapsibleSection id="kols" icon={Crown}>
+                  {!guestHide('/kols') && <NavItem href="/kols" icon={Crown} label="KOLs" />}
+                  {!guestHide('/lists') && <NavItem href="/lists" icon={List} label="Lists" />}
+                </CollapsibleSection>
+              )}
+
+              {/* Sales / CRM Section — pipeline + relationship
+                  surfaces only. Submissions / Meetings / TG Chats
+                  moved to Logistics per the 2026-06-19 reorg. */}
+              {!guestHideSection(['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
                 <CollapsibleSection id="crm" icon={DollarSign}>
                   {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
+                  {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
+                  {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
                   {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
                   {/* Analytics — team dashboard with KPIs, pipeline funnel,
                       owner workload, recent activity, health alerts.
                       Reads /api/analytics/dashboard in one call. */}
                   {!guestHide('/analytics') && <NavItem href="/analytics" icon={BarChart3} label="Analytics" />}
-                  {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
-                  {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
-                  {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
-                  {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
                 </CollapsibleSection>
               )}
 
-              {/* Documents Section */}
-              {!guestHideSection(['/delivery-logs', '/links']) && (
-                <CollapsibleSection id="documents" icon={FileText}>
-                  {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
-                  {/* [Wallet Analytics v1, May 2026] Admin-only campaign-
-                      participant intelligence — imported from the
-                      Data Bank xlsx (1,197 wallets). Placed next to
-                      Mindshare since both are audience-insight tools. */}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/wallets" icon={Wallet} label="Wallet Analytics" />}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
+              {/* Resources Section — Templates, SOPs, Initiatives,
+                  Team, Expenses, Links. The "stuff we use to do the
+                  work" bucket per the 2026-06-19 reorg. Templates +
+                  SOPs are also reachable from the HQ sub-nav, but
+                  they get top-level entries here for direct access. */}
+              {!guestHideAlways && (
+                <CollapsibleSection id="resources" icon={BookOpen}>
+                  <NavItem href="/templates" icon={MessageSquare} label="Templates" />
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                  <NavItem href="/initiatives" icon={Target} label="Initiatives" />
+                  {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
                   {/* [Expenses v1, 2026-05-29] Super-admin only. Reimbursable
                       spend tracking with recurrence (daily/weekly/monthly
                       instance generation via cron) + per-instance paid
                       tracking + receipt attachments. */}
                   {userProfile?.role === 'super_admin' && <NavItem href="/expenses" icon={DollarSign} label="Expenses" />}
                   {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
-                  {/* Templates + SOPs moved to HQ sub-nav. Their old
-                      registry entries in SidebarCustomize stay in the
-                      Workspace section so bookmarks/customization picks
-                      them up under the right header. */}
+                </CollapsibleSection>
+              )}
+
+              {/* Measurement Section — Mindshare + Wallet Analytics.
+                  Admin-only audience-insight tools. */}
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                <CollapsibleSection id="measurement" icon={TrendingUp}>
+                  <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />
+                  {/* [Wallet Analytics v1, May 2026] Admin-only campaign-
+                      participant intelligence — imported from the
+                      Data Bank xlsx (1,197 wallets). */}
+                  <NavItem href="/wallets" icon={Wallet} label="Wallet Analytics" />
+                </CollapsibleSection>
+              )}
+
+              {/* Logistics Section — Reminders + the "things that need
+                  to happen" bucket: Submissions, Meetings, TG Chats,
+                  Forms. Pulled out of CRM + Documents + Workspace per
+                  the 2026-06-19 reorg. */}
+              {!guestHideSection(['/reminders', '/crm/submissions', '/crm/meetings']) && (
+                <CollapsibleSection id="logistics" icon={Bell}>
+                  <NavItem href="/reminders" icon={Bell} label="Reminders" />
+                  {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
+                  {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
+                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                 </CollapsibleSection>
               )}
 
