@@ -296,13 +296,14 @@ export class KOLService {
       // Native (Meme/Culture) → Native + niche Meme/Degen, General +
       // 12 unmappable values cleared from creator_type entirely).
       //
-      // Now options expose ONLY the 13 spec niche tags. Old-data chips
-      // that survived migration (none, after the cleanup) would still
-      // render via the color-map fallback to gray.
+      // [2026-06-22] Doc 2 §7 — niche enum bumped 13 → 15. Added
+      // Infra/DePIN + Neobank. Import path remaps legacy values:
+      // AI x Crypto → AI, CeFi/Exchange → Trading, Payments/Neobank → Neobank.
       niches: [
         'AI', 'DeFi', 'L1/L2', 'Trading', 'Airdrop', 'NFT/Gaming',
         'RWA', 'Regulation', 'Macro', 'Meme/Degen',
         'Base', 'Solana', 'Ethereum',
+        'Infra/DePIN', 'Neobank',
       ],
       pricingTiers: ['<$200', '$200-500', '$500-1K', '$1K-2K', '$2K-3K', '>$3K'],
       // `tiers` was removed alongside the `tier` column (migration 071).

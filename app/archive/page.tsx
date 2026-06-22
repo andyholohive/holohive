@@ -70,7 +70,6 @@ interface ArchivedKOL {
   platform: string[] | null;
   followers: number | null;
   region: string | null;
-  tier: string | null;
   archived_at: string | null;
   created_at: string | null;
 }
