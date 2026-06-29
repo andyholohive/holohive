@@ -424,6 +424,17 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // [2026-06-29] /repost yes|no — KOL opt-in for repost (forwarding)
+  // deals. Same trust model as /wallet: whoever sends in the KOL's
+  // group chat sets that KOL's status (no anti-spoof, settlement is
+  // trust-based). Writes master_kols.forwarding_eligible. Mid-deal
+  // changes only affect future broadcasts — the Forwarding Deal Bot
+  // locks its eligible list at launch.
+  if (cmd === 'repost') {
+    await handleRepostCommand(chatId, args, message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -3795,6 +3806,100 @@ async function handleWalletCommand(chatId: string, args: string[], message: any)
     { text: '↩ Cancel', callback_data: `wal:cancel` },
   ]];
   await sendTelegramMessageWithButtons(chatId, text, buttons, threadId);
+}
+
+/* ─────────────── /repost — KOL forwarding opt-in/out ────────────── */
+
+/**
+ * `/repost yes|no` — KOL opt-in/out for repost (forwarding) deals.
+ *
+ * Spec (Andy 2026-06-29 §7):
+ *   - yes / y → master_kols.forwarding_eligible = true
+ *   - no  / n → master_kols.forwarding_eligible = false
+ *   - Case-insensitive. Trailing text ignored (`/repost yes please`
+ *     resolves to yes).
+ *   - Bare `/repost` with no arg → ask for yes/no.
+ *   - Anything else → invalid, ask for yes/no.
+ *   - Same answer resent → no-op, "No change" reply.
+ *
+ * Trust model: same as /wallet — chat → KOL via telegram_chats.
+ * No anti-spoof gating (§ 2.2). Whoever sends a valid /repost in a
+ * KOL's chat sets that KOL's status.
+ */
+async function handleRepostCommand(chatId: string, args: string[], message: any) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
+
+  // Resolve chat → KOL (same lookup as /wallet § 6).
+  const { data: chatRow } = await (supabaseAdmin as any)
+    .from('telegram_chats')
+    .select('master_kol_id')
+    .eq('chat_id', chatId)
+    .maybeSingle();
+  const masterKolId: string | null = (chatRow as any)?.master_kol_id ?? null;
+  if (!masterKolId) {
+    await sendTelegramMessage(
+      chatId,
+      "This chat isn't linked to a KOL record yet, so the repost opt-in wasn't saved. Flagging the team.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // Parse the first token after the command, case-insensitive.
+  // y → yes, n → no. Trailing text ignored.
+  const first = (args[0] || '').trim().toLowerCase();
+  const InvalidReply =
+    'Send <code>/repost yes</code> to get repost deals, or <code>/repost no</code> to stop them.';
+
+  let next: boolean | null = null;
+  if (first === 'yes' || first === 'y') next = true;
+  else if (first === 'no' || first === 'n') next = false;
+
+  if (next === null) {
+    // § 7.4 — bare or invalid argument
+    await sendTelegramMessage(chatId, InvalidReply, 'HTML', threadId);
+    return;
+  }
+
+  // Read current value
+  const { data: kolRow } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('id, forwarding_eligible')
+    .eq('id', masterKolId)
+    .maybeSingle();
+  const current: boolean | null = (kolRow as any)?.forwarding_eligible ?? null;
+
+  // § 7.3 — same answer resent
+  if (current === next) {
+    const msg = next
+      ? "No change, you're already opted in to repost deals."
+      : "No change, you're already opted out. Send <code>/repost yes</code> to turn them back on.";
+    await sendTelegramMessage(chatId, msg, 'HTML', threadId);
+    return;
+  }
+
+  // Persist
+  const { error } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .update({ forwarding_eligible: next })
+    .eq('id', masterKolId);
+  if (error) {
+    console.error('[/repost] update failed:', error.message);
+    await sendTelegramMessage(
+      chatId,
+      "⚠️ Bot hiccup saving that — try <code>/repost yes</code> (or <code>no</code>) again in a moment.",
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  // § 7.1 + § 7.2 confirmations
+  const reply = next
+    ? "You're in. We'll send you repost deals as they come up."
+    : "Done. You won't get repost deals from now on. Send <code>/repost yes</code> anytime to turn them back on.";
+  await sendTelegramMessage(chatId, reply, 'HTML', threadId);
 }
 
 /**
