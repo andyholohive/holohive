@@ -74,6 +74,7 @@ import {
 } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { MultiSelect } from '@/components/campaign/MultiSelect';
+import SetRepostRateDialog from '@/components/campaign/SetRepostRateDialog';
 
 type ContentSortField =
   | 'kol' | 'activation_date' | 'content_link' | 'platform' | 'type'
@@ -99,6 +100,17 @@ export function ContentDashboardTableView() {
   // perf). Per-row assignments still fetch per-cell because they
   // diverge per row.
   const [globalTags, setGlobalTags] = useState<ContentTag[]>([]);
+
+  // First-time repost-rate confirm dialog. Opens when a content row's
+  // type is changed to 'QRT' and the linked KOL has no repost_rate set
+  // on master_kols yet. Pre-fills with 50% of standard_rate per spec.
+  // Once accepted, future QRT flips for the same KOL skip the dialog.
+  const [repostRateDialog, setRepostRateDialog] = useState<{
+    open: boolean;
+    masterKolId: string;
+    kolName: string;
+    standardRate: number | null;
+  } | null>(null);
   useEffect(() => {
     let alive = true;
     (supabaseClient as any)
@@ -316,6 +328,23 @@ export function ContentDashboardTableView() {
       }
     }
 
+    // First-time repost-rate prompt — when a content type flips to
+    // 'QRT' and the linked KOL has no master_kols.repost_rate yet,
+    // open the confirm dialog pre-filled with 50% of standard_rate.
+    // Subsequent QRTs for the same KOL skip the dialog (the rate is
+    // already locked in for the budget to use).
+    if (field === 'type' && newValue === 'QRT') {
+      const mk = (content as any).master_kol;
+      if (mk?.id && mk?.repost_rate == null) {
+        setRepostRateDialog({
+          open: true,
+          masterKolId: mk.id,
+          kolName: mk.name || 'KOL',
+          standardRate: mk.standard_rate ?? null,
+        });
+      }
+    }
+
     // Auto-update campaign status to Active when content is posted.
     if (field === 'status' && newValue?.toLowerCase() === 'posted' && campaign?.status === 'Planning') {
       try {
@@ -406,6 +435,24 @@ export function ContentDashboardTableView() {
         supabase.from('contents').update({ type: bulkContentType } as any).eq('id', id),
       ));
       setContents((prev: any[]) => prev.map(c => selectedContents.includes(c.id) ? { ...c, type: bulkContentType } : c));
+
+      // First-time repost-rate prompt — fire once for the first
+      // selected-and-bulk-typed-to-QRT KOL that has no repost_rate yet.
+      // Bulk path is rare so a single prompt is fine; the second QRT
+      // for the same KOL silently uses the just-saved rate.
+      if (bulkContentType === 'QRT') {
+        const affected = contents.filter((c: any) => selectedContents.includes(c.id));
+        const needs = affected.find((c: any) => c.master_kol?.id && c.master_kol?.repost_rate == null);
+        if (needs) {
+          setRepostRateDialog({
+            open: true,
+            masterKolId: needs.master_kol.id,
+            kolName: needs.master_kol.name || 'KOL',
+            standardRate: needs.master_kol.standard_rate ?? null,
+          });
+        }
+      }
+
       setSelectedContents([]);
       setBulkContentType('');
       toast({ title: 'Type updated' });
@@ -1776,6 +1823,34 @@ export function ContentDashboardTableView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* First-time repost-rate confirm — fires when a content type is
+          set to 'QRT' for a KOL whose repost_rate isn't on file yet.
+          Pre-fills with 50% of standard_rate. Once saved, the Budget
+          Dashboard picks up the new rate for every QRT row. */}
+      {repostRateDialog && (
+        <SetRepostRateDialog
+          open={repostRateDialog.open}
+          onOpenChange={(open) => {
+            if (!open) setRepostRateDialog(null);
+          }}
+          masterKolId={repostRateDialog.masterKolId}
+          kolName={repostRateDialog.kolName}
+          masterStandardRate={repostRateDialog.standardRate}
+          onSaved={(rate) => {
+            // Reflect the saved repost_rate locally so the budget +
+            // future QRT flips on the same KOL pick it up without a
+            // page refresh. campaignKOLs[].master_kol is the source
+            // of truth that contents[].master_kol points at.
+            setContents((prev: any[]) => prev.map((c) =>
+              c.master_kol?.id === repostRateDialog.masterKolId
+                ? { ...c, master_kol: { ...c.master_kol, repost_rate: rate } }
+                : c
+            ));
+            setRepostRateDialog(null);
+          }}
+        />
+      )}
     </>
   );
 }

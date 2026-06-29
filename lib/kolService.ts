@@ -42,6 +42,10 @@ export interface MasterKOL {
   profile_picture_synced_at?: string | null;
   /** Telegram @handle (without '@') used by the Telethon scanner and bot lookup. Per TGB.1. */
   telegram_id?: string | null;
+  /** Standard per-content rate (USD). Source of truth for the budget. */
+  standard_rate?: number | null;
+  /** Per-KOL repost (QRT) rate (USD). Defaults to 50% of standard_rate on first-time confirm. Per REPOST-RATE.1. */
+  repost_rate?: number | null;
   created_at: string | null;
   updated_at: string | null;
 }

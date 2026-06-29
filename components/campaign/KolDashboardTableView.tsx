@@ -1595,15 +1595,24 @@ export function KolDashboardTableView({
 
                                                   // Auto-create payments for each content.
                                                   // Amount priority:
-                                                  //   1. campaign_kol.agreed_rate (set at onboarding)
-                                                  //   2. master_kol.standard_rate (mastersheet)
-                                                  //   3. most recent payment amount for this KOL
-                                                  //   4. 0 (user will need to fill in manually)
-                                                  const defaultAmount =
-                                                    (campaignKOL.agreed_rate ?? null) !== null
+                                                  //   1. QRT (repost): master_kol.repost_rate
+                                                  //      → fallback master_kol.standard_rate * 0.5
+                                                  //   2. campaign_kol.agreed_rate (set at onboarding)
+                                                  //   3. master_kol.standard_rate (mastersheet)
+                                                  //   4. most recent payment amount for this KOL
+                                                  //   5. 0 (user will need to fill in manually)
+                                                  const stdRate = campaignKOL.master_kol?.standard_rate != null
+                                                    ? Number(campaignKOL.master_kol.standard_rate)
+                                                    : null;
+                                                  const repostRate = (campaignKOL.master_kol as any)?.repost_rate != null
+                                                    ? Number((campaignKOL.master_kol as any).repost_rate)
+                                                    : null;
+                                                  const defaultAmount = type === 'QRT'
+                                                    ? (repostRate ?? (stdRate != null ? Math.round(stdRate * 0.5 * 100) / 100 : 0))
+                                                    : (campaignKOL.agreed_rate ?? null) !== null
                                                       ? Number(campaignKOL.agreed_rate)
-                                                      : (campaignKOL.master_kol?.standard_rate ?? null) !== null
-                                                      ? Number(campaignKOL.master_kol?.standard_rate)
+                                                      : stdRate != null
+                                                      ? stdRate
                                                       : (campaignKOL.master_kol?.id && latestCostMap.get(campaignKOL.master_kol.id)) || 0;
 
                                                   if (data && data.length > 0) {
