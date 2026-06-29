@@ -148,7 +148,12 @@ export function ContentDashboardTableView() {
     bookmarks_operator: '' as string,
     bookmarks_value: '' as string,
   });
-  const [contentSort, setContentSort] = useState<{ field: ContentSortField; direction: 'asc' | 'desc' }>({ field: null, direction: 'asc' });
+  // Default sort: Activation Date descending (newest at top). Rows
+  // with no activation_date fall to the bottom because the sort coerces
+  // null → 0 which sorts last in desc. Users can still click any
+  // column header or pick a different SortBy from the dropdown — that
+  // override stays in place until reload.
+  const [contentSort, setContentSort] = useState<{ field: ContentSortField; direction: 'asc' | 'desc' }>({ field: 'activation_date', direction: 'desc' });
   const [selectedContents, setSelectedContents] = useState<string[]>([]);
   const [bulkContentStatus, setBulkContentStatus] = useState('');
   const [bulkContentPlatform, setBulkContentPlatform] = useState('');
