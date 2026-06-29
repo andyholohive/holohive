@@ -932,6 +932,36 @@ export default function KOLsPage() {
             /* non-blocking */
           }
         }
+
+        // Platform → default content-type cascade. When a KOL's
+        // platforms gain X/Telegram, pre-select 'Post'. YouTube →
+        // 'Video'. Idempotent: only appends if not already in the
+        // KOL's deliverables[]. Mirrors the group_chat → in_house
+        // cascade already in this handler.
+        if (editingCell.field === 'platform' && Array.isArray(editingValue)) {
+          const prevPlatforms: string[] = Array.isArray(kolToUpdate.platform) ? kolToUpdate.platform : [];
+          const newlyAdded = (editingValue as string[]).filter(p => !prevPlatforms.includes(p));
+          const PLATFORM_DEFAULT: Record<string, string> = {
+            'X': 'Post',
+            'Telegram': 'Post',
+            'YouTube': 'Video',
+          };
+          const toAdd = newlyAdded
+            .map(p => PLATFORM_DEFAULT[p])
+            .filter((d): d is string => !!d);
+          if (toAdd.length > 0) {
+            const currentDeliv: string[] = Array.isArray(kolToUpdate.deliverables) ? kolToUpdate.deliverables : [];
+            const merged = Array.from(new Set([...currentDeliv, ...toAdd]));
+            if (merged.length > currentDeliv.length) {
+              setKols(prev => prev.map(k => k.id === kolId ? { ...k, deliverables: merged } : k));
+              try {
+                await KOLService.updateKOL({ id: kolId, deliverables: merged });
+              } catch (err) {
+                console.error('Error appending default content types:', err);
+              }
+            }
+          }
+        }
       } catch (error) {
         console.error('Error updating KOL:', error);
         setKols(prevKols =>
@@ -1481,7 +1511,7 @@ export default function KOLsPage() {
                                 (field as string) === 'content_type' ? (fieldOptions?.contentTypes || []) : [];
           const currentValues = Array.isArray(value) ? value : [];
                       const placeholder = (field as string) === 'platform' ? 'Select platforms...' :
-                              (field as string) === 'deliverables' ? 'Select deliverables...' :
+                              (field as string) === 'deliverables' ? 'Select content types...' :
                               (field as string) === 'niche' ? 'Select niches...' :
                               (field as string) === 'creator_type' ? 'Select creator types...' :
                               (field as string) === 'content_type' ? 'Select content types...' : 'Select options...';
@@ -1980,15 +2010,15 @@ export default function KOLsPage() {
               />
             </div>
           </div>
-          {/* Deliverables */}
+          {/* Content Type (column stored as master_kols.deliverables) */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Deliverables</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Content Type</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.deliverables || []}
                 selected={bulkEdit.deliverables || []}
                 onSelectedChange={deliverables => setBulkEdit(prev => ({ ...prev, deliverables }))}
-                placeholder="Deliverables"
+                placeholder="Content Type"
                 className="w-full"
                 isOpen={bulkEditDropdown === 'deliverables'}
                 onOpenChange={(open) => setBulkEditDropdown(open ? 'deliverables' : null)}
@@ -2328,15 +2358,15 @@ export default function KOLsPage() {
                 />
               </div>
             </div>
-            {/* Deliverables Filter */}
+            {/* Content Type Filter */}
             <div className="min-w-[120px] flex flex-col items-end justify-end">
-              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Deliverables</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Content Type</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.deliverables || []}
                   selected={filters.deliverables}
                   onSelectedChange={(deliverables) => setFilters(prev => ({ ...prev, deliverables }))}
-                  placeholder="Deliverables"
+                  placeholder="Content Type"
                   className="w-full"
                   triggerContent={
                     <div className="w-full flex items-center h-7 min-h-[28px]">
@@ -2581,7 +2611,7 @@ export default function KOLsPage() {
                     projects: 'Projects',
                     creator_type: 'Creator Type',
                     niche: 'Niche',
-                    deliverables: 'Deliverables',
+                    deliverables: 'Content Type',
                     latest_cost: 'Pricing',
                     community: 'Community Founder',
                     group_chat: 'Group Chat',
@@ -2917,7 +2947,7 @@ export default function KOLsPage() {
               {visibleColumns.deliverables && (
                 <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
-                    <span>Deliverables</span>
+                    <span>Content Type</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -3773,7 +3803,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.creator_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Creator Type</TableHead>}
             {visibleColumns.niche && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Niche</TableHead>}
             {visibleColumns.content_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
-            {visibleColumns.deliverables && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Deliverables</TableHead>}
+            {visibleColumns.deliverables && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
             {visibleColumns.pricing && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
             {visibleColumns.latest_cost && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
             {/* Score + Projects added per May 2026 KOL overhaul spec.

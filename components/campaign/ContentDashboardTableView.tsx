@@ -75,6 +75,7 @@ import {
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { MultiSelect } from '@/components/campaign/MultiSelect';
 import SetRepostRateDialog from '@/components/campaign/SetRepostRateDialog';
+import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
 
 type ContentSortField =
   | 'kol' | 'activation_date' | 'content_link' | 'platform' | 'type'
@@ -345,6 +346,25 @@ export function ContentDashboardTableView() {
       }
     }
 
+    // Auto-add the content type to the KOL's master_kols.deliverables
+    // list (idempotent). When a KOL gets their first Post / Repost
+    // (QRT) / Video / etc. on any campaign, the corresponding label
+    // appears in /kols → Content Type column without manual entry.
+    // Mirror in local state so the next inline read sees the new value.
+    if (field === 'type' && typeof newValue === 'string') {
+      const mk = (content as any).master_kol;
+      if (mk?.id) {
+        const merged = await ensureKolDeliverable(supabase as any, mk.id, newValue);
+        if (merged) {
+          setContents((prev: any[]) => prev.map((c) =>
+            c.master_kol?.id === mk.id
+              ? { ...c, master_kol: { ...c.master_kol, deliverables: merged } }
+              : c
+          ));
+        }
+      }
+    }
+
     // Auto-update campaign status to Active when content is posted.
     if (field === 'status' && newValue?.toLowerCase() === 'posted' && campaign?.status === 'Planning') {
       try {
@@ -452,6 +472,19 @@ export function ContentDashboardTableView() {
           });
         }
       }
+
+      // Auto-add the bulk content type to each affected KOL's
+      // master_kols.deliverables. Dedupe by master_kol_id so we don't
+      // hit the same KOL N times for N selected contents.
+      const affected = contents.filter((c: any) => selectedContents.includes(c.id));
+      const masterIds: string[] = Array.from(new Set(
+        affected
+          .map((c: any) => (c.master_kol?.id as string | undefined))
+          .filter((v: string | undefined): v is string => !!v),
+      )) as string[];
+      await Promise.all(masterIds.map((mkId: string) =>
+        ensureKolDeliverable(supabase as any, mkId, bulkContentType),
+      ));
 
       setSelectedContents([]);
       setBulkContentType('');

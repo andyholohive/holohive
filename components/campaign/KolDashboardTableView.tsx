@@ -88,6 +88,7 @@ import {
   type CampaignKOLWithDetails,
 } from '@/lib/campaignKolService';
 import { KOLService, type MasterKOL } from '@/lib/kolService';
+import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
 import {
   getContentTypeColor,
   getCreatorTypeColor,
@@ -1591,6 +1592,14 @@ export function KolDashboardTableView({
                                                       variant: 'destructive'
                                                     });
                                                     return;
+                                                  }
+
+                                                  // Auto-add the content type to the KOL's master_kols.deliverables.
+                                                  // Idempotent — silently appends 'Repost' (for QRT), 'Post', 'Video',
+                                                  // etc. so /kols Content Type column reflects every type the KOL
+                                                  // has actually delivered.
+                                                  if (campaignKOL.master_kol?.id) {
+                                                    await ensureKolDeliverable(supabase as any, campaignKOL.master_kol.id, type);
                                                   }
 
                                                   // Auto-create payments for each content.
