@@ -63,6 +63,7 @@ type Client = {
   name: string;
   logo_url: string | null;
   is_active: boolean;
+  is_ad_hoc: boolean | null;
 };
 
 const WORK_TYPES = ['Client-Facing', 'Internal'] as const;
@@ -104,21 +105,13 @@ export default function DeliveryLogsPage() {
   // amber pill on each client tab). Populated alongside the clients
   // list so we don't fan out an extra round-trip per tab.
   const [pendingDraftCounts, setPendingDraftCounts] = useState<Record<string, number>>({});
-  // [2026-06-04 v2] Active / Inactive view. Both views EXCLUDE
-  // archived clients (archived_at IS NOT NULL) — archived clients
-  // never surface here. Inactive = is_active=false but NOT archived,
-  // i.e. paused or between contracts but still on the books.
-  //   Active   → is_active = true  AND archived_at IS NULL
-  //   Inactive → is_active = false AND archived_at IS NULL
-  const [viewMode, setViewMode] = useState<'active' | 'inactive'>('active');
-  // Both tab counts tracked independently so badges stay stable
-  // when switching views (otherwise the inactive tab badge would
-  // flip to the loaded view's count and the other would blank out).
-  // Single mount-time head-count query each — no row payload.
-  const [tabCounts, setTabCounts] = useState<{ active: number | null; inactive: number | null }>({
-    active: null,
-    inactive: null,
-  });
+  // [2026-06-04 v2] View mode tabs — match /clients semantics exactly:
+  //   all      → every non-archived client
+  //   active   → is_active = true AND NOT is_ad_hoc
+  //   adhoc    → is_ad_hoc = true
+  //   inactive → is_active = false
+  // All views EXCLUDE archived clients (archived_at IS NOT NULL).
+  const [viewMode, setViewMode] = useState<'all' | 'active' | 'adhoc' | 'inactive'>('active');
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [whoMode, setWhoMode] = useState<'team' | 'custom'>('team');
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,16 +166,16 @@ export default function DeliveryLogsPage() {
     return Math.round((d - dayZeroDate) / (1000 * 60 * 60 * 24));
   };
 
-  // Fetch clients on mount AND whenever viewMode changes. Both views
-  // exclude archived clients (archived_at IS NULL); the only thing that
-  // varies is the is_active flag.
+  // Fetch ALL non-archived clients once on mount. Filtering by tab
+  // (All / Active / Ad-hoc / Inactive) happens client-side from this
+  // single list — same pattern /clients uses, and lets us compute tab
+  // counts without a separate head-count round-trip.
   useEffect(() => {
     const fetchClients = async () => {
       setClientsLoading(true);
       const clientsQuery = supabase
         .from('clients')
-        .select('id, name, logo_url, is_active')
-        .eq('is_active', viewMode === 'active')
+        .select('id, name, logo_url, is_active, is_ad_hoc')
         .is('archived_at', null);
 
       // Phase 3: pull pending-review draft counts in the same
@@ -232,17 +225,10 @@ export default function DeliveryLogsPage() {
       });
 
       setClients(sorted);
-      // Default to the first client if nothing is selected (or the
-      // selection has dropped off the list, e.g. we just switched
-      // viewMode and the picked client is in the other bucket).
-      const stillVisible = sorted.some(c => c.id === selectedClientId);
-      if (!stillVisible) {
-        setSelectedClientId(sorted.length > 0 ? sorted[0].id : '');
-      }
       setClientsLoading(false);
     };
     fetchClients();
-  }, [viewMode]);
+  }, []);
 
   // Team members only need to load once — independent of viewMode
   useEffect(() => {
@@ -251,30 +237,36 @@ export default function DeliveryLogsPage() {
     });
   }, []);
 
-  // Tab counts: fetch both Active and Inactive totals once so the
-  // badges stay stable regardless of which tab is currently selected.
-  // Head-count queries (no row payload). Both views exclude archived.
+  // Derived tab counts + filtered list — same /clients semantics:
+  //   active = is_active && !is_ad_hoc (Ad-hoc is its own bucket)
+  //   adhoc  = is_ad_hoc
+  //   inactive = !is_active
+  const tabCounts = useMemo(() => ({
+    all: clients.length,
+    active: clients.filter(c => c.is_active && !c.is_ad_hoc).length,
+    adhoc: clients.filter(c => !!c.is_ad_hoc).length,
+    inactive: clients.filter(c => !c.is_active).length,
+  }), [clients]);
+
+  const visibleClients = useMemo(() => {
+    if (viewMode === 'all') return clients;
+    if (viewMode === 'active') return clients.filter(c => c.is_active && !c.is_ad_hoc);
+    if (viewMode === 'adhoc') return clients.filter(c => !!c.is_ad_hoc);
+    return clients.filter(c => !c.is_active);
+  }, [clients, viewMode]);
+
+  // Keep the selected client visible across tab switches — if it falls
+  // out of the visible list (e.g. user switches from Active to Inactive
+  // and the picked client is in the other bucket), reset to the first
+  // of the visible set.
   useEffect(() => {
-    const fetchTabCounts = async () => {
-      const [activeRes, inactiveRes] = await Promise.all([
-        supabase
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_active', true)
-          .is('archived_at', null),
-        supabase
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_active', false)
-          .is('archived_at', null),
-      ]);
-      setTabCounts({
-        active: activeRes.count ?? 0,
-        inactive: inactiveRes.count ?? 0,
-      });
-    };
-    fetchTabCounts();
-  }, []);
+    if (!visibleClients.length) {
+      setSelectedClientId('');
+      return;
+    }
+    const stillVisible = visibleClients.some(c => c.id === selectedClientId);
+    if (!stillVisible) setSelectedClientId(visibleClients[0].id);
+  }, [viewMode, visibleClients, selectedClientId]);
 
   // Fetch entries when client changes
   useEffect(() => {
@@ -753,7 +745,7 @@ export default function DeliveryLogsPage() {
         dot="brand"
         counter={
           !selectedClientId
-            ? `${clients.length} ${viewMode} client${clients.length === 1 ? '' : 's'}`
+            ? `${visibleClients.length} ${viewMode === 'all' ? '' : viewMode + ' '}client${visibleClients.length === 1 ? '' : 's'}`
             : `${filtered.length} of ${entries.length} entries${
                 (filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm)
                   ? ' · filtered'
@@ -762,35 +754,43 @@ export default function DeliveryLogsPage() {
         }
         first
       />
+      {/* Status tabs — match /clients exactly so the same status names
+          show across both pages. All / Active / Ad-hoc / Inactive. */}
 
       {/* v11 filter toolbar — Active/Inactive view-mode tabs (left) +
           Search (middle) + Work-type / Trigger filters (right). The
           Inactive tab is for paused/between-contracts clients that
           aren't archived — both views exclude archived. */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'active' | 'inactive')}>
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'all' | 'active' | 'adhoc' | 'inactive')}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+            <TabsTrigger
+              value="all"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card text-sm px-4 py-2"
+            >
+              All
+              <span className="ml-2 text-xs bg-cream-200 data-[state=active]:bg-cream-100 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{tabCounts.all}</span>
+            </TabsTrigger>
             <TabsTrigger
               value="active"
               className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
             >
               Active
-              {tabCounts.active !== null && (
-                <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
-                  {tabCounts.active}
-                </span>
-              )}
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{tabCounts.active}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="adhoc"
+              className="data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-card text-sm px-4 py-2"
+            >
+              Ad-hoc
+              <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{tabCounts.adhoc}</span>
             </TabsTrigger>
             <TabsTrigger
               value="inactive"
-              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-700 data-[state=active]:shadow-card text-sm px-4 py-2"
             >
               Inactive
-              {tabCounts.inactive !== null && (
-                <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
-                  {tabCounts.inactive}
-                </span>
-              )}
+              <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{tabCounts.inactive}</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -846,21 +846,29 @@ export default function DeliveryLogsPage() {
           <div className="flex gap-2">
             {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-24 rounded" />)}
           </div>
-        ) : clients.length === 0 ? (
+        ) : visibleClients.length === 0 ? (
           <Card className="border-cream-200 overflow-hidden">
             <EmptyState
               icon={Building2}
-              title={viewMode === 'active' ? 'No active clients found.' : 'No inactive clients found.'}
-              description={viewMode === 'active'
-                ? 'Activate a client (or create one on /clients) to start logging deliveries.'
-                : 'No paused or between-contract clients right now — when one is deactivated (without being archived) it will show up here.'}
+              title={
+                viewMode === 'active' ? 'No active clients found.'
+                : viewMode === 'adhoc' ? 'No ad-hoc clients found.'
+                : viewMode === 'inactive' ? 'No inactive clients found.'
+                : 'No clients found.'
+              }
+              description={
+                viewMode === 'active' ? 'Activate a client (or create one on /clients) to start logging deliveries.'
+                : viewMode === 'adhoc' ? 'No one-off / specialized engagements right now — flag a client as Ad-hoc from /clients to surface them here.'
+                : viewMode === 'inactive' ? 'No paused or between-contract clients right now — when one is deactivated (without being archived) it will show up here.'
+                : 'No clients on the books right now.'
+              }
               className="py-12"
             />
           </Card>
         ) : (
           <Tabs value={selectedClientId} onValueChange={setSelectedClientId}>
             <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
-              {clients.map((client) => {
+              {visibleClients.map((client) => {
                 const draftCount = pendingDraftCounts[client.id] || 0;
                 return (
                   <TabsTrigger
