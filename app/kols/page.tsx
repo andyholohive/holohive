@@ -746,97 +746,105 @@ export default function KOLsPage() {
     setCurrentPage(1);
   }, [debouncedSearchTerm, filters, kolTab]);
 
-  // Sticky scrollbar effect
+  // Sticky scrollbar effect.
+  //
+  // [2026-06-26] Perf rewrite — previous version made scrolling on
+  // /kols feel laggy / janky:
+  //   • `querySelectorAll('*')` walked every descendant of the table
+  //     container on every scroll tick (potentially thousands of nodes
+  //     on a busy roster)
+  //   • Two listeners (capture-phase container + window) fired
+  //     `setStickyScrollbar({...})` unthrottled, triggering React
+  //     re-renders of the 3700-line page component on every tick
+  //   • Listeners were non-passive, blocking the scroll path
+  //
+  // Fix: discover the scrollable element once (cached in a ref via
+  // querySelector — table-scroll containers have a stable structure),
+  // wrap updates in requestAnimationFrame so we coalesce at most one
+  // setState per frame, and skip the setState entirely when nothing
+  // changed. Listeners are now passive.
   useEffect(() => {
-    // Function to find the actual scrollable element
-    const findScrollableElement = (container: HTMLElement): HTMLElement | null => {
-      if (container.scrollWidth > container.clientWidth) {
-        return container;
-      }
-      const allElements = container.querySelectorAll('*');
-      for (const el of Array.from(allElements)) {
-        const htmlEl = el as HTMLElement;
-        if (htmlEl.scrollWidth > htmlEl.clientWidth) {
-          return htmlEl;
-        }
-      }
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const findScrollableElement = (): HTMLElement | null => {
+      if (container.scrollWidth > container.clientWidth) return container;
+      // Stable: the inline table-scroll wrapper is always the first
+      // descendant that horizontally overflows. Direct queries beat
+      // walking the full tree.
+      const direct = container.querySelector(
+        '[data-table-scroll], [class*="overflow-x-auto"], [class*="overflow-auto"]',
+      ) as HTMLElement | null;
+      if (direct && direct.scrollWidth > direct.clientWidth) return direct;
       return null;
     };
 
-    const updateStickyScrollbar = () => {
-      if (!tableContainerRef.current) {
-        setStickyScrollbar(null);
-        return;
-      }
+    let rafId: number | null = null;
+    const sameSnapshot = (a: any, b: any) =>
+      !!a && !!b
+      && a.visible === b.visible
+      && a.width === b.width
+      && a.scrollWidth === b.scrollWidth
+      && a.scrollLeft === b.scrollLeft
+      && Math.abs(a.opacity - b.opacity) < 0.01;
 
-      const container = tableContainerRef.current;
-      const scrollableElement = findScrollableElement(container);
+    const computeSnapshot = () => {
+      const scrollableElement = scrollableRef.current ?? findScrollableElement();
+      if (!scrollableElement) return null;
+      scrollableRef.current = scrollableElement;
 
-      if (scrollableElement) {
-        scrollableRef.current = scrollableElement;
+      const rect = container.getBoundingClientRect();
+      const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+      if (!isInViewport) return null;
 
-        const rect = container.getBoundingClientRect();
-        const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
-
-        if (isInViewport) {
-          // Calculate opacity based on distance to bottom of page
-          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-          const windowHeight = window.innerHeight;
-          const documentHeight = document.documentElement.scrollHeight;
-          const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
-
-          // Check if page has scrollable content
-          const hasVerticalScroll = documentHeight > windowHeight + 10;
-
-          const fadeThreshold = 100;
-          let opacity = 1;
-
-          if (hasVerticalScroll) {
-            if (distanceFromBottom < fadeThreshold && distanceFromBottom > 0) {
-              opacity = distanceFromBottom / fadeThreshold;
-            } else if (distanceFromBottom <= 0) {
-              opacity = 0;
-            }
-          }
-
-          setStickyScrollbar({
-            visible: true,
-            width: scrollableElement.clientWidth,
-            scrollWidth: scrollableElement.scrollWidth,
-            scrollLeft: scrollableElement.scrollLeft,
-            opacity: opacity
-          });
-          return;
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+      const hasVerticalScroll = documentHeight > windowHeight + 10;
+      const fadeThreshold = 100;
+      let opacity = 1;
+      if (hasVerticalScroll) {
+        if (distanceFromBottom < fadeThreshold && distanceFromBottom > 0) {
+          opacity = distanceFromBottom / fadeThreshold;
+        } else if (distanceFromBottom <= 0) {
+          opacity = 0;
         }
       }
-
-      setStickyScrollbar(null);
+      return {
+        visible: true,
+        width: scrollableElement.clientWidth,
+        scrollWidth: scrollableElement.scrollWidth,
+        scrollLeft: scrollableElement.scrollLeft,
+        opacity,
+      };
     };
 
-    const handleScroll = () => {
-      updateStickyScrollbar();
+    const scheduleUpdate = () => {
+      if (rafId != null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const next = computeSnapshot();
+        setStickyScrollbar((prev) => (sameSnapshot(prev, next) ? prev : next));
+      });
     };
 
-    // Attach listeners
-    const container = tableContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, true);
-    }
-    window.addEventListener('scroll', updateStickyScrollbar);
-    window.addEventListener('resize', updateStickyScrollbar);
+    container.addEventListener('scroll', scheduleUpdate, { capture: true, passive: true });
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
 
-    // Initial check with delay to ensure table is rendered
-    const timer1 = setTimeout(updateStickyScrollbar, 100);
-    const timer2 = setTimeout(updateStickyScrollbar, 500);
+    const timer1 = setTimeout(scheduleUpdate, 100);
+    const timer2 = setTimeout(scheduleUpdate, 500);
 
     return () => {
-      if (container) {
-        container.removeEventListener('scroll', handleScroll, true);
-      }
-      window.removeEventListener('scroll', updateStickyScrollbar);
-      window.removeEventListener('resize', updateStickyScrollbar);
+      container.removeEventListener('scroll', scheduleUpdate, { capture: true } as any);
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (rafId != null) cancelAnimationFrame(rafId);
       clearTimeout(timer1);
       clearTimeout(timer2);
+      // Force re-discovery when deps change (filter, page, columns).
+      scrollableRef.current = null;
     };
   }, [filteredKOLs, currentPage, visibleColumns]);
 
@@ -1144,21 +1152,35 @@ export default function KOLsPage() {
         case 'boolean':
           if (field === 'community' || field === 'group_chat') {
             return (
-              <Select 
-                value={Boolean(value) ? 'yes' : 'no'} 
+              <Select
+                value={Boolean(value) ? 'yes' : 'no'}
                 onValueChange={async (newValue) => {
                   const boolValue = newValue === 'yes';
                   const kolToUpdate = kols.find(k => k.id === kolId);
                   if (kolToUpdate) {
-                    const updatedKOL = { ...kolToUpdate, [field]: boolValue };
-                    setKols(prevKols => 
+                    // [2026-06-26] Cascade: flipping group_chat → Yes
+                    // also sets in_house = "In-House" when in_house is
+                    // currently empty/'No'. Group chat access is a
+                    // strong signal of an in-house relationship.
+                    // Doesn't overwrite an existing agency assignment
+                    // (CryptoCrowd, Qube, KGen, R3ACH, Reverse).
+                    const cascadeInHouse =
+                      field === 'group_chat'
+                      && boolValue
+                      && (!kolToUpdate.in_house || kolToUpdate.in_house === 'No');
+                    const updatedKOL = {
+                      ...kolToUpdate,
+                      [field]: boolValue,
+                      ...(cascadeInHouse ? { in_house: 'In-House' } : {}),
+                    };
+                    setKols(prevKols =>
                       prevKols.map(k => k.id === kolId ? updatedKOL : k)
                     );
                     try {
                       await KOLService.updateKOL(updatedKOL);
                     } catch (error) {
                       console.error('Error updating boolean:', error);
-                      setKols(prevKols => 
+                      setKols(prevKols =>
                         prevKols.map(k => k.id === kolId ? kolToUpdate : k)
                       );
                     }
