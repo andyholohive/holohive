@@ -35,6 +35,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
+import { UserService } from '@/lib/userService';
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import {
   AlertTriangle, Clock, CheckCircle2, PlayCircle, Circle, PauseCircle,
   MessageCircle, LayoutDashboard,
@@ -54,7 +56,12 @@ export default function MyWorkTab() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
   const [loading, setLoading] = useState(true);
+  // Open the existing TaskDetailModal on row click so users can flip
+  // status (and edit anything else) from here. Previously rows were
+  // read-only — no way to mark a task done without leaving the page.
+  const [openTask, setOpenTask] = useState<Task | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -64,14 +71,20 @@ export default function MyWorkTab() {
   const loadData = async () => {
     if (!user?.id) return;
     try {
-      const [statsData, tasksData, clientsData] = await Promise.all([
+      const [statsData, tasksData, clientsData, teamData] = await Promise.all([
         TaskService.getDashboardStats(user.id),
         TaskService.getTasksForUser(user.id),
         ClientService.getAllClients(),
+        UserService.getActiveUsers(),
       ]);
       setStats(statsData);
       setTasks(tasksData);
       setClients(clientsData.map((c: any) => ({ id: c.id, name: c.name })));
+      setTeamMembers(
+        (teamData || [])
+          .filter((u: any) => u.role !== 'client')
+          .map((u: any) => ({ id: u.id, name: u.name || u.email, email: u.email, role: u.role })),
+      );
     } catch (err) {
       console.error('Error loading dashboard:', err);
     } finally {
@@ -215,6 +228,7 @@ export default function MyWorkTab() {
             tasks={overdueTasks}
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
+            onTaskClick={setOpenTask}
           />
         )}
 
@@ -227,6 +241,7 @@ export default function MyWorkTab() {
             tasks={dueThisWeek}
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
+            onTaskClick={setOpenTask}
           />
         )}
 
@@ -239,6 +254,7 @@ export default function MyWorkTab() {
             tasks={inProgressTasks}
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
+            onTaskClick={setOpenTask}
           />
         )}
 
@@ -252,6 +268,7 @@ export default function MyWorkTab() {
             tasks={recentlyCompleted}
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
+            onTaskClick={setOpenTask}
           />
         )}
 
@@ -272,6 +289,20 @@ export default function MyWorkTab() {
           </Card>
         )}
       </div>
+
+      {/* Edit modal — opened by clicking any task row. Reuses the
+          /tasks TaskDetailModal so PSG, recurring config, every other
+          field stays in lock-step. On save we reload the list so the
+          task moves between buckets (e.g. To Do → Complete drops it
+          out of Overdue and into Recently Completed). */}
+      <TaskDetailModal
+        open={!!openTask}
+        onOpenChange={(open) => { if (!open) setOpenTask(null); }}
+        task={openTask}
+        teamMembers={teamMembers}
+        clients={clients}
+        onSaved={() => { setOpenTask(null); loadData(); }}
+      />
     </div>
   );
 }
@@ -303,6 +334,7 @@ function TaskListCard({
   tasks,
   getDueDateColor,
   clientMap,
+  onTaskClick,
 }: {
   title: string;
   subtitle: string;
@@ -315,6 +347,10 @@ function TaskListCard({
   tasks: Task[];
   getDueDateColor: (d: string | null) => string;
   clientMap?: Record<string, string>;
+  /** Fires when the user clicks a task row. Opens the existing
+   *  TaskDetailModal in the parent so status/assignee/due-date can
+   *  be edited inline without leaving the dashboard. */
+  onTaskClick?: (task: Task) => void;
 }) {
   return (
     <Card className="relative border-cream-200 overflow-hidden">
@@ -349,7 +385,11 @@ function TaskListCard({
           return (
             <li
               key={task.id}
-              className="px-4 py-2.5 flex items-center gap-3 hover:bg-cream-50 transition-colors"
+              role={onTaskClick ? 'button' : undefined}
+              tabIndex={onTaskClick ? 0 : undefined}
+              onClick={onTaskClick ? () => onTaskClick(task) : undefined}
+              onKeyDown={onTaskClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTaskClick(task); } } : undefined}
+              className={`px-4 py-2.5 flex items-center gap-3 transition-colors ${onTaskClick ? 'cursor-pointer hover:bg-cream-50' : 'hover:bg-cream-50'}`}
             >
               <StatusIcon className={`h-4 w-4 ${cfg.color} flex-shrink-0`} aria-hidden />
               <span className={`flex-1 text-sm ${task.status === 'complete' ? 'line-through text-ink-warm-400' : 'text-ink-warm-900'}`}>
