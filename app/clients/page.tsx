@@ -3491,44 +3491,60 @@ export default function ClientsPage() {
                           core attribute (renewal math, dashboard tone)
                           and belongs next to Status. Saves to
                           client_context, not clients, via the upsert in
-                          handleCreateClient. */}
-                      <div className="grid gap-2">
-                        <Label>Engagement Start Date</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
+                          handleCreateClient.
+
+                          [2026-06-26] Hidden in Edit mode — engagement
+                          start is now managed via the EngagementTab on
+                          the Client Context modal (stint substrate),
+                          which is the single source of truth for
+                          covered_through / renewal math. Keeping the
+                          field visible during Add only, so new clients
+                          still get a baseline start date written to
+                          client_context.start_date. Editing it after
+                          the fact would silently bypass stint history.
+                          Not referenced anywhere in /portal — all
+                          engagement_start_date consumers are internal
+                          HQ surfaces (dashboard tabs, /api/dashboard
+                          routes, queries.ts). */}
+                      {!isEditMode && (
+                        <div className="grid gap-2">
+                          <Label>Engagement Start Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="focus-brand justify-start text-left font-normal"
+                                style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: newClient.start_date ? '#111827' : '#9ca3af' }}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newClient.start_date
+                                  ? formatDate(newClient.start_date)
+                                  : 'Select start date'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={newClient.start_date}
+                                onSelect={(date) => setNewClient({ ...newClient, start_date: date || undefined })}
+                                initialFocus
+                                classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          {newClient.start_date && (
+                            <button
                               type="button"
-                              variant="outline"
-                              className="focus-brand justify-start text-left font-normal"
-                              style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: newClient.start_date ? '#111827' : '#9ca3af' }}
+                              onClick={() => setNewClient({ ...newClient, start_date: undefined })}
+                              className="text-xs text-ink-warm-500 hover:text-rose-600 transition-colors w-fit"
                             >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {newClient.start_date
-                                ? formatDate(newClient.start_date)
-                                : 'Select start date'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={newClient.start_date}
-                              onSelect={(date) => setNewClient({ ...newClient, start_date: date || undefined })}
-                              initialFocus
-                              classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        {newClient.start_date && (
-                          <button
-                            type="button"
-                            onClick={() => setNewClient({ ...newClient, start_date: undefined })}
-                            className="text-xs text-ink-warm-500 hover:text-rose-600 transition-colors w-fit"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <div className="grid gap-2">
                         <Label>Engagement Model</Label>
                         <div className="flex items-center space-x-3">
