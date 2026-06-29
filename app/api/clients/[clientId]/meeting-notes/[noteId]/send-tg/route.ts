@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@/lib/supabase-server';
 import { TelegramService } from '@/lib/telegramService';
-import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,26 +103,13 @@ export async function POST(
   }
 
   // ─── Format the TG message ─────────────────────────────────────
-  const clientName = (client as any)?.name || 'Client';
-  const meetingDateFmt = note.meeting_date
-    ? formatDate(note.meeting_date + (note.meeting_date.includes('T') ? '' : 'T00:00:00'))
-    : 'Recent';
-
-  // HTML escape user-provided strings before interpolating.
+  // Header ("🤝 Client — Sync Recap"), meeting-date subtitle, and
+  // Action Items block all removed per Andy 2026-06-29 — the note
+  // content is already a fully-formatted recap on its own, so the
+  // generated chrome was duplicative on the client side.
   const esc = (s: string | null | undefined): string =>
     (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  const openItems = (note.action_items ?? []).filter(i => !i.is_done);
-  const contentBlock = note.content ? `${esc(note.content)}\n` : '';
-  const actionsBlock = openItems.length > 0
-    ? `\n<b>Action Items</b>\n${openItems.map(i => `• ${esc(i.text)}${i.owner_client_side ? '' : ' <i>(Holo Hive)</i>'}`).join('\n')}`
-    : '';
-
-  const message =
-    `🤝 <b>${esc(clientName)} — Sync Recap</b>\n` +
-    `<i>${esc(meetingDateFmt)}</i>\n\n` +
-    contentBlock +
-    actionsBlock;
+  const message = note.content ? esc(note.content) : '';
 
   // ─── Send via TG ───────────────────────────────────────────────
   const sent = await TelegramService.sendToChat(chatId, message, 'HTML');
