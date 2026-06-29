@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { extractAddressCandidate, hasValidChecksumIfMixed, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
+import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
 
 export const dynamic = 'force-dynamic';
 
@@ -2945,7 +2946,7 @@ async function handleSubmReviewCallback(
   const { data: sub } = await (supabaseAdmin as any)
     .from('content_submissions')
     .select(`
-      id, kol_id, campaign_id, link, status,
+      id, kol_id, campaign_id, link, platform, content_type, status,
       kol:master_kols!inner(id, name),
       campaign:campaigns!inner(id, name)
     `)
@@ -3012,6 +3013,26 @@ async function handleSubmReviewCallback(
     )
     .eq('link', sub.link)
     .neq('status', 'rejected');
+
+  // On approve: create a `contents` row so the campaign Content Dashboard
+  // reflects the submission. Without this the TG approval looked broken on
+  // the campaign — content_submissions + content_items got flipped but the
+  // Dashboard reads from `contents`. Web fallback does the same insert via
+  // the shared helper; we share the helper so they can't drift.
+  if (action === 'approve') {
+    const result = await createApprovedContentsRow(supabaseAdmin as any, {
+      submissionId,
+      campaignId: (sub as any).campaign_id,
+      kolId: (sub as any).kol_id,
+      link: (sub as any).link,
+      platform: (sub as any).platform,
+      contentType: (sub as any).content_type,
+      approverId: teamMember.id,
+    });
+    if (result.error) {
+      console.error('[/submit] contents insert on approve failed:', result.error);
+    }
+  }
 
   // Edit the review-channel message to reflect the decision (replaces the
   // buttons so it can't be tapped again).

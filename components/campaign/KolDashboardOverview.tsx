@@ -136,6 +136,7 @@ export function KolDashboardOverview() {
   const platformColor = (platform: string): string => {
     if (platform === 'X') return '#000000';
     if (platform === 'Telegram') return '#0088cc';
+    if (platform === 'YouTube') return '#FF0000';
     return BRAND_HEX;
   };
 

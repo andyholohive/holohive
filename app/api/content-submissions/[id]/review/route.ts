@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
+import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,44 +121,19 @@ export async function POST(
   let createdContentId: string | null = null;
   let createContentError: string | null = null;
   if (action === 'approve') {
-    // Find this KOL's campaign_kols row (the relationship key the
-    // contents table requires).
-    const { data: campaignKol } = await (adminClient as any)
-      .from('campaign_kols')
-      .select('id')
-      .eq('campaign_id', sub.campaign_id)
-      .eq('master_kol_id', sub.kol_id)
-      .is('deleted_at', null)
-      .maybeSingle();
-    if (campaignKol?.id) {
-      // content_submissions uses friendlier values ('X (Twitter)', 'tweet')
-      // than the contents CHECK constraints accept ('X', 'Post'). Map
-      // before inserting so the constraint passes.
-      // Spec Phase 2: bot-approved content lands at 'pending_verification', not 'posted'.
-      // Team flips to 'posted' (or deletes) via the Verify/Reject buttons on
-      // /campaigns content tab. This protects engagement totals + Top Post + budget
-      // from counting a row before a human eyeballs it.
-      const { data: contentRow, error: contentErr } = await (adminClient as any)
-        .from('contents')
-        .insert({
-          campaign_kols_id: campaignKol.id,
-          campaign_id: sub.campaign_id,
-          content_link: sub.link,
-          platform: mapSubmissionPlatformToContents(sub.platform),
-          type: mapSubmissionTypeToContents(sub.content_type),
-          status: 'pending_verification',
-          activation_date: nowIso.slice(0, 10),
-        })
-        .select('id')
-        .single();
-      if (contentErr) {
-        console.error('[/api/content-submissions/review] contents insert failed:', contentErr);
-        createContentError = contentErr.message ?? 'insert failed';
-      } else {
-        createdContentId = (contentRow as any)?.id ?? null;
-      }
-    } else {
-      createContentError = 'KOL is not on this campaign (campaign_kols row missing).';
+    const result = await createApprovedContentsRow(adminClient, {
+      submissionId: params.id,
+      campaignId: sub.campaign_id,
+      kolId: sub.kol_id,
+      link: sub.link,
+      platform: sub.platform,
+      contentType: sub.content_type,
+      approverId: user.id,
+    });
+    createdContentId = result.contentId;
+    createContentError = result.error;
+    if (createContentError) {
+      console.error('[/api/content-submissions/review] contents insert failed:', createContentError);
     }
   }
 
@@ -194,36 +170,3 @@ export async function POST(
   });
 }
 
-/**
- * content_submissions stores friendlier display values than the contents
- * table's CHECK constraint accepts. Map to the canonical contents values
- * so the auto-insert on approve actually lands.
- *
- * contents.platform CHECK: ('X', 'Telegram')
- */
-function mapSubmissionPlatformToContents(p: string | null | undefined): string {
-  const s = (p ?? '').toLowerCase();
-  if (s.includes('telegram') || s === 'tg') return 'Telegram';
-  // X / X (Twitter) / Twitter — everything else collapses to X for now
-  // (YouTube doesn't exist in contents.platform yet; that's a future
-  // schema change, tracked as a v2 gap.)
-  return 'X';
-}
-
-/**
- * contents.type CHECK: ('Post', 'Video', 'Article', 'AMA', 'Ambassadorship',
- *                       'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter')
- */
-function mapSubmissionTypeToContents(t: string | null | undefined): string {
-  const s = (t ?? '').toLowerCase();
-  if (s === 'tweet' || s === 'tg_post' || s === 'post') return 'Post';
-  if (s === 'video') return 'Video';
-  if (s === 'article') return 'Article';
-  if (s === 'ama') return 'AMA';
-  if (s === 'thread') return 'Thread';
-  if (s === 'qrt') return 'QRT';
-  if (s === 'spaces') return 'Spaces';
-  // Default to Post — least surprising; the team can re-classify in the
-  // Content Dashboard if the auto-mapping picked wrong.
-  return 'Post';
-}
