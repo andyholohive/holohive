@@ -3056,7 +3056,35 @@ export default function FormBuilderPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {!['section', 'description', 'link'].includes(fieldForm.field_type) && (
+              {/* Page picker — lets the editor move an existing field
+                  to another page (or pre-select the destination page for
+                  a new one). Previously page_number was set silently on
+                  create and frozen on edit, so re-homing a field meant
+                  delete+recreate. */}
+              {totalPages > 1 && (
+                <div>
+                  <Label>Page</Label>
+                  <Select
+                    value={String(fieldForm.page_number)}
+                    onValueChange={(value) => setFieldForm(prev => ({ ...prev, page_number: parseInt(value, 10) || 1 }))}
+                  >
+                    <SelectTrigger className="focus-brand">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={String(n)}>Page {n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {/* Required toggle — also shown on 'link' fields per Andy
+                  2026-06-29 (link can be "must view this URL before
+                  proceeding"; submission validation defers to the form
+                  consumer). 'section' + 'description' stay excluded —
+                  they're pure display chrome. */}
+              {!['section', 'description'].includes(fieldForm.field_type) && (
                 <div className="flex items-center gap-2">
                   <Checkbox checked={fieldForm.required} onCheckedChange={(checked) => setFieldForm(prev => ({ ...prev, required: checked as boolean }))} />
                   <Label>Required field</Label>
