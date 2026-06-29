@@ -385,8 +385,8 @@ export default function SubmissionsPage() {
           icon={Inbox}
           title="Contact Submissions"
           subtitle="Inbound inquiries from the contact form"
-          kicker="CRM · Submissions"
-          kickerDot="brand"
+          kicker="Logistics · Submissions"
+          kickerDot="sky"
           actions={headerActions(true)}
         />
 
@@ -465,8 +465,8 @@ export default function SubmissionsPage() {
         icon={Inbox}
         title="Contact Submissions"
         subtitle="Inbound inquiries from the contact form"
-        kicker="CRM · Submissions"
-        kickerDot="brand"
+        kicker="Logistics · Submissions"
+        kickerDot="sky"
         actions={headerActions(false)}
       />
 

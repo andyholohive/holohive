@@ -42,6 +42,7 @@ import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
+import { EngagementTab } from '@/components/clients/EngagementTab';
 import dynamic from 'next/dynamic';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -2686,7 +2687,7 @@ export default function ClientsPage() {
           <PageHeader
             title="Clients"
             subtitle="Manage your client relationships"
-            kicker="People · Engagements"
+            kicker="Clients · Engagements"
             kickerDot="sky"
             actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
               <>
@@ -2748,7 +2749,7 @@ export default function ClientsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <PageHeader title="Clients" subtitle="Manage your client relationships" kicker="People · Engagements" kickerDot="sky" />
+          <PageHeader title="Clients" subtitle="Manage your client relationships" kicker="Clients · Engagements" kickerDot="sky" />
           <div className="text-center py-8">
             <p className="text-rose-600">{error}</p>
             <Button variant="brand" onClick={fetchClients} className="mt-4">
@@ -2772,7 +2773,7 @@ export default function ClientsPage() {
         <PageHeader
           title={filteredPartnerName ? `Clients · ${filteredPartnerName}` : 'Clients'}
           subtitle="Manage your client relationships"
-          kicker={filteredPartnerName ? `People · Partner · ${filteredPartnerName}` : 'People · Engagements'}
+          kicker={filteredPartnerName ? `Clients · Partner · ${filteredPartnerName}` : 'Clients · Engagements'}
           kickerDot="sky"
           actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
             <>
@@ -4698,6 +4699,12 @@ export default function ClientsPage() {
                     dashboard reads from same column. HH-side action items
                     auto-create HQ tasks on save. */}
                 <TabsTrigger value="call-notes" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Call Notes</TabsTrigger>
+                {/* [2026-06-23] 5th tab — Engagement (stints + periods).
+                    First UI write surface for the Stint + Period substrate
+                    that was shipped backend-only with the lapse cron.
+                    Editor lives here so users can correct anything the
+                    cron auto-ends and add periods as engagements extend. */}
+                <TabsTrigger value="engagement" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Engagement</TabsTrigger>
               </TabsList>
               {/* Each tab is its own flex-col so the body scrolls and
                   the action row stays pinned below it. Previously the
@@ -5868,6 +5875,13 @@ export default function ClientsPage() {
                       clientId={contextModalClient.id}
                       currentUserId={user?.id ?? null}
                     />
+                  )}
+                </div>
+              </TabsContent>
+              <TabsContent value="engagement" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 overflow-y-auto px-1 pb-4">
+                  {contextModalClient && (
+                    <EngagementTab clientId={contextModalClient.id} />
                   )}
                 </div>
               </TabsContent>

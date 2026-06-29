@@ -914,8 +914,8 @@ export default function MindsharePage() {
           icon={BarChart3}
           title="Korean Mindshare"
           subtitle="Where projects stand in Korean crypto Telegram channels."
-          kicker="Documents · Mindshare"
-          kickerDot="brand"
+          kicker="Measurement · Mindshare"
+          kickerDot="emerald"
         />
         <Skeleton className="h-9 w-72 rounded-md" />
         <SectionHeader label="Leaderboard" dot="brand" first />
@@ -937,8 +937,8 @@ export default function MindsharePage() {
           icon={BarChart3}
           title="Korean Mindshare"
           subtitle="Where projects stand in Korean crypto Telegram channels."
-          kicker="Documents · Mindshare"
-          kickerDot="brand"
+          kicker="Measurement · Mindshare"
+          kickerDot="emerald"
         />
         <Card className="border-cream-200 overflow-hidden">
           <EmptyState
@@ -995,8 +995,8 @@ export default function MindsharePage() {
         icon={BarChart3}
         title="Korean Mindshare"
         subtitle="Where projects stand in Korean crypto Telegram channels."
-        kicker="Documents · Mindshare"
-        kickerDot="brand"
+        kicker="Measurement · Mindshare"
+        kickerDot="emerald"
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>

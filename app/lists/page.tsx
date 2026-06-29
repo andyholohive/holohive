@@ -1308,8 +1308,8 @@ export default function ListsPage() {
           <PageHeader
             title="Lists"
             subtitle="Manage your KOL lists and notes"
-            kicker="Talent · Lists"
-            kickerDot="amber"
+            kicker="KOLs · Lists"
+            kickerDot="violet"
             actions={(
               <>
                 <Button variant="brand" disabled>
@@ -1365,7 +1365,7 @@ export default function ListsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <PageHeader title="Lists" subtitle="Manage your KOL lists and notes" kicker="Talent · Lists" kickerDot="amber" />
+          <PageHeader title="Lists" subtitle="Manage your KOL lists and notes" kicker="KOLs · Lists" kickerDot="violet" />
           <div className="text-center py-8">
             <p className="text-rose-600">{error}</p>
             <Button variant="brand" onClick={fetchLists} className="mt-4">
@@ -1383,8 +1383,8 @@ export default function ListsPage() {
         <PageHeader
           title="Lists"
           subtitle="Manage your KOL lists and notes"
-          kicker="Talent · Lists"
-          kickerDot="amber"
+          kicker="KOLs · Lists"
+          kickerDot="violet"
           actions={(
             <>
               <Button variant="brand" onClick={() => setIsCombineListsDialogOpen(true)}

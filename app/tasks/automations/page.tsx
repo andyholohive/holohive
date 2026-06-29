@@ -153,8 +153,8 @@ export default function AutomationsPage() {
           icon={Zap}
           title="Task Automations"
           subtitle="Manage automation rules and view execution history"
-          kicker="Workspace · HQ · Automations"
-          kickerDot="brand"
+          kicker="Pinned · HQ · Automations"
+          kickerDot="amber"
         />
         <Card className="border-cream-200 overflow-hidden">
           <EmptyState
@@ -187,8 +187,8 @@ export default function AutomationsPage() {
           icon={Zap}
           title="Task Automations"
           subtitle="Manage automation rules and view execution history"
-          kicker="Workspace · HQ · Automations"
-          kickerDot="brand"
+          kicker="Pinned · HQ · Automations"
+          kickerDot="amber"
           actions={headerActions}
         />
         {Array.from({ length: 2 }).map((_, ci) => (
@@ -227,8 +227,8 @@ export default function AutomationsPage() {
         icon={Zap}
         title="Task Automations"
         subtitle="Manage automation rules and view execution history"
-        kicker="Workspace · HQ · Automations"
-        kickerDot="brand"
+        kicker="Pinned · HQ · Automations"
+        kickerDot="amber"
         actions={headerActions}
       />
 

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { getCampaignWeek, getTotalCampaignWeeks } from "@/lib/campaignWeekHelpers";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2106,12 +2107,12 @@ const CampaignDetailsPage = () => {
                       </>
                     )}
                     {campaign.start_date && campaign.end_date && (() => {
-                      const start = new Date(campaign.start_date + 'T00:00:00');
-                      const end = new Date(campaign.end_date + 'T00:00:00');
-                      const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86_400_000));
-                      const elapsedDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000));
-                      const totalWeeks = Math.max(1, Math.ceil(totalDays / 7));
-                      const currentWeek = Math.min(totalWeeks, Math.max(1, Math.ceil((elapsedDays + 1) / 7)));
+                      // Week 1 anchored to the first Monday on/after start_date
+                      // per lib/campaignWeekHelpers.ts — single source of truth
+                      // across hero, public portal, dashboard, Lineup Manager.
+                      const week = getCampaignWeek(campaign.start_date);
+                      const totalWeeks = getTotalCampaignWeeks(campaign.start_date, campaign.end_date);
+                      const currentWeek = week ? Math.min(totalWeeks, week.weekNumber) : 1;
                       return (
                         <>
                           <span className="text-ink-warm-300">·</span>
@@ -2211,7 +2212,7 @@ const CampaignDetailsPage = () => {
                 value="information"
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
               >
-                Information
+                Overview
               </TabsTrigger>
               <TabsTrigger
                 value="kols"
@@ -2321,18 +2322,15 @@ const CampaignDetailsPage = () => {
               {!editMode && campaign && (
                 <CampaignDetailViewLayout
                   campaign={campaign}
-                  setCampaign={setCampaign}
                   campaignKOLs={campaignKOLs}
                   payments={payments}
                   contents={contents}
                   allUsers={allUsers}
-                  allocations={allocations}
-                  editingCard={editingCard}
-                  setEditingCard={setEditingCard}
+                  onEditClick={() => setEditMode(true)}
                   onResourcesChange={async (next) => {
-                    // Persist immediately — resources is a side-edit
-                    // even in view mode; we don't want users to have
-                    // to flip into Edit mode to add a Telegram link.
+                    // Persist immediately — Resources is the only thing
+                    // editable from the Overview view (one-tap "add
+                    // Telegram link" without flipping to full Edit mode).
                     await handleSaveResources(next);
                   }}
                 />

@@ -109,8 +109,8 @@ function InitiativesPageSkeleton() {
         icon={Compass}
         title="Initiatives"
         subtitle="Strategic threads the team owns. Drives the dashboard's Initiative Tracker."
-        kicker="Operations · Strategy"
-        kickerDot="violet"
+        kicker="Resources · Initiatives"
+        kickerDot="amber"
       />
       <Skeleton className="h-10 w-[280px] rounded-md" />
       <Skeleton className="h-64 rounded-lg" />
@@ -254,8 +254,8 @@ function InitiativesPageInner() {
         icon={Compass}
         title="Initiatives"
         subtitle="Strategic threads + HHP backlog. Initiatives drive the dashboard's Initiative Tracker; Backlog captures bugs & requests."
-        kicker="Operations · Strategy"
-        kickerDot="violet"
+        kicker="Resources · Initiatives"
+        kickerDot="amber"
         actions={tab === 'initiatives' ? (
           <Button variant="brand" size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />New initiative

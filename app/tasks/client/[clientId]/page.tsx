@@ -97,8 +97,8 @@ export default function ClientTasksPage() {
           icon={Building2}
           title="Client"
           subtitle="Client task overview and deliverables"
-          kicker="Workspace · HQ · Client view"
-          kickerDot="brand"
+          kicker="Pinned · HQ · Client view"
+          kickerDot="amber"
         />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -143,8 +143,8 @@ export default function ClientTasksPage() {
         icon={Building2}
         title={clientName}
         subtitle="Client task overview and deliverables"
-        kicker="Workspace · HQ · Client view"
-        kickerDot="brand"
+        kicker="Pinned · HQ · Client view"
+        kickerDot="amber"
       />
 
       {/* Logo strip — sits between PageHeader and stats so users see

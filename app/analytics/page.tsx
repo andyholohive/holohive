@@ -388,8 +388,8 @@ export default function AnalyticsPage() {
           icon={BarChart3}
           title="Team Analytics"
           subtitle="Pipeline, Discovery, team workload, and health alerts at a glance."
-          kicker="CRM · Analytics"
-          kickerDot="brand"
+          kicker="Sales / CRM · Analytics"
+          kickerDot="violet"
         />
         {/* KPI strip skeletons — must mirror the actual `grid-cols-2
             md:grid-cols-4 gap-3` shape so the layout doesn't shift
@@ -411,8 +411,8 @@ export default function AnalyticsPage() {
         icon={BarChart3}
         title="Team Analytics"
         subtitle="Pipeline, Discovery, team workload, and health alerts at a glance."
-        kicker="CRM · Analytics"
-        kickerDot="brand"
+        kicker="Sales / CRM · Analytics"
+        kickerDot="violet"
         actions={(
           <>
             <Select value={String(windowDays)} onValueChange={(v) => setWindowDays(Number(v) as 7 | 14 | 30 | 90)}>

@@ -655,7 +655,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
           title={`${client?.name || 'Client'} — Delivery Log`}
           subtitle="Per-client delivery log entries"
           kicker="Clients · Delivery Log"
-          kickerDot="brand"
+          kickerDot="sky"
         />
         <SectionHeader label="Entries" dot="brand" counter="Loading…" first />
         <div className="flex items-center gap-3 flex-wrap">
@@ -696,7 +696,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
         title={`${client?.name || 'Client'} — Delivery Log`}
         subtitle="Per-client delivery log entries"
         kicker="Clients · Delivery Log"
-        kickerDot="brand"
+        kickerDot="sky"
         actions={(
           <>
             <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>

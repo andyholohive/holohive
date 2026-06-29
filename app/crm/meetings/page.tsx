@@ -324,8 +324,8 @@ export default function MeetingsPage() {
           icon={Calendar}
           title="Meetings"
           subtitle="View and manage your booked meetings."
-          kicker="CRM · Meetings"
-          kickerDot="brand"
+          kicker="Logistics · Meetings"
+          kickerDot="sky"
           actions={loadingHeaderActions}
         />
 
@@ -401,8 +401,8 @@ export default function MeetingsPage() {
         subtitle={viewUserId === 'me'
           ? 'View and manage your booked meetings.'
           : `Viewing ${(users.find(u => u.id === viewUserId)?.name || 'teammate')}'s booked meetings.`}
-        kicker="CRM · Meetings"
-        kickerDot="brand"
+        kicker="Logistics · Meetings"
+        kickerDot="sky"
         actions={headerActions}
       />
 

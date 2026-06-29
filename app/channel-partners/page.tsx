@@ -224,8 +224,8 @@ export default function PartnersPage() {
             icon={Handshake}
             title="Channel Partners"
             subtitle="Manage your channel partner relationships"
-            kicker="CRM · Channel Partners"
-            kickerDot="brand"
+            kicker="Sales / CRM · Channel Partners"
+            kickerDot="violet"
             actions={(
               <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
@@ -254,8 +254,8 @@ export default function PartnersPage() {
           icon={Handshake}
           title="Channel Partners"
           subtitle="Manage your channel partner relationships"
-          kicker="CRM · Channel Partners"
-          kickerDot="brand"
+          kicker="Sales / CRM · Channel Partners"
+          kickerDot="violet"
           actions={((userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
             <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" />

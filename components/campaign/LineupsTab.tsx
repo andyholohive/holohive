@@ -46,7 +46,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import {
   Plus, X, ChevronDown, Send, CheckCircle2, Unlock, Copy,
   Save, Users, Activity, Trash2, Edit2, History, GripVertical,
-  AlertTriangle, ListChecks,
+  AlertTriangle, ListChecks, UserPlus,
 } from 'lucide-react';
 import {
   DndContext, DragOverlay, type DragEndEvent, type DragStartEvent,
@@ -61,6 +61,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
+import { AddKOLsDialog } from '@/components/campaign/AddKOLsDialog';
 import { formatDateTime } from '@/lib/dateFormat';
 import {
   LineupManagerService,
@@ -168,6 +169,10 @@ export default function LineupsTab({
   const [busy, setBusy] = useState(false);
   // DnD overlay item — the KOL being dragged, for the ghost preview.
   const [draggingKolId, setDraggingKolId] = useState<string | null>(null);
+  // Add-KOLs dialog (reuses AddKOLsDialog from the KOL Dashboard tab —
+  // both flows insert into campaign_kols, so we share the form rather
+  // than build a slimmer per-tab variant).
+  const [addKolsOpen, setAddKolsOpen] = useState(false);
 
   // ─── Custom dialog state (replaces native window.prompt/confirm) ──
   // Rename angle dialog
@@ -330,6 +335,19 @@ export default function LineupsTab({
     if (lineup) {
       const fresh = await service.getLineupFull(lineup.id);
       setLineup(fresh);
+    }
+  }
+
+  async function refreshRoster() {
+    try {
+      const rosterRows = await fetchRosterWithPerformance(campaignId);
+      setRoster(rosterRows);
+    } catch (err: any) {
+      toast({
+        title: 'Failed to refresh roster',
+        description: err?.message,
+        variant: 'destructive',
+      });
     }
   }
 
@@ -883,6 +901,16 @@ export default function LineupsTab({
                 <span className="text-[10px] text-ink-warm-500 ml-auto tabular-nums">
                   {filteredRoster.length} of {roster.length}
                 </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 focus-brand"
+                  onClick={() => setAddKolsOpen(true)}
+                  title="Add KOLs to the campaign roster"
+                >
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  Add KOL
+                </Button>
               </div>
               <div className="px-3 py-2 border-b border-cream-100 shrink-0 flex items-center gap-2">
                 <Input
@@ -1194,6 +1222,18 @@ export default function LineupsTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add KOLs dialog — reused from the KOL Dashboard tab. Reads
+          campaign + availableKOLs from useCampaignDetail(); on close
+          we refresh the Lineups roster so newly-added KOLs appear
+          without a tab switch. */}
+      <AddKOLsDialog
+        open={addKolsOpen}
+        onOpenChange={(open) => {
+          setAddKolsOpen(open);
+          if (!open) void refreshRoster();
+        }}
+      />
     </DndContext>
   );
 }

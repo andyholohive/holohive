@@ -156,8 +156,8 @@ export default function StorytellerPage() {
           icon={BarChart3}
           title="Project"
           subtitle="Channels mentioning this project, ranked by mention count."
-          kicker="Documents · Mindshare · Project"
-          kickerDot="brand"
+          kicker="Measurement · Mindshare · Project"
+          kickerDot="emerald"
         />
 
         {/* Meta-row skeleton + Tabs strip skeleton matches the loaded
@@ -206,8 +206,8 @@ export default function StorytellerPage() {
           icon={BarChart3}
           title="Project not found"
           subtitle="The project you were looking for couldn't be loaded."
-          kicker="Documents · Mindshare · Project"
-          kickerDot="brand"
+          kicker="Measurement · Mindshare · Project"
+          kickerDot="emerald"
         />
 
         <Card className="border-cream-200">
@@ -253,8 +253,8 @@ export default function StorytellerPage() {
         icon={BarChart3}
         title={project?.name || 'Project'}
         subtitle={`Channels mentioning this project, ranked by mention count.${project?.description ? ' · ' + project.description : ''}`}
-        kicker="Documents · Mindshare · Project"
-        kickerDot="brand"
+        kicker="Measurement · Mindshare · Project"
+        kickerDot="emerald"
       />
 
       {/* Meta row — Pre-TGE + category chips + twitter/website links.

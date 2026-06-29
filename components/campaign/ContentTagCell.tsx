@@ -263,3 +263,71 @@ export default function ContentTagCell({
     </div>
   );
 }
+
+/**
+ * ClientFacingTagBadges — read-only render of just the `visibility==='client'`
+ * tags assigned to a content row.
+ *
+ * Mirrors the public campaign page's Notes-cell badge treatment so the
+ * team sees the same "this content is client-facing" signal on the
+ * internal Content Dashboard. Public page renders identical markup at
+ * `app/public/campaigns/[id]/page.tsx:3136`; the two must stay in
+ * sync — if the tag color/label rules change there, change here.
+ *
+ * Self-fetches assignments per row (cheap — same shape ContentTagCell
+ * already does). Takes the global active-tags list as a prop so a
+ * parent that already loaded it doesn't pay the per-cell fetch.
+ */
+export function ClientFacingTagBadges({
+  contentId,
+  tags,
+}: {
+  contentId: string;
+  tags: ContentTag[];
+}) {
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (supabase as any)
+      .from('content_tag_assignments')
+      .select('id, content_id, tag_id, sequence_n, sequence_of, multipost_group_id')
+      .eq('content_id', contentId)
+      .then(({ data }: any) => {
+        if (alive) setAssignments((data || []) as Assignment[]);
+      });
+    return () => { alive = false; };
+  }, [contentId]);
+
+  const tagsById = useMemo(() => {
+    const m = new Map<string, ContentTag>();
+    for (const t of tags) m.set(t.id, t);
+    return m;
+  }, [tags]);
+
+  const clientAssignments = assignments
+    .map((a) => ({ a, tag: tagsById.get(a.tag_id) }))
+    .filter(({ tag }) => tag && tag.visibility === 'client');
+
+  if (clientAssignments.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1 mb-1.5">
+      {clientAssignments.map(({ a, tag }) => {
+        const isMultiPost = tag!.name === 'Multi-Post' && a.sequence_n && a.sequence_of;
+        const label = isMultiPost
+          ? `Post ${a.sequence_n} of ${a.sequence_of}`
+          : tag!.name;
+        return (
+          <span
+            key={a.id}
+            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium text-white"
+            style={{ backgroundColor: tag!.color || '#10b981' }}
+          >
+            {label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}

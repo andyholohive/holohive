@@ -263,11 +263,26 @@ export async function POST(
     }
 
     if (event === 'confirmed') {
-      if (!campaign.tg_ops_group_id) {
+      // [2026-06-26] Confirmed lineups now route to the global internal
+      // team chat (app_settings.lineup_confirmed_chat_id + optional
+      // _thread_id), NOT the per-campaign client ops chat. Confirm is
+      // an internal coordination milestone — the team needs a single
+      // shared feed of "what's locked in this week" without spamming
+      // each client's ops chat. Falls back to campaigns.tg_ops_group_id
+      // only if the global setting is unset (legacy escape hatch).
+      const [globalChatSetting, globalThreadSetting] = await Promise.all([
+        (supabase as any).from('app_settings').select('value').eq('key', 'lineup_confirmed_chat_id').maybeSingle(),
+        (supabase as any).from('app_settings').select('value').eq('key', 'lineup_confirmed_chat_thread_id').maybeSingle(),
+      ]);
+      const globalChatId = (globalChatSetting.data as any)?.value as string | undefined;
+      const globalThreadId = (globalThreadSetting.data as any)?.value as string | undefined;
+      const targetChatId = globalChatId || campaign.tg_ops_group_id;
+      const targetThreadId = globalChatId ? globalThreadId : undefined;
+      if (!targetChatId) {
         return NextResponse.json({
           ok: false,
           skipped: true,
-          reason: 'Campaign has no tg_ops_group_id set. Configure on the campaign settings.',
+          reason: 'No destination configured. Set app_settings.lineup_confirmed_chat_id (recommended) or campaigns.tg_ops_group_id.',
         });
       }
       // Look up the confirmer's name for the post footer.
@@ -289,11 +304,12 @@ export async function POST(
         confirmedByName,
       );
       const sent = await TelegramService.sendToChat(
-        campaign.tg_ops_group_id,
+        targetChatId,
         text,
         'Markdown', // Service formatter emits markdown links
+        targetThreadId ? parseInt(targetThreadId, 10) : undefined,
       );
-      return NextResponse.json({ ok: sent });
+      return NextResponse.json({ ok: sent, target: globalChatId ? 'global' : 'per-campaign' });
     }
 
     if (event === 'unlocked') {

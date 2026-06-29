@@ -1774,8 +1774,8 @@ export default function TasksPage() {
           icon={ListTodo}
           title="Tasks"
           subtitle="Manage team tasks, SOPs, and recurring work"
-          kicker="Workspace · HQ"
-          kickerDot="brand"
+          kicker="Pinned · HQ"
+          kickerDot="amber"
           actions={headerActions}
         />
 
@@ -1842,8 +1842,8 @@ export default function TasksPage() {
         icon={ListTodo}
         title="Tasks"
         subtitle="Manage team tasks, SOPs, and recurring work"
-        kicker="Workspace · HQ"
-        kickerDot="brand"
+        kicker="Pinned · HQ"
+        kickerDot="amber"
         actions={headerActions}
       />
 

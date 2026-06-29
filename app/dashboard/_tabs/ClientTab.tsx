@@ -20,7 +20,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Users, FileText, AlertCircle, MessageCircle, Tag, Activity, Megaphone, ExternalLink, Send, CheckCircle2, Link2 } from 'lucide-react';
+import { Users, FileText, AlertCircle, MessageCircle, Tag, Activity, Megaphone, ExternalLink, Send, CheckCircle2, Link2, ChevronDown, ChevronRight, Clock, Circle } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -86,6 +86,21 @@ type ClientHealthRow = {
   extVisitsLast7d: number;
   healthTone: HealthTone;
   is_whitelisted: boolean;
+  // [2026-06-25] This-week KOL delivery roll-up. Populated from the
+  // current week's confirmed lineup per active campaign, joined to
+  // /submit (content_submissions). See lib/clientDeliveryService.ts.
+  kolDelivery: {
+    week_number: number | null;
+    approved: number;
+    total: number;
+    rows: Array<{
+      kol_id: string;
+      name: string;
+      campaign_id: string;
+      campaign_name: string;
+      status: 'approved' | 'in_qa' | 'not_submitted';
+    }>;
+  };
 };
 
 type ActionItemDto = {
@@ -151,10 +166,134 @@ const renewalLabel = (row: ClientHealthRow): string => {
   return `${row.renewal_days_left}d`;
 };
 
+// [2026-06-25] FragmentRow renders the main client row AND its
+// expanded KOL roll-up sub-rows. Lives outside the parent component
+// so it has its own render scope; the parent supplies expansion state
+// + toggler.
+function FragmentRow({
+  client,
+  isExpanded,
+  hasDelivery,
+  onToggle,
+}: {
+  client: ClientHealthRow;
+  isExpanded: boolean;
+  hasDelivery: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <TableRow
+        className="border-cream-100 row-accent cursor-pointer"
+        onClick={onToggle}
+      >
+        <TableCell className="py-3.5 px-2 align-middle">
+          {hasDelivery ? (
+            isExpanded
+              ? <ChevronDown className="h-4 w-4 text-ink-warm-400" />
+              : <ChevronRight className="h-4 w-4 text-ink-warm-400" />
+          ) : null}
+        </TableCell>
+        <TableCell className="py-3.5 px-5">
+          <Link
+            href={`/clients/${client.id}`}
+            className="group flex items-center gap-2.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ClientLogoTile row={client} />
+            <div className="min-w-0">
+              <div className="font-medium text-ink-warm-900 group-hover:text-brand transition-colors truncate">
+                {client.name}
+              </div>
+            </div>
+            {client.is_whitelisted && (
+              <span className="ml-1 text-[10px] uppercase tracking-wider text-emerald-700 font-semibold shrink-0">whitelisted</span>
+            )}
+          </Link>
+        </TableCell>
+        <TableCell className="py-3.5 px-5 text-ink-warm-700 tabular-nums">
+          {client.weekNumber !== null ? `Wk ${client.weekNumber}` : '—'}
+        </TableCell>
+        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{client.openTasks}</TableCell>
+        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{client.totalContentPosted}</TableCell>
+        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-500" title="Portal analytics not yet wired — see API header comment.">
+          {client.extVisitsLast7d}
+        </TableCell>
+        <TableCell className="py-3.5 px-5">
+          <StatusBadge tone={HEALTH_TO_BADGE[client.healthTone]} size="sm" bordered withDot>
+            {HEALTH_LABEL[client.healthTone]}
+          </StatusBadge>
+        </TableCell>
+      </TableRow>
+
+      {/* ── Expanded KOL roll-up sub-row ────────────────────────────── */}
+      {isExpanded && hasDelivery && (
+        <TableRow className="bg-cream-50/40 hover:bg-cream-50/40 border-cream-100">
+          <TableCell colSpan={7} className="py-0 px-5">
+            <div className="py-3">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.18em]">
+                  KOL Delivery · This week
+                  <span className="ml-2 text-ink-warm-400 normal-case font-normal tracking-normal">from /submit</span>
+                </div>
+                <div className="text-[11px] text-ink-warm-500 tabular-nums">
+                  {client.kolDelivery.approved}/{client.kolDelivery.total} approved
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {client.kolDelivery.rows.map((row) => (
+                  <KolDeliveryRowLine key={`${row.campaign_id}:${row.kol_id}`} row={row} />
+                ))}
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+const KOL_STATUS_LABEL: Record<'approved' | 'in_qa' | 'not_submitted', string> = {
+  approved: 'Approved',
+  in_qa: 'In QA',
+  not_submitted: 'Not submitted',
+};
+
+const KOL_STATUS_TONE: Record<'approved' | 'in_qa' | 'not_submitted', BadgeTone> = {
+  approved: 'success',
+  in_qa: 'warning',
+  not_submitted: 'neutral',
+};
+
+function KolDeliveryRowLine({ row }: { row: ClientHealthRow['kolDelivery']['rows'][number] }) {
+  const Icon = row.status === 'approved' ? CheckCircle2 : row.status === 'in_qa' ? Clock : Circle;
+  return (
+    <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-cream-100/60 transition-colors">
+      <div className="flex items-center gap-2 min-w-0">
+        <Icon className={`h-3 w-3 flex-shrink-0 ${row.status === 'approved' ? 'text-emerald-500' : row.status === 'in_qa' ? 'text-amber-500' : 'text-ink-warm-300'}`} />
+        <span className="text-sm text-ink-warm-800 truncate">{row.name}</span>
+      </div>
+      <StatusBadge tone={KOL_STATUS_TONE[row.status]} size="sm" bordered={row.status === 'approved' || row.status === 'in_qa'}>
+        {KOL_STATUS_LABEL[row.status]}
+      </StatusBadge>
+    </div>
+  );
+}
+
 export default function ClientTab() {
   const [data, setData] = useState<ClientPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // [2026-06-25] Expanded client IDs for the KOL delivery roll-up.
+  // Per Andy's mockup: rows expand to a roster of this-week's KOLs +
+  // their /submit status. Click anywhere on the row to toggle.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -207,11 +346,11 @@ export default function ClientTab() {
           subtitle lists the names when present so users see WHICH
           activations are running, not just the count. */}
       <div className="space-y-4">
-        <SectionHeader label="Output Signals" dot="emerald" counter="01 — Last 7 days · live counts" first />
+        <SectionHeader label="Output Signals" dot="emerald" counter="01 — This week · live counts" first />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard
             icon={FileText}
-            label="Content Posted (7d)"
+            label="Content Posted"
             value={data.outputSignals.contentPostedLast7d}
             sub="across active clients"
             accent="brand"
@@ -237,7 +376,7 @@ export default function ClientTab() {
           />
           <KpiCard
             icon={ExternalLink}
-            label="Ext. Visits (7d)"
+            label="Ext. Visits"
             value={data.outputSignals.totalExtVisitsLast7d}
             sub="TBD · portal analytics"
             accent="amber"
@@ -248,12 +387,13 @@ export default function ClientTab() {
 
       {/* ── 02 Health ──────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionHeader label="Engagements" dot="brand" counter="02 — Client health · Renewal · Health tone" />
+        <SectionHeader label="Client Health" dot="brand" counter="02 — Delivery only · This week" />
 
-      {/* Client Health table — columns now match spec § 4.2:
-          Client | Week | HQ Tasks | Content Posted | Ext. Visits (7d) | Renewal | Health
-          (Was: Client | Open | Overdue | Done wk | Posted wk | Renewal.
-          The Overdue column collapsed into the Health tone column.) */}
+      {/* Client Health table — post-2026-06-25 redesign:
+          Client | Week | HQ Tasks | Content | Visits | Health.
+          Renewal column moved to the dedicated Renewals & Pipeline tab
+          (single source of renewal math). Rows expand to show this week's
+          KOL roster from confirmed lineups + /submit status. */}
       <Card className="border-cream-200 overflow-hidden">
         <CardHeaderEditorial
           icon={Users}
@@ -273,51 +413,29 @@ export default function ClientTab() {
           <Table>
             <TableHeader>
               <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-8" />
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Week</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">HQ Tasks</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Content Posted</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Ext. Visits</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Renewal</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Content</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Visits</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Health</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.clientHealth.map(c => (
-                <TableRow key={c.id} className="border-cream-100 row-accent cursor-pointer">
-                  <TableCell className="py-3.5 px-5">
-                    <Link href={`/clients/${c.id}`} className="group flex items-center gap-2.5">
-                      <ClientLogoTile row={c} />
-                      <div className="min-w-0">
-                        <div className="font-medium text-ink-warm-900 group-hover:text-brand transition-colors truncate">
-                          {c.name}
-                        </div>
-                      </div>
-                      {c.is_whitelisted && (
-                        <span className="ml-1 text-[10px] uppercase tracking-wider text-emerald-700 font-semibold shrink-0">whitelisted</span>
-                      )}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="py-3.5 px-5 text-ink-warm-700 tabular-nums">
-                    {c.weekNumber !== null ? `Wk ${c.weekNumber}` : '—'}
-                  </TableCell>
-                  <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{c.openTasks}</TableCell>
-                  <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{c.totalContentPosted}</TableCell>
-                  <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-500" title="Portal analytics not yet wired — see API header comment.">
-                    {c.extVisitsLast7d}
-                  </TableCell>
-                  <TableCell className="py-3.5 px-5">
-                    <StatusBadge tone={renewalTone[c.renewal_tone]} size="sm" bordered withDot={c.renewal_tone === 'red' ? 'pulse' : true}>
-                      {renewalLabel(c)}
-                    </StatusBadge>
-                  </TableCell>
-                  <TableCell className="py-3.5 px-5">
-                    <StatusBadge tone={HEALTH_TO_BADGE[c.healthTone]} size="sm" bordered withDot>
-                      {HEALTH_LABEL[c.healthTone]}
-                    </StatusBadge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {data.clientHealth.map(c => {
+                const isExpanded = expandedIds.has(c.id);
+                const hasDelivery = c.kolDelivery.total > 0;
+                return (
+                  <FragmentRow
+                    key={c.id}
+                    client={c}
+                    isExpanded={isExpanded}
+                    hasDelivery={hasDelivery}
+                    onToggle={() => toggleExpanded(c.id)}
+                  />
+                );
+              })}
             </TableBody>
           </Table>
         )}

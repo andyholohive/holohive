@@ -100,8 +100,8 @@ export default function TemplatesPage() {
           icon={FileText}
           title="Templates"
           subtitle="Pre-built artifacts the team reuses across messages, tasks, and workflows"
-          kicker="Workspace · Templates"
-          kickerDot="brand"
+          kicker="Resources · Templates"
+          kickerDot="amber"
         />
         <div className="bg-cream-50 border border-cream-200 rounded-lg p-12 text-center">
           <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
@@ -118,8 +118,8 @@ export default function TemplatesPage() {
         icon={FileText}
         title="Templates"
         subtitle="Pre-built artifacts the team reuses across messages, tasks, and workflows"
-        kicker="Workspace · Templates"
-        kickerDot="brand"
+        kicker="Resources · Templates"
+        kickerDot="amber"
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">

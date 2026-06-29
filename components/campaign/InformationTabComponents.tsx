@@ -23,21 +23,29 @@
  * Information tab body (still inline on the page for now).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
+  Activity,
+  ArrowRight,
   Calendar,
   Calendar as CalendarIcon,
   CheckCircle,
   ChevronRight,
+  CircleCheck,
+  CircleDot,
+  DollarSign,
   Edit,
-  ExternalLink,
   Eye,
+  ExternalLink,
   File,
   FileText,
   Globe,
   Image as ImageIcon,
+  Pencil,
   Plus,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -106,62 +114,96 @@ const RESOURCE_ICON_TILES: Record<ResourceIcon, { bg: string; text: string; bord
 
 export function CampaignDetailViewLayout({
   campaign,
-  setCampaign,
   campaignKOLs,
   payments,
   contents,
   allUsers,
-  allocations,
-  editingCard,
-  setEditingCard,
+  onEditClick,
   onResourcesChange,
 }: {
   campaign: CampaignWithDetails;
-  setCampaign: (c: CampaignWithDetails) => void;
+  /** kept for prop compatibility with the page; the inline `setCampaign`
+   *  flow is no longer used now that Overview is read-only. */
+  setCampaign?: (c: CampaignWithDetails) => void;
   campaignKOLs: any[];
   payments: any[];
   contents: any[];
   allUsers: any[];
-  allocations: any[];
-  editingCard: null | 'engagement' | 'budget' | 'approved';
-  setEditingCard: (next: null | 'engagement' | 'budget' | 'approved') => void;
+  /** kept for prop compatibility; allocations now show on the Budget tab. */
+  allocations?: any[];
+  /** kept for prop compatibility; per-card edit state is no longer used. */
+  editingCard?: null | 'engagement' | 'budget' | 'approved';
+  setEditingCard?: (next: null | 'engagement' | 'budget' | 'approved') => void;
+  /** Hero "Edit campaign" → flips the page into full edit mode. */
+  onEditClick?: () => void;
   onResourcesChange: (next: CampaignResource[]) => void;
 }) {
-  // Derived metrics — single source of truth for the sidebar Quick
-  // Stats card and the Engagement card's progress bar.
+  // Derived metrics — KPI strip values.
   const startDate = campaign.start_date ? new Date(campaign.start_date + 'T00:00:00') : null;
   const endDate = campaign.end_date ? new Date(campaign.end_date + 'T00:00:00') : null;
-  const totalDays = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000)) : 0;
-  const elapsedDays = startDate ? Math.max(0, Math.floor((Date.now() - startDate.getTime()) / 86_400_000)) : 0;
-  const progressPct = totalDays > 0 ? Math.min(100, Math.round((elapsedDays / totalDays) * 100)) : 0;
   const daysRemaining = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86_400_000)) : null;
-  const totalWeeks = totalDays > 0 ? Math.max(1, Math.ceil(totalDays / 7)) : 0;
-  const currentWeek = totalWeeks > 0 ? Math.min(totalWeeks, Math.max(1, Math.ceil((elapsedDays + 1) / 7))) : 0;
 
   const totalPaid = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
   const postedContentCount = (contents || []).filter((c: any) => c.status === 'posted' || c.status === 'published').length;
   const totalContentCount = (contents || []).length;
 
   const manager = allUsers.find((u) => u.id === campaign.manager);
-
-  // Resources — pulled from campaign.resources (added 2026-06-XX as
-  // a jsonb column). Defaults to empty so the page works even before
-  // the Resources card has been populated.
   const resources: CampaignResource[] = ((campaign as any).resources || []) as CampaignResource[];
+  const clientId = (campaign as any).client_id as string | null;
 
-  // Renewal trigger — show the brand-tinted action card when the
-  // engagement ends within 60 days AND the campaign is still active.
-  const showRenewalCard = daysRemaining != null && daysRemaining <= 60 && daysRemaining > 0 && campaign.status === 'Active';
+  // Client + coverage + activity — single fetch wave, scoped to the
+  // campaign's client. The Linked Client card and the coverage pill
+  // both read from this; the Activity feed pulls from
+  // client_activity_log filtered to recent inserts.
+  type Client = { id: string; name: string };
+  type Coverage = { covered_through: string | null; days_left: number | null; coverage_tone: string | null };
+  type ActivityRow = {
+    id: string;
+    title: string;
+    activity_category: string;
+    activity_type: string;
+    created_at: string | null;
+    created_by_name: string | null;
+  };
+  const [client, setClient] = useState<Client | null>(null);
+  const [clientScope, setClientScope] = useState<string | null>(null);
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [activity, setActivity] = useState<ActivityRow[]>([]);
 
-  // KV cell helper — keeps the mockup's 10px uppercase tracked-out
-  // label + 14px font-medium value rhythm consistent across the
-  // Engagement card.
-  const KV = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div>
-      <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5">{label}</div>
-      <div className="text-ink-warm-900 font-medium text-sm">{children}</div>
-    </div>
-  );
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+    (async () => {
+      const [clientRes, contextRes, coverageRes, activityRes] = await Promise.all([
+        supabase.from('clients').select('id,name').eq('id', clientId).maybeSingle(),
+        supabase.from('client_context').select('scope').eq('client_id', clientId).maybeSingle(),
+        supabase
+          .from('client_coverage_status')
+          .select('covered_through,days_left,coverage_tone,stint_status')
+          .eq('client_id', clientId)
+          .eq('stint_status', 'active')
+          .maybeSingle(),
+        supabase
+          .from('client_activity_log')
+          .select('id,title,activity_category,activity_type,created_at,created_by_name')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ]);
+      if (cancelled) return;
+      if (clientRes.data) setClient({ id: clientRes.data.id, name: clientRes.data.name });
+      if (contextRes.data?.scope) setClientScope(contextRes.data.scope);
+      if (coverageRes.data) {
+        setCoverage({
+          covered_through: coverageRes.data.covered_through,
+          days_left: coverageRes.data.days_left,
+          coverage_tone: coverageRes.data.coverage_tone,
+        });
+      }
+      if (activityRes.data) setActivity(activityRes.data as ActivityRow[]);
+    })();
+    return () => { cancelled = true; };
+  }, [clientId]);
 
   const formatDate = (iso: string | null) => {
     if (!iso) return '—';
@@ -179,366 +221,222 @@ export function CampaignDetailViewLayout({
     return `$${n.toLocaleString()}`;
   };
 
+  const formatRelative = (iso: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const diffMs = Date.now() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60_000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay === 1) return 'yesterday';
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return fmtDate(iso) || '';
+  };
+
+  // Coverage pill tone — same green/amber/red ramp the dashboard uses
+  // via the client_coverage_status view's coverage_tone column.
+  const COVERAGE_PILL: Record<string, { bg: string; text: string; border: string }> = {
+    green:  { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100' },
+    amber:  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-100' },
+    red:    { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-100' },
+  };
+  const covPill = coverage?.coverage_tone ? COVERAGE_PILL[coverage.coverage_tone] : null;
+
+  const STATUS_PILL: Record<string, { bg: string; text: string }> = {
+    Active:    { bg: 'bg-brand-soft', text: 'text-brand-deep' },
+    Planning:  { bg: 'bg-sky-50',     text: 'text-sky-700' },
+    Paused:    { bg: 'bg-amber-50',   text: 'text-amber-700' },
+    Completed: { bg: 'bg-cream-100',  text: 'text-ink-warm-700' },
+  };
+  const statusPill = STATUS_PILL[campaign.status as string] ?? STATUS_PILL.Planning;
+
+  // Activity icon by category — falls back to a neutral dot.
+  const ACTIVITY_ICON: Record<string, { icon: typeof Activity; tone: string }> = {
+    content:    { icon: CircleCheck, tone: 'text-emerald-500' },
+    payment:    { icon: DollarSign,  tone: 'text-amber-500' },
+    lineup:     { icon: Eye,         tone: 'text-sky-500' },
+    edit:       { icon: Pencil,      tone: 'text-ink-warm-500' },
+    onboarding: { icon: Users,       tone: 'text-purple-500' },
+  };
+
   return (
-    // [2026-06-05] `pt-6` removed — left the layout with 24px extra
-    // top padding that no other tab (KOLs, Contents, Payments) had,
-    // because they use `CardContent pt-0 px-0` after their toolbar
-    // row. View mode has no toolbar row, so the layout sits directly
-    // under TabsContent's `mt-4` — same as the other tabs' content
-    // surface relative to the tab strip.
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      {/* ── Main column ──────────────────────────────────────────── */}
-      <div className="lg:col-span-2 space-y-5">
+    /* ── Overview layout — 2026-06-23 ──────────────────────────────────
+       Replaces the prior 3-column edit-grid (Engagement / Budget /
+       Approved Access + Quick Stats + Renewal + Activity placeholder).
+       Now a glance-only dashboard:
+         1. Hero band — name + status + coverage pill + account lead +
+            single "Edit campaign" button (opens InformationEditMode).
+         2. KPI strip — KpiCard-style 4-up: KOLs, Content, Budget, Days.
+         3. Two columns —
+             Left: Resources (kept) + Recent activity (real data from
+                   client_activity_log scoped to this campaign's client).
+             Right: Linked Client card — read-only summary + link to
+                    the Client Context modal's Engagement tab.
 
-        {/* Engagement card — consolidates Start / End / Type / Lead
-            with a progress bar at the bottom showing Week X of Y.
-            Per-card inline Edit affordance on the header. */}
-        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Engagement</h3>
-            {editingCard !== 'engagement' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditingCard('engagement')}
-                className="h-7 px-2 text-xs font-medium text-brand-deep hover:bg-cream-50"
-              >
-                <Edit className="w-3 h-3 mr-1" />
-                Edit
-              </Button>
-            )}
-          </div>
-          {editingCard === 'engagement' ? (
-            <EngagementEditForm
-              campaign={campaign}
-              setCampaign={setCampaign}
-              allUsers={allUsers}
-              onDone={() => setEditingCard(null)}
-            />
-          ) : (
-            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-              <KV label="Start date"><span className="mono tabular-nums">{formatDate(campaign.start_date)}</span></KV>
-              <KV label="End date"><span className="mono tabular-nums">{formatDate(campaign.end_date)}</span></KV>
-              <KV label="Region">
-                {(() => {
-                  // Mirrors the inline `displayRegion` helper used in
-                  // edit mode — APAC/EMEA/MENA stay all-caps, Global
-                  // title-case, others title-case.
-                  const region = (campaign as any).region as string | null;
-                  if (!region) return <span className="text-ink-warm-400 italic">Unset</span>;
-                  const lower = region.toLowerCase();
-                  if (lower === 'apac') return 'APAC';
-                  if (lower === 'emea') return 'EMEA';
-                  if (lower === 'mena') return 'MENA';
-                  if (lower === 'global') return 'Global';
-                  return region.charAt(0).toUpperCase() + region.slice(1).toLowerCase();
-                })()}
-              </KV>
-              <KV label="Account lead">
-                {manager ? (
-                  <div className="flex items-center gap-2">
-                    {/* Profile photo when available, falls back to a
-                        brand-tinted initial tile (same chrome as /team
-                        and /dashboard NameWithAvatar pattern). */}
-                    {manager.profile_photo_url ? (
-                      <div className="w-6 h-6 rounded-full overflow-hidden border border-cream-200 shrink-0 bg-white">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={manager.profile_photo_url}
-                          alt={manager.name || manager.email || 'Account lead'}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center text-[10px] font-semibold shrink-0">
-                        {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <span className="truncate">{manager.name || manager.email}</span>
-                  </div>
-                ) : (
-                  <span className="text-ink-warm-400 italic">Unassigned</span>
-                )}
-              </KV>
-            </div>
-          )}
-          {/* Progress bar + description — only in view mode (edit
-              form handles dates + description with inputs). */}
-          {editingCard !== 'engagement' && startDate && endDate && (
-            <div className="mt-6 pt-5 border-t border-cream-200">
-              <div className="flex items-baseline justify-between mb-2.5">
-                <span className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">Campaign progress</span>
-                <span className="text-xs text-ink-warm-900 mono tabular-nums font-medium">
-                  Week <span className="font-semibold">{currentWeek}</span> of {totalWeeks}
-                </span>
-              </div>
-              <div className="h-[3px] bg-cream-200 rounded-full overflow-hidden">
-                <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: `${progressPct}%` }} />
-              </div>
-              <div className="flex justify-between mt-2">
-                <span className="text-[10px] text-ink-warm-400 mono uppercase tracking-[0.1em]">{formatDate(campaign.start_date)}</span>
-                <span className="text-[10px] text-ink-warm-400 mono uppercase tracking-[0.1em]">{formatDate(campaign.end_date)}</span>
-              </div>
-            </div>
-          )}
-          {editingCard !== 'engagement' && campaign.description && (
-            <div className="mt-6 pt-5 border-t border-cream-200">
-              <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Description</div>
-              <p className="text-sm text-ink-warm-700 leading-relaxed whitespace-pre-line">{campaign.description}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Resources card — colored icon tile per resource, editable
-            in place. Mockup pattern: 2-column grid of link rows with
-            36px icon tile + label + truncated URL underneath. */}
-        <ResourcesCard resources={resources} onChange={onResourcesChange} />
-
-        {/* Budget + Approved Access — paired side-by-side in a 2-col
-            sub-grid so the dense Approved Access chip list sits
-            alongside the Budget summary instead of stacking below
-            (mockup pattern: secondary cards side-by-side under the
-            primary cards). Both cards still stack vertically on
-            screens narrower than md. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Budget card — total + per-region allocations + progress
-            bar showing how much has been paid out. Per-card Edit
-            affordance links into the Budget tab where the full
-            editor lives (we don't duplicate the allocation editor
-            inline — it's complex and lives elsewhere). */}
-        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Budget</h3>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
-                {campaign.total_budget > 0
-                  ? `${Math.round((totalPaid / campaign.total_budget) * 100)}% paid`
-                  : 'Not set'}
+       What got removed and why:
+         - Engagement editor card → all dates / lead / status edits go
+           through the Edit Campaign dialog (single source of truth).
+         - Budget card → the Budget tab does this better.
+         - Approved Access editor → already on Edit Client dialog.
+         - Renewal Alert card → dashboard already shows it via the same
+           coverage_tone the hero pill uses.
+         - "Coming soon" recent-activity placeholder → real data now. */
+    <div className="space-y-5">
+      {/* ── Hero band ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-[14px] border border-cream-200 shadow-card px-5 py-4 flex items-center gap-3 flex-wrap">
+        <p className="text-base font-semibold text-ink-warm-900 truncate">{campaign.name || 'Untitled campaign'}</p>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusPill.bg} ${statusPill.text}`}>
+          {campaign.status || 'Planning'}
+        </span>
+        {covPill && coverage?.covered_through && coverage?.days_left != null && (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${covPill.bg} ${covPill.text} ${covPill.border}`}>
+            <CircleDot className="h-3 w-3" />
+            Covered through {formatDate(coverage.covered_through)} · {coverage.days_left}d
+          </span>
+        )}
+        {manager && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-ink-warm-700">
+            {manager.profile_photo_url ? (
+              <span className="w-5 h-5 rounded-full overflow-hidden border border-cream-200 bg-white shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={manager.profile_photo_url} alt={manager.name || 'Lead'} className="w-full h-full object-cover" />
               </span>
-              {editingCard === 'budget' ? null : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditingCard('budget')}
-                  className="h-7 px-2 text-xs font-medium text-brand-deep hover:bg-cream-50"
-                >
-                  <Edit className="w-3 h-3 mr-1" />
-                  Edit
-                </Button>
-              )}
-            </div>
-          </div>
-          {editingCard === 'budget' ? (
-            <BudgetEditForm
-              campaign={campaign}
-              setCampaign={setCampaign}
-              onDone={() => setEditingCard(null)}
-            />
-          ) : (
-            <div className="grid grid-cols-3 gap-x-6 gap-y-5">
-              <KV label="Total"><span className="mono tabular-nums">{formatCurrency(campaign.total_budget || 0)}</span></KV>
-              <KV label="Paid"><span className="mono tabular-nums text-emerald-700">{formatCurrency(totalPaid)}</span></KV>
-              <KV label="Remaining"><span className="mono tabular-nums">{formatCurrency(Math.max(0, (campaign.total_budget || 0) - totalPaid))}</span></KV>
-            </div>
-          )}
-          {/* Paid progress bar — emerald to read as "good news" */}
-          {campaign.total_budget > 0 && (
-            <div className="mt-5 pt-5 border-t border-cream-200">
-              <div className="h-[3px] bg-cream-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (totalPaid / campaign.total_budget) * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-          {/* Budget types + per-region allocations. Budget types
-              are campaign-level (Token / Fiat / WL chips); region
-              allocations are per-row with currency-formatted amounts.
-              Tone palette by budget type:
-                Token → brand-soft (default)
-                Fiat → emerald (real money)
-                WL → purple (whitelist allocation) */}
-          {(((campaign as any).budget_type && (campaign as any).budget_type.length > 0) || (allocations && allocations.length > 0)) && (
-            <div className="mt-5 pt-5 border-t border-cream-200 space-y-4">
-              {(campaign as any).budget_type && (campaign as any).budget_type.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Budget types</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {((campaign as any).budget_type as string[]).map((bt) => {
-                      const lower = bt.toLowerCase();
-                      const cls = lower === 'fiat'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        : lower === 'wl' || lower === 'whitelist'
-                          ? 'bg-purple-50 text-purple-700 border-purple-100'
-                          : 'bg-brand-soft text-brand-deep border-brand-light';
-                      return (
-                        <span
-                          key={bt}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs border ${cls}`}
-                        >
-                          {bt}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {allocations && allocations.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">By region</div>
-                  <div className="space-y-2">
-                    {allocations.map((alloc, idx) => {
-                      // Same region-formatting rules as the Region
-                      // cell above: APAC/EMEA/MENA all-caps, Global
-                      // title-case, others title-case.
-                      const r = (alloc.region || 'Unknown') as string;
-                      const lower = r.toLowerCase();
-                      const display = lower === 'apac' ? 'APAC'
-                        : lower === 'emea' ? 'EMEA'
-                        : lower === 'mena' ? 'MENA'
-                        : lower === 'global' ? 'Global'
-                        : r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
-                      const amt = parseFloat(alloc.allocated_budget || '0') || 0;
-                      const pct = (campaign.total_budget || 0) > 0
-                        ? Math.round((amt / campaign.total_budget) * 100)
-                        : null;
-                      return (
-                        <div key={idx} className="text-sm">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <Globe className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
-                              <span className="text-ink-warm-700 font-medium">{display}</span>
-                              {pct != null && (
-                                <span className="text-[10px] text-ink-warm-400 mono tabular-nums">{pct}%</span>
-                              )}
-                            </div>
-                            <span className="mono tabular-nums text-ink-warm-900 font-medium">
-                              {formatCurrency(amt)}
-                            </span>
-                          </div>
-                          {/* Per-region progress bar — same brand
-                              hue as the campaign progress bar above. */}
-                          {pct != null && (
-                            <div className="h-[2px] bg-cream-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-brand rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, pct)}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            ) : (
+              <span className="w-5 h-5 rounded-full bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center text-[9px] font-semibold shrink-0">
+                {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="truncate max-w-[140px]">{manager.name || manager.email}</span>
+          </span>
+        )}
+        {onEditClick && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEditClick}
+            className="ml-auto h-8 text-xs font-medium"
+          >
+            <Edit className="h-3.5 w-3.5 mr-1.5" />
+            Edit campaign
+          </Button>
+        )}
+      </div>
 
-        {/* Approved Access card — emails + domains allowed to access
-            the public campaign view (in addition to the client email
-            and same-domain users). Inline Add affordances for both
-            email and domain entries; per-chip Remove on hover. */}
-        <ApprovedAccessCard
-          campaign={campaign}
-          setCampaign={setCampaign}
-          isEditing={editingCard === 'approved'}
-          onStartEdit={() => setEditingCard('approved')}
-          onDone={() => setEditingCard(null)}
-        />
+      {/* ── KPI strip ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-cream-50/60 border border-cream-200 rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">KOLs</p>
+          <p className="mt-1.5 text-2xl font-bold text-ink-warm-900 tabular-nums">{campaignKOLs.length}</p>
+        </div>
+        <div className="bg-cream-50/60 border border-cream-200 rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">Content</p>
+          <p className="mt-1.5 text-2xl font-bold text-ink-warm-900 tabular-nums">
+            {postedContentCount}<span className="text-base text-ink-warm-400"> / {totalContentCount}</span>
+          </p>
+        </div>
+        <div className="bg-cream-50/60 border border-cream-200 rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">Budget</p>
+          <p className="mt-1.5 text-2xl font-bold text-ink-warm-900 tabular-nums">
+            {formatCurrency(totalPaid)}<span className="text-base text-ink-warm-400"> / {formatCurrency(campaign.total_budget || 0)}</span>
+          </p>
+        </div>
+        <div className="bg-cream-50/60 border border-cream-200 rounded-xl p-4">
+          <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">Days left</p>
+          <p className={`mt-1.5 text-2xl font-bold tabular-nums ${daysRemaining != null && daysRemaining <= 14 ? 'text-rose-700' : 'text-ink-warm-900'}`}>
+            {daysRemaining ?? '—'}
+          </p>
         </div>
       </div>
 
-      {/* ── Sidebar column ───────────────────────────────────────── */}
-      <div className="space-y-5">
+      {/* ── Two-column body ──────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-5">
+          <ResourcesCard resources={resources} onChange={onResourcesChange} />
 
-        {/* Quick stats — matches mockup's Live dot + KV list pattern */}
-        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Quick stats</h3>
-            <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-semibold uppercase tracking-[0.2em]">
-              <span className="dot-pulse bg-emerald-500" aria-hidden />
-              Live
-            </span>
-          </div>
-          <div className="space-y-3.5">
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm text-ink-warm-500">KOLs</span>
-              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
-                {campaignKOLs.length}
-              </span>
+          {/* Recent activity — real client_activity_log rows for this
+              campaign's client. Empty state when no rows. */}
+          <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Recent activity</h3>
+              {client && (
+                <Link
+                  href={`/clients?contextModalClientId=${client.id}&tab=engagement`}
+                  className="text-xs text-ink-warm-500 hover:text-brand-deep inline-flex items-center gap-1"
+                >
+                  View all <ArrowRight className="h-3 w-3" />
+                </Link>
+              )}
             </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm text-ink-warm-500">Content {totalContentCount > 0 && <span className="text-[10px] text-ink-warm-400 mono">live</span>}</span>
-              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
-                {postedContentCount}
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm text-ink-warm-500">Paid</span>
-              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
-                {formatCurrency(totalPaid)}
-              </span>
-            </div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm text-ink-warm-500">Total budget</span>
-              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
-                {formatCurrency(campaign.total_budget || 0)}
-              </span>
-            </div>
-            {daysRemaining != null && (
-              <div className="flex justify-between items-baseline">
-                <span className="text-sm text-ink-warm-500">Days left</span>
-                <span className={`flex items-center gap-1.5`}>
-                  {daysRemaining <= 14 && <span className="dot bg-rose-500" aria-hidden />}
-                  <span className={`text-lg mono tabular-nums font-medium ${daysRemaining <= 14 ? 'text-rose-700' : 'text-ink-warm-900'}`} style={{ letterSpacing: '-0.025em' }}>
-                    {daysRemaining}
-                  </span>
-                </span>
-              </div>
+            {activity.length === 0 ? (
+              <p className="text-sm text-ink-warm-500 italic">No recent activity for this client.</p>
+            ) : (
+              <ul className="space-y-3">
+                {activity.map((row) => {
+                  const meta = ACTIVITY_ICON[row.activity_category] || ACTIVITY_ICON.edit;
+                  const Icon = meta.icon;
+                  return (
+                    <li key={row.id} className="flex items-center gap-3">
+                      <Icon className={`h-4 w-4 flex-shrink-0 ${meta.tone}`} />
+                      <span className="text-sm text-ink-warm-800 flex-1 truncate">{row.title}</span>
+                      <span className="text-xs text-ink-warm-400 mono whitespace-nowrap">{formatRelative(row.created_at)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </div>
 
-        {/* Renewal action card — brand-tinted, shown when end < 60d */}
-        {showRenewalCard && (
-          <div className="crd-feature p-6">
-            <div className="flex items-center gap-1.5 mb-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-brand-deep">
-              <span className="dot bg-brand" aria-hidden />
-              <span>Action needed</span>
-            </div>
-            <h3 className="display-serif text-[20px] leading-[1.1] text-ink-warm-900">
-              Renewal in{' '}
-              <span className="display-serif-italic text-brand">{daysRemaining} days.</span>
-            </h3>
-            <p className="text-[13px] leading-relaxed mt-3 mb-5 text-ink-warm-700">
-              Engagement ends <span className="font-medium mono text-ink-warm-900">{formatDate(campaign.end_date)}</span>.
-              Worth opening the renewal conversation now while momentum is high.
-            </p>
-            <Button variant="brand" size="sm" className="w-full">
-              Schedule check-in
-              <ChevronRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
+        {/* ── Linked Client (right column) ─────────────────────────── */}
+        <div>
+          <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+            <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">Linked client</p>
+            {client ? (
+              <>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center text-xs font-semibold shrink-0">
+                    {client.name.charAt(0).toUpperCase()}
+                  </div>
+                  <p className="text-sm font-semibold text-ink-warm-900 truncate">{client.name}</p>
+                </div>
+                {clientScope && (
+                  <>
+                    <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5">Scope</p>
+                    <p className="text-sm text-ink-warm-700 mb-4 line-clamp-3 leading-relaxed">{clientScope}</p>
+                  </>
+                )}
+                {coverage?.covered_through && (
+                  <>
+                    <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5">Coverage</p>
+                    <p className="text-sm text-ink-warm-700 mb-4">
+                      Covered through {formatDate(coverage.covered_through)}
+                      {coverage.days_left != null && (
+                        <span className="text-ink-warm-500"> · {coverage.days_left}d left</span>
+                      )}
+                    </p>
+                  </>
+                )}
+                <Button asChild variant="outline" size="sm" className="w-full text-xs">
+                  <Link href={`/clients?contextModalClientId=${client.id}&tab=engagement`}>
+                    Open client context
+                    <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <p className="text-sm text-ink-warm-500 italic">No client linked.</p>
+            )}
           </div>
-        )}
-
-        {/* Recent activity — placeholder for now; will wire to a
-            campaign_events query in a follow-up. */}
-        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Recent activity</h3>
-            <span className="text-[10px] text-ink-warm-400 mono uppercase tracking-[0.2em]">Coming soon</span>
-          </div>
-          <p className="text-sm text-ink-warm-500 italic">
-            Campaign event feed (KOL adds, content posts, payments) will surface here.
-          </p>
         </div>
       </div>
     </div>
   );
 }
+
 
 /* ── ResourcesCard ────────────────────────────────────────────────────
    In-place editable list of campaign resources. Matches the mockup's

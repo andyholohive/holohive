@@ -1027,8 +1027,8 @@ export default function NetworkPage() {
           icon={Handshake}
           title="Network"
           subtitle="Manage your partners and affiliates"
-          kicker="CRM · Network"
-          kickerDot="brand"
+          kicker="Sales / CRM · Network"
+          kickerDot="violet"
           actions={(
             <>
               <Skeleton className="h-10 w-64" />
@@ -1073,8 +1073,8 @@ export default function NetworkPage() {
         icon={Handshake}
         title="Network"
         subtitle="Manage your partners and affiliates"
-        kicker="CRM · Network"
-        kickerDot="brand"
+        kicker="Sales / CRM · Network"
+        kickerDot="violet"
         actions={(
           <>
             <div className="relative">

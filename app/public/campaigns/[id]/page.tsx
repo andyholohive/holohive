@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { getCampaignWeek, getTotalCampaignWeeks } from '@/lib/campaignWeekHelpers';
 import { createClient } from '@supabase/supabase-js';
 import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1250,17 +1251,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             line, standalone Metrics block (budget-per-region). Each
             of those was either duplicated on the portal or noisy. */}
         {(() => {
-          // Week math — identical to the portal hero so the two
-          // experiences read in sync.
+          // Week math — single source of truth in lib/campaignWeekHelpers.ts.
+          // Week 1 anchored to the first Monday on/after start_date.
           const startMs = campaign.start_date ? new Date(`${campaign.start_date}T00:00:00`).getTime() : null;
           const endMs = campaign.end_date ? new Date(`${campaign.end_date}T00:00:00`).getTime() : null;
           const todayMs = Date.now();
           let weekN = 0, weekOf = 0, progressPct = 0;
           if (startMs && endMs && endMs > startMs) {
-            const elapsedDays = Math.max(0, Math.floor((todayMs - startMs) / 86_400_000));
-            const totalDays = Math.max(1, Math.ceil((endMs - startMs) / 86_400_000));
-            weekN = Math.min(Math.ceil(elapsedDays / 7), Math.ceil(totalDays / 7));
-            weekOf = Math.ceil(totalDays / 7);
+            const week = getCampaignWeek(campaign.start_date);
+            weekOf = getTotalCampaignWeeks(campaign.start_date, campaign.end_date);
+            weekN = week ? Math.min(weekOf, week.weekNumber) : 0;
             progressPct = Math.max(0, Math.min(1, (todayMs - startMs) / (endMs - startMs)));
           }
           const initial = (campaign.client_name || campaign.name || 'C').trim().charAt(0).toUpperCase();

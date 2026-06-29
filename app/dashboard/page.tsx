@@ -93,8 +93,8 @@ export default function DashboardPage() {
         icon={Activity}
         title="Team Dashboard"
         subtitle="Real-time view of what's happening, what's at risk, and what's next."
-        kicker="Operations · Live"
-        kickerDot="brand"
+        kicker="Pinned · Dashboard"
+        kickerDot="amber"
         actions={<MondayFormChip />}
       />
 

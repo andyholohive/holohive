@@ -1635,8 +1635,8 @@ export default function KOLsPage() {
         <PageHeader
           title="KOLs"
           subtitle="Manage your Key Opinion Leaders"
-          kicker="Talent · KOLs"
-          kickerDot="amber"
+          kicker="KOLs"
+          kickerDot="violet"
           actions={
             <Button variant="brand" disabled>
               <Plus className="h-4 w-4 mr-2" />
@@ -1684,7 +1684,7 @@ export default function KOLsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="KOLs" subtitle="Manage your Key Opinion Leaders" kicker="Talent · KOLs" kickerDot="amber" />
+        <PageHeader title="KOLs" subtitle="Manage your Key Opinion Leaders" kicker="KOLs" kickerDot="violet" />
         <div className="text-center py-8">
           <p className="text-rose-600">{error}</p>
           <Button onClick={fetchKOLs} className="mt-4">Retry</Button>
@@ -1698,8 +1698,8 @@ export default function KOLsPage() {
       <PageHeader
         title="KOLs"
         subtitle="Manage your Key Opinion Leaders"
-        kicker="Talent · KOLs"
-        kickerDot="amber"
+        kicker="KOLs"
+        kickerDot="violet"
         actions={
           <div className="flex items-center gap-2">
             {userProfile?.role === 'super_admin' && (

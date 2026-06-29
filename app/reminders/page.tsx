@@ -541,8 +541,8 @@ export default function RemindersPage() {
           icon={Bell}
           title="Reminders"
           subtitle="Automated Telegram reminders for your team"
-          kicker="Workspace · Reminders"
-          kickerDot="brand"
+          kicker="Logistics · Reminders"
+          kickerDot="sky"
           actions={(
             <Button variant="brand" disabled>
               <Plus className="h-4 w-4 mr-2" />
@@ -600,8 +600,8 @@ export default function RemindersPage() {
         icon={Bell}
         title="Reminders"
         subtitle="Automated Telegram reminders for your team"
-        kicker="Workspace · Reminders"
-        kickerDot="brand"
+        kicker="Logistics · Reminders"
+        kickerDot="sky"
         actions={(
           <Button variant="brand" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />

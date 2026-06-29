@@ -98,9 +98,22 @@ const EMPTY_PAYMENT_ROW: PerPaymentRow = {
   notes: '',
 };
 
+// [2026-06-23] Widened to include 'activation' + 'prize_pool' so the
+// Budget Dashboard's Activation tile can read non-zero. Prior to this,
+// every Other-Expense write defaulted to 'other' and totals.activation
+// was structurally pinned at $0 (BudgetDashboardV2.tsx:67).
+type NonKolCategory = 'activation' | 'prize_pool' | 'operational' | 'other';
+
+const NON_KOL_CATEGORY_OPTIONS: { value: NonKolCategory; label: string }[] = [
+  { value: 'activation',  label: 'Activation' },
+  { value: 'prize_pool',  label: 'Prize Pool' },
+  { value: 'operational', label: 'Operational' },
+  { value: 'other',       label: 'Other' },
+];
+
 const DEFAULT_NON_KOL_PAYMENT = {
   recipient_name: '',
-  payment_category: 'other' as 'operational' | 'other',
+  payment_category: 'other' as NonKolCategory,
   amount: 0,
   payment_date: '',
   payment_method: 'Fiat',
@@ -663,6 +676,26 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
                 onChange={(e) => setNonKOLPayment(prev => ({ ...prev, recipient_name: e.target.value }))}
                 className="focus-brand"
               />
+            </div>
+
+            {/* Category — drives which Budget Dashboard tile this rolls
+                up under: 'activation' + 'prize_pool' → Activation tile,
+                'operational' + 'other' → Expenses tile. */}
+            <div className="grid gap-2">
+              <Label>Category</Label>
+              <Select
+                value={nonKOLPayment.payment_category}
+                onValueChange={(value) => setNonKOLPayment(prev => ({ ...prev, payment_category: value as NonKolCategory }))}
+              >
+                <SelectTrigger className="focus-brand">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {NON_KOL_CATEGORY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

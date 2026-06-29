@@ -85,8 +85,8 @@ export default function IntelligencePage() {
         icon={Radar}
         title="Intelligence"
         subtitle="Prospect discovery and Korean exchange listings"
-        kicker="CRM · Intelligence"
-        kickerDot="brand"
+        kicker="Sales / CRM · Intelligence"
+        kickerDot="violet"
         actions={(
           <>
             {/* Schedule, Alerts, Cost — same chip shape (label + value,

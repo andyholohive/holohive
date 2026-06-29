@@ -20,12 +20,14 @@
  * `type = content` only. Prize pool + internal stay out of the math.
  */
 
-import { useMemo } from 'react';
-import { DollarSign, TrendingUp, Activity, Receipt, Wallet, Eye, Heart, FileText, Gauge, Trophy } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, DollarSign, TrendingUp, Activity, Receipt, Wallet, Eye, Heart, FileText, Gauge, Trophy } from 'lucide-react';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/dateFormat';
 
 function fmtMoney(n: number): string {
   if (!Number.isFinite(n)) return '$0';
@@ -37,10 +39,68 @@ function fmtPct(n: number): string {
   return `${Math.round(n)}%`;
 }
 
+/** Per Andy 2026-06-25: secondary sections (efficiency tiles, portfolio
+ *  benchmark, phase 2, rollover summary) collapse by default so the
+ *  Budget tab opens to the spend strip only. CMs expand what they
+ *  need. State is per-session — no localStorage persistence yet. */
+type CollapsibleId = 'efficiency' | 'portfolio' | 'phase2' | 'rollover';
+
+function SectionHeader({
+  id,
+  title,
+  subtitle,
+  expanded,
+  onToggle,
+}: {
+  id: CollapsibleId;
+  title: string;
+  subtitle?: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const Icon = expanded ? ChevronDown : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-controls={`budget-section-${id}`}
+      className="w-full flex items-center gap-2 px-1 py-1.5 text-left rounded hover:bg-cream-50 transition-colors"
+    >
+      <Icon className="h-4 w-4 text-ink-warm-400 flex-shrink-0" />
+      <span className="text-sm font-semibold text-ink-warm-900">{title}</span>
+      {subtitle && (
+        <span className="text-xs text-ink-warm-500 truncate">· {subtitle}</span>
+      )}
+    </button>
+  );
+}
+
+type StintRollover = {
+  id: string;
+  label: string;
+  status: 'active' | 'ended';
+  allocated: number;
+  spent: number;
+  /** Only populated when the stint has ended; null for active stints. */
+  rolledOver: number | null;
+  rolloverPct: number | null;
+};
+
 export function BudgetDashboardV2() {
   const { campaign, campaignKOLs, payments } = useCampaignDetail();
   const { userProfile } = useAuth();
   const isAdminOrOwner = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
+
+  // Collapsible state. Default = all closed except the top spend strip
+  // (which sits above any collapsible).
+  const [openSections, setOpenSections] = useState<Set<CollapsibleId>>(new Set());
+  const toggleSection = (id: CollapsibleId) => setOpenSections((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
 
   /** Type-segmented spend totals from payments. Per spec: every tile
    *  filters on Content only; Community Activation + Expenses stay out
@@ -128,6 +188,87 @@ export function BudgetDashboardV2() {
     return { pctSpent, pctElapsed, gap: pctSpent - pctElapsed };
   }, [campaign, totalBudget, totals]);
 
+  // ── Rollover Summary, by stint ────────────────────────────────────
+  // [2026-06-25] Per Andy: rows are stints, not segments. For each
+  // stint we sum `client_engagement_periods.amount` as the allocated
+  // budget and match the campaign's payments by `payment_date` falling
+  // inside the stint window (start_date → end_date inclusive). Ended
+  // stints get a "rolled over" column = allocated − spent; active stints
+  // show "—" since rollover only crystallises at term close.
+  const clientId = (campaign as any)?.client_id as string | null;
+  const [stintRollover, setStintRollover] = useState<StintRollover[] | null>(null);
+  useEffect(() => {
+    if (!clientId) { setStintRollover([]); return; }
+    let cancelled = false;
+    (async () => {
+      const [stintsRes, periodsRes] = await Promise.all([
+        (supabase as any)
+          .from('client_stints')
+          .select('id,start_date,end_date,status')
+          .eq('client_id', clientId)
+          .order('start_date', { ascending: true }),
+        (supabase as any)
+          .from('client_engagement_periods')
+          .select('stint_id,amount,start_date,end_date')
+          .order('start_date', { ascending: true }),
+      ]);
+      if (cancelled) return;
+      const stints = (stintsRes.data ?? []) as Array<{
+        id: string;
+        start_date: string;
+        end_date: string | null;
+        status: string;
+      }>;
+      const periods = (periodsRes.data ?? []) as Array<{
+        stint_id: string;
+        amount: number | null;
+      }>;
+      const allocByStint = new Map<string, number>();
+      for (const p of periods) {
+        const v = Number(p.amount ?? 0);
+        allocByStint.set(p.stint_id, (allocByStint.get(p.stint_id) ?? 0) + v);
+      }
+      // Bucket this campaign's payments by stint via payment_date.
+      const pmts = (payments ?? []) as Array<{ amount?: number; payment_date?: string | null }>;
+      const spentByStint = new Map<string, number>();
+      for (const stint of stints) {
+        const start = new Date(stint.start_date + 'T00:00:00');
+        const end = stint.end_date
+          ? new Date(stint.end_date + 'T23:59:59')
+          : new Date('9999-12-31T00:00:00');
+        let total = 0;
+        for (const p of pmts) {
+          if (!p.payment_date) continue;
+          const d = new Date(p.payment_date + (p.payment_date.includes('T') ? '' : 'T12:00:00'));
+          if (d >= start && d <= end) total += Number(p.amount ?? 0);
+        }
+        spentByStint.set(stint.id, total);
+      }
+      const rows: StintRollover[] = stints.map((s, idx) => {
+        const allocated = allocByStint.get(s.id) ?? 0;
+        const spent = spentByStint.get(s.id) ?? 0;
+        const status: 'active' | 'ended' = s.status === 'ended' ? 'ended' : 'active';
+        const rolledOver = status === 'ended' ? allocated - spent : null;
+        const rolloverPct =
+          status === 'ended' && allocated > 0
+            ? Math.round((rolledOver as number) / allocated * 100)
+            : null;
+        const range = `${formatDate(s.start_date)} → ${s.end_date ? formatDate(s.end_date) : 'Ongoing'}`;
+        return {
+          id: s.id,
+          label: `Stint ${idx + 1} · ${range}`,
+          status,
+          allocated,
+          spent,
+          rolledOver,
+          rolloverPct,
+        };
+      });
+      setStintRollover(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [clientId, payments]);
+
   if (!campaign) return null;
 
   return (
@@ -173,115 +314,176 @@ export function BudgetDashboardV2() {
         />
       </div>
 
-      {/* ── Efficiency tile grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          icon={Eye}
-          label="CPM"
-          value={contentMetrics.cpm !== null ? fmtMoney(contentMetrics.cpm) : '—'}
-          sub={`per 1,000 views · ${contentMetrics.totalViews.toLocaleString()} views`}
-          accent="sky"
+      {/* ── Efficiency metrics (collapsed by default) ────────────────
+          CPM · CPE · Cost per content piece · Burn vs Pace. Grouped
+          because they share a single mental model ("is the spend
+          efficient?"). Expanding shows all four KPIs at once. */}
+      <div>
+        <SectionHeader
+          id="efficiency"
+          title="Efficiency Metrics"
+          subtitle="CPM · CPE · Cost per piece · Burn vs Pace"
+          expanded={openSections.has('efficiency')}
+          onToggle={() => toggleSection('efficiency')}
         />
-        <KpiCard
-          icon={Heart}
-          label="CPE"
-          value={contentMetrics.cpe !== null ? `$${contentMetrics.cpe.toFixed(2)}` : '—'}
-          sub={`per engagement · ${contentMetrics.engagementSum.toLocaleString()} eng`}
-          accent="rose"
-        />
-        <KpiCard
-          icon={FileText}
-          label="Cost per content piece"
-          value={contentMetrics.costPerPiece !== null ? fmtMoney(contentMetrics.costPerPiece) : '—'}
-          sub={`blended · ${contentMetrics.contentCount} pieces`}
-          accent="brand"
-        />
-        <KpiCard
-          icon={Gauge}
-          label="Burn vs Pace"
-          value={burn ? `${fmtPct(burn.pctSpent)} / ${fmtPct(burn.pctElapsed)}` : '—'}
-          sub={
-            burn
-              ? burn.gap > 5 ? `Running hot (+${Math.round(burn.gap)}%)`
-              : burn.gap < -5 ? `Under (${Math.round(burn.gap)}%)`
-              : 'On pace'
-              : 'No timeline'
-          }
-          accent={burn && burn.gap > 5 ? 'rose' : burn && burn.gap < -5 ? 'amber' : 'emerald'}
-        />
+        {openSections.has('efficiency') && (
+          <div id="budget-section-efficiency" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
+            <KpiCard
+              icon={Eye}
+              label="CPM"
+              value={contentMetrics.cpm !== null ? fmtMoney(contentMetrics.cpm) : '—'}
+              sub={`per 1,000 views · ${contentMetrics.totalViews.toLocaleString()} views`}
+              accent="sky"
+            />
+            <KpiCard
+              icon={Heart}
+              label="CPE"
+              value={contentMetrics.cpe !== null ? `$${contentMetrics.cpe.toFixed(2)}` : '—'}
+              sub={`per engagement · ${contentMetrics.engagementSum.toLocaleString()} eng`}
+              accent="rose"
+            />
+            <KpiCard
+              icon={FileText}
+              label="Cost per content piece"
+              value={contentMetrics.costPerPiece !== null ? fmtMoney(contentMetrics.costPerPiece) : '—'}
+              sub={`blended · ${contentMetrics.contentCount} pieces`}
+              accent="brand"
+            />
+            <KpiCard
+              icon={Gauge}
+              label="Burn vs Pace"
+              value={burn ? `${fmtPct(burn.pctSpent)} / ${fmtPct(burn.pctElapsed)}` : '—'}
+              sub={
+                burn
+                  ? burn.gap > 5 ? `Running hot (+${Math.round(burn.gap)}%)`
+                  : burn.gap < -5 ? `Under (${Math.round(burn.gap)}%)`
+                  : 'On pace'
+                  : 'No timeline'
+              }
+              accent={burn && burn.gap > 5 ? 'rose' : burn && burn.gap < -5 ? 'amber' : 'emerald'}
+            />
+          </div>
+        )}
       </div>
 
-      {/* ── Portfolio benchmark · placeholder until backfill exists ── */}
-      <Card className="border-cream-200 border-dashed">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <Trophy className="h-5 w-5 text-brand" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-ink-warm-900">Portfolio Benchmark</p>
-              <p className="text-xs text-ink-warm-500 italic">
-                Renders &quot;$X vs HH avg $Y, top quartile&quot; under CPM + CPE — pending historical CPM/CPE backfill across past campaigns.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Phase 2 funnel placeholder ── */}
-      <Card className="border-cream-200 border-dashed">
-        <CardContent className="p-4">
-          <p className="text-sm font-semibold text-ink-warm-900 mb-2">Phase 2 · Spend Funnel</p>
-          <p className="text-xs text-ink-warm-500 italic mb-3">
-            Pending activation data: Spend → Clicks → Sign-ups → Wallet connects → Volume
-          </p>
-          <div className="grid grid-cols-5 gap-1">
-            {['Spend', 'Clicks', 'Sign-ups', 'Wallets', 'Volume'].map(label => (
-              <div key={label} className="bg-cream-100 rounded p-2 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">{label}</p>
-                <p className="text-xs text-ink-warm-400 font-mono">—</p>
+      {/* ── Portfolio Benchmark (collapsed by default) ──────────────── */}
+      <div>
+        <SectionHeader
+          id="portfolio"
+          title="Portfolio Benchmark"
+          subtitle="Pending historical CPM/CPE backfill"
+          expanded={openSections.has('portfolio')}
+          onToggle={() => toggleSection('portfolio')}
+        />
+        {openSections.has('portfolio') && (
+          <Card id="budget-section-portfolio" className="border-cream-200 border-dashed mt-2">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Trophy className="h-5 w-5 text-brand" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-ink-warm-900">Portfolio Benchmark</p>
+                  <p className="text-xs text-ink-warm-500 italic">
+                    Renders &quot;$X vs HH avg $Y, top quartile&quot; under CPM + CPE — pending historical CPM/CPE backfill across past campaigns.
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-      {/* ── Rollover Summary · gated on Term records ── */}
-      <Card className="border-cream-200">
-        <CardContent className="p-4">
-          <p className="text-sm font-semibold text-ink-warm-900 mb-2">Rollover Summary</p>
-          <p className="text-[11px] text-ink-warm-500 italic mb-3">
-            Per-segment view of allocated vs spent vs rolled forward at most recent renewal. Mid-term shows Remaining; rollover only computed at term close.
-          </p>
-          <div className="overflow-x-auto">
-            <table className="text-xs w-full">
-              <thead className="border-b border-cream-100">
-                <tr className="text-left text-ink-warm-500">
-                  <th className="py-1.5 pr-3 font-medium">Segment</th>
-                  <th className="py-1.5 pr-3 font-medium text-right">Allocated</th>
-                  <th className="py-1.5 pr-3 font-medium text-right">Spent</th>
-                  <th className="py-1.5 pr-3 font-medium text-right">Rolled over</th>
-                  <th className="py-1.5 font-medium text-right">Rollover %</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono">
-                {[
-                  ['Content', null, totals.content, null, null],
-                  ['Activation', null, totals.activation, null, null],
-                  ['Expenses', null, totals.internal, null, null],
-                  ['Total', totalBudget, totals.content + totals.activation + totals.internal, null, null],
-                ].map(([label, alloc, spent, rolled, pct]) => (
-                  <tr key={label as string} className="border-b border-cream-50">
-                    <td className="py-1.5 pr-3 font-sans">{label as string}</td>
-                    <td className="py-1.5 pr-3 text-right">{alloc !== null ? fmtMoney(alloc as number) : '—'}</td>
-                    <td className="py-1.5 pr-3 text-right">{fmtMoney(spent as number)}</td>
-                    <td className="py-1.5 pr-3 text-right text-ink-warm-400">{rolled !== null ? fmtMoney(rolled as number) : '—'}</td>
-                    <td className="py-1.5 text-right text-ink-warm-400">{pct !== null ? `${pct}%` : '—'}</td>
-                  </tr>
+      {/* ── Phase 2 funnel (collapsed by default) ──────────────────── */}
+      <div>
+        <SectionHeader
+          id="phase2"
+          title="Phase 2 · Spend Funnel"
+          subtitle="Spend → Clicks → Sign-ups → Wallets → Volume"
+          expanded={openSections.has('phase2')}
+          onToggle={() => toggleSection('phase2')}
+        />
+        {openSections.has('phase2') && (
+          <Card id="budget-section-phase2" className="border-cream-200 border-dashed mt-2">
+            <CardContent className="p-4">
+              <p className="text-xs text-ink-warm-500 italic mb-3">
+                Pending activation data: Spend → Clicks → Sign-ups → Wallet connects → Volume
+              </p>
+              <div className="grid grid-cols-5 gap-1">
+                {['Spend', 'Clicks', 'Sign-ups', 'Wallets', 'Volume'].map(label => (
+                  <div key={label} className="bg-cream-100 rounded p-2 text-center">
+                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">{label}</p>
+                    <p className="text-xs text-ink-warm-400 font-mono">—</p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* ── Rollover Summary by stint (collapsed by default) ─────────
+          [2026-06-25] Per Andy: rows are stints, not segments. Allocated
+          = sum of the stint's client_engagement_periods.amount.
+          Spent   = this campaign's payments with payment_date inside
+                    the stint window.
+          Rollover only computed for ended stints (active = "—" since
+          rollover crystallises at term close). */}
+      <div>
+        <SectionHeader
+          id="rollover"
+          title="Rollover Summary"
+          subtitle={stintRollover && stintRollover.length > 0 ? `${stintRollover.length} stint${stintRollover.length === 1 ? '' : 's'}` : 'No stints'}
+          expanded={openSections.has('rollover')}
+          onToggle={() => toggleSection('rollover')}
+        />
+        {openSections.has('rollover') && (
+          <Card id="budget-section-rollover" className="border-cream-200 mt-2">
+            <CardContent className="p-4">
+              <p className="text-[11px] text-ink-warm-500 italic mb-3">
+                Per-stint view of allocated vs spent vs rolled forward. Allocated = sum of the stint&apos;s periods. Spent = this campaign&apos;s payments inside the stint window. Active stints show &quot;—&quot; for rollover until term close.
+              </p>
+              {stintRollover === null ? (
+                <p className="text-xs text-ink-warm-400 italic">Loading stints…</p>
+              ) : stintRollover.length === 0 ? (
+                <p className="text-xs text-ink-warm-400 italic">No stints recorded for this client. Add one on the client&apos;s Engagement tab.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="text-xs w-full">
+                    <thead className="border-b border-cream-100">
+                      <tr className="text-left text-ink-warm-500">
+                        <th className="py-1.5 pr-3 font-medium">Stint</th>
+                        <th className="py-1.5 pr-3 font-medium text-right">Allocated</th>
+                        <th className="py-1.5 pr-3 font-medium text-right">Spent</th>
+                        <th className="py-1.5 pr-3 font-medium text-right">Rolled over</th>
+                        <th className="py-1.5 font-medium text-right">Rollover %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="font-mono">
+                      {stintRollover.map((row) => (
+                        <tr key={row.id} className="border-b border-cream-50">
+                          <td className="py-1.5 pr-3 font-sans">
+                            {row.label}
+                            {row.status === 'active' && (
+                              <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider bg-brand-soft text-brand-deep">Active</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right">{fmtMoney(row.allocated)}</td>
+                          <td className="py-1.5 pr-3 text-right">{fmtMoney(row.spent)}</td>
+                          <td className="py-1.5 pr-3 text-right text-ink-warm-400">
+                            {row.rolledOver !== null ? fmtMoney(row.rolledOver) : '—'}
+                          </td>
+                          <td className="py-1.5 text-right text-ink-warm-400">
+                            {row.rolloverPct !== null ? `${row.rolloverPct}%` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -148,8 +148,8 @@ export default function ProspectDetailPage({ params }: { params: { id: string } 
           icon={Radar}
           title="Loading prospect…"
           subtitle="Discovered prospect · score / triggers / outreach context"
-          kicker="CRM · Intelligence · Prospect"
-          kickerDot="brand"
+          kicker="Sales / CRM · Intelligence · Prospect"
+          kickerDot="violet"
           actions={<Skeleton className="h-9 w-24" />}
         />
         <div className="flex items-center gap-2 flex-wrap -mt-2">
@@ -187,8 +187,8 @@ export default function ProspectDetailPage({ params }: { params: { id: string } 
           icon={Radar}
           title="Prospect not found"
           subtitle="The prospect you were looking for couldn't be loaded."
-          kicker="CRM · Intelligence · Prospect"
-          kickerDot="brand"
+          kicker="Sales / CRM · Intelligence · Prospect"
+          kickerDot="violet"
         />
         <Card className="border-cream-200">
           <EmptyState
@@ -230,8 +230,8 @@ export default function ProspectDetailPage({ params }: { params: { id: string } 
         icon={Radar}
         title={p.name}
         subtitle="Discovered prospect · score / triggers / outreach context"
-        kicker="CRM · Intelligence · Prospect"
-        kickerDot="brand"
+        kicker="Sales / CRM · Intelligence · Prospect"
+        kickerDot="violet"
         actions={(
           <Button variant="outline" size="sm" onClick={fetchDetail} disabled={loading} className="h-9">
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />

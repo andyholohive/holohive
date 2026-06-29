@@ -118,8 +118,8 @@ export default function WalletsPage() {
         icon={Wallet}
         title="Wallet Analytics"
         subtitle="Cross-campaign wallet participation, retention, and audience overlap."
-        kicker="Documents · Wallet Analytics"
-        kickerDot="brand"
+        kicker="Measurement · Wallet Analytics"
+        kickerDot="emerald"
       />
 
       {/* KPI strip — four headline numbers. */}

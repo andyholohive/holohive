@@ -15,6 +15,10 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  getCampaignWeek,
+  mondayOfCampaignWeek as mondayOfCampaignWeekHelper,
+} from '@/lib/campaignWeekHelpers';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -77,38 +81,45 @@ export type LineupFull = CampaignLineup & {
 
 /**
  * Compute the Monday-anchored ISO date for week N of a campaign.
- * Spec § 4.1: "Weeks calculated from campaign start date." Week 1 =
- * the week containing the campaign start; subsequent weeks start the
- * following Monday.
+ *
+ * [2026-06-23] Behaviour change: Week 1 now anchors to the **first
+ * Monday on or after** start_date (not the Monday containing start).
+ * This aligns lineup weeks across all campaigns regardless of which
+ * day the campaign starts on — per Andy's spec.
+ *
+ * Delegates to lib/campaignWeekHelpers.ts so the math stays in lockstep
+ * with the campaign hero, public portal, and any other week-counter
+ * surfaces. Anything that wants to compute campaign weeks should call
+ * those helpers directly; this function is preserved for the lineup
+ * service's existing callers.
  */
 export function mondayOfCampaignWeek(campaignStartDate: string, weekNumber: number): string {
-  const start = new Date(campaignStartDate + 'T00:00:00Z');
-  // Find the Monday of the week the campaign started.
-  const dayOfWeek = start.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const daysBackToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const week1Monday = new Date(start);
-  week1Monday.setUTCDate(start.getUTCDate() - daysBackToMonday);
-  // Add (weekNumber - 1) weeks.
-  const target = new Date(week1Monday);
-  target.setUTCDate(week1Monday.getUTCDate() + (weekNumber - 1) * 7);
-  return target.toISOString().slice(0, 10);
+  const monday = mondayOfCampaignWeekHelper(campaignStartDate, weekNumber);
+  if (!monday) {
+    // Defensive fallback — preserves the old return shape so callers
+    // don't have to handle null. Returns the input date as-is.
+    return campaignStartDate.slice(0, 10);
+  }
+  // Use local Y-M-D so we return the visible Monday's calendar date,
+  // not a UTC-shifted one.
+  const y = monday.getFullYear();
+  const m = String(monday.getMonth() + 1).padStart(2, '0');
+  const d = String(monday.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /**
  * Compute "what week of the campaign are we in right now?" Used to
- * preselect the current week in the Week Selector (§ 4.1).
- * Returns null if `now` is before the campaign start.
+ * preselect the current week in the Week Selector.
+ *
+ * [2026-06-23] Returns 1 for any date before Week 1's Monday (per
+ * Andy's call: no Week 0 state on already-running campaigns).
+ * Anchored on the first Monday on/after start per
+ * lib/campaignWeekHelpers.ts.
  */
 export function currentWeekNumber(campaignStartDate: string, now = new Date()): number | null {
-  const start = new Date(campaignStartDate + 'T00:00:00Z');
-  // Anchor on the Monday of the campaign-start week.
-  const dayOfWeek = start.getUTCDay();
-  const daysBackToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const week1Monday = new Date(start);
-  week1Monday.setUTCDate(start.getUTCDate() - daysBackToMonday);
-  const diffMs = now.getTime() - week1Monday.getTime();
-  if (diffMs < 0) return null;
-  return Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1;
+  const week = getCampaignWeek(campaignStartDate, now);
+  return week?.weekNumber ?? null;
 }
 
 // ─── Service ────────────────────────────────────────────────────────

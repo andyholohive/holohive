@@ -540,8 +540,8 @@ export default function LinksPage() {
           icon={LinkIcon}
           title="Links"
           subtitle="Manage all your important links"
-          kicker="Documents · Links"
-          kickerDot="brand"
+          kicker="Resources · Links"
+          kickerDot="amber"
           actions={<Skeleton className="h-10 w-32" />}
         />
         {/* SectionHeader skeleton — matches the loaded chapter divider. */}
@@ -579,8 +579,8 @@ export default function LinksPage() {
         icon={LinkIcon}
         title="Links"
         subtitle={`Manage all your important links (${links.length} total)`}
-        kicker="Documents · Links"
-        kickerDot="brand"
+        kicker="Resources · Links"
+        kickerDot="amber"
         actions={(
           <>
             <Button

@@ -319,8 +319,8 @@ export default function ExpensesPage() {
           icon={DollarSign}
           title="Expenses"
           subtitle="Reimbursable spend tracking · super-admin only"
-          kicker="Documents · Expenses"
-          kickerDot="brand"
+          kicker="Resources · Expenses"
+          kickerDot="amber"
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
@@ -335,8 +335,8 @@ export default function ExpensesPage() {
           icon={DollarSign}
           title="Expenses"
           subtitle="Reimbursable spend tracking · super-admin only"
-          kicker="Documents · Expenses"
-          kickerDot="brand"
+          kicker="Resources · Expenses"
+          kickerDot="amber"
         />
         <EmptyState
           icon={AlertCircle}
@@ -353,8 +353,8 @@ export default function ExpensesPage() {
         icon={DollarSign}
         title="Expenses"
         subtitle="Reimbursable spend tracking · super-admin only"
-        kicker="Documents · Expenses"
-        kickerDot="brand"
+        kicker="Resources · Expenses"
+        kickerDot="amber"
         actions={(
           <>
             <Button variant="outline" size="sm" onClick={exportCsv}>

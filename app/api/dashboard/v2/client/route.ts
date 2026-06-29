@@ -29,6 +29,7 @@
 import { NextResponse } from 'next/server';
 import { adminSupabase, getStandardClients, getAdHocClients, renewalToneFor, overdueToneFor } from '@/lib/dashboard/queries';
 import { getDashboardConfig } from '@/lib/dashboard/config';
+import { getThisWeekKolDelivery } from '@/lib/clientDeliveryService';
 
 export const dynamic = 'force-dynamic';
 
@@ -364,12 +365,19 @@ export async function GET(request: Request) {
       return 'red';
     };
 
+    // [2026-06-25] This-Week KOL delivery roll-up per client. Pulls
+    // the confirmed/completed lineup for each client's active campaigns
+    // and joins against content_submissions to bucket each KOL into
+    // Approved / In QA / Not submitted. See lib/clientDeliveryService.
+    const deliveryByClient = await getThisWeekKolDelivery(sb as any, standardClientIds);
+
     // Build client health rows
     const clientHealth = standardClients.map(c => {
       const t = taskAgg.get(c.id) ?? { open: 0, overdue: 0, doneThisWeek: 0 };
       // [Stint+Period 2026-06-16] Same precedence as above — covered_through first.
       const renewalDate = c.covered_through ?? c.engagement_end_date;
       const renewal = renewalToneFor(renewalDate, cfg.renewal_red_days, cfg.renewal_amber_days);
+      const delivery = deliveryByClient[c.id];
       return {
         id: c.id,
         name: c.name,
@@ -378,6 +386,10 @@ export async function GET(request: Request) {
         engagement_start_date: c.engagement_start_date,
         engagement_end_date: c.engagement_end_date,
         weekNumber: weekNumberFor(c.engagement_start_date),
+        // Renewal tone/days kept for callers that still read them
+        // (e.g. callNotes header tints). The Client Success tab itself
+        // no longer renders a Renewal column post-2026-06-25 — the
+        // Renewals & Pipeline tab is the single source of truth.
         renewal_tone: renewal.tone,
         renewal_days_left: renewal.daysLeft,
         openTasks: t.open,
@@ -390,6 +402,14 @@ export async function GET(request: Request) {
         extVisitsLast7d: extVisitsByClient.get(c.id) ?? 0,
         healthTone: healthToneFor(t.overdue),
         is_whitelisted: c.is_whitelisted ?? false,
+        kolDelivery: delivery
+          ? {
+              week_number: delivery.week_number,
+              approved: delivery.approved,
+              total: delivery.total,
+              rows: delivery.rows,
+            }
+          : { week_number: null, approved: 0, total: 0, rows: [] },
       };
     });
 

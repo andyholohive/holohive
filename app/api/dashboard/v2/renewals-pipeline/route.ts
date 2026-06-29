@@ -66,12 +66,20 @@ export async function GET() {
         .eq('status', 'active'),
     ]);
 
-    // Build renewal entries — only those with an end_date set (ad-hoc
-    // clients are already excluded by getStandardClients).
-    const withEnd = clients.filter(c => c.engagement_end_date);
+    // Build renewal entries — only those with a coverage anchor set
+    // (ad-hoc clients are already excluded by getStandardClients).
+    //
+    // [2026-06-25] Andy: Days Left anchors to covered_through from the
+    // Stint+Period substrate (single source of renewal math). Falls
+    // back to engagement_end_date only when no active stint exists.
+    // Matches the EngagementTab + dashboard pills exactly.
+    const renewalAnchor = (c: typeof clients[number]): string | null =>
+      c.covered_through ?? c.engagement_end_date ?? null;
+    const withEnd = clients.filter(c => renewalAnchor(c) !== null);
     const renewals = withEnd
       .map(c => {
-        const t = renewalToneFor(c.engagement_end_date, cfg.renewal_red_days, cfg.renewal_amber_days);
+        const anchor = renewalAnchor(c)!;
+        const t = renewalToneFor(anchor, cfg.renewal_red_days, cfg.renewal_amber_days);
         // Week number per TD §5.2 — continuous since engagement_start_date,
         // doesn't reset on renewal (matches the §4.1 Client Health rule).
         let weekNumber: number | null = null;
@@ -85,7 +93,10 @@ export async function GET() {
           name: c.name,
           slug: c.slug,
           engagement_start_date: c.engagement_start_date,
+          // engagement_end_date kept for callers that surface the actual
+          // contract end; renewal_anchor is what drives the badge.
           engagement_end_date: c.engagement_end_date,
+          renewal_anchor: anchor,
           weekNumber,
           tone: t.tone,
           daysLeft: t.daysLeft,
@@ -103,7 +114,7 @@ export async function GET() {
     const now = new Date();
     for (const r of renewals) {
       if (r.daysLeft === null || r.daysLeft < 0 || r.daysLeft > 90) continue;
-      const end = new Date(r.engagement_end_date as string);
+      const end = new Date(r.renewal_anchor);
       const key = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}`;
       upcomingByMonth.set(key, (upcomingByMonth.get(key) ?? 0) + 1);
     }

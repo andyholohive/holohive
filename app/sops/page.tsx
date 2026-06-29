@@ -773,8 +773,8 @@ export default function SOPsPage() {
             icon={BookOpen}
             title="SOPs"
             subtitle="Standard Operating Procedures"
-            kicker="Workspace · HQ · SOPs"
-            kickerDot="brand"
+            kicker="Resources · SOPs"
+            kickerDot="amber"
             actions={(
               <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
@@ -811,8 +811,8 @@ export default function SOPsPage() {
           icon={BookOpen}
           title="SOPs"
           subtitle="Standard Operating Procedures"
-          kicker="Workspace · HQ · SOPs"
-          kickerDot="brand"
+          kicker="Resources · SOPs"
+          kickerDot="amber"
           actions={(
             <Button variant="brand" onClick={handleCreateNew}>
               <Plus className="h-4 w-4 mr-2" />

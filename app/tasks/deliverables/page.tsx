@@ -267,8 +267,8 @@ export default function DeliverablesPage() {
           icon={Package}
           title="Deliverables"
           subtitle="Structured workflows from templates"
-          kicker="Workspace · HQ · Deliverables"
-          kickerDot="brand"
+          kicker="Pinned · HQ · Deliverables"
+          kickerDot="amber"
           actions={headerActions}
         />
 
@@ -327,8 +327,8 @@ export default function DeliverablesPage() {
         icon={Package}
         title="Deliverables"
         subtitle="Structured workflows from templates"
-        kicker="Workspace · HQ · Deliverables"
-        kickerDot="brand"
+        kicker="Pinned · HQ · Deliverables"
+        kickerDot="amber"
         actions={headerActions}
       />
 

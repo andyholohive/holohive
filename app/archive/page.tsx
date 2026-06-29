@@ -311,7 +311,7 @@ export default function ArchivePage() {
           title="Archive"
           subtitle="Manage archived items — restore or permanently delete"
           kicker="Admin · Archive"
-          kickerDot="brand"
+          kickerDot="rose"
         />
         {/* Filter row skeleton — mirrors the loaded layout (tab strip on
             the left, search input on the right) so title + filter row
@@ -336,7 +336,7 @@ export default function ArchivePage() {
         title="Archive"
         subtitle="Manage archived items — restore or permanently delete"
         kicker="Admin · Archive"
-        kickerDot="brand"
+        kickerDot="rose"
       />
 
       {error && (

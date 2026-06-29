@@ -2584,8 +2584,8 @@ export default function SalesPipelinePage() {
           icon={Target}
           title="Sales"
           subtitle="Track and manage your active sales opportunities"
-          kicker="CRM · Sales"
-          kickerDot="brand"
+          kicker="Sales / CRM · Sales"
+          kickerDot="violet"
           actions={(
             <>
               <Skeleton className="h-9 w-28 rounded-md hidden md:block" />
@@ -2934,8 +2934,8 @@ export default function SalesPipelinePage() {
         icon={Target}
         title="Sales"
         subtitle="Track and manage your active sales opportunities"
-        kicker="CRM · Sales"
-        kickerDot="brand"
+        kicker="Sales / CRM · Sales"
+        kickerDot="violet"
         actions={(
           <SalesPipelineHeaderActions
             onOpenPalette={() => setPaletteOpen(true)}

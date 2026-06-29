@@ -587,8 +587,8 @@ export default function FormsPage() {
           icon={ClipboardList}
           title="Forms & Submissions"
           subtitle="Create forms and view external submissions"
-          kicker="Documents · Forms"
-          kickerDot="brand"
+          kicker="Logistics · Forms"
+          kickerDot="sky"
           actions={(activeTab === 'forms' ? (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>

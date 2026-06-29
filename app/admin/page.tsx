@@ -59,7 +59,7 @@ function AdminPageInner() {
         title="Admin Tools"
         subtitle="Field Options, Claude MCP, Content Tags, and Telegram Comm — combined into one tabbed page."
         kicker="Admin · Tools"
-        kickerDot="brand"
+        kickerDot="rose"
       />
 
       {/* v11 underline tabs — same pattern as the campaign admin page,
@@ -131,7 +131,7 @@ function AdminPageSkeleton() {
         title="Admin Tools"
         subtitle="Field Options, Claude MCP, Content Tags, and Telegram Comm — combined into one tabbed page."
         kicker="Admin · Tools"
-        kickerDot="brand"
+        kickerDot="rose"
       />
       {/* Skeleton matches the v11 underline tab strip — a thin border-bottom
           line with no pill background. */}

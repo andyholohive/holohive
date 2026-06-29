@@ -28,6 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
+  CheckCircle2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -531,6 +532,9 @@ export default function LineupSettingsPage() {
 
       {/* ─── Lineup Proposals Channel section [2026-06-19] ─── */}
       <LineupProposalChannelSection />
+
+      {/* ─── Confirmed Lineups Channel section [2026-06-26] ─── */}
+      <LineupConfirmedChannelSection />
     </div>
   );
 }
@@ -624,6 +628,114 @@ function LineupProposalChannelSection() {
                   setThreadId(nextThread);
                 }}
                 label="Broadcast destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
+
+/**
+ * LineupConfirmedChannelSection — global destination for the formatted
+ * post that fires when a lineup is confirmed. Replaces the legacy
+ * per-campaign `campaigns.tg_ops_group_id` routing as of 2026-06-26:
+ * confirm is an internal team coordination milestone, so the post
+ * goes to one shared chat instead of fanning into each client's ops
+ * chat. Writes to app_settings.lineup_confirmed_chat_id +
+ * lineup_confirmed_chat_thread_id; the notify route falls back to the
+ * per-campaign chat only when this is unset.
+ */
+function LineupConfirmedChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'lineup_confirmed_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'lineup_confirmed_chat_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'lineup_confirmed_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'lineup_confirmed_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Confirmed lineup destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'Confirmed lineups will post in this topic.' : 'Confirmed lineups will post in this chat.'
+          : 'Confirmed lineups will fall back to per-campaign tg_ops_group_id.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={CheckCircle2}
+      title="Confirmed Lineup Channel"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm">Fallback</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Global chat that receives the formatted post when a lineup is <code className="bg-cream-100 px-1 rounded text-[10px]">confirmed</code>. Replaces the legacy per-campaign client ops chat — confirm is an internal team milestone, so one shared feed beats fanning into each client&apos;s chat. Leave empty to fall back to <code className="bg-cream-100 px-1 rounded text-[10px]">campaigns.tg_ops_group_id</code>.</>
+      )}
+    >
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Confirmed-lineup destination"
                 disabled={saving}
               />
               <div className="flex items-center justify-end gap-2">

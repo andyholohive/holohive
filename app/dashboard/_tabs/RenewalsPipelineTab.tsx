@@ -36,6 +36,12 @@ type Renewal = {
   slug: string | null;
   engagement_start_date: string | null;
   engagement_end_date: string | null;
+  /** [2026-06-25] Single source of renewal math — covered_through
+   *  from client_coverage_status, falling back to engagement_end_date.
+   *  This is what drives the displayed "Ends" date + Days Left badge
+   *  so the Renewals tab reads the same anchor as EngagementTab and
+   *  the dashboard coverage pills. */
+  renewal_anchor: string | null;
   /** Week number since engagement_start_date — continuous, doesn't
    *  reset on renewal (matches the §4.1 Client Health column rule).
    *  null when no start date is set. Per TD §5.2. */
@@ -263,7 +269,11 @@ export default function RenewalsPipelineTab() {
                       : <span className="text-ink-warm-400">—</span>}
                   </TableCell>
                   <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">
-                    {formatDate(r.engagement_end_date)}
+                    {/* [2026-06-25] renewal_anchor = covered_through ??
+                        engagement_end_date. Single source of renewal
+                        math so the row's "Ends" + Days Left agree with
+                        the EngagementTab pill. */}
+                    {formatDate(r.renewal_anchor ?? r.engagement_end_date)}
                   </TableCell>
                   <TableCell className={`py-3 text-right tabular-nums ${r.tone === 'red' ? 'text-rose-600 font-semibold' : r.tone === 'amber' ? 'text-amber-700 font-medium' : 'text-ink-warm-700'}`}>
                     {r.daysLeft}d

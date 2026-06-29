@@ -509,8 +509,8 @@ export default function TeamPage() {
         icon={Shield}
         title="Team Members"
         subtitle="Manage your team members"
-        kicker="People · Team"
-        kickerDot="violet"
+        kicker="Resources · Team"
+        kickerDot="amber"
       />
 
       {loading ? (

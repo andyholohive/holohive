@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import ContentTagCell, { type ContentTag } from './ContentTagCell';
+import ContentTagCell, { ClientFacingTagBadges, type ContentTag } from './ContentTagCell';
 import { supabase as supabaseClient } from '@/lib/supabase';
 import {
   ArrowDown,
@@ -1697,6 +1697,11 @@ export function ContentDashboardTableView() {
                                   }
                                 }}
                               >
+                                {/* Client-facing tag badges — parity with the
+                                    public campaign page's Notes cell. Lets
+                                    the team see at a glance which content
+                                    the client sees as showcase-tagged. */}
+                                <ClientFacingTagBadges contentId={content.id} tags={globalTags} />
                                 {renderEditableContentCell(content.notes, 'notes', content)}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>

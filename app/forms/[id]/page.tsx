@@ -2117,8 +2117,8 @@ export default function FormBuilderPage() {
         <PageHeader
           icon={ClipboardList}
           title="Form Editor"
-          kicker="Documents · Forms · Editor"
-          kickerDot="brand"
+          kicker="Logistics · Forms · Editor"
+          kickerDot="sky"
         />
         <div className="flex items-center gap-2 -mt-3">
           <Skeleton className="h-5 w-16 rounded-full" />
@@ -2183,8 +2183,8 @@ export default function FormBuilderPage() {
         <PageHeader
           icon={ClipboardList}
           title={form.name}
-          kicker="Documents · Forms · Editor"
-          kickerDot="brand"
+          kicker="Logistics · Forms · Editor"
+          kickerDot="sky"
           actions={form.status === 'published' ? (
             <>
               <Button variant="outline" onClick={handleCopyShareLink}>

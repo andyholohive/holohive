@@ -340,8 +340,8 @@ export default function ActionBoardTemplatesPage() {
         icon={ListChecks}
         title="Action Board Templates"
         subtitle="Reusable milestone sets you can apply to any client's Action Board."
-        kicker="Templates · Action Board"
-        kickerDot="brand"
+        kicker="Clients · Action Board Templates"
+        kickerDot="sky"
         actions={(
           <Button variant="brand" onClick={openNew}>
             <Plus className="h-4 w-4 mr-2" />

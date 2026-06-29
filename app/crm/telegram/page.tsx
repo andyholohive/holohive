@@ -1353,8 +1353,8 @@ export default function TelegramChatsPage() {
           icon={MessageSquare}
           title="Telegram"
           subtitle="Manage Telegram chats and bot commands"
-          kicker="CRM · TG Chats"
-          kickerDot="brand"
+          kicker="Logistics · TG Chats"
+          kickerDot="sky"
         />
 
         {/* Tab strip skeleton — 9 chip-shaped placeholders inside the
@@ -1429,8 +1429,8 @@ export default function TelegramChatsPage() {
         icon={MessageSquare}
         title="Telegram"
         subtitle="Manage Telegram chats and bot commands"
-        kicker="CRM · TG Chats"
-        kickerDot="brand"
+        kicker="Logistics · TG Chats"
+        kickerDot="sky"
       />
 
       {/* Tabs — v11 chrome: cream-100 outer container, white active

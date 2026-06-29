@@ -522,8 +522,8 @@ export default function CampaignsPage() {
         <PageHeader
           title="Campaigns"
           subtitle="Track and manage your marketing campaigns"
-          kicker="Talent · Campaigns"
-          kickerDot="amber"
+          kicker="Clients · Campaigns"
+          kickerDot="sky"
           actions={
             <Button variant="brand" onClick={() => setIsNewCampaignOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -574,7 +574,7 @@ export default function CampaignsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Campaigns" subtitle="Track and manage your marketing campaigns" kicker="Talent · Campaigns" kickerDot="amber" />
+        <PageHeader title="Campaigns" subtitle="Track and manage your marketing campaigns" kicker="Clients · Campaigns" kickerDot="sky" />
         <div className="text-center py-8">
           <p className="text-rose-600">{error}</p>
           <Button onClick={fetchCampaigns} variant="brand" className="mt-4">
@@ -590,8 +590,8 @@ export default function CampaignsPage() {
       <PageHeader
         title="Campaigns"
         subtitle="Track and manage your marketing campaigns"
-        kicker="Talent · Campaigns"
-        kickerDot="amber"
+        kicker="Clients · Campaigns"
+        kickerDot="sky"
         actions={
           <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
             <DialogTrigger asChild>

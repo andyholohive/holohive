@@ -344,8 +344,8 @@ export default function ContactsPage() {
           icon={UserPlus}
           title="Contacts"
           subtitle="Manage your contact directory"
-          kicker="CRM · Contacts"
-          kickerDot="brand"
+          kicker="Sales / CRM · Contacts"
+          kickerDot="violet"
           actions={(
             <>
               <Skeleton className="h-10 w-64" />
@@ -385,8 +385,8 @@ export default function ContactsPage() {
         icon={UserPlus}
         title="Contacts"
         subtitle="Manage your contact directory"
-        kicker="CRM · Contacts"
-        kickerDot="brand"
+        kicker="Sales / CRM · Contacts"
+        kickerDot="violet"
         actions={(
           <>
             <div className="relative">

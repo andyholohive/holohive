@@ -82,8 +82,8 @@ export default function AIInsightsPage() {
           icon={Sparkles}
           title="AI Insights & Analytics"
           subtitle="Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns."
-          kicker="CRM · AI Insights"
-          kickerDot="brand"
+          kicker="Sales / CRM · AI Insights"
+          kickerDot="violet"
         />
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
@@ -126,8 +126,8 @@ export default function AIInsightsPage() {
         icon={Sparkles}
         title="AI Insights & Analytics"
         subtitle="Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns."
-        kicker="CRM · AI Insights"
-        kickerDot="brand"
+        kicker="Sales / CRM · AI Insights"
+        kickerDot="violet"
       />
 
       <Tabs defaultValue="insights" className="w-full">

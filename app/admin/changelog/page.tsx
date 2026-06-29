@@ -254,7 +254,7 @@ export default function ChangelogAdminPage() {
           title="Changelog Management"
           subtitle="Create and manage portal update announcements"
           kicker="Admin · Changelog"
-          kickerDot="brand"
+          kickerDot="rose"
         />
         <Card className="border-cream-200">
           <EmptyState
@@ -275,7 +275,7 @@ export default function ChangelogAdminPage() {
           title="Changelog Management"
           subtitle="Create and manage portal update announcements"
           kicker="Admin · Changelog"
-          kickerDot="brand"
+          kickerDot="rose"
           actions={<Skeleton className="h-10 w-32" />}
         />
         <div className="space-y-4">
@@ -294,7 +294,7 @@ export default function ChangelogAdminPage() {
         title="Changelog Management"
         subtitle="Create and manage portal update announcements"
         kicker="Admin · Changelog"
-        kickerDot="brand"
+        kickerDot="rose"
         actions={(
           <Button variant="brand" onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />

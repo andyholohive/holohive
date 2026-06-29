@@ -729,8 +729,8 @@ export default function DeliveryLogsPage() {
       <PageHeader
         title="Delivery Logs"
         subtitle="Track work delivered for each client"
-        kicker="Documents · Delivery Logs"
-        kickerDot="brand"
+        kicker="Clients · Delivery Logs"
+        kickerDot="sky"
         actions={(selectedClientId ? (
           <>
             <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
