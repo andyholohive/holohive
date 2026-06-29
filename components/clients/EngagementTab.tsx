@@ -104,8 +104,9 @@ type PeriodForm = {
   period_n: number;
   start_date: Date | undefined;
   end_date: Date | undefined;
-  signed_date: Date | undefined;
-  scope: string;
+  // amount is stored formatted with thousands separators ("12,500") so
+  // the input always renders with commas as the user types; parsed
+  // back to a plain number via parseAmount() at save time.
   amount: string;
   notes: string;
 };
@@ -114,11 +115,28 @@ const EMPTY_PERIOD_FORM: PeriodForm = {
   period_n: 1,
   start_date: undefined,
   end_date: undefined,
-  signed_date: undefined,
-  scope: '',
   amount: '',
   notes: '',
 };
+
+// ─── Amount formatting helpers ──────────────────────────────────────
+// Display value carries commas while typing — strip them at save time.
+// One decimal point + up to 2 decimals (USD cents). Anything else is
+// dropped silently so paste-from-spreadsheet stays forgiving.
+function formatAmountInput(raw: string): string {
+  const digitsOnly = raw.replace(/[^0-9.]/g, '');
+  if (!digitsOnly) return '';
+  const [intPart, ...decimalParts] = digitsOnly.split('.');
+  const formattedInt = (intPart || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (decimalParts.length === 0) return formattedInt;
+  const decimalDigits = decimalParts.join('').slice(0, 2);
+  return `${formattedInt}.${decimalDigits}`;
+}
+
+function parseAmount(formatted: string): number {
+  const stripped = formatted.replace(/,/g, '');
+  return Number(stripped);
+}
 
 // ─── Date field shared between dialogs ─────────────────────────────
 
@@ -293,9 +311,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       period_n: period.period_n,
       start_date: parseIso(period.start_date),
       end_date: parseIso(period.end_date),
-      signed_date: parseIso(period.signed_date),
-      scope: period.scope ?? '',
-      amount: period.amount != null ? String(period.amount) : '',
+      amount: period.amount != null ? formatAmountInput(String(period.amount)) : '',
       notes: period.notes ?? '',
     });
     setPeriodDialogOpen(true);
@@ -307,20 +323,29 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       toast({ title: 'Start + end dates required', variant: 'destructive' });
       return;
     }
-    const amt = periodForm.amount.trim() === '' ? 0 : Number(periodForm.amount);
+    // [2026-06-26] Amount required (was optional with 0 fallback).
+    if (periodForm.amount.trim() === '') {
+      toast({ title: 'Amount required', variant: 'destructive' });
+      return;
+    }
+    const amt = parseAmount(periodForm.amount);
     if (Number.isNaN(amt) || amt < 0) {
       toast({ title: 'Amount must be a non-negative number', variant: 'destructive' });
       return;
     }
     setSavingPeriod(true);
     try {
+      // [2026-06-26] Save bug fix: scope has a CHECK constraint that
+      // only allows ('initial','renewal','scope_add'). The old form
+      // sent scope: '' (empty string) which violated CHECK and silently
+      // failed every save. Omitting scope + signed_date from the
+      // payload lets the DB default (scope='initial') apply on insert
+      // and preserves existing values on update.
       const payload = {
         stint_id: periodDialogStintId,
         period_n: periodForm.period_n,
         start_date: toIsoDate(periodForm.start_date)!,
         end_date: toIsoDate(periodForm.end_date)!,
-        signed_date: periodForm.signed_date ? toIsoDate(periodForm.signed_date)! : null,
-        scope: periodForm.scope.trim(),
         amount: amt,
         notes: periodForm.notes.trim() || null,
       };
@@ -653,6 +678,8 @@ export function EngagementTab({ clientId }: { clientId: string }) {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
+            {/* Period # alone on its row — Signed Date hidden per
+                Andy 2026-06-26 (rarely used; clutters the form). */}
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label>Period # <RequiredAsterisk /></Label>
@@ -664,12 +691,20 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                   className="h-9 focus-brand"
                 />
               </div>
-              <DateField
-                label="Signed Date"
-                allowClear
-                value={periodForm.signed_date}
-                onChange={(d) => setPeriodForm({ ...periodForm, signed_date: d })}
-              />
+              <div className="grid gap-1.5">
+                <Label>Amount (USD) <RequiredAsterisk /></Label>
+                {/* Text input with live thousands-separator formatting.
+                    inputMode=decimal pops the numeric keypad on mobile.
+                    Saved as a plain number via parseAmount(). */}
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={periodForm.amount}
+                  onChange={(e) => setPeriodForm({ ...periodForm, amount: formatAmountInput(e.target.value) })}
+                  placeholder="0"
+                  className="h-9 focus-brand"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <DateField
@@ -685,28 +720,11 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                 onChange={(d) => setPeriodForm({ ...periodForm, end_date: d })}
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label>Scope</Label>
-              <Textarea
-                value={periodForm.scope}
-                onChange={(e) => setPeriodForm({ ...periodForm, scope: e.target.value })}
-                placeholder="What's included in this period."
-                className="focus-brand"
-                rows={2}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Amount (USD)</Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={periodForm.amount}
-                onChange={(e) => setPeriodForm({ ...periodForm, amount: e.target.value })}
-                placeholder="0"
-                className="h-9 focus-brand"
-              />
-            </div>
+            {/* Scope textarea hidden per Andy 2026-06-26 — also fixes a
+                silent save bug: the DB CHECK constraint only allows
+                scope IN ('initial','renewal','scope_add'), so free
+                text from this field would violate CHECK and every
+                save would fail. DB default 'initial' now applies. */}
             <div className="grid gap-1.5">
               <Label>Notes</Label>
               <Textarea
