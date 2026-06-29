@@ -291,7 +291,7 @@ export class KOLService {
     return {
       platforms: ['X', 'Telegram', 'YouTube', 'Facebook', 'TikTok'],
       regions: ['Vietnam', 'Turkey', 'SEA', 'Philippines', 'Korea', 'Global', 'China', 'Brazil'],
-      deliverables: ['Post', 'Video', 'Article', 'AMA', 'Ambassadorship', 'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter'],
+      deliverables: ['Post', 'Repost', 'Video', 'Article', 'AMA', 'QRT', 'Thread', 'Spaces', 'Newsletter'],
       // [2026-06-10] HHP Creator Taxonomy Spec — fully migrated. All
       // legacy values cleared from data via SQL passes (Research →
       // Analyst, Crypto → niche Trading, 6 topic words → niche moves,
