@@ -118,6 +118,11 @@ export function CallNotesTab({
   // Delete confirm
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Per-note Send-to-TG state — tracks which note has a request in
+  // flight so we can spinner the right button (and disable it).
+  // Mirrors the dashboard CallNoteCard pattern; same endpoint reused.
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
   // ─── Fetch ────────────────────────────────────────────────────────
 
   async function refresh() {
@@ -312,6 +317,43 @@ export function CallNotesTab({
     }
   }
 
+  /** Send a single call note to the client's TG chat via the existing
+   *  send-tg route (same endpoint the dashboard CallNoteCard uses).
+   *  On success, optimistically stamps sent_to_client_tg_at so the
+   *  "Sent to TG" badge appears without a refresh. */
+  async function sendNoteToTg(noteId: string) {
+    if (!clientId) return;
+    setSendingId(noteId);
+    try {
+      const res = await fetch(
+        `/api/clients/${clientId}/meeting-notes/${noteId}/send-tg`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        toast({
+          title: 'Send failed',
+          description: json.error || json.hint || `HTTP ${res.status}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      const stamp = json.sent_at || new Date().toISOString();
+      setNotes(prev => prev.map(n => n.id === noteId
+        ? { ...n, sent_to_client_tg_at: stamp }
+        : n));
+      toast({ title: 'Sent to client TG' });
+    } catch (err: any) {
+      toast({
+        title: 'Send failed',
+        description: err?.message || 'Network error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   /** Toggle a single action item's is_done flag inline (from the list
    *  view), without opening the edit form. Optimistic UI + write-through
    *  to client_context.call_notes JSONB. */
@@ -421,6 +463,23 @@ export function CallNotesTab({
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* Send to client TG — same endpoint the
+                          dashboard CallNoteCard uses. Hidden once a
+                          note has been sent (sent_to_client_tg_at
+                          stamped) so the "Sent to TG" badge above
+                          serves as the receipt. */}
+                      {!note.sent_to_client_tg_at && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-brand hover:bg-brand-soft"
+                          onClick={() => sendNoteToTg(note.id)}
+                          disabled={sendingId === note.id}
+                          title="Send to client TG"
+                        >
+                          <Send className={`h-3.5 w-3.5 ${sendingId === note.id ? 'opacity-50' : ''}`} />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
