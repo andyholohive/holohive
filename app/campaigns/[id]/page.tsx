@@ -2320,19 +2320,15 @@ const CampaignDetailsPage = () => {
                   below takes over for edit mode (one source of truth
                   for the form fields). */}
               {!editMode && campaign && (
+                /* [2026-06-29] Overview is now read-only per Andy — no
+                   onEditClick, no onResourcesChange. Edits move to the
+                   full Edit Campaign dialog + other tabs. */
                 <CampaignDetailViewLayout
                   campaign={campaign}
                   campaignKOLs={campaignKOLs}
                   payments={payments}
                   contents={contents}
                   allUsers={allUsers}
-                  onEditClick={() => setEditMode(true)}
-                  onResourcesChange={async (next) => {
-                    // Persist immediately — Resources is the only thing
-                    // editable from the Overview view (one-tap "add
-                    // Telegram link" without flipping to full Edit mode).
-                    await handleSaveResources(next);
-                  }}
                 />
               )}
 

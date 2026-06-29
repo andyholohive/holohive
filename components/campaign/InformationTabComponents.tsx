@@ -118,8 +118,6 @@ export function CampaignDetailViewLayout({
   payments,
   contents,
   allUsers,
-  onEditClick,
-  onResourcesChange,
 }: {
   campaign: CampaignWithDetails;
   /** kept for prop compatibility with the page; the inline `setCampaign`
@@ -134,9 +132,14 @@ export function CampaignDetailViewLayout({
   /** kept for prop compatibility; per-card edit state is no longer used. */
   editingCard?: null | 'engagement' | 'budget' | 'approved';
   setEditingCard?: (next: null | 'engagement' | 'budget' | 'approved') => void;
-  /** Hero "Edit campaign" → flips the page into full edit mode. */
+  /** [2026-06-29] Overview tab is now fully read-only per Andy. All
+   *  editing happens elsewhere (Edit Campaign dialog from the campaigns
+   *  list, /clients context modal, Budget tab, Lineups tab, etc.).
+   *  These props are kept on the signature for backwards-compat but
+   *  ignored — the Hero edit button is gone and ResourcesCard is
+   *  rendered in read-only mode. */
   onEditClick?: () => void;
-  onResourcesChange: (next: CampaignResource[]) => void;
+  onResourcesChange?: (next: CampaignResource[]) => void;
 }) {
   // Derived metrics — KPI strip values.
   const startDate = campaign.start_date ? new Date(campaign.start_date + 'T00:00:00') : null;
@@ -313,17 +316,10 @@ export function CampaignDetailViewLayout({
             <span className="truncate max-w-[140px]">{manager.name || manager.email}</span>
           </span>
         )}
-        {onEditClick && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onEditClick}
-            className="ml-auto h-8 text-xs font-medium"
-          >
-            <Edit className="h-3.5 w-3.5 mr-1.5" />
-            Edit campaign
-          </Button>
-        )}
+        {/* [2026-06-29] Edit campaign button removed — Overview tab is
+            display-only. Edit affordances live on the other tabs +
+            dialogs (Edit Campaign from the campaigns list, KOL
+            Dashboard, Content, Budget, Lineups, etc.). */}
       </div>
 
       {/* ── KPI strip ────────────────────────────────────────────── */}
@@ -355,7 +351,7 @@ export function CampaignDetailViewLayout({
       {/* ── Two-column body ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          <ResourcesCard resources={resources} onChange={onResourcesChange} />
+          <ResourcesCard resources={resources} readOnly />
 
           {/* Recent activity — real client_activity_log rows for this
               campaign's client. Empty state when no rows. */}
@@ -446,9 +442,15 @@ export function CampaignDetailViewLayout({
 export function ResourcesCard({
   resources,
   onChange,
+  readOnly = false,
 }: {
   resources: CampaignResource[];
-  onChange: (next: CampaignResource[]) => void;
+  /** Required when readOnly is false. Omitted on read-only renders. */
+  onChange?: (next: CampaignResource[]) => void;
+  /** [2026-06-29] Display-only mode for the campaign Overview tab —
+   *  hides Add + Remove affordances. Other consumers (e.g. the full
+   *  Edit Campaign dialog) still pass onChange + leave readOnly false. */
+  readOnly?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [draftLabel, setDraftLabel] = useState('');
@@ -463,12 +465,13 @@ export function ResourcesCard({
   };
 
   const handleAdd = () => {
-    if (!draftLabel.trim() || !draftUrl.trim()) return;
+    if (!draftLabel.trim() || !draftUrl.trim() || !onChange) return;
     onChange([...resources, { label: draftLabel.trim(), url: draftUrl.trim(), icon: draftIcon }]);
     reset();
   };
 
   const handleRemove = (idx: number) => {
+    if (!onChange) return;
     onChange(resources.filter((_, i) => i !== idx));
   };
 
@@ -482,7 +485,7 @@ export function ResourcesCard({
           <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Resources</h3>
           <span className="text-[11px] text-ink-warm-400 mono tabular-nums">{resources.length}</span>
         </div>
-        {!adding && (
+        {!adding && !readOnly && (
           <Button
             variant="ghost"
             size="sm"
@@ -495,7 +498,7 @@ export function ResourcesCard({
         )}
       </div>
 
-      {adding && (
+      {adding && !readOnly && (
         <div className="mb-4 rounded-md border border-cream-200 bg-cream-50 p-3 space-y-2">
           <div className="grid grid-cols-[100px_1fr] gap-2">
             <Select value={draftIcon} onValueChange={(v) => setDraftIcon(v as ResourceIcon)}>
@@ -535,7 +538,9 @@ export function ResourcesCard({
 
       {resources.length === 0 && !adding ? (
         <p className="text-sm text-ink-warm-500 italic">
-          No resources yet. Pin commonly-referenced links (Telegram group, brand assets, GTM plan, etc.).
+          {readOnly
+            ? 'No resources pinned for this campaign.'
+            : 'No resources yet. Pin commonly-referenced links (Telegram group, brand assets, GTM plan, etc.).'}
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -572,15 +577,17 @@ export function ResourcesCard({
                   </div>
                 </a>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0 ml-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
-                    onClick={() => handleRemove(idx)}
-                    title="Remove resource"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                      onClick={() => handleRemove(idx)}
+                      title="Remove resource"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
                   <ExternalLink className="w-4 h-4 text-ink-warm-300 group-hover:text-brand transition shrink-0" />
                 </div>
               </div>
