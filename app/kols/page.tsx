@@ -907,6 +907,31 @@ export default function KOLsPage() {
       setEditingValue(null);
       try {
         await KOLService.updateKOL(updatedKOL);
+
+        // Auto-fire a Telethon scan when a t.me link is added or
+        // changed. The scanner reads `master_kols.link` (the channel
+        // URL), not the numeric `telegram_id` column. Non-blocking —
+        // the route returns immediately and a toast tells the user
+        // the score will refresh in about a minute.
+        if (
+          editingCell.field === 'link' &&
+          typeof editingValue === 'string' &&
+          /t\.me\//i.test(editingValue) &&
+          editingValue.trim() !== (kolToUpdate.link || '').trim()
+        ) {
+          try {
+            const res = await fetch(`/api/kols/${kolId}/rescan`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok) {
+              toast({
+                title: 'Scan queued',
+                description: 'Score will refresh in about a minute.',
+              });
+            }
+          } catch {
+            /* non-blocking */
+          }
+        }
       } catch (error) {
         console.error('Error updating KOL:', error);
         setKols(prevKols =>

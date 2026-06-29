@@ -40,6 +40,8 @@ export interface MasterKOL {
   /** Profile picture URL — Telegram avatar in our storage, or unavatar.io for X. Per KOL-AVATAR.* (2026-06-17). */
   profile_picture_url?: string | null;
   profile_picture_synced_at?: string | null;
+  /** Telegram @handle (without '@') used by the Telethon scanner and bot lookup. Per TGB.1. */
+  telegram_id?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }

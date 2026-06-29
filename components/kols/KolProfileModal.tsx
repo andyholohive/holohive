@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ExternalLink, Pencil, Save, X, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Pencil, Save, X, Calendar as CalendarIcon, RefreshCw } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { MasterKOL, KOLService } from "@/lib/kolService";
@@ -109,6 +109,14 @@ export function KolProfileModal({
                 <ExternalLink className="h-4 w-4" />
               </a>
             )}
+            {/* Rescan button — fires the GH-Actions Telethon scan for
+                this KOL. Only meaningful when `link` is a t.me URL
+                (the scanner reads `link`, not the numeric telegram_id).
+                ~30-90s end-to-end; toast tells the user the score will
+                refresh soon. */}
+            {kol.link && /t\.me\//i.test(kol.link) && (
+              <RescanButton kolId={kol.id} onMetricsChanged={onMetricsChanged} />
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -146,6 +154,65 @@ export function KolProfileModal({
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ─────────────────────────── Rescan button ────────────────────────── */
+
+function RescanButton({
+  kolId,
+  onMetricsChanged,
+}: {
+  kolId: string;
+  onMetricsChanged?: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/kols/${kolId}/rescan`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        toast({
+          title: "Rescan failed",
+          description: data.error || `HTTP ${res.status}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Scan queued",
+        description: "Score will refresh in about a minute.",
+      });
+      // Best-effort: nudge the parent to re-fetch after a delay so the
+      // new snapshot lands in the list. The user can also reopen the
+      // modal to see it sooner.
+      if (onMetricsChanged) {
+        setTimeout(() => onMetricsChanged(), 90_000);
+      }
+    } catch (err: any) {
+      toast({
+        title: "Rescan failed",
+        description: err?.message || String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      title="Re-scan this KOL's TG channel"
+      className="text-brand hover:text-brand-dark disabled:opacity-50"
+    >
+      <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+    </button>
   );
 }
 
