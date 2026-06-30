@@ -107,6 +107,37 @@ export async function GET() {
     const completedThisWeekRows = (completedThisWeekRes.data ?? []) as any[];
     const completedThisWeek = completedThisWeekRows.length;
 
+    // ─── Scorecards data (TD Scorecards block) ───────────────────────
+    // Per HHP Team Dashboard Spec § Scorecards: one anchor metric per
+    // role, auto-pulled from HQ. Data sources, computed in JS below:
+    //   - Bolt   — Client renewal rate over the last 90 days
+    //   - Jaymz  — On-time rate (1 - overdue/total)
+    //   - Quazo  — On-time rate (1 - overdue/total)
+    //   - Andy   — Composite: initiatives shipped (50%) + bug count (30%)
+    //              + ext. visits (20%, TBD until portal analytics ships;
+    //              omitted so weights renormalize to 62.5/37.5)
+    // The 30d / 90d windows are chosen to balance signal vs. recency.
+    const SCORE_LOOKBACK_30D_ISO = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const SCORE_LOOKBACK_90D_ISO = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const [stintsRes, completedInitiativesRes, liveBugsRes] = await Promise.all([
+      (sb as any)
+        .from('client_stints')
+        .select('client_id, start_date, end_date, status')
+        .order('start_date', { ascending: true }),
+      (sb as any)
+        .from('initiatives')
+        .select('id, owner_user_id, status, updated_at')
+        .eq('status', 'completed')
+        .is('deleted_at', null)
+        .gte('updated_at', SCORE_LOOKBACK_30D_ISO),
+      (sb as any)
+        .from('backlog_items')
+        .select('id, assignee_id, type, live_at')
+        .eq('type', 'bug')
+        .not('live_at', 'is', null)
+        .gte('live_at', SCORE_LOOKBACK_30D_ISO),
+    ]);
+
     // ─── Week-over-week deltas for Layer 1 KPI trend arrows ──────
     // Per HHP Initiative Feature Checklist vF (TD §2.3 · HHP-C §6):
     // "all live from HQ with trend arrows". We compare each metric
@@ -215,6 +246,136 @@ export async function GET() {
     const workload = Array.from(perUser.values()).sort((a, b) => b.overdue - a.overdue || b.open - a.open || b.completed - a.completed);
     const escalations = workload.filter(w => w.overdue >= cfg.person_escalation_threshold);
 
+    // ─── Scorecards (TD Scorecards block) ───────────────────────────
+    // Resolve the four named teammates dynamically by first-name match
+    // (case-insensitive) — keeps the rollup working if their user id
+    // ever changes. Falls back to null if a person isn't found.
+    // Match priority: exact full-name match (case-insensitive) wins; if
+    // none, fall back to first-name prefix match, excluding any user
+    // whose name contains "test" so seeded test accounts (Andy Test /
+    // bolt test) don't shadow the real teammates.
+    const findUserByFirstName = (first: string) => {
+      const lowered = first.toLowerCase();
+      const users = ((usersRes.data ?? []) as any[]).filter(
+        x => !(x.name || '').toLowerCase().includes('test'),
+      );
+      const exact = users.find(x => (x.name || '').toLowerCase() === lowered);
+      const u = exact ?? users.find(
+        x => (x.name || '').toLowerCase().split(/\s+/)[0] === lowered,
+      );
+      return u ? { id: u.id as string, name: u.name as string, photo: (u.profile_photo_url || null) as string | null } : null;
+    };
+    const scoreUserBolt = findUserByFirstName('Bolt');
+    const scoreUserJaymz = findUserByFirstName('Jaymz');
+    const scoreUserQuazo = findUserByFirstName('Quazo');
+    const scoreUserAndy = findUserByFirstName('Andy');
+
+    // Helper: on-time rate for a given user from the workload roll-up.
+    // Denominator = open + completed-this-week (the recent-activity
+    // window). Returns null when the user has no activity in this
+    // window — UI shows "—" instead of a misleading 100%.
+    const onTimeRateFor = (userId: string | null) => {
+      if (!userId) return null;
+      const row = workload.find(w => w.id === userId);
+      if (!row) return null;
+      const denom = row.open + row.completed;
+      if (denom === 0) return null;
+      return Math.round((1 - row.overdue / denom) * 100);
+    };
+
+    // Renewal rate (Bolt): of clients whose stint ended in the last
+    // 90 days, what fraction have a subsequent stint that starts after
+    // that end? Same client can only be eligible once per window —
+    // we anchor on their most recent ended stint in the window.
+    const NINETY_DAYS_AGO_DATE = new Date(Date.now() - 90 * 86_400_000);
+    const stintsByClient = new Map<string, Array<{ start: Date; end: Date | null }>>();
+    for (const s of ((stintsRes.data ?? []) as any[])) {
+      if (!s.client_id || !s.start_date) continue;
+      const arr = stintsByClient.get(s.client_id) ?? [];
+      arr.push({
+        start: new Date(s.start_date),
+        end: s.end_date ? new Date(s.end_date) : null,
+      });
+      stintsByClient.set(s.client_id, arr);
+    }
+    let renewalEligible = 0;
+    let renewalRenewed = 0;
+    for (const [, stints] of stintsByClient) {
+      // Most recent stint that ENDED within the 90d window.
+      const recentEnded = stints
+        .filter(s => s.end && s.end >= NINETY_DAYS_AGO_DATE && s.end <= new Date())
+        .sort((a, b) => (b.end as Date).getTime() - (a.end as Date).getTime())[0];
+      if (!recentEnded) continue;
+      renewalEligible += 1;
+      // Renewed = any subsequent stint that started after the end.
+      const renewedAfter = stints.some(s => s.start > (recentEnded.end as Date));
+      if (renewedAfter) renewalRenewed += 1;
+    }
+    const renewalRatePct = renewalEligible > 0
+      ? Math.round((renewalRenewed / renewalEligible) * 100)
+      : null;
+
+    // Andy composite: initiatives shipped (50%) + bug count (30%).
+    // Ext. visits (20%) is omitted until portal analytics ships, so we
+    // renormalize to 62.5 / 37.5. Counts are normalized against a soft
+    // monthly target of 5 of each — anything above scores 100%.
+    const ANDY_TARGET = 5;
+    const initShippedAndy = scoreUserAndy
+      ? ((completedInitiativesRes.data ?? []) as any[]).filter(i => i.owner_user_id === scoreUserAndy.id).length
+      : 0;
+    const bugsShippedAndy = scoreUserAndy
+      ? ((liveBugsRes.data ?? []) as any[]).filter(b => b.assignee_id === scoreUserAndy.id).length
+      : 0;
+    const initShippedPct = Math.min(100, Math.round((initShippedAndy / ANDY_TARGET) * 100));
+    const bugsShippedPct = Math.min(100, Math.round((bugsShippedAndy / ANDY_TARGET) * 100));
+    const andyCompositePct = scoreUserAndy
+      ? Math.round(initShippedPct * 0.625 + bugsShippedPct * 0.375)
+      : null;
+
+    const scorecards = [
+      scoreUserBolt && {
+        kind: 'renewal' as const,
+        person: scoreUserBolt,
+        valuePct: renewalRatePct,
+        formulaCaption: 'Renewed ÷ Eligible (90d)',
+        sourceCaption: 'Source · client_stints end_date + status',
+        detail: renewalRatePct === null
+          ? 'No stints ended in the last 90 days.'
+          : `${renewalRenewed} of ${renewalEligible} clients renewed in the last 90 days.`,
+      },
+      scoreUserJaymz && {
+        kind: 'on_time' as const,
+        person: scoreUserJaymz,
+        valuePct: onTimeRateFor(scoreUserJaymz.id),
+        formulaCaption: '1 − (Overdue ÷ Total)',
+        sourceCaption: 'Source · Team Workload',
+        detail: 'Open + completed (7d) as denominator.',
+      },
+      scoreUserQuazo && {
+        kind: 'on_time' as const,
+        person: scoreUserQuazo,
+        valuePct: onTimeRateFor(scoreUserQuazo.id),
+        formulaCaption: '1 − (Overdue ÷ Total)',
+        sourceCaption: 'Source · Team Workload',
+        detail: 'Open + completed (7d) as denominator.',
+      },
+      scoreUserAndy && {
+        kind: 'composite' as const,
+        person: scoreUserAndy,
+        valuePct: andyCompositePct,
+        formulaCaption: 'Initiatives 50% + Bugs 30% (Ext visits 20% TBD)',
+        sourceCaption: 'Source · Initiative Tracker / backlog_items.live_at',
+        detail: `${initShippedAndy} init shipped (30d) · ${bugsShippedAndy} bugs shipped (30d). Ext-visits omitted until portal analytics ships; weights renormalize to 62.5 / 37.5.`,
+      },
+    ].filter(Boolean) as Array<{
+      kind: 'renewal' | 'on_time' | 'composite';
+      person: { id: string; name: string; photo: string | null };
+      valuePct: number | null;
+      formulaCaption: string;
+      sourceCaption: string;
+      detail: string;
+    }>;
+
     // ─── Overdue panel per TD §3.2 ───────────────────────────────────
     // Task-level list sorted by days-overdue desc. Spec wording:
     // "Overdue panel (sorted by days overdue descending, active clients
@@ -312,6 +473,7 @@ export async function GET() {
       },
       workload,
       escalations,
+      scorecards,
       overdueTasks: overduePanel,
       initiatives,
       adHocWork: {

@@ -79,6 +79,16 @@ type MondayFormStatus = {
   entries: MondayFormEntry[];
 };
 
+type Scorecard = {
+  kind: 'renewal' | 'on_time' | 'composite';
+  person: { id: string; name: string; photo: string | null };
+  /** Headline value, 0–100. null means "no signal yet" — UI shows "—". */
+  valuePct: number | null;
+  formulaCaption: string;
+  sourceCaption: string;
+  detail: string;
+};
+
 type InternalPayload = {
   asOf: string;
   thresholds: { person_escalation_threshold: number; overdue_yellow_days: number; overdue_red_days: number };
@@ -98,6 +108,7 @@ type InternalPayload = {
   };
   workload: WorkloadRow[];
   escalations: WorkloadRow[];
+  scorecards: Scorecard[];
   overdueTasks: OverdueTaskRow[];
   initiatives: Initiative[];
   adHocWork: { recentCount: number; recent: AdHocTask[] };
@@ -261,7 +272,43 @@ export default function InternalTab() {
         </div>
       </div>
 
-      {/* ── 02 Workload ─────────────────────────────────────────────── */}
+      {/* ── 02 Scorecards ────────────────────────────────────────────── */}
+      {/* Per HHP Team Dashboard Spec § Scorecards: one anchor metric
+          per role, auto-pulled from HQ. Andy's composite excludes the
+          ext-visits weight (20%) until portal analytics ships — that's
+          surfaced in the card's detail line so the partial weighting
+          is visible. The metric value renders large; formula caption
+          + source line keep the formula auditable inline. */}
+      {data.scorecards.length > 0 && (
+        <div className="space-y-4">
+          <SectionHeader label="Scorecards" dot="violet" counter="02 — Anchor metrics · Live" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {data.scorecards.map(sc => (
+              <Card key={sc.person.id} className="border-cream-200 p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2.5">
+                  {sc.person.photo ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={sc.person.photo} alt={`${sc.person.name}'s profile`} className="w-8 h-8 rounded-md object-cover border border-cream-200" />
+                  ) : (
+                    <div className={`w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-bold border ${avatarTone(sc.person.name)}`}>
+                      {initials(sc.person.name)}
+                    </div>
+                  )}
+                  <div className="text-sm font-semibold text-ink-warm-900">{sc.person.name}</div>
+                </div>
+                <div className="text-3xl font-bold tabular-nums text-ink-warm-900 leading-none">
+                  {sc.valuePct === null ? <span className="text-ink-warm-400">—</span> : `${sc.valuePct}%`}
+                </div>
+                <div className="text-[11px] text-ink-warm-600 font-medium">{sc.formulaCaption}</div>
+                <div className="text-[11px] text-ink-warm-500 leading-snug">{sc.detail}</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-ink-warm-400 mt-1">{sc.sourceCaption}</div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 03 Workload ─────────────────────────────────────────────── */}
       {/* Mockup pattern: only the Engagements section sits in an inset
           block. Workload / Strategy / etc. sit directly on the page bg
           so the chrome doesn't compete with the cards. */}
@@ -270,7 +317,7 @@ export default function InternalTab() {
           the workload table — the closest analogue to the old Tasks-per-
           Member admin view. scroll-mt offsets the sticky chrome. */}
       <div id="workload" className="space-y-4 scroll-mt-20">
-        <SectionHeader label="Workload" dot="sky" counter="02 — Team · Escalations · Check-in" />
+        <SectionHeader label="Workload" dot="sky" counter="03 — Team · Escalations · Check-in" />
 
       {/* Workload + escalations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -437,7 +484,7 @@ export default function InternalTab() {
 
       {/* ── 03 Strategy ─────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionHeader label="Strategy" dot="violet" counter="03 — Initiatives" />
+        <SectionHeader label="Strategy" dot="violet" counter="04 — Initiatives" />
 
       {/* Initiatives — card grid per mockup. Each card shows name + tone
           status badge, owner + updated date, linked task count chip,
