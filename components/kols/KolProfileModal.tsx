@@ -47,6 +47,15 @@ import { ScoreBreakdownTab } from "./ScoreBreakdownTab";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/dateFormat";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 /**
  * KOL profile detail modal — Phase 2 of the May 2026 KOL overhaul.
@@ -309,17 +318,11 @@ function OverviewTab({
     }
   };
 
-  // Profile section visibility — only render when the Telegram scan has
-  // populated at least one of the four AI-inferred fields. Avoids a
-  // sea-of-em-dashes for KOLs that haven't been scanned yet.
+  // Niche + Creator are rendered as chips inside Profile Insights;
+  // narrative fields render whether or not they're populated so the
+  // team can see what data the AI scan will fill in.
   const niche = kol.niche_tags || [];
   const creator = kol.creator_types || [];
-  const hasProfile =
-    niche.length > 0 ||
-    creator.length > 0 ||
-    (kol.style_summary && kol.style_summary.trim()) ||
-    (kol.audience_summary && kol.audience_summary.trim()) ||
-    (kol.brief_angle_hint && kol.brief_angle_hint.trim());
 
   return (
     <div className="space-y-4 text-sm">
@@ -365,94 +368,142 @@ function OverviewTab({
 
       {/* Profile Insights — AI-inferred niche / creator type / style /
           audience / brief angle from the Telegram MCP scan (Doc 2 Q7a).
-          Empty until the first scan completes; team can override via
-          edit dialog. */}
-      {hasProfile && (
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-ink-warm-700">Profile Insights</div>
-          <Card className="p-3 space-y-3">
-            {(niche.length > 0 || creator.length > 0) && (
-              <div className="space-y-2">
-                {niche.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-warm-500 mr-1">Niche</span>
-                    {niche.map(tag => (
-                      <StatusBadge key={tag} tone="brand" size="sm" bordered>{tag}</StatusBadge>
-                    ))}
-                  </div>
-                )}
-                {creator.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-warm-500 mr-1">Creator</span>
-                    {creator.map(tag => (
-                      <StatusBadge key={tag} tone="purple" size="sm" bordered>{tag}</StatusBadge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {kol.style_summary && (
-              <ProfileBlock label="Style" body={kol.style_summary} />
-            )}
-            {kol.audience_summary && (
-              <ProfileBlock label="Audience" body={kol.audience_summary} />
-            )}
-            {kol.brief_angle_hint && (
-              <ProfileBlock label="Brief Angle" body={kol.brief_angle_hint} />
-            )}
-          </Card>
-        </div>
-      )}
+          Always rendered so the team can find the slots; narrative fields
+          show an empty-state placeholder until the AI scan populates
+          them (triggered from Score tab → Refresh from TG). */}
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-ink-warm-700">Profile Insights</div>
+        <Card className="p-3 space-y-3">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-warm-500 mr-1">Niche</span>
+              {niche.length > 0
+                ? niche.map(tag => (
+                    <StatusBadge key={tag} tone="brand" size="sm" bordered>{tag}</StatusBadge>
+                  ))
+                : <span className="text-xs text-ink-warm-400 italic">Not yet inferred</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-warm-500 mr-1">Creator</span>
+              {creator.length > 0
+                ? creator.map(tag => (
+                    <StatusBadge key={tag} tone="purple" size="sm" bordered>{tag}</StatusBadge>
+                  ))
+                : <span className="text-xs text-ink-warm-400 italic">Not yet inferred</span>}
+            </div>
+          </div>
+          <ProfileBlock
+            label="Style"
+            body={kol.style_summary || null}
+            placeholder="Posting style summary will appear after the AI scan."
+          />
+          <ProfileBlock
+            label="Audience"
+            body={kol.audience_summary || null}
+            placeholder="Audience description will appear after the AI scan."
+          />
+          <ProfileBlock
+            label="Brief Angle"
+            body={kol.brief_angle_hint || null}
+            placeholder="Activation hook will appear after the AI scan."
+          />
+          {!kol.style_summary && !kol.audience_summary && !kol.brief_angle_hint && (
+            <p className="text-[11px] text-ink-warm-500 italic pt-1 border-t border-cream-100">
+              Run an AI scan from the <span className="font-semibold">Score</span> tab → "Refresh from TG" to populate.
+            </p>
+          )}
+        </Card>
+      </div>
 
       {/* Latest Channel Snapshot — surfaces the most recent scan's
-          headline metrics so the team doesn't need to flip to the
-          Snapshots tab for at-a-glance channel health. Snapshot tab
-          remains the time-series + edit/delete surface. */}
-      {latestSnapshot && (
-        <div className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <div className="text-xs font-semibold text-ink-warm-700">Latest Channel Snapshot</div>
+          full headline metrics so the team doesn't need to flip to the
+          Snapshots tab for at-a-glance channel health. Snapshots tab
+          remains the time-series + chart + edit/delete surface. */}
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <div className="text-xs font-semibold text-ink-warm-700">Latest Channel Snapshot</div>
+          {latestSnapshot && (
             <div className="text-[10px] text-ink-warm-500">
               Scanned {formatDate(new Date(latestSnapshot.snapshot_date + 'T00:00:00'))}
             </div>
-          </div>
-          <Card className="p-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-            <SnapshotStat
-              label="Followers"
-              value={latestSnapshot.follower_count?.toLocaleString() ?? '—'}
-            />
-            <SnapshotStat
-              label="Avg Views"
-              value={
-                latestSnapshot.avg_views_per_post != null
-                  ? Number(latestSnapshot.avg_views_per_post).toLocaleString()
-                  : '—'
-              }
-            />
-            <SnapshotStat
-              label="Posts/Wk"
-              value={
-                latestSnapshot.posting_frequency != null
-                  ? Number(latestSnapshot.posting_frequency).toFixed(1)
-                  : '—'
-              }
-            />
-            <SnapshotStat
-              label="ER %"
-              value={
-                latestSnapshot.engagement_rate != null
-                  ? `${(Number(latestSnapshot.engagement_rate) * 100).toFixed(2)}%`
-                  : '—'
-              }
-            />
-          </Card>
-          {latestSnapshot.low_organic_volume_flag && (
-            <p className="text-[11px] text-amber-600">
-              ⚠ Low organic post volume ({latestSnapshot.organic_posts_analyzed ?? 0} posts analyzed) — engagement numbers may be noisy.
-            </p>
           )}
         </div>
-      )}
+        {latestSnapshot ? (
+          <>
+            <Card className="p-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <SnapshotStat
+                label="Followers"
+                value={latestSnapshot.follower_count?.toLocaleString() ?? '—'}
+              />
+              <SnapshotStat
+                label="MoM Growth"
+                value={
+                  latestSnapshot.follower_growth_pct != null
+                    ? `${Number(latestSnapshot.follower_growth_pct) > 0 ? '↑' : Number(latestSnapshot.follower_growth_pct) < 0 ? '↓' : '·'} ${Math.abs(Number(latestSnapshot.follower_growth_pct)).toFixed(1)}%`
+                    : '—'
+                }
+              />
+              <SnapshotStat
+                label="Avg Views"
+                value={
+                  latestSnapshot.avg_views_per_post != null
+                    ? Number(latestSnapshot.avg_views_per_post).toLocaleString()
+                    : '—'
+                }
+              />
+              <SnapshotStat
+                label="Avg Reactions"
+                value={
+                  latestSnapshot.avg_reactions_per_post != null
+                    ? Number(latestSnapshot.avg_reactions_per_post).toLocaleString()
+                    : '—'
+                }
+              />
+              <SnapshotStat
+                label="Avg Replies"
+                value={
+                  latestSnapshot.avg_replies_per_post != null
+                    ? Number(latestSnapshot.avg_replies_per_post).toFixed(1)
+                    : '—'
+                }
+              />
+              <SnapshotStat
+                label="Posts/Wk"
+                value={
+                  latestSnapshot.posting_frequency != null
+                    ? Number(latestSnapshot.posting_frequency).toFixed(1)
+                    : '—'
+                }
+              />
+              <SnapshotStat
+                label="ER %"
+                value={
+                  latestSnapshot.engagement_rate != null
+                    ? `${(Number(latestSnapshot.engagement_rate) * 100).toFixed(2)}%`
+                    : '—'
+                }
+              />
+              <SnapshotStat
+                label="Organic Posts"
+                value={
+                  latestSnapshot.organic_posts_analyzed != null
+                    ? Number(latestSnapshot.organic_posts_analyzed).toLocaleString()
+                    : '—'
+                }
+              />
+            </Card>
+            {latestSnapshot.low_organic_volume_flag && (
+              <p className="text-[11px] text-amber-600">
+                ⚠ Low organic post volume ({latestSnapshot.organic_posts_analyzed ?? 0} posts analyzed) — engagement numbers may be noisy.
+              </p>
+            )}
+          </>
+        ) : (
+          <Card className="p-3 text-xs text-ink-warm-400 italic text-center">
+            No snapshots yet. Run an AI scan from the Score tab to create one.
+          </Card>
+        )}
+      </div>
 
       {/* Notes field — editable here. The /kols list also exposes this
           as the "Notes" column, but inline-editing a textarea in a
@@ -481,11 +532,15 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function ProfileBlock({ label, body }: { label: string; body: string }) {
+function ProfileBlock({ label, body, placeholder }: { label: string; body: string | null; placeholder?: string }) {
   return (
     <div className="text-xs">
       <div className="text-[10px] text-ink-warm-500 font-semibold uppercase tracking-wide">{label}</div>
-      <div className="mt-0.5 text-ink-warm-900 whitespace-pre-wrap leading-relaxed">{body}</div>
+      {body ? (
+        <div className="mt-0.5 text-ink-warm-900 whitespace-pre-wrap leading-relaxed">{body}</div>
+      ) : (
+        <div className="mt-0.5 text-ink-warm-400 italic">{placeholder ?? '—'}</div>
+      )}
     </div>
   );
 }
@@ -969,6 +1024,7 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
         // Snapshot rows have 4 mini-stats (Views/Reactions/Posts/ER)
         // so the skeleton uses stats=4 to match the loaded shape.
         <div className="space-y-2">
+          <Skeleton className="h-44 rounded-lg" />
           {Array.from({ length: 3 }).map((_, i) => (
             <RowSkeleton key={i} stats={4} notes={false} />
           ))}
@@ -978,10 +1034,13 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
           No snapshots yet. Log a monthly snapshot to feed the Channel Health and Growth Trajectory score dimensions.
         </p>
       ) : (
-        <div className="space-y-2">
-          {list.map((s) => (
-            <SnapshotRow key={s.id} s={s} onDelete={() => handleDelete(s)} />
-          ))}
+        <div className="space-y-3">
+          <SnapshotTrendChart rows={list} />
+          <div className="space-y-2">
+            {list.map((s) => (
+              <SnapshotRow key={s.id} s={s} onDelete={() => handleDelete(s)} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -1013,6 +1072,83 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Time-series chart for the Snapshots tab. Renders three lines —
+ * followers / avg views / ER % — sharing the X axis (month) but using
+ * separate Y axes so the very different magnitudes are all readable.
+ * Hides itself when there's only one snapshot (a chart of one point is
+ * just a dot).
+ */
+function SnapshotTrendChart({ rows }: { rows: KolChannelSnapshot[] }) {
+  // recharts wants data oldest-first along the X axis; the service
+  // returns newest-first, so reverse + flatten the fields we plot.
+  const data = [...rows]
+    .reverse()
+    .map(r => ({
+      month: (() => {
+        const d = new Date(r.snapshot_date + 'T00:00:00');
+        return isNaN(d.getTime())
+          ? r.snapshot_date
+          : d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      })(),
+      followers: r.follower_count ?? null,
+      avgViews: r.avg_views_per_post != null ? Number(r.avg_views_per_post) : null,
+      erPct: r.engagement_rate != null ? Number((Number(r.engagement_rate) * 100).toFixed(2)) : null,
+    }));
+
+  if (data.length < 2) return null;
+
+  return (
+    <Card className="p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs font-semibold text-ink-warm-700">Channel Trend</div>
+        <div className="flex items-center gap-3 text-[10px] text-ink-warm-500">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#3e8692' }} />Followers
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#8b5cf6' }} />Avg Views
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f59e0b' }} />ER %
+          </span>
+        </div>
+      </div>
+      <div className="h-44 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#6b7280' }} />
+            <YAxis
+              yAxisId="left"
+              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tickFormatter={(v) => `${v}%`}
+            />
+            <ChartTooltip
+              formatter={(value: any, name: any) => {
+                if (name === 'ER %') return [`${value}%`, name];
+                if (typeof value === 'number') return [value.toLocaleString(), name];
+                return [value, name];
+              }}
+              labelStyle={{ fontSize: 11 }}
+              contentStyle={{ fontSize: 11 }}
+            />
+            <Line yAxisId="left" type="monotone" dataKey="followers" name="Followers" stroke="#3e8692" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+            <Line yAxisId="left" type="monotone" dataKey="avgViews" name="Avg Views" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+            <Line yAxisId="right" type="monotone" dataKey="erPct" name="ER %" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   );
 }
 
