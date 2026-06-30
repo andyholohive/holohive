@@ -2596,19 +2596,12 @@ async function finalizeSubmission(opts: {
   const submittedAt = new Date();
   const submittedLabel = formatDateTime(submittedAt);
 
-  // Send KOL confirmation receipt per spec verbatim.
-  await sendTelegramMessage(
-    opts.chatId,
-    [
-      '✅ <b>Submission received</b>',
-      `Campaign: <b>${escapeHtml(opts.campaignName)}</b>`,
-      `Type: ${escapeHtml(opts.contentType)}`,
-      `Date: ${escapeHtml(submittedLabel)}`,
-      `Link: ${escapeHtml(opts.link)}`,
-    ].join('\n'),
-    'HTML',
-    opts.threadId,
-  );
+  // [2026-06-30] KOL confirmation receipt removed per Andy. KOLs were
+  // getting acknowledgement DMs after every /submit which was extra
+  // noise — the submission card already lands in the team review
+  // chat, and the team's approve/reject reply is the real signal a
+  // KOL cares about. Keep the dedup + error replies above (those
+  // ARE actionable), drop the success-path receipt.
 
   // Forward to the team review channel.
   await forwardSubmissionToReviewChannel({
