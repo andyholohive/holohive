@@ -2643,34 +2643,52 @@ async function finalizeSubmission(opts: {
 /**
  * [2026-06-12] HHP Submission-Progress Alert — fires after every
  * successful /submit. Posts day-split + daily quota push to the
- * campaign's tg_ops_group_id. Bot counts; team paces.
+ * global SPA chat. Bot counts; team paces.
  *
- * Data sources (all already exist):
+ * [2026-06-30] Destination consolidated to a single global chat
+ * (app_settings.spa_chat_id + spa_chat_thread_id) to match the
+ * other team-wide TG sections (lineup proposals, lineup confirms,
+ * content review). Falls back to campaigns.tg_ops_group_id only
+ * when the global setting is unset (legacy escape hatch — will be
+ * dropped once /admin/telegram-comm is configured).
+ *
+ * Data sources:
  *   - Live count: distinct content_items WHERE campaign + this week
  *   - Planned count: lineup_slots for campaign's current confirmed week
- *   - Destination: campaigns.tg_ops_group_id
- *   - KOL name: rendered live from master_kols
+ *   - KOL name + campaign name: included in the body so a single shared
+ *     chat can route alerts from all campaigns
  *
  * Day-split: 1-4 KOLs → 2-day, 5+ → 3-day. Daily quota = ceil(planned/days).
  * Push line appears when today's count hits quota.
  *
- * Edge cases: no confirmed lineup → omit % + split + push line. No ops
- * group configured → suppress + log warning.
+ * Edge cases: no confirmed lineup → omit % + split + push line. No
+ * destination configured anywhere → suppress + log warning.
  */
 async function sendSubmissionProgressAlert(opts: {
   campaignId: string;
   campaignName: string;
   kolName: string;
 }) {
-  // Get ops group id
-  const { data: campaign } = await (supabaseAdmin as any)
-    .from('campaigns')
-    .select('id, name, tg_ops_group_id, start_date')
-    .eq('id', opts.campaignId)
-    .maybeSingle();
-  const opsGroup = campaign?.tg_ops_group_id;
+  // Resolve destination: global SPA chat first, fall back to the
+  // per-campaign ops chat only when the global setting is unset.
+  const [chatSetting, threadSetting, campaignRes] = await Promise.all([
+    (supabaseAdmin as any).from('app_settings').select('value').eq('key', 'spa_chat_id').maybeSingle(),
+    (supabaseAdmin as any).from('app_settings').select('value').eq('key', 'spa_chat_thread_id').maybeSingle(),
+    (supabaseAdmin as any)
+      .from('campaigns')
+      .select('id, name, tg_ops_group_id, start_date')
+      .eq('id', opts.campaignId)
+      .maybeSingle(),
+  ]);
+  const campaign = (campaignRes as any)?.data ?? null;
+  const globalChatId = (chatSetting as any)?.data?.value as string | undefined;
+  const globalThreadIdRaw = (threadSetting as any)?.data?.value as string | undefined;
+  const opsGroup = globalChatId || campaign?.tg_ops_group_id;
+  const targetThreadId = globalChatId && globalThreadIdRaw
+    ? parseInt(globalThreadIdRaw, 10)
+    : undefined;
   if (!opsGroup) {
-    console.log('[progress-alert] No tg_ops_group_id for campaign — suppressed.');
+    console.log('[progress-alert] No spa_chat_id (or campaigns.tg_ops_group_id) — suppressed.');
     return;
   }
 
@@ -2748,7 +2766,7 @@ async function sendSubmissionProgressAlert(opts: {
     lines.push('<i>No confirmed lineup yet.</i>');
   }
 
-  await sendTelegramMessage(opsGroup, lines.join('\n'), 'HTML');
+  await sendTelegramMessage(opsGroup, lines.join('\n'), 'HTML', targetThreadId);
 }
 
 async function forwardSubmissionToReviewChannel(opts: {

@@ -28,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2,
+  CheckCircle2, Activity,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -366,13 +366,16 @@ export default function LineupSettingsPage() {
         )}
       </CollapsibleSection>
 
+      {/* ─── Submission-Progress Alert section [2026-06-30] ─── */}
+      <SubmissionProgressChannelSection />
+
       {/* ─── Per-campaign ops chat section ─── */}
       <CollapsibleSection
         icon={MessageCircle}
-        title="Campaign Ops Chats"
+        title="Campaign Ops Chats (legacy fallback)"
         badge={!campaignsLoading ? <CountChip n={campaigns.filter(c => c.tg_ops_group_id).length} total={campaigns.length} /> : null}
         subtitle={(
-          <>Telegram group chat where confirmed lineups get auto-posted (§ 6.3). Pick from the list of chats HHP has seen — same source as <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>.</>
+          <>Per-campaign fallback chat. Used only when the global Submission-Progress Alert destination above is empty. Going forward, leave this blank and configure the single global chat instead.</>
         )}
       >
         <Card className="border-cream-200">
@@ -736,6 +739,113 @@ function LineupConfirmedChannelSection() {
                   setThreadId(nextThread);
                 }}
                 label="Confirmed-lineup destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
+
+/**
+ * SubmissionProgressChannelSection — picker for the global destination of
+ * the post-live Submission-Progress Alert ("X just posted, N live this
+ * week"). Replaces the per-campaign `campaigns.tg_ops_group_id` routing
+ * as of 2026-06-30: every alert now lands in one shared chat, matching
+ * the other team-wide sections (proposals, confirmed lineups, review).
+ * Writes to app_settings.spa_chat_id + spa_chat_thread_id; the webhook
+ * falls back to per-campaign tg_ops_group_id only when this is unset.
+ */
+function SubmissionProgressChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'spa_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'spa_chat_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'spa_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'spa_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Submission-Progress destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'Post-live alerts will fire in this topic.' : 'Post-live alerts will fire in this chat.'
+          : 'Post-live alerts will fall back to the per-campaign tg_ops_group_id.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={Activity}
+      title="Submission-Progress Alert Channel"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm">Fallback</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Global chat that receives the post-live alert after every approved <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> ("X just posted, N live this week"). Replaces the legacy per-campaign client ops chat — every campaign&apos;s alerts now feed one shared team channel. Leave empty to fall back to <code className="bg-cream-100 px-1 rounded text-[10px]">campaigns.tg_ops_group_id</code>.</>
+      )}
+    >
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Submission-Progress destination"
                 disabled={saving}
               />
               <div className="flex items-center justify-end gap-2">
