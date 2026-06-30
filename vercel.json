@@ -49,6 +49,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/kol-niche-drift",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/cron/cron-health-check",
       "schedule": "0 8 * * *"
     },

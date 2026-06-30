@@ -173,6 +173,26 @@ export class KOLService {
         console.log('⚠️  KOL created but not indexed. Run indexing script later.');
       });
 
+      // [PROF.5 / Doc 2 Q7a] Auto-profile on KOL add. Fire the GHA
+      // dispatch for the kol-telegram-mcp scan-one workflow so the
+      // new KOL has a Channel Score + AI niche tags by the time someone
+      // opens their profile (~60s later). Fire-and-forget; failures
+      // are logged but don't block creation. Only fires for TG KOLs
+      // with a usable link — the refresh-tg route does the same check
+      // server-side and returns 400 if either is missing.
+      const platforms = Array.isArray(kolData.platform) ? kolData.platform : [];
+      const isTg = platforms.some(p =>
+        typeof p === 'string' && ['telegram', 'tg'].includes(p.toLowerCase().trim()),
+      );
+      if (isTg && kolData.link) {
+        fetch(`/api/kols/${kol.id}/refresh-tg`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch(scanError => {
+          console.error('Failed to auto-dispatch TG scan:', scanError);
+        });
+      }
+
       return (kol as unknown) as MasterKOL;
     } catch (error) {
       console.error('Error creating KOL:', error);

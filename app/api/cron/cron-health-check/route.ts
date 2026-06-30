@@ -53,6 +53,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   STINT_LAPSE_SWEEP: 1,        // daily — HHP Stint+Period F1 auto-stamp churn after grace
   DASHBOARD_ESCALATIONS: 1,    // daily 08:00 UTC — HHP Team Dashboard v2 escalations
   KOL_AVATAR_REFRESH: 1,       // daily 05:00 UTC — KOL-AVATAR.10 staleness cron
+  KOL_NICHE_DRIFT: 1,          // daily 04:30 UTC — PROF.6 / Doc 2 Q7b 30-day niche drift sweep
   TG_SCAN_NUDGE: 1,            // monthly (1st @ 03:00 UTC) — TG-CRON.1 manual scan reminder
   // Anything else defaults to 5 (daily-or-less crons)
 };
