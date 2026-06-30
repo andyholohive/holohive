@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Info, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { formatRelativeShort } from "@/lib/dateFormat";
 import type { ScoreResult, Tier } from "@/lib/kolScoreService";
 
 /**
@@ -31,6 +34,14 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
   const [data, setData] = useState<ScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // [2026-06-30] PROF.4 — on-demand TG scan (Doc 2 §4 Mode 3). State
+  // tracks the in-flight POST and the "queued at" timestamp so we can
+  // both disable the button mid-flight and show a "queued Nm ago" hint
+  // until the next score refetch.
+  const [refreshing, setRefreshing] = useState(false);
+  const [queuedAt, setQueuedAt] = useState<Date | null>(null);
+  const [bumpKey, setBumpKey] = useState(0);
+  const { toast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -45,7 +56,43 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
       .then(score => { if (!cancelled) { setData(score); setLoading(false); } })
       .catch(err => { if (!cancelled) { setError(err.message); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [kolId, refreshKey]);
+  }, [kolId, refreshKey, bumpKey]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/kols/${kolId}/refresh-tg`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: 'Refresh failed',
+          description: json.hint || json.error || `HTTP ${res.status}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setQueuedAt(new Date(json.queued_at || Date.now()));
+      toast({
+        title: 'Scan queued',
+        description: `${json.handle || 'KOL'} — snapshot + profile will land in ~${json.eta_seconds ?? 60}s.`,
+      });
+      // Auto-refetch the score after 90s to surface the new snapshot.
+      // The score endpoint reads the latest snapshot/deliverables row
+      // each call, so just bumping bumpKey re-runs the effect above.
+      window.setTimeout(() => setBumpKey(k => k + 1), 90_000);
+    } catch (err: any) {
+      toast({
+        title: 'Refresh failed',
+        description: err?.message || 'Network error',
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (loading) return <LoadingState />;
   if (error) return <div className="text-sm text-rose-600">{error}</div>;
@@ -55,30 +102,52 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
 
   return (
     <div className="space-y-4 text-sm">
-      {/* Hero — blended displayed score + tier + Channel/Campaign split. */}
+      {/* Hero — blended displayed score + tier + Channel/Campaign split.
+          The Refresh button (right side) dispatches scan-one.yml in the
+          MCP repo. Doc 2 §4 Mode 3: on-demand single-KOL refresh. */}
       <Card className="p-4">
-        <div className="flex items-baseline gap-3">
-          <span className="text-3xl font-bold text-ink-warm-900 tabular-nums leading-none">
-            {Math.round(blended.displayed)}
-          </span>
-          <TierBadge tier={blended.tier} />
-          {blended.lowConfidence && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-              <Info className="h-3 w-3" /> Low-confidence
-            </span>
-          )}
-        </div>
-        <div className="mt-2 flex items-center gap-3 text-xs text-ink-warm-500">
-          <span>
-            <span className="text-ink-warm-700 font-medium">Channel {Math.round(blended.channel)}</span>
-            {blended.activated && blended.campaign != null && (
-              <> <span className="mx-1.5">·</span>
-                <span className="text-ink-warm-700 font-medium">Campaign {Math.round(blended.campaign)}</span></>
-            )}
-          </span>
-          {!blended.activated && (
-            <span className="text-ink-warm-400">Not activated — needs 3+ deliverables for Campaign Performance.</span>
-          )}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-3xl font-bold text-ink-warm-900 tabular-nums leading-none">
+                {Math.round(blended.displayed)}
+              </span>
+              <TierBadge tier={blended.tier} />
+              {blended.lowConfidence && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                  <Info className="h-3 w-3" /> Low-confidence
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-xs text-ink-warm-500 flex-wrap">
+              <span>
+                <span className="text-ink-warm-700 font-medium">Channel {Math.round(blended.channel)}</span>
+                {blended.activated && blended.campaign != null && (
+                  <> <span className="mx-1.5">·</span>
+                    <span className="text-ink-warm-700 font-medium">Campaign {Math.round(blended.campaign)}</span></>
+                )}
+              </span>
+              {!blended.activated && (
+                <span className="text-ink-warm-400">Not activated — needs 3+ deliverables for Campaign Performance.</span>
+              )}
+              {queuedAt && (
+                <span className="text-ink-warm-400 italic">
+                  · Scan queued {formatRelativeShort(queuedAt.toISOString())} — score updates in ~1 min
+                </span>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="shrink-0"
+            title="Re-scan this KOL's Telegram channel + AI-refresh their profile fields"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Queuing…' : 'Refresh from TG'}
+          </Button>
         </div>
       </Card>
 
