@@ -37,6 +37,7 @@ import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   AlertTriangle, Clock, CheckCircle2, PlayCircle, Circle, PauseCircle,
   MessageCircle, LayoutDashboard,
@@ -62,6 +63,21 @@ export default function MyWorkTab() {
   // status (and edit anything else) from here. Previously rows were
   // read-only — no way to mark a task done without leaving the page.
   const [openTask, setOpenTask] = useState<Task | null>(null);
+
+  // [2026-06-30] Per Andy: clicking the status circle (ClickUp-style)
+  // opens an inline picker instead of opening the full modal. Updates
+  // optimistically so the row re-buckets immediately; server failure
+  // surfaces via console + reverts via the loadData refetch chain.
+  const handleStatusChange = async (taskId: string, newStatus: string) => {
+    const prev = tasks;
+    setTasks(t => t.map(x => x.id === taskId ? { ...x, status: newStatus } : x));
+    try {
+      await TaskService.updateTask(taskId, { status: newStatus });
+    } catch (err) {
+      console.error('Failed to update task status', err);
+      setTasks(prev);
+    }
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -229,6 +245,7 @@ export default function MyWorkTab() {
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
             onTaskClick={setOpenTask}
+            onStatusChange={handleStatusChange}
           />
         )}
 
@@ -242,6 +259,7 @@ export default function MyWorkTab() {
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
             onTaskClick={setOpenTask}
+            onStatusChange={handleStatusChange}
           />
         )}
 
@@ -255,6 +273,7 @@ export default function MyWorkTab() {
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
             onTaskClick={setOpenTask}
+            onStatusChange={handleStatusChange}
           />
         )}
 
@@ -269,6 +288,7 @@ export default function MyWorkTab() {
             getDueDateColor={getDueDateColor}
             clientMap={clientMap}
             onTaskClick={setOpenTask}
+            onStatusChange={handleStatusChange}
           />
         )}
 
@@ -335,6 +355,7 @@ function TaskListCard({
   getDueDateColor,
   clientMap,
   onTaskClick,
+  onStatusChange,
 }: {
   title: string;
   subtitle: string;
@@ -351,6 +372,10 @@ function TaskListCard({
    *  TaskDetailModal in the parent so status/assignee/due-date can
    *  be edited inline without leaving the dashboard. */
   onTaskClick?: (task: Task) => void;
+  /** Fires when the user picks a new status from the inline popover
+   *  on the status circle. Optional — when omitted the circle is
+   *  decorative only. ClickUp-style: click circle → pick status. */
+  onStatusChange?: (taskId: string, newStatus: string) => void;
 }) {
   return (
     <Card className="relative border-cream-200 overflow-hidden">
@@ -391,7 +416,51 @@ function TaskListCard({
               onKeyDown={onTaskClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTaskClick(task); } } : undefined}
               className={`px-4 py-2.5 flex items-center gap-3 transition-colors ${onTaskClick ? 'cursor-pointer hover:bg-cream-50' : 'hover:bg-cream-50'}`}
             >
-              <StatusIcon className={`h-4 w-4 ${cfg.color} flex-shrink-0`} aria-hidden />
+              {onStatusChange ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      className="flex-shrink-0 rounded-full p-0.5 hover:bg-cream-100 transition-colors"
+                      title={`Status: ${cfg.label} — click to change`}
+                    >
+                      <StatusIcon className={`h-4 w-4 ${cfg.color}`} aria-hidden />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="!bg-white border shadow-md p-1 w-44 z-[80]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([key, c]) => {
+                      const Icon = c.icon;
+                      const active = key === task.status;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (key !== task.status) onStatusChange(task.id, key);
+                            // Close the popover by dispatching Escape on
+                            // the document; Radix listens for it via the
+                            // open-state machinery.
+                            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+                          }}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded text-left transition-colors ${active ? 'bg-cream-100 font-medium' : 'hover:bg-cream-50'}`}
+                        >
+                          <Icon className={`h-3.5 w-3.5 ${c.color}`} aria-hidden />
+                          <span className="text-ink-warm-800">{c.label}</span>
+                        </button>
+                      );
+                    })}
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <StatusIcon className={`h-4 w-4 ${cfg.color} flex-shrink-0`} aria-hidden />
+              )}
               <span className={`flex-1 text-sm ${task.status === 'complete' ? 'line-through text-ink-warm-400' : 'text-ink-warm-900'}`}>
                 {task.task_name}
               </span>

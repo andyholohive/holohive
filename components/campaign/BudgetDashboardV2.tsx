@@ -76,13 +76,13 @@ function SectionHeader({
   );
 }
 
-type StintRollover = {
+type TermRollover = {
   id: string;
   label: string;
   status: 'active' | 'ended';
   allocated: number;
   spent: number;
-  /** Only populated when the stint has ended; null for active stints. */
+  /** Only populated when the term has ended; null for active terms. */
   rolledOver: number | null;
   rolloverPct: number | null;
 };
@@ -188,83 +188,75 @@ export function BudgetDashboardV2() {
     return { pctSpent, pctElapsed, gap: pctSpent - pctElapsed };
   }, [campaign, totalBudget, totals]);
 
-  // ── Rollover Summary, by stint ────────────────────────────────────
-  // [2026-06-25] Per Andy: rows are stints, not segments. For each
-  // stint we sum `client_engagement_periods.amount` as the allocated
-  // budget and match the campaign's payments by `payment_date` falling
-  // inside the stint window (start_date → end_date inclusive). Ended
-  // stints get a "rolled over" column = allocated − spent; active stints
-  // show "—" since rollover only crystallises at term close.
+  // ── Rollover Summary, by term ─────────────────────────────────────
+  // [2026-06-30] Per Andy: rows are TERMS (client_engagement_periods),
+  // not stints. A stint represents a continuous engagement chunk
+  // (effectively a different campaign era); within a stint each term
+  // is one signed slice with its own amount + window. Rollover
+  // crystallises term-by-term.
+  //
+  // For each term:
+  //   allocated = period.amount
+  //   spent     = sum of THIS campaign's payments inside the term's
+  //               [start_date, end_date] window
+  //   status    = end_date < today → ended; else active
+  //   rolled    = allocated - spent (ended only)
   const clientId = (campaign as any)?.client_id as string | null;
-  const [stintRollover, setStintRollover] = useState<StintRollover[] | null>(null);
+  const [termRollover, setTermRollover] = useState<TermRollover[] | null>(null);
   useEffect(() => {
-    if (!clientId) { setStintRollover([]); return; }
+    if (!clientId) { setTermRollover([]); return; }
     let cancelled = false;
     (async () => {
-      const [stintsRes, periodsRes] = await Promise.all([
-        (supabase as any)
-          .from('client_stints')
-          .select('id,start_date,end_date,status')
-          .eq('client_id', clientId)
-          .order('start_date', { ascending: true }),
-        (supabase as any)
-          .from('client_engagement_periods')
-          .select('stint_id,amount,start_date,end_date')
-          .order('start_date', { ascending: true }),
-      ]);
+      // Stints filter scopes terms to this client. We don't sum per
+      // stint here — the rows are per-term and the term row itself
+      // carries everything we need.
+      const stintsRes = await (supabase as any)
+        .from('client_stints')
+        .select('id')
+        .eq('client_id', clientId);
       if (cancelled) return;
-      const stints = (stintsRes.data ?? []) as Array<{
+      const stintIds = ((stintsRes.data ?? []) as Array<{ id: string }>).map(s => s.id);
+      if (stintIds.length === 0) { setTermRollover([]); return; }
+      const periodsRes = await (supabase as any)
+        .from('client_engagement_periods')
+        .select('id,stint_id,period_n,amount,start_date,end_date')
+        .in('stint_id', stintIds)
+        .order('start_date', { ascending: true });
+      if (cancelled) return;
+      const terms = (periodsRes.data ?? []) as Array<{
         id: string;
-        start_date: string;
-        end_date: string | null;
-        status: string;
-      }>;
-      const periods = (periodsRes.data ?? []) as Array<{
         stint_id: string;
+        period_n: number | null;
         amount: number | null;
+        start_date: string;
+        end_date: string;
       }>;
-      const allocByStint = new Map<string, number>();
-      for (const p of periods) {
-        const v = Number(p.amount ?? 0);
-        allocByStint.set(p.stint_id, (allocByStint.get(p.stint_id) ?? 0) + v);
-      }
-      // Bucket this campaign's payments by stint via payment_date.
+
+      // Bucket this campaign's payments by term via payment_date in
+      // the term's [start, end] window.
       const pmts = (payments ?? []) as Array<{ amount?: number; payment_date?: string | null }>;
-      const spentByStint = new Map<string, number>();
-      for (const stint of stints) {
-        const start = new Date(stint.start_date + 'T00:00:00');
-        const end = stint.end_date
-          ? new Date(stint.end_date + 'T23:59:59')
-          : new Date('9999-12-31T00:00:00');
-        let total = 0;
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const rows: TermRollover[] = terms.map((t) => {
+        const start = new Date(t.start_date + 'T00:00:00');
+        const end = new Date(t.end_date + 'T23:59:59');
+        let spent = 0;
         for (const p of pmts) {
           if (!p.payment_date) continue;
           const d = new Date(p.payment_date + (p.payment_date.includes('T') ? '' : 'T12:00:00'));
-          if (d >= start && d <= end) total += Number(p.amount ?? 0);
+          if (d >= start && d <= end) spent += Number(p.amount ?? 0);
         }
-        spentByStint.set(stint.id, total);
-      }
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const rows: StintRollover[] = stints.map((s, idx) => {
-        const allocated = allocByStint.get(s.id) ?? 0;
-        const spent = spentByStint.get(s.id) ?? 0;
-        // [2026-06-30] Derive status from end_date directly so this
-        // surface stays correct even if the persisted status column
-        // drifts (e.g. a cron updates updated_at without flipping
-        // status, or the row was last touched before the auto-derive
-        // trigger landed). end_date < today → ended; null/future →
-        // active. Matches the client_stints_derive_status trigger
-        // exactly.
-        const status: 'active' | 'ended' = s.end_date && s.end_date < todayIso ? 'ended' : 'active';
+        const allocated = Number(t.amount ?? 0);
+        const status: 'active' | 'ended' = t.end_date < todayIso ? 'ended' : 'active';
         const rolledOver = status === 'ended' ? allocated - spent : null;
         const rolloverPct =
           status === 'ended' && allocated > 0
             ? Math.round((rolledOver as number) / allocated * 100)
             : null;
-        const range = `${formatDate(s.start_date)} → ${s.end_date ? formatDate(s.end_date) : 'Ongoing'}`;
+        const termN = t.period_n ?? '?';
+        const range = `${formatDate(t.start_date)} → ${formatDate(t.end_date)}`;
         return {
-          id: s.id,
-          label: `Stint ${idx + 1} · ${range}`,
+          id: t.id,
+          label: `Term ${termN} · ${range}`,
           status,
           allocated,
           spent,
@@ -272,7 +264,7 @@ export function BudgetDashboardV2() {
           rolloverPct,
         };
       });
-      setStintRollover(rows);
+      setTermRollover(rows);
     })();
     return () => { cancelled = true; };
   }, [clientId, payments]);
@@ -428,18 +420,19 @@ export function BudgetDashboardV2() {
         )}
       </div>
 
-      {/* ── Rollover Summary by stint (collapsed by default) ─────────
-          [2026-06-25] Per Andy: rows are stints, not segments. Allocated
-          = sum of the stint's client_engagement_periods.amount.
-          Spent   = this campaign's payments with payment_date inside
-                    the stint window.
-          Rollover only computed for ended stints (active = "—" since
-          rollover crystallises at term close). */}
+      {/* ── Rollover Summary by term (collapsed by default) ──────────
+          [2026-06-30] Per Andy: rows are TERMS (client_engagement_periods),
+          not stints. A stint is the engagement-era container; each
+          term inside a stint is one signed slice with its own
+          allocation + window. Rollover crystallises term-by-term.
+          Allocated = the term's amount.
+          Spent     = this campaign's payments dated inside the term window.
+          Rollover only computed for ended terms; active terms show "—". */}
       <div>
         <SectionHeader
           id="rollover"
           title="Rollover Summary"
-          subtitle={stintRollover && stintRollover.length > 0 ? `${stintRollover.length} stint${stintRollover.length === 1 ? '' : 's'}` : 'No stints'}
+          subtitle={termRollover && termRollover.length > 0 ? `${termRollover.length} term${termRollover.length === 1 ? '' : 's'}` : 'No terms'}
           expanded={openSections.has('rollover')}
           onToggle={() => toggleSection('rollover')}
         />
@@ -447,18 +440,18 @@ export function BudgetDashboardV2() {
           <Card id="budget-section-rollover" className="border-cream-200 mt-2">
             <CardContent className="p-4">
               <p className="text-[11px] text-ink-warm-500 italic mb-3">
-                Per-stint view of allocated vs spent vs rolled forward. Allocated = sum of the stint&apos;s periods. Spent = this campaign&apos;s payments inside the stint window. Active stints show &quot;—&quot; for rollover until term close.
+                Per-term view of allocated vs spent vs rolled forward. Allocated = the term&apos;s amount. Spent = this campaign&apos;s payments inside the term window. Active terms show &quot;—&quot; for rollover until they close.
               </p>
-              {stintRollover === null ? (
-                <p className="text-xs text-ink-warm-400 italic">Loading stints…</p>
-              ) : stintRollover.length === 0 ? (
-                <p className="text-xs text-ink-warm-400 italic">No stints recorded for this client. Add one on the client&apos;s Engagement tab.</p>
+              {termRollover === null ? (
+                <p className="text-xs text-ink-warm-400 italic">Loading terms…</p>
+              ) : termRollover.length === 0 ? (
+                <p className="text-xs text-ink-warm-400 italic">No terms recorded for this client. Add one on the client&apos;s Engagement tab.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="text-xs w-full">
                     <thead className="border-b border-cream-100">
                       <tr className="text-left text-ink-warm-500">
-                        <th className="py-1.5 pr-3 font-medium">Stint</th>
+                        <th className="py-1.5 pr-3 font-medium">Term</th>
                         <th className="py-1.5 pr-3 font-medium text-right">Allocated</th>
                         <th className="py-1.5 pr-3 font-medium text-right">Spent</th>
                         <th className="py-1.5 pr-3 font-medium text-right">Rolled over</th>
@@ -466,7 +459,7 @@ export function BudgetDashboardV2() {
                       </tr>
                     </thead>
                     <tbody className="font-mono">
-                      {stintRollover.map((row) => (
+                      {termRollover.map((row) => (
                         <tr key={row.id} className="border-b border-cream-50">
                           <td className="py-1.5 pr-3 font-sans">
                             {row.label}
