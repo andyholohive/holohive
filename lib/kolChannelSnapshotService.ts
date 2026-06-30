@@ -38,6 +38,16 @@ export interface KolChannelSnapshot {
    *  Trigger-derived from the previous snapshot for the same KOL
    *  (mig 075). NULL on the first snapshot per KOL. */
   follower_growth_pct: number | null;
+  /** Doc 2 Discussion Engagement input. Avg replies per post in the
+   *  organic sample. Written by the Telegram MCP scan. */
+  avg_replies_per_post: number | null;
+  /** Doc 2 — count of posts the scan deemed organic (after the
+   *  promotional/forward filter). Helps the team judge how trustworthy
+   *  a snapshot is. */
+  organic_posts_analyzed: number | null;
+  /** Doc 2 §4 — true when the organic sample was <5 posts, signalling
+   *  the snapshot's engagement numbers are noisy. */
+  low_organic_volume_flag: boolean | null;
 }
 
 export interface CreateKolChannelSnapshotInput {

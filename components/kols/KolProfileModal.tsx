@@ -275,7 +275,24 @@ function OverviewTab({
 }) {
   const [notes, setNotes] = useState(kol.notes || "");
   const [savingNotes, setSavingNotes] = useState(false);
+  // Latest snapshot — fetched here so the team can see channel health
+  // (followers / avg views / ER% / posts-per-week) without flipping to
+  // the Snapshots tab. Same row that scoring reads from.
+  const [latestSnapshot, setLatestSnapshot] = useState<KolChannelSnapshot | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await KolChannelSnapshotService.getForKol(kol.id);
+        if (!cancelled) setLatestSnapshot(rows[0] ?? null);
+      } catch (err) {
+        console.warn('[OverviewTab] latest snapshot fetch failed', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [kol.id]);
 
   const saveNotes = async () => {
     if (notes === (kol.notes || "")) return;
@@ -291,6 +308,18 @@ function OverviewTab({
       setSavingNotes(false);
     }
   };
+
+  // Profile section visibility — only render when the Telegram scan has
+  // populated at least one of the four AI-inferred fields. Avoids a
+  // sea-of-em-dashes for KOLs that haven't been scanned yet.
+  const niche = kol.niche_tags || [];
+  const creator = kol.creator_types || [];
+  const hasProfile =
+    niche.length > 0 ||
+    creator.length > 0 ||
+    (kol.style_summary && kol.style_summary.trim()) ||
+    (kol.audience_summary && kol.audience_summary.trim()) ||
+    (kol.brief_angle_hint && kol.brief_angle_hint.trim());
 
   return (
     <div className="space-y-4 text-sm">
@@ -334,6 +363,97 @@ function OverviewTab({
           tab per Jdot Q8 (modal-with-tabs). Single source of truth — no
           stale-prop-vs-fresh-fetch drift between Overview and Score. */}
 
+      {/* Profile Insights — AI-inferred niche / creator type / style /
+          audience / brief angle from the Telegram MCP scan (Doc 2 Q7a).
+          Empty until the first scan completes; team can override via
+          edit dialog. */}
+      {hasProfile && (
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-ink-warm-700">Profile Insights</div>
+          <Card className="p-3 space-y-3">
+            {(niche.length > 0 || creator.length > 0) && (
+              <div className="space-y-2">
+                {niche.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-warm-500 mr-1">Niche</span>
+                    {niche.map(tag => (
+                      <StatusBadge key={tag} tone="brand" size="sm" bordered>{tag}</StatusBadge>
+                    ))}
+                  </div>
+                )}
+                {creator.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-warm-500 mr-1">Creator</span>
+                    {creator.map(tag => (
+                      <StatusBadge key={tag} tone="purple" size="sm" bordered>{tag}</StatusBadge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {kol.style_summary && (
+              <ProfileBlock label="Style" body={kol.style_summary} />
+            )}
+            {kol.audience_summary && (
+              <ProfileBlock label="Audience" body={kol.audience_summary} />
+            )}
+            {kol.brief_angle_hint && (
+              <ProfileBlock label="Brief Angle" body={kol.brief_angle_hint} />
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Latest Channel Snapshot — surfaces the most recent scan's
+          headline metrics so the team doesn't need to flip to the
+          Snapshots tab for at-a-glance channel health. Snapshot tab
+          remains the time-series + edit/delete surface. */}
+      {latestSnapshot && (
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <div className="text-xs font-semibold text-ink-warm-700">Latest Channel Snapshot</div>
+            <div className="text-[10px] text-ink-warm-500">
+              Scanned {formatDate(new Date(latestSnapshot.snapshot_date + 'T00:00:00'))}
+            </div>
+          </div>
+          <Card className="p-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <SnapshotStat
+              label="Followers"
+              value={latestSnapshot.follower_count?.toLocaleString() ?? '—'}
+            />
+            <SnapshotStat
+              label="Avg Views"
+              value={
+                latestSnapshot.avg_views_per_post != null
+                  ? Number(latestSnapshot.avg_views_per_post).toLocaleString()
+                  : '—'
+              }
+            />
+            <SnapshotStat
+              label="Posts/Wk"
+              value={
+                latestSnapshot.posting_frequency != null
+                  ? Number(latestSnapshot.posting_frequency).toFixed(1)
+                  : '—'
+              }
+            />
+            <SnapshotStat
+              label="ER %"
+              value={
+                latestSnapshot.engagement_rate != null
+                  ? `${(Number(latestSnapshot.engagement_rate) * 100).toFixed(2)}%`
+                  : '—'
+              }
+            />
+          </Card>
+          {latestSnapshot.low_organic_volume_flag && (
+            <p className="text-[11px] text-amber-600">
+              ⚠ Low organic post volume ({latestSnapshot.organic_posts_analyzed ?? 0} posts analyzed) — engagement numbers may be noisy.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Notes field — editable here. The /kols list also exposes this
           as the "Notes" column, but inline-editing a textarea in a
           table cell is cramped; the modal is a better home. */}
@@ -357,6 +477,24 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="text-xs">
       <div className="text-ink-warm-500 font-semibold uppercase tracking-wide">{label}</div>
       <div className="mt-0.5 text-ink-warm-900">{value}</div>
+    </div>
+  );
+}
+
+function ProfileBlock({ label, body }: { label: string; body: string }) {
+  return (
+    <div className="text-xs">
+      <div className="text-[10px] text-ink-warm-500 font-semibold uppercase tracking-wide">{label}</div>
+      <div className="mt-0.5 text-ink-warm-900 whitespace-pre-wrap leading-relaxed">{body}</div>
+    </div>
+  );
+}
+
+function SnapshotStat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] text-ink-warm-500 font-semibold uppercase tracking-wide">{label}</div>
+      <div className="mt-0.5 text-sm font-semibold text-ink-warm-900 tabular-nums">{value}</div>
     </div>
   );
 }
@@ -918,14 +1056,25 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
                 </span>
               </StatusBadge>
             )}
+            {/* Doc 2 §4 — surface low-organic-volume so the team knows
+                this row's engagement numbers are noisy and shouldn't
+                drive a confident scoring decision on their own. */}
+            {s.low_organic_volume_flag && (
+              <StatusBadge tone="warning" size="sm" bordered>
+                <span title={`Only ${s.organic_posts_analyzed ?? 0} organic posts in sample`}>
+                  Low organic volume
+                </span>
+              </StatusBadge>
+            )}
           </div>
           {/* [May 2026 KOL overhaul follow-up] avg_forwards_per_post
               intentionally dropped per the user's exclusion list. The
               column still exists in kol_channel_snapshots for
               compatibility but isn't surfaced or written from the UI. */}
-          <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+          <div className="mt-2 grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
             <Stat label="Avg Views" value={s.avg_views_per_post} />
             <Stat label="Avg Reactions" value={s.avg_reactions_per_post} />
+            <Stat label="Avg Replies" value={s.avg_replies_per_post} />
             <Stat label="Posts/Wk" value={s.posting_frequency != null ? Number(s.posting_frequency) : null} />
             {/* Engagement rate (avg_views / followers) — formatted as
                 a percentage with 2 decimals for sub-1% precision
@@ -934,6 +1083,7 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
               label="ER %"
               value={engagementRate != null ? Number((engagementRate * 100).toFixed(2)) : null}
             />
+            <Stat label="Organic Posts" value={s.organic_posts_analyzed} />
           </div>
           {s.notes && <p className="mt-2 text-xs text-ink-warm-700 italic">"{s.notes}"</p>}
         </div>

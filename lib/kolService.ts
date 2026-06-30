@@ -46,6 +46,12 @@ export interface MasterKOL {
   standard_rate?: number | null;
   /** Per-KOL repost (QRT) rate (USD). Defaults to 50% of standard_rate on first-time confirm. Per REPOST-RATE.1. */
   repost_rate?: number | null;
+  /** AI-inferred posting style summary (Doc 2 Q7a). Written by the Telegram MCP scan via /api/mcp/kol-profile/update. */
+  style_summary?: string | null;
+  /** AI-inferred audience summary (Doc 2 Q7a). */
+  audience_summary?: string | null;
+  /** AI-inferred brief-angle hint (Doc 2 Q7a). One-line activation hook the team can lift into a brief. */
+  brief_angle_hint?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
