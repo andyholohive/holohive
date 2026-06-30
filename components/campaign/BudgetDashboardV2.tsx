@@ -244,10 +244,18 @@ export function BudgetDashboardV2() {
         }
         spentByStint.set(stint.id, total);
       }
+      const todayIso = new Date().toISOString().slice(0, 10);
       const rows: StintRollover[] = stints.map((s, idx) => {
         const allocated = allocByStint.get(s.id) ?? 0;
         const spent = spentByStint.get(s.id) ?? 0;
-        const status: 'active' | 'ended' = s.status === 'ended' ? 'ended' : 'active';
+        // [2026-06-30] Derive status from end_date directly so this
+        // surface stays correct even if the persisted status column
+        // drifts (e.g. a cron updates updated_at without flipping
+        // status, or the row was last touched before the auto-derive
+        // trigger landed). end_date < today → ended; null/future →
+        // active. Matches the client_stints_derive_status trigger
+        // exactly.
+        const status: 'active' | 'ended' = s.end_date && s.end_date < todayIso ? 'ended' : 'active';
         const rolledOver = status === 'ended' ? allocated - spent : null;
         const rolloverPct =
           status === 'ended' && allocated > 0
@@ -396,7 +404,7 @@ export function BudgetDashboardV2() {
       <div>
         <SectionHeader
           id="phase2"
-          title="Phase 2 · Spend Funnel"
+          title="Community Activation Spend Funnel"
           subtitle="Spend → Clicks → Sign-ups → Wallets → Volume"
           expanded={openSections.has('phase2')}
           onToggle={() => toggleSection('phase2')}
