@@ -87,6 +87,25 @@ export async function GET(request: Request) {
       if (!updErr) endedCount++;
     }
 
+    // [2026-06-30] Belt-and-suspenders for the auto-derive trigger:
+    // a stint whose end_date silently passes (no row write) won't
+    // re-fire the BEFORE UPDATE trigger, so we also sweep here.
+    // Touch each row's updated_at so the trigger recomputes status.
+    const { data: silentlyLapsed } = await (supabase as any)
+      .from('client_stints')
+      .select('id')
+      .eq('status', 'active')
+      .not('end_date', 'is', null)
+      .lt('end_date', new Date().toISOString().slice(0, 10));
+    let silentEndedCount = 0;
+    for (const row of ((silentlyLapsed ?? []) as Array<{ id: string }>)) {
+      const { error } = await (supabase as any)
+        .from('client_stints')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', row.id);
+      if (!error) silentEndedCount++;
+    }
+
     // Log run complete
     if (agentRunId) {
       await (supabase as any)

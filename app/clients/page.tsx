@@ -336,6 +336,11 @@ export default function ClientsPage() {
   const partnerIdParam = searchParams.get('partnerId');
   const [clients, setClients] = useState<ClientWithAccess[]>([]);
   const [clientsWithStatus, setClientsWithStatus] = useState<ClientWithStatus[]>([]);
+  /** Per-client earliest stint start_date. Sourced from client_stints
+   *  in fetchClients(); the card uses this in place of the older
+   *  client_context.start_date so the card always reflects the
+   *  Engagement tab's truth. */
+  const [earliestStintStartByClient, setEarliestStintStartByClient] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -792,6 +797,21 @@ export default function ClientsPage() {
           .is('parent_task_id', null)
           .not('client_id', 'is', null),
       ]);
+
+      // [2026-06-30] Per Andy: client card start date should anchor to
+      // the earliest stint, not client_context.start_date. We pull
+      // ASC-sorted stints once and keep the first start per client.
+      const stintsRes = await supabase
+        .from('client_stints')
+        .select('client_id, start_date')
+        .order('start_date', { ascending: true });
+      const earliestStintStart: Record<string, string> = {};
+      for (const s of ((stintsRes as any).data ?? []) as Array<{ client_id: string; start_date: string }>) {
+        if (!earliestStintStart[s.client_id] && s.start_date) {
+          earliestStintStart[s.client_id] = s.start_date;
+        }
+      }
+      setEarliestStintStartByClient(earliestStintStart);
 
       // Build the campaigns-by-status map per client
       const statusMap: Record<string, Record<CampaignStatus, number>> = {};
@@ -3413,6 +3433,19 @@ export default function ClientsPage() {
                       and the DialogFooter (also inside <form> for submit
                       semantics) stays pinned at the bottom. */}
                   <form onSubmit={handleCreateClient} className="flex flex-col flex-1 min-h-0">
+                    {/* [2026-06-30] Per Andy: Engagement editor lives
+                        here, not on the Client Context modal. Add Client
+                        sees Details only (no client id yet); Edit Client
+                        gets both. Tabs sit above the scroll body so the
+                        DialogFooter Save / Cancel still pin below. */}
+                    <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
+                      <TabsList className="bg-cream-100/40 mt-1">
+                        <TabsTrigger value="details" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Details</TabsTrigger>
+                        {isEditMode && (
+                          <TabsTrigger value="engagement" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Engagement</TabsTrigger>
+                        )}
+                      </TabsList>
+                      <TabsContent value="details" className="flex-1 flex flex-col min-h-0 mt-0">
                     <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                       <div className="grid gap-2">
                         <Label htmlFor="name">Company Name</Label>
@@ -3635,6 +3668,15 @@ export default function ClientsPage() {
                         )}
                       </div>
                     </div>
+                      </TabsContent>
+                      {isEditMode && editingClient && (
+                        <TabsContent value="engagement" className="flex-1 flex flex-col min-h-0 mt-0">
+                          <div className="flex-1 overflow-y-auto px-1 pb-4">
+                            <EngagementTab clientId={editingClient.id} />
+                          </div>
+                        </TabsContent>
+                      )}
+                    </Tabs>
                     <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
                         Cancel
@@ -3922,14 +3964,17 @@ export default function ClientsPage() {
                               <span className="font-semibold text-ink-warm-700">
                                 {weekN != null ? `Week ${weekN}` : 'Engagement live'}
                               </span>
-                              {/* Date range. Start date prefers the client_context
-                                  value (what the team sees in the modal), falling
-                                  back to clients.engagement_start_date. End date
-                                  reads clients.engagement_end_date; if null, the
-                                  engagement is open-ended → "ongoing". Per Andy
-                                  2026-06-19. */}
+                              {/* Date range. Start prefers the earliest stint
+                                  start_date (Engagement tab is the source of
+                                  truth per Andy 2026-06-30); falls back to
+                                  client_context.start_date, then to
+                                  clients.engagement_start_date. End reads
+                                  clients.engagement_end_date; null → ongoing. */}
                               {(() => {
-                                const startRaw = ctx?.start_date || (client as any).engagement_start_date;
+                                const startRaw =
+                                  earliestStintStartByClient[client.id]
+                                  || ctx?.start_date
+                                  || (client as any).engagement_start_date;
                                 if (!startRaw) return null;
                                 const start = formatDate(new Date(startRaw + 'T00:00:00'));
                                 const endRaw = (client as any).engagement_end_date as string | null | undefined;
@@ -4715,12 +4760,10 @@ export default function ClientsPage() {
                     dashboard reads from same column. HH-side action items
                     auto-create HQ tasks on save. */}
                 <TabsTrigger value="call-notes" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Call Notes</TabsTrigger>
-                {/* [2026-06-23] 5th tab — Engagement (stints + periods).
-                    First UI write surface for the Stint + Period substrate
-                    that was shipped backend-only with the lapse cron.
-                    Editor lives here so users can correct anything the
-                    cron auto-ends and add periods as engagements extend. */}
-                <TabsTrigger value="engagement" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Engagement</TabsTrigger>
+                {/* [2026-06-30] Engagement tab moved to the Edit Client
+                    popup per Andy — the substrate is admin-only data, so
+                    living next to "Edit Client" matches its scope better
+                    than the Context modal that team members open daily. */}
               </TabsList>
               {/* Each tab is its own flex-col so the body scrolls and
                   the action row stays pinned below it. Previously the
@@ -5891,13 +5934,6 @@ export default function ClientsPage() {
                       clientId={contextModalClient.id}
                       currentUserId={user?.id ?? null}
                     />
-                  )}
-                </div>
-              </TabsContent>
-              <TabsContent value="engagement" className="flex-1 flex flex-col min-h-0 mt-0">
-                <div className="flex-1 overflow-y-auto px-1 pb-4">
-                  {contextModalClient && (
-                    <EngagementTab clientId={contextModalClient.id} />
                   )}
                 </div>
               </TabsContent>

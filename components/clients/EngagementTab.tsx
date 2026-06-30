@@ -265,12 +265,16 @@ export function EngagementTab({ clientId }: { clientId: string }) {
     }
     setSavingStint(true);
     try {
+      // status + ended_reason are derived: status is auto-set by the
+      // client_stints_derive_status DB trigger; we no longer expose
+      // status/reason in the dialog (per Andy 2026-06-30). Sending
+      // `status` is still safe — the trigger overrides on write — but
+      // omitting `ended_reason` preserves any prior value (e.g.
+      // "coverage_lapse" stamped by the cron) on edit.
       const payload = {
         client_id: clientId,
         start_date: toIsoDate(stintForm.start_date)!,
         end_date: stintForm.end_date ? toIsoDate(stintForm.end_date)! : null,
-        status: stintForm.status,
-        ended_reason: stintForm.ended_reason.trim() || null,
         notes: stintForm.notes.trim() || null,
       };
       if (editingStint) {
@@ -351,16 +355,16 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       };
       if (editingPeriod) {
         await updatePeriod(editingPeriod.id, payload);
-        toast({ title: 'Period updated' });
+        toast({ title: 'Term updated' });
       } else {
         await createPeriod(payload);
-        toast({ title: 'Period added' });
+        toast({ title: 'Term added' });
       }
       setPeriodDialogOpen(false);
       await load();
     } catch (e: unknown) {
       const err = e instanceof Error ? e.message : 'Save failed.';
-      toast({ title: 'Could not save period', description: err, variant: 'destructive' });
+      toast({ title: 'Could not save term', description: err, variant: 'destructive' });
     } finally {
       setSavingPeriod(false);
     }
@@ -374,7 +378,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
         toast({ title: 'Stint deleted' });
       } else {
         await deletePeriod(confirmDelete.id);
-        toast({ title: 'Period deleted' });
+        toast({ title: 'Term deleted' });
       }
       setConfirmDelete(null);
       await load();
@@ -398,12 +402,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-ink-warm-900">Engagement</h3>
-          <p className="text-xs text-ink-warm-500 mt-0.5">
-            Stints + periods drive the renewal pill on the dashboard and the daily lapse cron.
-          </p>
-        </div>
+        <h3 className="text-sm font-semibold text-ink-warm-900">Engagement</h3>
         <Button variant="brand" size="sm" onClick={openAddStint}>
           <Plus className="h-4 w-4 mr-2" />Add Stint
         </Button>
@@ -451,7 +450,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                         {stint.end_date ? formatDate(stint.end_date) : 'Ongoing'}
                       </div>
                       <div className="text-xs text-ink-warm-500">
-                        {stint.periods.length} period{stint.periods.length === 1 ? '' : 's'}
+                        {stint.periods.length} term{stint.periods.length === 1 ? '' : 's'}
                         {stint.coverage?.covered_through && (
                           <> · Covered through {formatDate(stint.coverage.covered_through)}</>
                         )}
@@ -484,7 +483,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                         setConfirmDelete({
                           kind: 'stint',
                           id: stint.id,
-                          label: `${formatDate(stint.start_date)} stint and all its ${stint.periods.length} period(s)`,
+                          label: `${formatDate(stint.start_date)} stint and all its ${stint.periods.length} term(s)`,
                         })
                       }
                       aria-label="Delete stint"
@@ -510,11 +509,11 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                     {stint.periods.length === 0 ? (
                       <EmptyState
                         icon={CalIcon}
-                        title="No periods yet"
-                        description="Add a period to extend coverage."
+                        title="No terms yet"
+                        description="Add a term to extend coverage."
                       >
                         <Button variant="brand" size="sm" onClick={() => openAddPeriod(stint.id)}>
-                          <Plus className="h-4 w-4 mr-2" />Add First Period
+                          <Plus className="h-4 w-4 mr-2" />Add First Term
                         </Button>
                       </EmptyState>
                     ) : (
@@ -524,8 +523,6 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                             <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
                               <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500 w-12">#</TableHead>
                               <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Dates</TableHead>
-                              <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Signed</TableHead>
-                              <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Scope</TableHead>
                               <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-ink-warm-500 text-right">Amount</TableHead>
                               <TableHead className="h-9 py-2 w-20" />
                             </TableRow>
@@ -537,12 +534,6 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                                 <TableCell className="py-2.5 text-sm">
                                   {formatDate(p.start_date)} → {formatDate(p.end_date)}
                                 </TableCell>
-                                <TableCell className="py-2.5 text-sm">
-                                  {p.signed_date ? formatDate(p.signed_date) : <span className="text-ink-warm-400">—</span>}
-                                </TableCell>
-                                <TableCell className="py-2.5 text-sm max-w-[200px] truncate" title={p.scope}>
-                                  {p.scope || <span className="text-ink-warm-400">—</span>}
-                                </TableCell>
                                 <TableCell className="py-2.5 text-sm text-right tabular-nums">
                                   {p.amount > 0 ? `$${Number(p.amount).toLocaleString('en-US')}` : <span className="text-ink-warm-400">—</span>}
                                 </TableCell>
@@ -553,7 +544,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                                       size="sm"
                                       className="h-7 w-7 p-0"
                                       onClick={() => openEditPeriod(p)}
-                                      aria-label="Edit period"
+                                      aria-label="Edit term"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
@@ -565,10 +556,10 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                                         setConfirmDelete({
                                           kind: 'period',
                                           id: p.id,
-                                          label: `Period ${p.period_n} (${formatDate(p.start_date)} → ${formatDate(p.end_date)})`,
+                                          label: `Term ${p.period_n} (${formatDate(p.start_date)} → ${formatDate(p.end_date)})`,
                                         })
                                       }
-                                      aria-label="Delete period"
+                                      aria-label="Delete term"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
@@ -584,7 +575,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                           onClick={() => openAddPeriod(stint.id)}
                           className="w-fit"
                         >
-                          <Plus className="h-4 w-4 mr-2" />Add Period
+                          <Plus className="h-4 w-4 mr-2" />Add Term
                         </Button>
                       </>
                     )}
@@ -621,32 +612,10 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                 onChange={(d) => setStintForm({ ...stintForm, end_date: d })}
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label>Status</Label>
-              <Select
-                value={stintForm.status}
-                onValueChange={(v) => setStintForm({ ...stintForm, status: v as 'active' | 'ended' })}
-              >
-                <SelectTrigger className="h-9 focus-brand">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="ended">Ended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {stintForm.status === 'ended' && (
-              <div className="grid gap-1.5">
-                <Label>Reason for ending</Label>
-                <Input
-                  value={stintForm.ended_reason}
-                  onChange={(e) => setStintForm({ ...stintForm, ended_reason: e.target.value })}
-                  placeholder="Churn / pause / replaced / etc."
-                  className="h-9 focus-brand"
-                />
-              </div>
-            )}
+            {/* Status + ended_reason controls dropped per Andy 2026-06-30 —
+                status is now auto-derived from end_date by the
+                client_stints_derive_status DB trigger. Set an End Date
+                to mark a stint as ended; leave it blank to keep active. */}
             <div className="grid gap-1.5">
               <Label>Notes</Label>
               <Textarea
@@ -671,9 +640,9 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       <Dialog open={periodDialogOpen} onOpenChange={setPeriodDialogOpen}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>{editingPeriod ? 'Edit Period' : 'Add Period'}</DialogTitle>
+            <DialogTitle>{editingPeriod ? 'Edit Term' : 'Add Term'}</DialogTitle>
             <DialogDescription>
-              A period is one signed slice of work inside a stint. Add one per renewal or
+              A term is one signed slice of work inside a stint. Add one per renewal or
               expansion; the dashboard reads the latest end-date as "covered through."
             </DialogDescription>
           </DialogHeader>
@@ -682,7 +651,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                 Andy 2026-06-26 (rarely used; clutters the form). */}
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label>Period # <RequiredAsterisk /></Label>
+                <Label>Term # <RequiredAsterisk /></Label>
                 <Input
                   type="number"
                   min={1}
@@ -749,7 +718,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       <Dialog open={confirmDelete !== null} onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Delete {confirmDelete?.kind === 'stint' ? 'Stint' : 'Period'}</DialogTitle>
+            <DialogTitle>Delete {confirmDelete?.kind === 'stint' ? 'Stint' : 'Term'}</DialogTitle>
             <DialogDescription>
               This will permanently remove {confirmDelete?.label}. This can't be undone.
             </DialogDescription>
