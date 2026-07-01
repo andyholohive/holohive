@@ -2421,13 +2421,21 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   const todayIso = new Date().toISOString().slice(0, 10);
   const { data: assignments } = await (supabaseAdmin as any)
     .from('campaign_kols')
-    .select('id, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at)')
+    .select('id, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name))')
     .eq('master_kol_id', caller.id)
     .is('deleted_at', null);
 
   const activeCampaigns = ((assignments ?? []) as Array<{
     id: string;
-    campaign: { id: string; name: string; status: string; start_date: string | null; end_date: string | null; archived_at: string | null };
+    campaign: {
+      id: string;
+      name: string;
+      status: string;
+      start_date: string | null;
+      end_date: string | null;
+      archived_at: string | null;
+      client: { id: string; name: string } | null;
+    };
   }>)
     .map(a => a.campaign)
     .filter(c =>
@@ -2490,8 +2498,12 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   // fails to send and the bot appears unresponsive. We use only the first
   // 8 chars of the campaign UUID (plenty unique within this KOL's small
   // active-campaign set) and resolve back to the full id on callback.
+  // Prefer the CLIENT name in the button label — KOLs identify their
+  // work by the client they're delivering for (Venice, Fogo, Altura),
+  // not by our internal campaign name ("Venice Korea Expansion").
+  // Fall back to campaign name if a campaign has no client wired up.
   const buttons = activeCampaigns.map(c => [{
-    text: c.name,
+    text: c.client?.name || c.name,
     callback_data: `subm:pick:${pending.id}:${c.id.slice(0, 8)}`,
   }]);
   buttons.push([{ text: '❌ Cancel', callback_data: `subm:cancel:${pending.id}` }]);

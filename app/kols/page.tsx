@@ -119,13 +119,16 @@ export default function KOLsPage() {
     projects: true,
     creator_type: true,
     niche: true,
-    // content_type + pricing (Pricing Tier) intentionally hidden — the
-    // toggle dropdown no longer exposes them either. Cells still render
-    // if a saved URL pre-dating this change has them on, but power
-    // users can't switch them on going forward.
+    // content_type intentionally hidden — the toggle dropdown no longer
+    // exposes it either. Cells still render if a saved URL pre-dating
+    // this change has it on.
     content_type: false,
     deliverables: true,
-    pricing: false,
+    // [2026-07-01] Pricing (free-text override) is back on by default
+    // per Andy — ops need to write bespoke deal terms directly on the
+    // row. Distinct from `latest_cost` (renamed to "Latest Cost"), which
+    // shows the realized rate from campaign contents.
+    pricing: true,
     latest_cost: true,
     community: true,
     group_chat: true,
@@ -1682,14 +1685,25 @@ export default function KOLsPage() {
           }
           if (field === 'link' && value) {
             return (
-              <a 
-                href={value} 
-                target="_blank" 
-                rel="noopener noreferrer" 
+              <a
+                href={value}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-800"
               >
                 <span className="truncate max-w-32">{value}</span>
               </a>
+            );
+          }
+          // Pricing chip — same colour palette as the old select-mode
+          // display. Free-text edits ride the same rendering path;
+          // unknown values fall back to the default blue chip via
+          // getPricingColor's `colorMap[pricing] || 'bg-blue-100 …'`.
+          if (field === 'pricing' && value) {
+            return (
+              <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(value)}`}>
+                {value}
+              </span>
             );
           }
           return value || '-';
@@ -2612,7 +2626,7 @@ export default function KOLsPage() {
                     creator_type: 'Creator Type',
                     niche: 'Niche',
                     deliverables: 'Content Type',
-                    latest_cost: 'Pricing',
+                    latest_cost: 'Latest Cost',
                     community: 'Community Founder',
                     group_chat: 'Group Chat',
                     in_house: 'In-House',
@@ -3039,7 +3053,7 @@ export default function KOLsPage() {
                 </TableHead>
               )}
               {visibleColumns.latest_cost && (
-                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Latest Cost</TableHead>
               )}
               {/* Score: placeholder until Phase 3 (kol_channel_snapshots
                   + scoring formula) ships. Show a static "Score" header;
@@ -3357,7 +3371,7 @@ export default function KOLsPage() {
                   )}
                   {visibleColumns.pricing && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
-                    <div>{renderEditableCell(kol.pricing, 'pricing', kol.id, 'select')}</div>
+                    <div>{renderEditableCell(kol.pricing, 'pricing', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.latest_cost && (
@@ -3805,7 +3819,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.content_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
             {visibleColumns.deliverables && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
             {visibleColumns.pricing && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
-            {visibleColumns.latest_cost && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
+            {visibleColumns.latest_cost && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Latest Cost</TableHead>}
             {/* Score + Projects added per May 2026 KOL overhaul spec.
                 Rating column removed (migration 071). Loading skeleton
                 mirrors the live table so columns don't reflow on load. */}
