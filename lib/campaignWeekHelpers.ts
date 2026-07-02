@@ -94,6 +94,25 @@ export function getTotalCampaignWeeks(
   return Math.max(1, Math.ceil((diffMs + MS_PER_DAY) / MS_PER_WEEK));
 }
 
+/**
+ * Total weeks derived from a client's covered_through instead of the
+ * campaign's own end_date. Enables the "Week 8 of 24" client-facing
+ * framing where M reflects how much time is left in the client's
+ * engagement, not just this one campaign.
+ *
+ * Falls back to getTotalCampaignWeeks(start, endFallback) when
+ * covered_through is null — e.g. brand-new client without stint yet.
+ */
+export function getTotalCampaignWeeksFromCoverage(
+  startDateIso: string | null | undefined,
+  coveredThroughIso: string | null | undefined,
+  endDateFallbackIso?: string | null | undefined,
+): number {
+  const covered = parseLocalIsoDate(coveredThroughIso ?? '');
+  if (covered) return getTotalCampaignWeeks(startDateIso, coveredThroughIso ?? null);
+  return getTotalCampaignWeeks(startDateIso, endDateFallbackIso ?? null);
+}
+
 /** Monday anchoring week N (1-indexed) for a campaign. Useful for
  *  "Week N runs Mon X → Sun Y" labels. */
 export function mondayOfCampaignWeek(

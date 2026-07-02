@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { getCampaignWeek, getTotalCampaignWeeks } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 import { createClient } from '@supabase/supabase-js';
 import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -67,6 +67,9 @@ type Campaign = {
   showcase_enabled?: boolean;
   showcase_token?: string | null;
   showcase_config?: ShowcaseConfig | null;
+  // [Stint-scoped Week N of M] Client's max covered_through — Week N of
+  // M's "M" derives from this. Falls back to end_date when null.
+  client_covered_through?: string | null;
 };
 
 type ShowcaseConfig = {
@@ -968,7 +971,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         showcase_enabled: (campaignData as any).showcase_enabled || false,
         showcase_token: (campaignData as any).showcase_token || null,
         showcase_config: (campaignData as any).showcase_config || null,
+        client_covered_through: null,
       };
+
+      // [Stint-scoped Week N of M] Best-effort fetch. If RLS blocks
+      // client_coverage for anon (older setups), we silently fall back
+      // to campaign.end_date via getTotalCampaignWeeksFromCoverage.
+      try {
+        const { data: covData } = await supabasePublic
+          .from('client_coverage')
+          .select('covered_through')
+          .eq('client_id', campaignData.client_id);
+        const max = ((covData as Array<{ covered_through: string | null }> | null) ?? [])
+          .map(r => r.covered_through)
+          .filter((d): d is string => !!d)
+          .sort()
+          .pop() ?? null;
+        normalizedCampaign.client_covered_through = max;
+      } catch {
+        // silent — fallback to end_date
+      }
+
       setCampaign(normalizedCampaign);
       // If we reached this row via a matching showcase_token, the
       // token itself is the auth — skip the email gate and mark the
@@ -1284,7 +1307,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           let weekN = 0, weekOf = 0, progressPct = 0;
           if (startMs && endMs && endMs > startMs) {
             const week = getCampaignWeek(campaign.start_date);
-            weekOf = getTotalCampaignWeeks(campaign.start_date, campaign.end_date);
+            // [Stint-scoped M — 2026-07-02] Prefer client covered_through
+            // so the client sees weeks-until-engagement-end instead of
+            // weeks-until-this-campaign-ends. F1.1 alignment.
+            weekOf = getTotalCampaignWeeksFromCoverage(
+              campaign.start_date,
+              campaign.client_covered_through,
+              campaign.end_date,
+            );
             weekN = week ? Math.min(weekOf, week.weekNumber) : 0;
             progressPct = Math.max(0, Math.min(1, (todayMs - startMs) / (endMs - startMs)));
           }

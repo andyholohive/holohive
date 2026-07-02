@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getCampaignWeek, getTotalCampaignWeeks } from "@/lib/campaignWeekHelpers";
+import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from "@/lib/campaignWeekHelpers";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -189,6 +189,11 @@ const CampaignDetailsPage = () => {
   // Extend CampaignWithDetails inline for local use
   type CampaignDetails = CampaignWithDetails;
   const [campaign, setCampaign] = useState<CampaignDetails | null>(null);
+  // [Stint-scoped Week N of M] Client's max covered_through — used by
+  // the hero pill to show weeks-until-engagement-end instead of just
+  // weeks-until-campaign-end. Falls back to campaign.end_date when the
+  // client has no stint coverage yet.
+  const [clientCoveredThrough, setClientCoveredThrough] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -448,6 +453,24 @@ const CampaignDetailsPage = () => {
     };
     fetchCampaign();
   }, [id]);
+
+  // [Stint-scoped Week N of M] Fetch max covered_through for this campaign's
+  // client so the hero pill's "of M" reflects engagement end, not campaign end.
+  useEffect(() => {
+    if (!campaign?.client_id) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('client_coverage')
+        .select('covered_through')
+        .eq('client_id', campaign.client_id);
+      const max = ((data as Array<{ covered_through: string | null }> | null) ?? [])
+        .map(r => r.covered_through)
+        .filter((d): d is string => !!d)
+        .sort()
+        .pop() ?? null;
+      setClientCoveredThrough(max);
+    })();
+  }, [campaign?.client_id]);
 
   useEffect(() => {
     UserService.getActiveUsers().then(setAllUsers);
@@ -2106,12 +2129,20 @@ const CampaignDetailsPage = () => {
                         <span className="text-ink-warm-700">{campaign.current_phase}</span>
                       </>
                     )}
-                    {campaign.start_date && campaign.end_date && (() => {
+                    {campaign.start_date && (campaign.end_date || clientCoveredThrough) && (() => {
                       // Week 1 anchored to the first Monday on/after start_date
                       // per lib/campaignWeekHelpers.ts — single source of truth
                       // across hero, public portal, dashboard, Lineup Manager.
+                      // [Stint-scoped M — 2026-07-02] Total weeks prefers the
+                      // client's covered_through (engagement end) over the
+                      // campaign's own end_date. F1.1 goal: campaign end derives
+                      // from stint coverage, not stored per-campaign.
                       const week = getCampaignWeek(campaign.start_date);
-                      const totalWeeks = getTotalCampaignWeeks(campaign.start_date, campaign.end_date);
+                      const totalWeeks = getTotalCampaignWeeksFromCoverage(
+                        campaign.start_date,
+                        clientCoveredThrough,
+                        campaign.end_date,
+                      );
                       const currentWeek = week ? Math.min(totalWeeks, week.weekNumber) : 1;
                       return (
                         <>
