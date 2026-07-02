@@ -3923,9 +3923,27 @@ export default function ClientsPage() {
                           badge keeps a single very-long partner name
                           inside the card. */}
                       <div className="flex gap-2 flex-wrap">
-                        <StatusBadge tone={client.is_active ? 'brand' : 'neutral'} bordered withDot className="flex-shrink-0">
-                          {client.is_active ? 'Active' : 'Inactive'}
-                        </StatusBadge>
+                        {/* [2026-07-02] Pill now reflects the same 4-bucket
+                            derivation as the tabs (active / adhoc / paused
+                            / inactive) via clientBucketOf(). Previously
+                            this only checked is_active, so Ad-hoc and
+                            Paused clients incorrectly showed "Active". */}
+                        {(() => {
+                          const bucket = clientBucketOf(client);
+                          const tone: BadgeTone =
+                            bucket === 'active' ? 'brand' :
+                            bucket === 'adhoc' ? 'purple' :
+                            bucket === 'paused' ? 'warning' : 'neutral';
+                          const label =
+                            bucket === 'active' ? 'Active' :
+                            bucket === 'adhoc' ? 'Ad-hoc' :
+                            bucket === 'paused' ? 'Paused' : 'Inactive';
+                          return (
+                            <StatusBadge tone={tone} bordered withDot className="flex-shrink-0">
+                              {label}
+                            </StatusBadge>
+                          );
+                        })()}
                         {client.is_whitelisted && (
                           <StatusBadge tone="success" bordered withDot className="cursor-default pointer-events-none max-w-full">
                             <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
