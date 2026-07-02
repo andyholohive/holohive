@@ -14,8 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity, RefreshCw } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity, RefreshCw, Send } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
+import { SendAnnouncementDialog } from "@/components/kols/SendAnnouncementDialog";
 // [2026-06-22] Migrated off lib/kolScoringEngine (legacy May 2026 5-dim
 // model) to Jdot's TG Addendum two-score model. Score data now comes
 // from /api/kols/scores which runs the new compute server-side against
@@ -170,6 +171,10 @@ export default function KOLsPage() {
   const [isSavingNewKOL, setIsSavingNewKOL] = useState(false);
   // Bulk avatar refresh (super_admin only) — sits in the PageHeader actions.
   const [bulkAvatarRunning, setBulkAvatarRunning] = useState(false);
+
+  // [2026-07-02 ANN.4] Send Announcement — bulk-message the selected
+  // KOLs' group chats. Composer dialog gates itself on reachability.
+  const [announceDialogOpen, setAnnounceDialogOpen] = useState(false);
   // 1. Add state for delete dialog (single KOL)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [kolToDelete, setKolToDelete] = useState<string | null>(null);
@@ -1876,7 +1881,7 @@ export default function KOLsPage() {
             <div className="h-4 w-px bg-cream-200"></div>
             <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">Bulk Edit Fields</span>
           </div>
-          <div className="mb-4 pb-4 border-b border-cream-200">
+          <div className="mb-4 pb-4 border-b border-cream-200 flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
               variant="outline"
@@ -1892,6 +1897,19 @@ export default function KOLsPage() {
             >
               {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
             </Button>
+            {/* [2026-07-02 ANN.4] Send Announcement — super_admin only.
+                Composer resolves KOL→chat server-side; recipients without
+                a linked GC are surfaced as skipped in the dialog + toast. */}
+            {userProfile?.role === 'super_admin' && (
+              <Button
+                size="sm"
+                variant="brand"
+                onClick={() => setAnnounceDialogOpen(true)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send Announcement
+              </Button>
+            )}
           </div>
           <div className="flex flex-wrap items-end gap-2">
           {/* Platform */}
@@ -3569,6 +3587,18 @@ export default function KOLsPage() {
         onClose={() => setActivationsDialogKolId(null)}
         kolId={activationsDialogKolId}
         kolName={kols.find(k => k.id === activationsDialogKolId)?.name}
+      />
+
+      {/* [2026-07-02 ANN.4] Send Announcement composer. Recipients derived
+          from the current bulk-selection; hasGc comes from the master_kols
+          group_chat boolean (server does the definitive telegram_chats
+          lookup and surfaces true-skip in the result). */}
+      <SendAnnouncementDialog
+        open={announceDialogOpen}
+        onOpenChange={setAnnounceDialogOpen}
+        recipients={kols
+          .filter(k => selectedKOLs.includes(k.id))
+          .map(k => ({ id: k.id, name: k.name || 'KOL', hasGc: k.group_chat === true }))}
       />
 
       {/* 4. Add Dialog for single delete at the bottom of the component */}
