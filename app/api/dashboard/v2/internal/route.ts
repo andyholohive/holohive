@@ -402,10 +402,17 @@ export async function GET() {
     // 90 days, what fraction have a subsequent stint that starts after
     // that end? Same client can only be eligible once per window —
     // we anchor on their most recent ended stint in the window.
+    //
+    // [2026-07-02] Filter to the standardClients allowlist (active,
+    // non-ad-hoc, non-archived) — otherwise the denominator picks up
+    // archived brands, test clients, and churned accounts that shouldn't
+    // count toward Bolt's renewal KPI.
+    const standardClientIdSet = new Set(standardClients.map(c => c.id));
     const NINETY_DAYS_AGO_DATE = new Date(Date.now() - 90 * 86_400_000);
     const stintsByClient = new Map<string, Array<{ start: Date; end: Date | null }>>();
     for (const s of ((stintsRes.data ?? []) as any[])) {
       if (!s.client_id || !s.start_date) continue;
+      if (!standardClientIdSet.has(s.client_id)) continue;
       const arr = stintsByClient.get(s.client_id) ?? [];
       arr.push({
         start: new Date(s.start_date),
