@@ -16,7 +16,7 @@ import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion, Tag } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion, Tag, Zap } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -83,6 +83,7 @@ import ShowcaseSettingsDialog from './_components/ShowcaseSettingsDialog';
 import ContentTagDialog from './_components/ContentTagDialog';
 import ActivationSettingsDialog from './_components/ActivationSettingsDialog';
 import LineupsTab from '@/components/campaign/LineupsTab';
+import { AddActivationDialog } from '@/components/campaign/AddActivationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from '@/lib/dateFormat';
 
@@ -1588,6 +1589,7 @@ const CampaignDetailsPage = () => {
   // Section 9 — Showcase Settings dialog. Standalone in
   // _components/ShowcaseSettingsDialog so this page doesn't grow.
   const [isShowcaseOpen, setIsShowcaseOpen] = useState(false);
+  const [isAddActivationOpen, setIsAddActivationOpen] = useState(false);
   // Section 7.5 — Content tag assignment dialog. Standalone for the
   // same reason; the content table view is already large.
   const [isContentTagOpen, setIsContentTagOpen] = useState(false);
@@ -2174,6 +2176,15 @@ const CampaignDetailsPage = () => {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setIsAddActivationOpen(true)}
+                title="Mid-stint scope addition: extra deliverables + budget delta"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Add Activation
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsShareCampaignOpen(true)}
               >
                 <Share2 className="h-4 w-4 mr-2" />
@@ -2726,6 +2737,14 @@ const CampaignDetailsPage = () => {
       {/* Share Campaign Dialog moved into
           `components/campaign/ShareCampaignDialog.tsx` on 2026-06-02. */}
       <ShareCampaignDialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen} />
+      {campaign && (
+        <AddActivationDialog
+          open={isAddActivationOpen}
+          onOpenChange={setIsAddActivationOpen}
+          campaignId={campaign.id}
+          campaignName={campaign.name}
+        />
+      )}
       {campaign && (
         <ShowcaseSettingsDialog
           open={isShowcaseOpen}

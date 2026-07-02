@@ -70,11 +70,13 @@ export async function GET() {
     // (ad-hoc clients are already excluded by getStandardClients).
     //
     // [2026-06-25] Andy: Days Left anchors to covered_through from the
-    // Stint+Period substrate (single source of renewal math). Falls
-    // back to engagement_end_date only when no active stint exists.
-    // Matches the EngagementTab + dashboard pills exactly.
+    // Stint+Period substrate (single source of renewal math).
+    // [2026-07-02 F1 cleanup] Legacy engagement_end_date fallback removed.
+    // Ended clients (no active stint) intentionally show no end date on
+    // pipeline dashboards — they're ended, so renewal math shouldn't
+    // page for them.
     const renewalAnchor = (c: typeof clients[number]): string | null =>
-      c.covered_through ?? c.engagement_end_date ?? null;
+      c.covered_through ?? null;
     const withEnd = clients.filter(c => renewalAnchor(c) !== null);
     const renewals = withEnd
       .map(c => {
@@ -139,17 +141,17 @@ export async function GET() {
     const clientRetentionPct = denomRet > 0 ? Math.round((activeCountRet / denomRet) * 100) : 100;
 
     // Avg engagement weeks — anchored to the CURRENT active stint per
-    // TD §5.1 ("anchors to the stint, fixing multi-term blur"). For
-    // clients without an active stint row yet, fall back to
-    // engagement_start_date so the metric remains meaningful during
-    // the migration. Skip rows where neither is available.
+    // TD §5.1 ("anchors to the stint, fixing multi-term blur").
+    // [2026-07-02 F1 cleanup] Legacy engagement_start_date fallback removed.
+    // Clients without an active stint row are skipped — the metric
+    // is now purely stint-anchored.
     const stintStartByClient = new Map<string, string>();
     for (const s of ((activeStintsRaw.data ?? []) as Array<{ client_id: string; start_date: string }>)) {
       if (s.client_id && s.start_date) stintStartByClient.set(s.client_id, s.start_date);
     }
     const weekSpans = retentionRows
       .filter(c => c.engagement_status === 'active')
-      .map(c => stintStartByClient.get(c.id) ?? c.engagement_start_date ?? null)
+      .map(c => stintStartByClient.get(c.id) ?? null)
       .filter((s): s is string => s != null)
       .map(s => {
         const start = new Date(s + (s.includes('T') ? '' : 'T00:00:00Z'));
