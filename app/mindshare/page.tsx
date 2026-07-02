@@ -24,7 +24,7 @@ import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown,
   Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
-  XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy,
+  XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 import { formatDateTime } from '@/lib/dateFormat';
@@ -32,6 +32,14 @@ import { formatDateTime } from '@/lib/dateFormat';
 // ─── Types ──────────────────────────────────────────────────────────
 
 type Range = '24h' | '7d' | '14d' | '30d' | '90d';
+
+// [Category taxonomy] Recommended labels for the Projects edit dialog +
+// bulk-add flow. Free-text is still allowed for one-offs, but keeping
+// these consistent lets the leaderboard filter chips group cleanly.
+const RECOMMENDED_CATEGORIES = [
+  'L1', 'L2', 'BTC-L2', 'DeFi', 'DEX', 'Stablecoin', 'Restaking',
+  'AI', 'DePIN', 'RWA', 'Gaming', 'NFT', 'Meme', 'Infra', 'Korea',
+] as const;
 
 interface LeaderboardItem {
   project_id: string;
@@ -628,6 +636,135 @@ export default function MindsharePage() {
   const [editingProject, setEditingProject] = useState<MindshareProject | null>(null);
   const [projectForm, setProjectForm] = useState<Partial<MindshareProject>>({});
   const [savingProject, setSavingProject] = useState(false);
+  const [suggestingKeywords, setSuggestingKeywords] = useState(false);
+
+  // ─── Bulk-add projects state ────────────────────────────────────
+  type BulkRow = {
+    name: string;
+    category: string | null;
+    keywords: string[];
+    is_pre_tge: boolean;
+    status: 'pending' | 'suggested' | 'saved' | 'error';
+    error?: string;
+  };
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkDefaultCategory, setBulkDefaultCategory] = useState<string>('__none__');
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkStep, setBulkStep] = useState<'input' | 'preview'>('input');
+  const [bulkWorking, setBulkWorking] = useState(false);
+
+  const openBulkAdd = () => {
+    setBulkOpen(true);
+    setBulkText('');
+    setBulkRows([]);
+    setBulkStep('input');
+    setBulkDefaultCategory('__none__');
+  };
+
+  // Parse pasted list → for each line, call the suggester in sequence
+  // so we don't hammer the API. Failures fall through with an "error"
+  // status but let the user proceed with the rest.
+  const runBulkSuggest = async () => {
+    const names = bulkText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (names.length === 0) {
+      toast({ title: 'Add at least one project name', variant: 'destructive' });
+      return;
+    }
+    const defaultCat = bulkDefaultCategory === '__none__' ? null : bulkDefaultCategory;
+    const initialRows: BulkRow[] = names.map(name => ({
+      name,
+      category: defaultCat,
+      keywords: [],
+      is_pre_tge: false,
+      status: 'pending',
+    }));
+    setBulkRows(initialRows);
+    setBulkStep('preview');
+    setBulkWorking(true);
+    for (let i = 0; i < initialRows.length; i++) {
+      try {
+        const res = await fetch('/api/mindshare/suggest-keywords', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: initialRows[i].name, category: defaultCat || undefined }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed');
+        setBulkRows(rows => rows.map((r, idx) => idx === i
+          ? { ...r, keywords: json.keywords || [], status: 'suggested' }
+          : r));
+      } catch (err: any) {
+        setBulkRows(rows => rows.map((r, idx) => idx === i
+          ? { ...r, status: 'error', error: err?.message || 'suggestion failed' }
+          : r));
+      }
+    }
+    setBulkWorking(false);
+  };
+
+  const commitBulkAdd = async () => {
+    setBulkWorking(true);
+    const toSave = bulkRows.filter(r => r.status !== 'saved' && r.name.trim());
+    for (let i = 0; i < toSave.length; i++) {
+      const row = toSave[i];
+      try {
+        const res = await fetch('/api/mindshare/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: row.name,
+            category: row.category,
+            tracked_keywords: row.keywords,
+            is_pre_tge: row.is_pre_tge,
+            is_active: true,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed');
+        setBulkRows(rows => rows.map(r => r.name === row.name ? { ...r, status: 'saved' } : r));
+      } catch (err: any) {
+        setBulkRows(rows => rows.map(r => r.name === row.name
+          ? { ...r, status: 'error', error: err?.message || 'save failed' }
+          : r));
+      }
+    }
+    setBulkWorking(false);
+    const savedCount = bulkRows.filter(r => r.status === 'saved').length + toSave.length;
+    toast({ title: `Added ${savedCount} project${savedCount === 1 ? '' : 's'}` });
+    loadProjects();
+  };
+
+  const suggestKeywords = async () => {
+    if (!projectForm.name?.trim()) {
+      toast({ title: 'Enter a name first', variant: 'destructive' });
+      return;
+    }
+    setSuggestingKeywords(true);
+    try {
+      const res = await fetch('/api/mindshare/suggest-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: projectForm.name, category: projectForm.category || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      const existing = new Set((projectForm.tracked_keywords || []).map(k => k.toLowerCase()));
+      const merged = [
+        ...(projectForm.tracked_keywords || []),
+        ...(json.keywords || []).filter((k: string) => !existing.has(k.toLowerCase())),
+      ];
+      setProjectForm(f => ({ ...f, tracked_keywords: merged }));
+      toast({ title: `Added ${json.keywords?.length ?? 0} suggested keywords` });
+    } catch (err: any) {
+      toast({ title: 'Suggestion failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSuggestingKeywords(false);
+    }
+  };
 
   const loadProjects = useCallback(async () => {
     setProjectsLoading(true);
@@ -1624,9 +1761,14 @@ export default function MindsharePage() {
             <p className="text-sm text-ink-warm-700">
               The universe ranked on the leaderboard. Includes your clients (auto-seeded) plus competitor benchmarks you add manually.
             </p>
-            <Button variant="brand" onClick={openCreateProject}>
-              <Plus className="h-4 w-4 mr-1.5" /> Add Project
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={openBulkAdd}>
+                <Upload className="h-4 w-4 mr-1.5" /> Bulk Add
+              </Button>
+              <Button variant="brand" onClick={openCreateProject}>
+                <Plus className="h-4 w-4 mr-1.5" /> Add Project
+              </Button>
+            </div>
           </div>
 
           {/* [v11] Section header above projects table */}
@@ -1761,14 +1903,41 @@ export default function MindsharePage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Category</Label>
-                    <Input value={projectForm.category || ''} onChange={(e) => setProjectForm(f => ({ ...f, category: e.target.value || null }))} placeholder="DeFi, L1, AI..." className="focus-brand" />
+                    <Select
+                      value={projectForm.category || '__none__'}
+                      onValueChange={(v) => setProjectForm(f => ({ ...f, category: v === '__none__' ? null : v }))}
+                    >
+                      <SelectTrigger className="h-9 focus-brand"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— None</SelectItem>
+                        {RECOMMENDED_CATEGORIES.map(c => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                        {projectForm.category && !RECOMMENDED_CATEGORIES.includes(projectForm.category as any) && (
+                          <SelectItem value={projectForm.category}>{projectForm.category} (custom)</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Twitter handle</Label>
                     <Input value={projectForm.twitter_handle || ''} onChange={(e) => setProjectForm(f => ({ ...f, twitter_handle: e.target.value || null }))} placeholder="solana" className="focus-brand" />
                   </div>
                   <div className="col-span-2 space-y-1.5">
-                    <Label>Tracked keywords (comma-separated, case-insensitive)</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Tracked keywords (comma-separated, case-insensitive)</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={suggestKeywords}
+                        disabled={suggestingKeywords || !projectForm.name?.trim()}
+                      >
+                        <Sparkles className={`h-3 w-3 mr-1 ${suggestingKeywords ? 'animate-pulse' : ''}`} />
+                        {suggestingKeywords ? 'Suggesting…' : 'Suggest'}
+                      </Button>
+                    </div>
                     <Textarea
                       rows={2}
                       value={(projectForm.tracked_keywords || []).join(', ')}
@@ -1789,6 +1958,130 @@ export default function MindsharePage() {
                 <Button variant="brand" onClick={saveProject} disabled={savingProject}>
                   {savingProject ? 'Saving…' : (editingProject?.id ? 'Save Changes' : 'Add Project')}
                 </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Bulk Add dialog — paste project names → suggest keywords → preview → commit */}
+          <Dialog open={bulkOpen} onOpenChange={(open) => { if (!open) setBulkOpen(false); }}>
+            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Upload className="h-4 w-4 text-brand" />
+                  Bulk Add Projects
+                </DialogTitle>
+                <DialogDescription>
+                  Paste one project name per line. Claude suggests Korean + English keywords for each; review and commit.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto px-1 py-2 space-y-3">
+                {bulkStep === 'input' ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label>Project names (one per line)</Label>
+                      <Textarea
+                        rows={10}
+                        value={bulkText}
+                        onChange={(e) => setBulkText(e.target.value)}
+                        placeholder={`BONK\nJupiter\nOndo\nEthena\nMerlin`}
+                        className="focus-brand font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Default category (applied to all, editable after)</Label>
+                      <Select value={bulkDefaultCategory} onValueChange={setBulkDefaultCategory}>
+                        <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— None</SelectItem>
+                          {RECOMMENDED_CATEGORIES.map(c => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-ink-warm-500">
+                      {bulkWorking
+                        ? `Suggesting keywords — ${bulkRows.filter(r => r.status !== 'pending').length}/${bulkRows.length}`
+                        : `${bulkRows.filter(r => r.status === 'suggested').length} ready · ${bulkRows.filter(r => r.status === 'saved').length} saved · ${bulkRows.filter(r => r.status === 'error').length} errors`}
+                    </p>
+                    <div className="border border-cream-200 rounded-md overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                            <TableHead className="py-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[160px]">Name</TableHead>
+                            <TableHead className="py-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px]">Category</TableHead>
+                            <TableHead className="py-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Keywords</TableHead>
+                            <TableHead className="py-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[90px]">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bulkRows.map((row, i) => (
+                            <TableRow key={i} className="border-cream-100">
+                              <TableCell className="py-2 px-3">
+                                <Input
+                                  value={row.name}
+                                  onChange={(e) => setBulkRows(rs => rs.map((r, idx) => idx === i ? { ...r, name: e.target.value } : r))}
+                                  className="focus-brand h-8 text-sm"
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 px-3">
+                                <Select
+                                  value={row.category || '__none__'}
+                                  onValueChange={(v) => setBulkRows(rs => rs.map((r, idx) => idx === i ? { ...r, category: v === '__none__' ? null : v } : r))}
+                                >
+                                  <SelectTrigger className="h-8 focus-brand text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">— None</SelectItem>
+                                    {RECOMMENDED_CATEGORIES.map(c => (
+                                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="py-2 px-3">
+                                <Input
+                                  value={row.keywords.join(', ')}
+                                  onChange={(e) => setBulkRows(rs => rs.map((r, idx) => idx === i
+                                    ? { ...r, keywords: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }
+                                    : r))}
+                                  placeholder={row.status === 'pending' ? 'Waiting…' : ''}
+                                  className="focus-brand h-8 text-xs font-mono"
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 px-3">
+                                {row.status === 'pending' && <StatusBadge tone="neutral" size="sm">Pending</StatusBadge>}
+                                {row.status === 'suggested' && <StatusBadge tone="info" size="sm">Ready</StatusBadge>}
+                                {row.status === 'saved' && <StatusBadge tone="success" size="sm">Saved</StatusBadge>}
+                                {row.status === 'error' && (
+                                  <span title={row.error}>
+                                    <StatusBadge tone="danger" size="sm">Error</StatusBadge>
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+                <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkWorking}>Close</Button>
+                {bulkStep === 'input' ? (
+                  <Button variant="brand" onClick={runBulkSuggest} disabled={!bulkText.trim() || bulkWorking}>
+                    <Sparkles className="h-4 w-4 mr-1.5" /> Suggest Keywords
+                  </Button>
+                ) : (
+                  <Button variant="brand" onClick={commitBulkAdd} disabled={bulkWorking || bulkRows.every(r => r.status === 'saved')}>
+                    {bulkWorking ? 'Working…' : `Add ${bulkRows.filter(r => r.status !== 'saved' && r.name.trim()).length} Project${bulkRows.filter(r => r.status !== 'saved' && r.name.trim()).length === 1 ? '' : 's'}`}
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
