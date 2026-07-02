@@ -360,7 +360,15 @@ function OverviewTab({
           }
         />
         <Field label="Group Chat" value={kol.group_chat ? "Yes" : "No"} />
-        <Field label="Pricing" value={kol.pricing || "—"} />
+        <Field
+          label="Post Price"
+          value={kol.post_price != null ? `$${Number(kol.post_price).toLocaleString('en-US')}` : "—"}
+        />
+        <Field
+          label="Share Price"
+          value={kol.share_price != null ? `$${Number(kol.share_price).toLocaleString('en-US')}` : "—"}
+        />
+        {kol.pricing_notes ? <Field label="Pricing Notes" value={kol.pricing_notes} /> : null}
       </Card>
       {/* Score field + per-dim breakdown moved to the dedicated Score
           tab per Jdot Q8 (modal-with-tabs). Single source of truth — no

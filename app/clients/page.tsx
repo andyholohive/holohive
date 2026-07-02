@@ -341,6 +341,10 @@ export default function ClientsPage() {
    *  client_context.start_date so the card always reflects the
    *  Engagement tab's truth. */
   const [earliestStintStartByClient, setEarliestStintStartByClient] = useState<Record<string, string>>({});
+  // [2026-07-01] MAX covered_through per client from the client_coverage view.
+  // Drives auto-derived Paused status (covered_through < today or null while
+  // is_active is still true = engagement lapsed but client not manually turned off).
+  const [coveredThroughByClient, setCoveredThroughByClient] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -812,6 +816,24 @@ export default function ClientsPage() {
         }
       }
       setEarliestStintStartByClient(earliestStintStart);
+
+      // [2026-07-01] Paused = auto-derived when engagement coverage has
+      // passed today. Pull covered_through per client from the
+      // client_coverage view and stash the MAX per client — a client is
+      // "covered" if any active stint still stretches past today.
+      const coverageRes = await (supabase as any)
+        .from('client_coverage')
+        .select('client_id, covered_through');
+      const coveredThroughByClient: Record<string, string | null> = {};
+      for (const row of ((coverageRes as any).data ?? []) as Array<{ client_id: string; covered_through: string | null }>) {
+        const prev = coveredThroughByClient[row.client_id];
+        if (row.covered_through && (!prev || row.covered_through > prev)) {
+          coveredThroughByClient[row.client_id] = row.covered_through;
+        } else if (!prev) {
+          coveredThroughByClient[row.client_id] = row.covered_through ?? null;
+        }
+      }
+      setCoveredThroughByClient(coveredThroughByClient);
 
       // Build the campaigns-by-status map per client
       const statusMap: Record<string, Record<CampaignStatus, number>> = {};
@@ -2276,17 +2298,23 @@ export default function ClientsPage() {
       matchesPartner = client.is_whitelisted === true && client.whitelist_partner_id === partnerIdParam;
     }
 
-    // Ad-hoc is a cross-cutting flag (an ad-hoc client can be either
-    // active or inactive) — when the user picks the Ad-hoc tab we show
-    // every is_ad_hoc client regardless of active state, matching the
-    // mental model of "show me the ad-hoc bucket."
-    // Per Andy 2026-06-19: Active tab excludes ad-hoc clients so the
-    // bucket reads as ongoing engagements only. Ad-hoc clients still
-    // surface under the dedicated Ad-hoc tab.
-    const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'active' && client.is_active && !(client as any).is_ad_hoc) ||
-      (statusFilter === 'inactive' && !client.is_active) ||
-      (statusFilter === 'adhoc' && !!(client as any).is_ad_hoc);
+    // [2026-07-01] Per Andy: Paused is auto-derived from engagement data
+    // (covered_through has passed today), Inactive is the manual toggle
+    // (is_active = false). Precedence when computing a client's bucket:
+    //   1. Inactive   — manual off wins over everything
+    //   2. Ad-Hoc     — cross-cutting flag among still-active clients
+    //   3. Paused     — active + not ad-hoc + coverage lapsed
+    //   4. Active     — active + not ad-hoc + still covered today
+    const today = new Date().toISOString().slice(0, 10);
+    const covered = coveredThroughByClient[client.id] ?? null;
+    const isAdHoc = !!(client as any).is_ad_hoc;
+    const bucketOf = () => {
+      if (!client.is_active) return 'inactive';
+      if (isAdHoc) return 'adhoc';
+      if (!covered || covered < today) return 'paused';
+      return 'active';
+    };
+    const matchesStatus = statusFilter === 'all' || bucketOf() === statusFilter;
 
     return matchesSearch && matchesPartner && matchesStatus;
   });
@@ -2296,11 +2324,21 @@ export default function ClientsPage() {
   const inPartnerScope = (c: ClientWithStatus) => partnerIdParam
     ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam
     : true;
+  // Mirrors the same precedence used by the filter above.
+  const clientBucketOf = (c: ClientWithStatus): 'active' | 'adhoc' | 'paused' | 'inactive' => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!c.is_active) return 'inactive';
+    if ((c as any).is_ad_hoc) return 'adhoc';
+    const covered = coveredThroughByClient[c.id] ?? null;
+    if (!covered || covered < today) return 'paused';
+    return 'active';
+  };
   const statusCounts = {
     all:      clientsWithStatus.filter(c => inPartnerScope(c)).length,
-    active:   clientsWithStatus.filter(c => c.is_active && !(c as any).is_ad_hoc && inPartnerScope(c)).length,
-    inactive: clientsWithStatus.filter(c => !c.is_active && inPartnerScope(c)).length,
-    adhoc:    clientsWithStatus.filter(c => !!(c as any).is_ad_hoc && inPartnerScope(c)).length,
+    active:   clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'active').length,
+    adhoc:    clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'adhoc').length,
+    paused:   clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'paused').length,
+    inactive: clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'inactive').length,
   };
   const handleEditClient = (client: ClientWithAccess) => {
     setEditingClient(client);
@@ -3750,6 +3788,18 @@ export default function ClientsPage() {
                 >
                   Ad-hoc
                   <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.adhoc}</span>
+                </TabsTrigger>
+                {/* [2026-07-01] Paused — auto-derived: client is still is_active
+                    but the engagement (client_coverage.covered_through) has
+                    passed today. Distinguishes "engagement lapsed while active"
+                    from "manually turned off" (Inactive). Amber accent matches
+                    the /campaigns Paused chip. */}
+                <TabsTrigger
+                  value="paused"
+                  className="data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-card px-4 py-2"
+                >
+                  Paused
+                  <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.paused}</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="inactive"

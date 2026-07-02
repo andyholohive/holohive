@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -105,13 +105,17 @@ export default function DeliveryLogsPage() {
   // amber pill on each client tab). Populated alongside the clients
   // list so we don't fan out an extra round-trip per tab.
   const [pendingDraftCounts, setPendingDraftCounts] = useState<Record<string, number>>({});
+  // [2026-07-01] MAX covered_through per client from client_coverage.
+  // Drives the auto-derived Paused bucket (engagement lapsed while
+  // is_active still true).
+  const [coveredThroughByClient, setCoveredThroughByClient] = useState<Record<string, string | null>>({});
   // [2026-06-04 v2] View mode tabs — match /clients semantics exactly:
   //   all      → every non-archived client
   //   active   → is_active = true AND NOT is_ad_hoc
   //   adhoc    → is_ad_hoc = true
   //   inactive → is_active = false
   // All views EXCLUDE archived clients (archived_at IS NOT NULL).
-  const [viewMode, setViewMode] = useState<'all' | 'active' | 'adhoc' | 'inactive'>('active');
+  const [viewMode, setViewMode] = useState<'all' | 'active' | 'adhoc' | 'paused' | 'inactive'>('active');
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [whoMode, setWhoMode] = useState<'team' | 'custom'>('team');
   const [searchTerm, setSearchTerm] = useState('');
@@ -182,7 +186,9 @@ export default function DeliveryLogsPage() {
       // round-trip so the per-client tabs can show a "draft" badge
       // without an N+1 fetch. Filtered by the partial index added
       // in the pending_review migration so this stays cheap.
-      const [{ data: clientData }, { data: logData }, { data: draftRows }] = await Promise.all([
+      // [2026-07-01] Also pull MAX covered_through per client so the
+      // Paused bucket can auto-derive from engagement data.
+      const [{ data: clientData }, { data: logData }, { data: draftRows }, { data: coverageRows }] = await Promise.all([
         clientsQuery,
         supabase
           .from('client_delivery_log')
@@ -192,7 +198,21 @@ export default function DeliveryLogsPage() {
           .from('client_delivery_log')
           .select('client_id')
           .eq('pending_review', true),
+        (supabase as any)
+          .from('client_coverage')
+          .select('client_id, covered_through'),
       ]);
+
+      const coveredThroughMap = new Map<string, string | null>();
+      for (const row of (coverageRows || []) as Array<{ client_id: string; covered_through: string | null }>) {
+        const prev = coveredThroughMap.get(row.client_id) ?? null;
+        if (row.covered_through && (!prev || row.covered_through > prev)) {
+          coveredThroughMap.set(row.client_id, row.covered_through);
+        } else if (prev === undefined) {
+          coveredThroughMap.set(row.client_id, row.covered_through ?? null);
+        }
+      }
+      setCoveredThroughByClient(Object.fromEntries(coveredThroughMap));
 
       // Build a map of client_id -> latest activity timestamp
       const latestActivity = new Map<string, string>();
@@ -238,22 +258,31 @@ export default function DeliveryLogsPage() {
   }, []);
 
   // Derived tab counts + filtered list — same /clients semantics:
-  //   active = is_active && !is_ad_hoc (Ad-hoc is its own bucket)
-  //   adhoc  = is_ad_hoc
-  //   inactive = !is_active
+  //   inactive → manual toggle (is_active = false) wins over everything
+  //   adhoc    → is_ad_hoc flag among still-active clients
+  //   paused   → active + not ad-hoc + covered_through < today (auto-derived
+  //              from engagement data — client_coverage view rolls up MAX)
+  //   active   → active + not ad-hoc + still covered
+  const bucketOfClient = useCallback((c: Client): 'active' | 'adhoc' | 'paused' | 'inactive' => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!c.is_active) return 'inactive';
+    if (c.is_ad_hoc) return 'adhoc';
+    const covered = coveredThroughByClient[c.id] ?? null;
+    if (!covered || covered < today) return 'paused';
+    return 'active';
+  }, [coveredThroughByClient]);
   const tabCounts = useMemo(() => ({
     all: clients.length,
-    active: clients.filter(c => c.is_active && !c.is_ad_hoc).length,
-    adhoc: clients.filter(c => !!c.is_ad_hoc).length,
-    inactive: clients.filter(c => !c.is_active).length,
-  }), [clients]);
+    active: clients.filter(c => bucketOfClient(c) === 'active').length,
+    adhoc: clients.filter(c => bucketOfClient(c) === 'adhoc').length,
+    paused: clients.filter(c => bucketOfClient(c) === 'paused').length,
+    inactive: clients.filter(c => bucketOfClient(c) === 'inactive').length,
+  }), [clients, bucketOfClient]);
 
   const visibleClients = useMemo(() => {
     if (viewMode === 'all') return clients;
-    if (viewMode === 'active') return clients.filter(c => c.is_active && !c.is_ad_hoc);
-    if (viewMode === 'adhoc') return clients.filter(c => !!c.is_ad_hoc);
-    return clients.filter(c => !c.is_active);
-  }, [clients, viewMode]);
+    return clients.filter(c => bucketOfClient(c) === viewMode);
+  }, [clients, viewMode, bucketOfClient]);
 
   // Keep the selected client visible across tab switches — if it falls
   // out of the visible list (e.g. user switches from Active to Inactive
@@ -754,15 +783,13 @@ export default function DeliveryLogsPage() {
         }
         first
       />
-      {/* Status tabs — match /clients exactly so the same status names
-          show across both pages. All / Active / Ad-hoc / Inactive. */}
-
-      {/* v11 filter toolbar — Active/Inactive view-mode tabs (left) +
-          Search (middle) + Work-type / Trigger filters (right). The
-          Inactive tab is for paused/between-contracts clients that
-          aren't archived — both views exclude archived. */}
+      {/* [2026-07-01] Status tabs mirror /clients + /campaigns:
+          All / Active / Ad-hoc / Paused / Inactive.
+          Paused is auto-derived (engagement covered_through has passed
+          today while is_active is still true); Inactive is the manual
+          off switch. */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'all' | 'active' | 'adhoc' | 'inactive')}>
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'all' | 'active' | 'adhoc' | 'paused' | 'inactive')}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             <TabsTrigger
               value="all"
@@ -784,6 +811,13 @@ export default function DeliveryLogsPage() {
             >
               Ad-hoc
               <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{tabCounts.adhoc}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="paused"
+              className="data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-card text-sm px-4 py-2"
+            >
+              Paused
+              <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{tabCounts.paused}</span>
             </TabsTrigger>
             <TabsTrigger
               value="inactive"

@@ -997,7 +997,32 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           console.warn('KOLs fetch error:', kolError);
           setKols([]);
         } else {
-          setKols((kolData as any) || []);
+          // [2026-07-01] Public page: same activation-recency treatment as
+          // internal KOL Dashboard. Source is campaign_kol_activation_status
+          // (rewired to approved contents, not lineup membership) so KOLs in a
+          // confirmed lineup who never post won't show as active on the client
+          // portal either.
+          try {
+            const { data: activationRows } = await (supabasePublic as any)
+              .from('campaign_kol_activation_status')
+              .select('campaign_kol_id, active_week_number, last_active_week_number')
+              .eq('campaign_id', actualCampaignId);
+            const byId = new Map<string, { active: number | null; last: number | null }>();
+            for (const row of (activationRows ?? []) as any[]) {
+              byId.set(row.campaign_kol_id, {
+                active: row.active_week_number ?? null,
+                last: row.last_active_week_number ?? null,
+              });
+            }
+            const decorated = ((kolData as any) || []).map((k: any) => {
+              const a = byId.get(k.id) ?? { active: null, last: null };
+              return { ...k, activation_active_week: a.active, activation_last_week: a.last };
+            });
+            setKols(decorated);
+          } catch (aErr) {
+            console.warn('Activation status fetch failed (public):', aErr);
+            setKols((kolData as any) || []);
+          }
         }
       } catch (kolErr) {
         console.warn('KOLs fetch failed:', kolErr);
@@ -2017,6 +2042,41 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                             View Profile
                                           </a>
                                         )}
+                                      </div>
+                                      {/* [2026-07-01] Merged inline status strip —
+                                          same treatment as internal KOL Dashboard.
+                                          Recency chip sources from approved contents
+                                          (view rewritten), hh_status pill sits next
+                                          to it. Read-only on the public page (no
+                                          Select) — the client shouldn't be editing
+                                          KOL relationship status from the portal. */}
+                                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                        {(() => {
+                                          const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
+                                          const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
+                                          if (aw != null) {
+                                            return (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                Active Week {aw}
+                                              </span>
+                                            );
+                                          }
+                                          if (lw != null) {
+                                            return (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50/60 text-emerald-600 border border-emerald-100">
+                                                Last active Week {lw}
+                                              </span>
+                                            );
+                                          }
+                                          return (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                              Onboarded
+                                            </span>
+                                          );
+                                        })()}
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
+                                          {campaignKOL.hh_status || 'Curated'}
+                                        </span>
                                       </div>
                                       {/* Section 5 — approved client-facing profile
                                           note. Renders as a subtitle under the KOL

@@ -56,7 +56,6 @@ import {
   getCreatorTypeColor,
   getContentTypeColor,
   getNewContentTypeColor,
-  getPricingColor,
 } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 
@@ -284,9 +283,9 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
                           ) : '-'}
                         </TableCell>
                         <TableCell>
-                          {kol.pricing ? (
-                            <span className={`px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${getPricingColor(kol.pricing)}`}>
-                              {kol.pricing}
+                          {kol.post_price != null ? (
+                            <span className="px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-brand-light text-brand tabular-nums">
+                              ${Number(kol.post_price).toLocaleString('en-US')}
                             </span>
                           ) : '-'}
                         </TableCell>

@@ -792,7 +792,7 @@ export default function LineupsTab({
               )}
               {lineup?.confirmed_at && (
                 <span className="text-[11px] text-ink-warm-500">
-                  Confirmed {formatDateTime(lineup.confirmed_at)}
+                  Confirmed{lineup.confirmed_by_name ? ` by ${lineup.confirmed_by_name}` : ''} · {formatDateTime(lineup.confirmed_at)}
                 </span>
               )}
             </div>
@@ -1502,9 +1502,12 @@ function SummaryView({
             {totalKols} KOL{totalKols === 1 ? '' : 's'} across {lineup.angles.length} angle{lineup.angles.length === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="text-right text-xs text-ink-warm-500">
+        <div className="text-right text-xs text-ink-warm-500 space-y-0.5">
+          {lineup.confirmed_by_name && (
+            <p>Confirmed by <span className="font-semibold text-ink-warm-700">{lineup.confirmed_by_name}</span></p>
+          )}
           {lineup.confirmed_at && (
-            <p>Confirmed {formatDateTime(lineup.confirmed_at)}</p>
+            <p>{formatDateTime(lineup.confirmed_at)}</p>
           )}
         </div>
       </div>

@@ -52,7 +52,10 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("Active");
+  // [2026-07-01] Status tabs now filter by the campaign's CLIENT status
+  // (matches /clients + /delivery-logs): all / active / adhoc / inactive.
+  // Default lands on 'active' so day-1 view is the operational bucket.
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
@@ -319,12 +322,27 @@ export default function CampaignsPage() {
     }
   };
 
+  // Client-status bucket for a campaign. Mirrors /clients + /delivery-logs:
+  //   inactive → manual toggle (client.is_active = false) wins over everything
+  //   adhoc    → client.is_ad_hoc among still-active clients
+  //   paused   → auto-derived: engagement covered_through < today (or null)
+  //              while client is still is_active + not ad-hoc
+  //   active   → still is_active + not ad-hoc + still covered today
+  const clientBucket = (c: CampaignWithDetails): 'active' | 'adhoc' | 'paused' | 'inactive' => {
+    if (c.client_is_active === false) return 'inactive';
+    if (c.client_is_ad_hoc) return 'adhoc';
+    const today = new Date().toISOString().slice(0, 10);
+    const covered = c.client_covered_through ?? null;
+    if (!covered || covered < today) return 'paused';
+    return 'active';
+  };
+
   // Filter campaigns by clientId if present and add is NOT present
   const filteredCampaigns = campaigns.filter(campaign => {
     const matchesClient = clientIdParam && addParam !== '1' ? campaign.client_id === clientIdParam : true;
     const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       campaign.client_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || campaign.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || clientBucket(campaign) === statusFilter;
     return matchesClient && matchesSearch && matchesStatus;
   });
 
@@ -342,21 +360,22 @@ export default function CampaignsPage() {
   type CampaignRef = { id: string; name: string; slug: string | null };
   const toRef = (c: CampaignWithDetails): CampaignRef => ({ id: c.id, name: c.name, slug: c.slug ?? null });
   const byName = (a: CampaignRef, b: CampaignRef) => a.name.localeCompare(b.name);
-  const campaignsByStatus: Record<'all' | 'Planning' | 'Active' | 'Paused' | 'Completed', CampaignRef[]> = {
-    all:       scopedCampaigns.map(toRef).sort(byName),
-    Planning:  scopedCampaigns.filter(c => c.status === 'Planning').map(toRef).sort(byName),
-    Active:    scopedCampaigns.filter(c => c.status === 'Active').map(toRef).sort(byName),
-    Paused:    scopedCampaigns.filter(c => c.status === 'Paused').map(toRef).sort(byName),
-    Completed: scopedCampaigns.filter(c => c.status === 'Completed').map(toRef).sort(byName),
+  // Bucket campaigns by their CLIENT'S status. Same taxonomy as /clients + /delivery-logs.
+  const campaignsByStatus: Record<'all' | 'active' | 'adhoc' | 'paused' | 'inactive', CampaignRef[]> = {
+    all:      scopedCampaigns.map(toRef).sort(byName),
+    active:   scopedCampaigns.filter(c => clientBucket(c) === 'active').map(toRef).sort(byName),
+    adhoc:    scopedCampaigns.filter(c => clientBucket(c) === 'adhoc').map(toRef).sort(byName),
+    paused:   scopedCampaigns.filter(c => clientBucket(c) === 'paused').map(toRef).sort(byName),
+    inactive: scopedCampaigns.filter(c => clientBucket(c) === 'inactive').map(toRef).sort(byName),
   };
 
-  // Count campaigns by status for tab badges (derived from the names map)
+  // Count campaigns by client status for tab badges.
   const statusCounts = {
-    all:       campaignsByStatus.all.length,
-    Planning:  campaignsByStatus.Planning.length,
-    Active:    campaignsByStatus.Active.length,
-    Paused:    campaignsByStatus.Paused.length,
-    Completed: campaignsByStatus.Completed.length,
+    all:      campaignsByStatus.all.length,
+    active:   campaignsByStatus.active.length,
+    adhoc:    campaignsByStatus.adhoc.length,
+    paused:   campaignsByStatus.paused.length,
+    inactive: campaignsByStatus.inactive.length,
   };
 
   // Pagination
@@ -1051,7 +1070,7 @@ export default function CampaignsPage() {
         <SectionHeader
           label="Campaigns"
           dot="amber"
-          counter={`${filteredCampaigns.length} of ${statusCounts.all} campaign${statusCounts.all === 1 ? '' : 's'}${statusFilter !== 'all' ? ` · ${statusFilter.toLowerCase()}` : ''}`}
+          counter={`${filteredCampaigns.length} of ${statusCounts.all} campaign${statusCounts.all === 1 ? '' : 's'}${statusFilter !== 'all' ? ` · ${statusFilter === 'adhoc' ? 'ad-hoc' : statusFilter}` : ''}`}
           first
         />
 
@@ -1070,12 +1089,17 @@ export default function CampaignsPage() {
                   can't use Tailwind's `data-[state=active]:...`. We
                   derive active styling from the controlled
                   statusFilter state instead. */}
+              {/* [2026-07-01] Tabs mirror /clients + /delivery-logs — filter
+                  campaigns by their CLIENT status, not the campaign's own
+                  lifecycle. Ad-Hoc uses the purple accent from the /clients
+                  StatusBadge tone so the color reads consistently across
+                  surfaces. */}
               {([
-                { value: 'all',       label: 'All',       activeText: 'text-ink-warm-900', countBg: 'bg-cream-200 text-ink-warm-700' },
-                { value: 'Planning',  label: 'Planning',  activeText: 'text-sky-700',      countBg: 'bg-sky-100 text-sky-700' },
-                { value: 'Active',    label: 'Active',    activeText: 'text-brand',        countBg: 'bg-brand-light text-brand' },
-                { value: 'Paused',    label: 'Paused',    activeText: 'text-amber-700',    countBg: 'bg-amber-100 text-amber-800' },
-                { value: 'Completed', label: 'Completed', activeText: 'text-emerald-700',  countBg: 'bg-emerald-100 text-emerald-800' },
+                { value: 'all',      label: 'All',      activeText: 'text-ink-warm-900', countBg: 'bg-cream-200 text-ink-warm-700' },
+                { value: 'active',   label: 'Active',   activeText: 'text-brand',        countBg: 'bg-brand-light text-brand' },
+                { value: 'adhoc',    label: 'Ad-Hoc',   activeText: 'text-purple-700',   countBg: 'bg-purple-100 text-purple-700' },
+                { value: 'paused',   label: 'Paused',   activeText: 'text-amber-700',    countBg: 'bg-amber-100 text-amber-800' },
+                { value: 'inactive', label: 'Inactive', activeText: 'text-ink-warm-700', countBg: 'bg-cream-200 text-ink-warm-700' },
               ] as const).map((t) => {
                 const items = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
                 const isActive = statusFilter === t.value;

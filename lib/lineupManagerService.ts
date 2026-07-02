@@ -75,6 +75,11 @@ export type LineupActivityLogRow = {
 /** Composite returned by `getLineupFull` — what the UI usually wants. */
 export type LineupFull = CampaignLineup & {
   angles: Array<LineupAngle & { slots: LineupSlot[] }>;
+  // [2026-07-02] Joined `users.name` for proposed_by / confirmed_by so the
+  // read-only summary panel can show "Confirmed by Andy" without an extra
+  // fetch. Nullable when the actor row is missing or the field itself is null.
+  proposed_by_name?: string | null;
+  confirmed_by_name?: string | null;
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -165,8 +170,28 @@ export class LineupManagerService {
       slotsByAngle.set(s.angle_id, arr);
     }
 
+    // [2026-07-02] Join the actor names for proposed_by / confirmed_by so
+    // the read-only summary panel can render "Confirmed by <name>". One tiny
+    // extra roundtrip; keeps the concern in the service so every consumer
+    // gets the same shape.
+    const actorIds = Array.from(new Set(
+      [lineup.proposed_by, lineup.confirmed_by].filter(Boolean) as string[]
+    ));
+    const nameById = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const { data: users } = await (this.supabase as any)
+        .from('users')
+        .select('id, name')
+        .in('id', actorIds);
+      for (const u of (users || []) as Array<{ id: string; name: string | null }>) {
+        if (u.name) nameById.set(u.id, u.name);
+      }
+    }
+
     return {
       ...(lineup as CampaignLineup),
+      proposed_by_name: lineup.proposed_by ? (nameById.get(lineup.proposed_by) ?? null) : null,
+      confirmed_by_name: lineup.confirmed_by ? (nameById.get(lineup.confirmed_by) ?? null) : null,
       angles: (angles as LineupAngle[]).map(a => ({
         ...a,
         slots: slotsByAngle.get(a.id) || [],

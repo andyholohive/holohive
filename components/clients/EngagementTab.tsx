@@ -403,7 +403,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-ink-warm-900">Engagement</h3>
-        <Button variant="brand" size="sm" onClick={openAddStint}>
+        <Button type="button" variant="brand" size="sm" onClick={openAddStint}>
           <Plus className="h-4 w-4 mr-2" />Add Stint
         </Button>
       </div>
@@ -419,7 +419,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
           title="No stints yet"
           description="Add a stint to start tracking this client's engagement timeline."
         >
-          <Button variant="brand" onClick={openAddStint}>
+          <Button type="button" variant="brand" onClick={openAddStint}>
             <Plus className="h-4 w-4 mr-2" />Add First Stint
           </Button>
         </EmptyState>
@@ -434,6 +434,21 @@ export function EngagementTab({ clientId }: { clientId: string }) {
             return (
               <Card key={stint.id} className="border-cream-200 overflow-hidden">
                 {/* Header */}
+                {(() => {
+                  // [2026-07-02] Per Andy: the stint's own start_date /
+                  // end_date were drifting from the actual engagement
+                  // data (top said 5/5 while periods said 5/15). Derive
+                  // the displayed dates from MIN/MAX of the periods so
+                  // the header always mirrors what the terms table
+                  // shows below. Falls back to the raw stint fields
+                  // only when there are no periods yet.
+                  const periodStarts = stint.periods.map(p => p.start_date).filter(Boolean).sort();
+                  const periodEnds = stint.periods.map(p => p.end_date).filter(Boolean).sort();
+                  const displayStart = periodStarts[0] ?? stint.start_date;
+                  const displayEnd = periodEnds.length > 0
+                    ? periodEnds[periodEnds.length - 1]
+                    : stint.end_date;
+                  return (
                 <div className="p-3 border-b border-cream-100 flex items-center gap-3 flex-wrap">
                   <button
                     type="button"
@@ -445,9 +460,9 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                     />
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-ink-warm-900">
-                        {formatDate(stint.start_date)}
+                        {formatDate(displayStart)}
                         {' → '}
-                        {stint.end_date ? formatDate(stint.end_date) : 'Ongoing'}
+                        {displayEnd ? formatDate(displayEnd) : 'Ongoing'}
                       </div>
                       <div className="text-xs text-ink-warm-500">
                         {stint.periods.length} term{stint.periods.length === 1 ? '' : 's'}
@@ -466,16 +481,13 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                         {daysLeft >= 0 ? `${daysLeft}d left` : `Lapsed ${Math.abs(daysLeft)}d ago`}
                       </StatusBadge>
                     )}
+                    {/* [2026-07-02] Per Andy: no Edit pencil for stints —
+                        the stint is now a derived container that mirrors
+                        the underlying terms. Correct dates by editing
+                        the terms instead. Delete stays for the "wrong
+                        stint entirely, blow it away" case. */}
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={() => openEditStint(stint)}
-                      aria-label="Edit stint"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700"
@@ -483,7 +495,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                         setConfirmDelete({
                           kind: 'stint',
                           id: stint.id,
-                          label: `${formatDate(stint.start_date)} stint and all its ${stint.periods.length} term(s)`,
+                          label: `${formatDate(displayStart)} stint and all its ${stint.periods.length} term(s)`,
                         })
                       }
                       aria-label="Delete stint"
@@ -492,6 +504,8 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                     </Button>
                   </div>
                 </div>
+                  );
+                })()}
 
                 {/* Body */}
                 {isExpanded && (
@@ -512,7 +526,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                         title="No terms yet"
                         description="Add a term to extend coverage."
                       >
-                        <Button variant="brand" size="sm" onClick={() => openAddPeriod(stint.id)}>
+                        <Button type="button" variant="brand" size="sm" onClick={() => openAddPeriod(stint.id)}>
                           <Plus className="h-4 w-4 mr-2" />Add First Term
                         </Button>
                       </EmptyState>
@@ -540,6 +554,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                                 <TableCell className="py-2.5 text-right">
                                   <div className="flex justify-end gap-1">
                                     <Button
+                                      type="button"
                                       variant="ghost"
                                       size="sm"
                                       className="h-7 w-7 p-0"
@@ -549,6 +564,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
                                     <Button
+                                      type="button"
                                       variant="ghost"
                                       size="sm"
                                       className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700"
@@ -570,6 +586,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
                           </TableBody>
                         </Table>
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => openAddPeriod(stint.id)}

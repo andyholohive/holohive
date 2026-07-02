@@ -41,7 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import {
   MessageCircle, Plus, Pencil, Trash2, Calendar as CalIcon,
-  X, Send, CheckCircle2,
+  X, Send, CheckCircle2, ChevronDown,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -122,6 +122,10 @@ export function CallNotesTab({
   // flight so we can spinner the right button (and disable it).
   // Mirrors the dashboard CallNoteCard pattern; same endpoint reused.
   const [sendingId, setSendingId] = useState<string | null>(null);
+  // [2026-07-02] Per Andy: call notes weren't collapsible — a long
+  // backlog blew up the tab. Track which notes are expanded; default
+  // to just the most recent one when the list first loads.
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(new Set());
 
   // ─── Fetch ────────────────────────────────────────────────────────
 
@@ -148,6 +152,12 @@ export function CallNotesTab({
       // Latest first
       arr.sort((a, b) => (b.meeting_date || '').localeCompare(a.meeting_date || ''));
       setNotes(arr);
+      // [2026-07-02] Default-expand only the most recent note so a long
+      // backlog stays scannable. Everything else starts collapsed and
+      // toggles via the chevron in its header.
+      if (arr.length > 0) {
+        setExpandedNoteIds(new Set([arr[0].id]));
+      }
       setContextRowId((ctxRes.data as any)?.id ?? null);
       setTeamUsers(((usersRes.data ?? []) as UserRow[]).filter(u => u.name));
     } finally {
@@ -446,12 +456,30 @@ export function CallNotesTab({
         </Card>
       ) : (
         <ul className="space-y-2">
-          {notes.map(note => (
+          {notes.map(note => {
+            const isExpanded = expandedNoteIds.has(note.id);
+            const openItems = note.action_items.filter(it => !it.is_done).length;
+            return (
             <li key={note.id}>
               <Card className="border-cream-200">
                 <CardContent className="p-3.5">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedNoteIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(note.id)) next.delete(note.id);
+                          else next.add(note.id);
+                          return next;
+                        });
+                      }}
+                      className="flex items-center gap-2 flex-wrap text-left flex-1 min-w-0"
+                      aria-expanded={isExpanded}
+                    >
+                      <ChevronDown
+                        className={`h-4 w-4 text-ink-warm-400 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`}
+                      />
                       <CalIcon className="h-3.5 w-3.5 text-ink-warm-400" />
                       <span className="text-sm font-semibold text-ink-warm-900">
                         {formatDate(note.meeting_date)}
@@ -461,7 +489,16 @@ export function CallNotesTab({
                           <CheckCircle2 className="h-3 w-3 mr-1" />Sent to TG
                         </StatusBadge>
                       )}
-                    </div>
+                      {/* Collapsed-state chip: quick summary of open action
+                          items so the user can scan without expanding. */}
+                      {!isExpanded && note.action_items.length > 0 && (
+                        <span className="text-[10px] text-ink-warm-500">
+                          {openItems > 0
+                            ? `${openItems} open item${openItems === 1 ? '' : 's'}`
+                            : `${note.action_items.length} item${note.action_items.length === 1 ? '' : 's'} · all done`}
+                        </span>
+                      )}
+                    </button>
                     <div className="flex items-center gap-1 shrink-0">
                       {/* Send to client TG — same endpoint the
                           dashboard CallNoteCard uses. Hidden once a
@@ -501,45 +538,50 @@ export function CallNotesTab({
                     </div>
                   </div>
 
-                  <p className="text-xs text-ink-warm-700 whitespace-pre-wrap mb-2">
-                    {note.content}
-                  </p>
-
-                  {note.action_items.length > 0 && (
-                    <div className="border-t border-cream-100 pt-2 mt-2 space-y-1">
-                      <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1">
-                        Action items
+                  {isExpanded && (
+                    <>
+                      <p className="text-xs text-ink-warm-700 whitespace-pre-wrap mb-2 mt-3">
+                        {note.content}
                       </p>
-                      <ul className="space-y-1.5">
-                        {note.action_items.map(it => (
-                          <li key={it.id} className="flex items-center gap-2 text-xs min-h-[20px]">
-                            <Checkbox
-                              checked={it.is_done}
-                              onCheckedChange={() => toggleActionItem(note.id, it.id)}
-                              disabled={saving}
-                              aria-label={it.is_done ? `Mark "${it.text}" not done` : `Mark "${it.text}" done`}
-                              className="shrink-0 self-center"
-                            />
-                            <span className={`leading-tight ${it.is_done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}`}>
-                              {it.text}
-                            </span>
-                            <span className="ml-auto text-[10px] leading-none px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 shrink-0 self-center">
-                              {ownerNameFor(it)}
-                            </span>
-                            {it.auto_created_task_id && !it.owner_client_side && (
-                              <span className="text-[9px] text-ink-warm-400 shrink-0 self-center" title="HQ task auto-created">
-                                ↗ task
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+
+                      {note.action_items.length > 0 && (
+                        <div className="border-t border-cream-100 pt-2 mt-2 space-y-1">
+                          <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1">
+                            Action items
+                          </p>
+                          <ul className="space-y-1.5">
+                            {note.action_items.map(it => (
+                              <li key={it.id} className="flex items-center gap-2 text-xs min-h-[20px]">
+                                <Checkbox
+                                  checked={it.is_done}
+                                  onCheckedChange={() => toggleActionItem(note.id, it.id)}
+                                  disabled={saving}
+                                  aria-label={it.is_done ? `Mark "${it.text}" not done` : `Mark "${it.text}" done`}
+                                  className="shrink-0 self-center"
+                                />
+                                <span className={`leading-tight ${it.is_done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}`}>
+                                  {it.text}
+                                </span>
+                                <span className="ml-auto text-[10px] leading-none px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 shrink-0 self-center">
+                                  {ownerNameFor(it)}
+                                </span>
+                                {it.auto_created_task_id && !it.owner_client_side && (
+                                  <span className="text-[9px] text-ink-warm-400 shrink-0 self-center" title="HQ task auto-created">
+                                    ↗ task
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

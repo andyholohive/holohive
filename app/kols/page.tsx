@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity, RefreshCw } from "lucide-react";
@@ -129,7 +130,10 @@ export default function KOLsPage() {
     // row. Distinct from `latest_cost` (renamed to "Latest Cost"), which
     // shows the realized rate from campaign contents.
     pricing: true,
-    latest_cost: true,
+    // [2026-07-02] Latest Cost merged into Pricing per Andy — kept in state
+    // as `false` so saved-URL toggles pre-dating the merge don't break, but
+    // the column no longer renders anywhere.
+    latest_cost: false,
     community: true,
     group_chat: true,
     in_house: true,
@@ -705,7 +709,8 @@ export default function KOLsPage() {
         (!filters.creator_type.length || filters.creator_type.some(ct => effectiveCreatorTypes(kol.creator_type).includes(ct))) &&
         (!filters.content_type.length || filters.content_type.some(ct => kol.content_type?.includes(ct))) &&
         (!filters.deliverables.length || filters.deliverables.some(d => kol.deliverables?.includes(d))) &&
-        (!filters.pricing.length || filters.pricing.some(p => kol.pricing === p)) &&
+        // Pricing filter dropped 2026-07-01 — schema switched to numeric
+        // post_price/share_price; the old free-string tier match is gone.
         // rating filter removed alongside the column (migration 071).
         (!filters.community || kol.community === (filters.community === 'yes')) &&
         (!filters.group_chat || kol.group_chat === (filters.group_chat === 'yes')) &&
@@ -1008,7 +1013,9 @@ export default function KOLsPage() {
         // filter. The display-side coalesce in effectiveCreatorTypes
         // handles existing empties; this stops creating new ones.
         creator_type: ['General'],
-        pricing: null,
+        post_price: null,
+        share_price: null,
+        pricing_notes: null,
         group_chat: false,
         in_house: null,
         description: '',
@@ -2055,44 +2062,9 @@ export default function KOLsPage() {
               />
             </div>
           </div>
-          {/* Pricing */}
-          <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Pricing</span>
-            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-              <MultiSelect
-                options={fieldOptions.pricingTiers || []}
-                selected={bulkEdit.pricing ? [bulkEdit.pricing] : []}
-                onSelectedChange={pricingTiers => {
-                  // For single-select behavior, always take the last selected item
-                  const newPricing = pricingTiers.length > 0 ? pricingTiers[pricingTiers.length - 1] : null;
-                  setBulkEdit(prev => ({ ...prev, pricing: newPricing }));
-                }}
-                placeholder="Pricing"
-                className="w-full"
-                isOpen={bulkEditDropdown === 'pricing'}
-                onOpenChange={(open) => setBulkEditDropdown(open ? 'pricing' : null)}
-                renderOption={(option) => (
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(option)}`}>
-                    {option}
-                  </span>
-                )}
-                triggerContent={
-                  <div className="w-full flex items-center h-7 min-h-[28px]">
-                    {bulkEdit.pricing ? (
-                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(bulkEdit.pricing)}`}>
-                        {bulkEdit.pricing}
-                      </span>
-                    ) : (
-                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                    )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-          </div>
-                }
-              />
-          </div>
-          </div>
+          {/* Pricing bulk-edit dropped 2026-07-01 — post_price / share_price
+              are numeric per-row values, not a tier the whole selection shares.
+              Edit inline via the row's Pricing cell instead. */}
           {/* Community Founder (renamed from "Community" per May 2026 spec). */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
             <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Community Founder</span>
@@ -2401,40 +2373,9 @@ export default function KOLsPage() {
                 />
               </div>
             </div>
-            {/* Pricing Filter */}
-            <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Pricing</span>
-              <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                <MultiSelect
-                  options={fieldOptions.pricingTiers || []}
-                  selected={filters.pricing}
-                  onSelectedChange={(pricing) => setFilters(prev => ({ ...prev, pricing }))}
-                  placeholder="Pricing"
-                  className="w-full"
-                  renderOption={(option) => (
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(option)}`}>
-                      {option}
-                    </span>
-                  )}
-                  triggerContent={
-                    <div className="w-full flex items-center h-7 min-h-[28px]">
-                      {filters.pricing && filters.pricing.length > 0 ? (
-                        <>
-                          {filters.pricing.map(item => (
-                            <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getPricingColor(item)} mr-1`}>{item}</span>
-                          ))}
-                        </>
-                      ) : (
-                        <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                      )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  }
-                />
-              </div>
-            </div>
+            {/* Pricing filter dropped 2026-07-01 — pricing is now numeric
+                (post_price / share_price), so a fixed-tier select can't
+                represent free-value fields. Sort by column header instead. */}
             {/* Community Founder filter (renamed from "Community"). */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
               <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Community Founder</span>
@@ -2626,7 +2567,8 @@ export default function KOLsPage() {
                     creator_type: 'Creator Type',
                     niche: 'Niche',
                     deliverables: 'Content Type',
-                    latest_cost: 'Latest Cost',
+                    // [2026-07-02] 'latest_cost' dropped from the toggle list
+                    // because the column merged into Pricing.
                     community: 'Community Founder',
                     group_chat: 'Group Chat',
                     in_house: 'In-House',
@@ -3007,54 +2949,10 @@ export default function KOLsPage() {
               )}
               {visibleColumns.pricing && (
                 <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
-                  <div className="flex items-center gap-1 cursor-pointer group">
-                    <span>Pricing</span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
-                          <ChevronDown className="h-3 w-3" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[200px] p-0" align="start">
-                        <div className="p-3">
-                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Pricing</div>
-                          {(fieldOptions.pricingTiers || []).map((pricing) => (
-                            <div
-                              key={pricing}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const newPricing = filters.pricing.includes(pricing)
-                                  ? filters.pricing.filter(p => p !== pricing)
-                                  : [...filters.pricing, pricing];
-                                setFilters(prev => ({ ...prev, pricing: newPricing }));
-                              }}
-                            >
-                              <Checkbox checked={filters.pricing.includes(pricing)} />
-                              <span className="text-sm">{pricing}</span>
-                            </div>
-                          ))}
-                          {filters.pricing.length > 0 && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="w-full mt-2 text-xs"
-                              onClick={() => setFilters(prev => ({ ...prev, pricing: [] }))}
-                            >
-                              Clear
-                            </Button>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <FilterCountBadge count={filters.pricing.length} />
-                  </div>
+                  Pricing
                 </TableHead>
               )}
-              {visibleColumns.latest_cost && (
-                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Latest Cost</TableHead>
-              )}
+              {/* [2026-07-02] Latest Cost header dropped — merged into Pricing. */}
               {/* Score: placeholder until Phase 3 (kol_channel_snapshots
                   + scoring formula) ships. Show a static "Score" header;
                   no filter yet (will get a numeric range filter in Phase 3). */}
@@ -3371,28 +3269,27 @@ export default function KOLsPage() {
                   )}
                   {visibleColumns.pricing && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
-                    <div>{renderEditableCell(kol.pricing, 'pricing', kol.id, 'text')}</div>
+                    <PricingCell
+                      kol={kol}
+                      latestCost={latestCostMap.get(kol.id) ?? null}
+                      onSave={async (fields) => {
+                        const kolToUpdate = kols.find(k => k.id === kol.id);
+                        if (!kolToUpdate) return;
+                        const optimistic = { ...kolToUpdate, ...fields };
+                        setKols(prev => prev.map(k => k.id === kol.id ? optimistic : k));
+                        try {
+                          await KOLService.updateKOL({ id: kol.id, ...fields });
+                        } catch (err) {
+                          console.error('Error updating pricing:', err);
+                          setKols(prev => prev.map(k => k.id === kol.id ? kolToUpdate : k));
+                        }
+                      }}
+                    />
                   </TableCell>
                   )}
-                  {visibleColumns.latest_cost && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
-                    <div className="truncate text-sm">
-                      {latestCostMap.has(kol.id) ? (
-                        <button
-                          className="text-brand hover:underline cursor-pointer"
-                          onClick={() => {
-                            const entry = latestCostMap.get(kol.id)!;
-                            if (entry.campaignSlug) {
-                              router.push(`/campaigns/${entry.campaignSlug}`);
-                            }
-                          }}
-                        >
-                          ${latestCostMap.get(kol.id)!.amount.toLocaleString()}
-                        </button>
-                      ) : '-'}
-                    </div>
-                  </TableCell>
-                  )}
+                  {/* [2026-07-02] Latest Cost column merged into Pricing per
+                      Andy — the paid amount now shows as the primary value in
+                      the Pricing cell with the ask visible on hover. */}
                   {/* Score: Doc 2 two-score blended display. Hover →
                       Channel/Campaign split per Jdot Q6c. Tier from
                       result.blended.tier (absolute bands S 85+ / A 70 /
@@ -3791,6 +3688,131 @@ function FilterCountBadge({ count }: { count: number }) {
   );
 }
 
+// Inline editor for the three-field pricing model (Doc "3. KOL Database Change"):
+//   post_price (mandatory numeric) + share_price (optional numeric) + pricing_notes (free-text).
+// Popover so it stays consistent with the rest of the row's inline-edit affordances.
+function PricingCell({
+  kol,
+  latestCost,
+  onSave,
+}: {
+  kol: MasterKOL;
+  // [2026-07-02] Latest-paid amount + campaign slug from the payments
+  // table. When present, Pricing cell shows this as the primary value
+  // (what the KOL actually charged last time) and the tooltip reveals
+  // both the ask and the paid so the drift signal is preserved.
+  latestCost?: { amount: number; campaignSlug: string } | null;
+  onSave: (fields: { post_price: number | null; share_price: number | null; pricing_notes: string | null }) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [post, setPost] = useState<string>(kol.post_price != null ? String(kol.post_price) : '');
+  const [share, setShare] = useState<string>(kol.share_price != null ? String(kol.share_price) : '');
+  const [notes, setNotes] = useState<string>(kol.pricing_notes || '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setPost(kol.post_price != null ? String(kol.post_price) : '');
+      setShare(kol.share_price != null ? String(kol.share_price) : '');
+      setNotes(kol.pricing_notes || '');
+    }
+  }, [open, kol.post_price, kol.share_price, kol.pricing_notes]);
+
+  // Primary display: latest paid amount if available, else fall back
+  // to the KOL's asking post_price, else free-text pricing notes, else —.
+  const primary = latestCost
+    ? `$${latestCost.amount.toLocaleString('en-US')}`
+    : kol.post_price != null
+      ? `$${Number(kol.post_price).toLocaleString('en-US')}`
+      : (kol.pricing_notes ? kol.pricing_notes : '—');
+  // Muted grey when we're showing free-text notes or a fallback dash,
+  // brand when showing a numeric value.
+  const primaryColor = (latestCost || kol.post_price != null) ? 'text-brand' : 'text-ink-warm-400';
+
+  const tooltipLines = [
+    kol.post_price != null ? `Asking $${Number(kol.post_price).toLocaleString('en-US')} / post` : null,
+    kol.share_price != null ? `Asking $${Number(kol.share_price).toLocaleString('en-US')} / share` : null,
+    kol.pricing_notes ? `Notes: ${kol.pricing_notes}` : null,
+    latestCost ? `Paid $${latestCost.amount.toLocaleString('en-US')} last (${latestCost.campaignSlug || 'campaign'})` : null,
+  ].filter(Boolean);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave({
+        post_price: post === '' ? null : Number(post),
+        share_price: share === '' ? null : Number(share),
+        pricing_notes: notes.trim() || null,
+      });
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full text-left px-2 py-1 rounded-md text-xs font-medium tabular-nums hover:bg-cream-100 truncate"
+          title={tooltipLines.length > 0 ? tooltipLines.join('\n') : 'Click to set pricing'}
+        >
+          <span className={primaryColor}>{primary}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-3 space-y-2 bg-white">
+        <div className="text-xs font-semibold text-ink-warm-700">Pricing — {kol.name}</div>
+        <div className="space-y-1">
+          <Label htmlFor={`pp-${kol.id}`} className="text-[10px] uppercase tracking-wider text-ink-warm-500">Post Price ($)</Label>
+          <Input
+            id={`pp-${kol.id}`}
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={post}
+            onChange={(e) => setPost(e.target.value)}
+            placeholder="e.g. 1250"
+            className="h-8 focus-brand"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`sp-${kol.id}`} className="text-[10px] uppercase tracking-wider text-ink-warm-500">Share Price ($) — optional</Label>
+          <Input
+            id={`sp-${kol.id}`}
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={share}
+            onChange={(e) => setShare(e.target.value)}
+            placeholder="Blank = no share deal"
+            className="h-8 focus-brand"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`pn-${kol.id}`} className="text-[10px] uppercase tracking-wider text-ink-warm-500">Notes</Label>
+          <Textarea
+            id={`pn-${kol.id}`}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Barter, revshare, etc."
+            rows={2}
+            className="text-sm focus-brand"
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button variant="brand" size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Props mirror the two state values it depends on inside the page:
 //   - visibleColumns: which columns to render skeleton cells for
 //   - addingNewOptionForRow: drives the In-House column's width variant
@@ -3819,7 +3841,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.content_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
             {visibleColumns.deliverables && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
             {visibleColumns.pricing && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
-            {visibleColumns.latest_cost && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Latest Cost</TableHead>}
+            {/* [2026-07-02] Latest Cost skeleton dropped — merged into Pricing. */}
             {/* Score + Projects added per May 2026 KOL overhaul spec.
                 Rating column removed (migration 071). Loading skeleton
                 mirrors the live table so columns don't reflow on load. */}

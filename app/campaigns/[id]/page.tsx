@@ -129,7 +129,7 @@ function compareKolByColumn(a: any, b: any, key: KolSortKey): number {
       case 'creator_type': return (row.master_kol?.creator_type || []).join(', ');
       case 'content_type': return (row.master_kol?.content_type || []).join(', ');
       case 'deliverables': return (row.deliverables || row.master_kol?.deliverables || []).join(', ');
-      case 'pricing':      return row.master_kol?.pricing || '';
+      case 'pricing':      return row.master_kol?.post_price ?? null;
       // Sort by workflow stage, not alphabetically. See KOL_STATUS_ORDER.
       case 'hh_status':    return statusOrderIndex(row.hh_status);
       case 'budget_type':  return row.budget_type || '';
@@ -2208,12 +2208,19 @@ const CampaignDetailsPage = () => {
                 used in the mockup's Workspace tabs (Context /
                 Action Board / Weekly Update / Delivery Log / Activity). */}
             <TabsList className="w-full justify-start gap-0.5 bg-transparent p-0 h-auto rounded-none border-b border-cream-200">
+              {/* [2026-07-02] Internal Overview tab hidden per Andy — the
+                  KOL Dashboard tab is now the entry point. Keeping the
+                  TabsContent below so an old bookmark with ?tab=information
+                  still renders instead of crashing, but the trigger is
+                  gated so day-to-day navigation ignores it. */}
+              {false && (
               <TabsTrigger
                 value="information"
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
               >
                 Overview
               </TabsTrigger>
+              )}
               <TabsTrigger
                 value="kols"
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t flex items-center gap-1.5"

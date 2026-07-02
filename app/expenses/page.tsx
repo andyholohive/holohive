@@ -153,16 +153,20 @@ export default function ExpensesPage() {
     try {
       const params = new URLSearchParams();
       params.set('include_templates', 'false');
-      // Period filter
+      // [2026-07-01] Period filter defaults to 'this_month', but Unpaid is a
+      // backlog view — a receipt from three months ago is still owed today.
+      // Skip the period param when the user picks Unpaid so nothing hides
+      // from reimbursement.
+      const skipPeriod = filterPaid === 'unpaid';
       const now = new Date();
-      if (filterPeriod === 'this_month') {
+      if (!skipPeriod && filterPeriod === 'this_month') {
         params.set('from_date', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
-      } else if (filterPeriod === 'last_month') {
+      } else if (!skipPeriod && filterPeriod === 'last_month') {
         const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lmEnd = new Date(now.getFullYear(), now.getMonth(), 0);
         params.set('from_date', `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}-01`);
         params.set('to_date',   `${lmEnd.getFullYear()}-${String(lmEnd.getMonth() + 1).padStart(2, '0')}-${String(lmEnd.getDate()).padStart(2, '0')}`);
-      } else if (filterPeriod === 'this_year') {
+      } else if (!skipPeriod && filterPeriod === 'this_year') {
         params.set('from_date', `${now.getFullYear()}-01-01`);
       }
 
@@ -405,6 +409,10 @@ export default function ExpensesPage() {
               </span>
             </div>
             <div className="h-4 w-px bg-cream-200" />
+            <span className="text-sm font-semibold tabular-nums text-ink-warm-900">
+              {formatUSD(expenses.filter(e => selected.has(e.id)).reduce((sum, e) => sum + Number(e.amount_usd || 0), 0))}
+            </span>
+            <div className="h-4 w-px bg-cream-200" />
             <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
               Bulk Actions
             </span>
@@ -502,13 +510,13 @@ export default function ExpensesPage() {
             <TableHeader>
               <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-10"></TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[90px]">Paid?</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px]">Date</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[140px]">User</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px] text-right">Amount</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[140px]">Type</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[110px]">Frequency</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Description</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[90px]">Paid?</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -524,6 +532,13 @@ export default function ExpensesPage() {
                   >
                     <TableCell className="py-3.5 px-5 w-10" onClick={(ev) => ev.stopPropagation()}>
                       <Checkbox checked={isSelected} onCheckedChange={() => toggleSelected(e.id)} />
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      {e.is_paid ? (
+                        <StatusBadge tone="success">Paid</StatusBadge>
+                      ) : (
+                        <StatusBadge tone="warning">Unpaid</StatusBadge>
+                      )}
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700">{formatDate(e.expense_date)}</TableCell>
                     <TableCell className="py-3.5 px-5 text-sm">{u?.name || <span className="text-ink-warm-400">{e.user_id.slice(0, 8)}…</span>}</TableCell>
@@ -543,13 +558,6 @@ export default function ExpensesPage() {
                       )}
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700 max-w-md truncate" title={e.description}>{e.description}</TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      {e.is_paid ? (
-                        <StatusBadge tone="success">Paid</StatusBadge>
-                      ) : (
-                        <StatusBadge tone="warning">Unpaid</StatusBadge>
-                      )}
-                    </TableCell>
                     <TableCell className="py-3.5 px-5 text-right" onClick={(ev) => ev.stopPropagation()}>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openDetail(e)}>
                         <Eye className="h-3.5 w-3.5 text-ink-warm-500" />
@@ -676,6 +684,7 @@ function AddExpenseDialog({
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
   const [recurrenceStart, setRecurrenceStart] = useState(new Date().toISOString().slice(0, 10));
   const [recurrenceEnd, setRecurrenceEnd] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -688,6 +697,7 @@ function AddExpenseDialog({
       setExpenseDate(new Date().toISOString().slice(0, 10));
       setRecurrenceStart(new Date().toISOString().slice(0, 10));
       setRecurrenceEnd('');
+      setAttachment(null);
     }
   }, [open, defaultUserId]);
 
@@ -723,6 +733,23 @@ function AddExpenseDialog({
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
+      const created = await r.json();
+      const newId: string | undefined = created?.expense?.id;
+
+      if (attachment && newId) {
+        try {
+          const fd = new FormData();
+          fd.append('file', attachment);
+          const up = await fetch(`/api/expenses/${newId}/attachments`, { method: 'POST', body: fd });
+          if (!up.ok) {
+            const msg = (await up.text()).slice(0, 200);
+            toast({ title: 'Expense created, attachment failed', description: msg, variant: 'destructive' });
+          }
+        } catch (upErr: any) {
+          toast({ title: 'Expense created, attachment failed', description: upErr?.message?.slice(0, 200), variant: 'destructive' });
+        }
+      }
+
       toast({ title: 'Expense created' });
       onCreated();
     } catch (err: any) {
@@ -830,9 +857,47 @@ function AddExpenseDialog({
             />
           </div>
 
-          <p className="text-[11px] text-ink-warm-500">
-            Attachments can be added after creating — open the detail view.
-          </p>
+          <div>
+            <Label>Attachment (Optional)</Label>
+            {attachment ? (
+              <div className="flex items-center gap-2 rounded-md border border-cream-200 bg-cream-50 px-3 py-2">
+                <FileText className="h-4 w-4 text-ink-warm-500 flex-shrink-0" />
+                <span className="text-sm text-ink-warm-800 truncate flex-1" title={attachment.name}>
+                  {attachment.name}
+                </span>
+                <span className="text-[11px] text-ink-warm-500 tabular-nums">
+                  {(attachment.size / 1024).toFixed(0)} KB
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setAttachment(null)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 10 * 1024 * 1024) {
+                    toast({ title: 'File too large', description: 'Max 10 MB', variant: 'destructive' });
+                    return;
+                  }
+                  setAttachment(f);
+                }}
+                className="h-9 focus-brand file:mr-3 file:rounded file:border-0 file:bg-cream-100 file:px-2 file:py-1 file:text-xs file:text-ink-warm-700"
+              />
+            )}
+            <p className="text-[11px] text-ink-warm-500 mt-1">
+              Receipt or invoice (JPG / PNG / GIF / WebP / PDF, max 10 MB). More can be added later from the detail view.
+            </p>
+          </div>
         </div>
 
         <DialogFooter className="border-t border-cream-100 pt-3 mt-0">

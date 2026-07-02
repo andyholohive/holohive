@@ -147,9 +147,12 @@ export function shouldGenerateInstance(
   }
 
   if (template.frequency === 'monthly') {
-    const startDay = start.getUTCDate();
-    const clampedTarget = clampDayOfMonth(startDay, target.getUTCFullYear(), target.getUTCMonth() + 1);
-    return target.getUTCDate() === clampedTarget;
+    // [2026-07-02] Per Andy: fire monthly instances on the 15th of every
+    // month, regardless of the template's start day. Rationale: a template
+    // starting on Jan 31 would clamp to Feb 28 / Mar 31 / Apr 30 — cleaner
+    // to standardize mid-month where no month ever lacks a matching day
+    // and there's no ambiguity when a cron run is missed near month-end.
+    return target.getUTCDate() === 15;
   }
 
   return false;

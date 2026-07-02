@@ -28,7 +28,14 @@ export interface MasterKOL {
   niche_tags: string[] | null;
   /** @deprecated Use `niche_tags`. Kept while sync trigger mirrors both ways. */
   niche?: string[] | null;
-  pricing: string | null;
+  /** Standard sponsored post rate (USD). Mandatory per Doc "3. KOL Database Change". */
+  post_price?: number | null;
+  /** Share-deal rate (USD). NULL = KOL not eligible for share deals. */
+  share_price?: number | null;
+  /** Free-text carry-over for arrangements that don't fit two numeric fields (barter, revshare, etc.). */
+  pricing_notes?: string | null;
+  /** @deprecated Column dropped 2026-07-01. Kept typed for cheap-migration of legacy readers. Always null. */
+  pricing?: string | null;
   group_chat: boolean | null;
   in_house: string | null;
   /** Spec-canonical name (HHP KOL DB Overhaul May '26). */
@@ -74,7 +81,9 @@ export interface CreateKOLData {
   niche_tags?: string[];
   /** @deprecated alias of niche_tags */
   niche?: string[];
-  pricing?: MasterKOL['pricing'];
+  post_price?: number | null;
+  share_price?: number | null;
+  pricing_notes?: string | null;
   group_chat?: boolean;
   in_house?: string | null;
   notes?: string;
@@ -103,7 +112,9 @@ export interface UpdateKOLData {
   niche_tags?: string[] | null;
   /** @deprecated alias of niche_tags */
   niche?: string[] | null;
-  pricing?: string | null;
+  post_price?: number | null;
+  share_price?: number | null;
+  pricing_notes?: string | null;
   group_chat?: boolean | null;
   in_house?: string | null;
   notes?: string | null;
@@ -154,7 +165,9 @@ export class KOLService {
           community_link: kolData.community_link || null,
           deliverables: kolData.deliverables || [],
           niche_tags: kolData.niche_tags || [],
-          pricing: kolData.pricing || null,
+          post_price: kolData.post_price ?? null,
+          share_price: kolData.share_price ?? null,
+          pricing_notes: kolData.pricing_notes ?? null,
           group_chat: kolData.group_chat || false,
           notes: kolData.notes || null,
           creator_types: kolData.creator_types || null,
@@ -213,6 +226,9 @@ export class KOLService {
     try {
       const updateData: any = { ...kolData };
       delete updateData.id; // Remove id from update data
+      // `pricing` column was dropped 2026-07-01 in favor of post_price / share_price / pricing_notes.
+      // Strip it defensively so legacy callers can't error out the whole update.
+      delete updateData.pricing;
 
       const { data: kol, error } = await supabase
         .from('master_kols')

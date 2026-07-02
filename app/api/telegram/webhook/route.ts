@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { extractAddressCandidate, hasValidChecksumIfMixed, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
 import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
+import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
 
 export const dynamic = 'force-dynamic';
 
@@ -3916,6 +3917,17 @@ async function handleRepostCommand(chatId: string, args: string[], message: any)
       threadId,
     );
     return;
+  }
+
+  // [2026-07-02] Per Andy: opting in should also add "Repost" to the KOL's
+  // Content Type list on /kols so the profile reflects the offering. Same
+  // mapping used by contents-side auto-add (QRT → Repost). Fire-and-forget;
+  // failure here is non-fatal for the opt-in flow — we still confirm the
+  // primary flag was saved.
+  if (next === true) {
+    ensureKolDeliverable(supabaseAdmin as any, masterKolId, 'QRT').catch(err => {
+      console.warn('[/repost] deliverable append failed:', err?.message ?? err);
+    });
   }
 
   // § 7.1 + § 7.2 confirmations

@@ -9,6 +9,15 @@ export interface CampaignWithDetails extends Campaign {
   client_name?: string;
   client_email?: string;
   client_logo_url?: string | null;
+  // [2026-07-01] Client status flags surfaced for the /campaigns All / Active
+  // / Ad-Hoc / Inactive tab filter — the tabs read from the campaign's client,
+  // not the campaign's own lifecycle status.
+  client_is_active?: boolean | null;
+  client_is_ad_hoc?: boolean | null;
+  // [2026-07-01] MAX covered_through across active stints for this client
+  // (via client_coverage view). Drives the auto-derived Paused bucket on the
+  // /campaigns tab strip: client engagement lapsed while is_active still true.
+  client_covered_through?: string | null;
   budget_allocations?: CampaignBudgetAllocation[];
   total_allocated?: number;
   share_creator_type?: boolean;
@@ -33,7 +42,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!campaigns_client_id_fkey(name, email, logo_url),
+          clients!campaigns_client_id_fkey(name, email, logo_url, is_active, is_ad_hoc),
           campaign_budget_allocations(*)
         `)
         .is('archived_at', null)
@@ -41,11 +50,34 @@ export class CampaignService {
 
       if (error) throw error;
 
-      return campaigns?.map(campaign => ({
+      // [2026-07-01] Join in MAX covered_through per client so the Paused
+      // bucket can auto-derive. One extra round-trip; cheap because the view
+      // rolls up active stints only.
+      const clientIds = Array.from(new Set((campaigns || []).map((c: any) => c.client_id).filter(Boolean)));
+      const coveredThroughByClient: Record<string, string | null> = {};
+      if (clientIds.length > 0) {
+        const { data: coverageRows } = await client
+          .from('client_coverage')
+          .select('client_id, covered_through')
+          .in('client_id', clientIds);
+        for (const row of (coverageRows || []) as Array<{ client_id: string; covered_through: string | null }>) {
+          const prev = coveredThroughByClient[row.client_id];
+          if (row.covered_through && (!prev || row.covered_through > prev)) {
+            coveredThroughByClient[row.client_id] = row.covered_through;
+          } else if (prev === undefined) {
+            coveredThroughByClient[row.client_id] = row.covered_through ?? null;
+          }
+        }
+      }
+
+      return campaigns?.map((campaign: any) => ({
         ...campaign,
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
         client_logo_url: (campaign.clients as any)?.logo_url,
+        client_is_active: (campaign.clients as any)?.is_active ?? null,
+        client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
+        client_covered_through: coveredThroughByClient[campaign.client_id] ?? null,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
       })) || [];
@@ -65,7 +97,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!campaigns_client_id_fkey(name, email, logo_url),
+          clients!campaigns_client_id_fkey(name, email, logo_url, is_active, is_ad_hoc),
           campaign_budget_allocations(*)
         `)
         .eq('id', campaignId)
@@ -79,6 +111,8 @@ export class CampaignService {
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
         client_logo_url: (campaign.clients as any)?.logo_url,
+        client_is_active: (campaign.clients as any)?.is_active ?? null,
+        client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
 
@@ -158,7 +192,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!campaigns_client_id_fkey(name, email, logo_url),
+          clients!campaigns_client_id_fkey(name, email, logo_url, is_active, is_ad_hoc),
           campaign_budget_allocations(*)
         `)
         .eq('slug', slug)
@@ -172,6 +206,8 @@ export class CampaignService {
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
         client_logo_url: (campaign.clients as any)?.logo_url,
+        client_is_active: (campaign.clients as any)?.is_active ?? null,
+        client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
       };

@@ -133,7 +133,7 @@ function compareKolByColumn(a: any, b: any, key: KolSortKey): number {
       case 'creator_type': return (row.master_kol?.creator_type || []).join(', ');
       case 'content_type': return (row.master_kol?.content_type || []).join(', ');
       case 'deliverables': return (row.deliverables || row.master_kol?.deliverables || []).join(', ');
-      case 'pricing':      return row.master_kol?.pricing || '';
+      case 'pricing':      return row.master_kol?.post_price ?? null;
       case 'hh_status':    return statusOrderIndex(row.hh_status);
       case 'budget_type':  return row.budget_type || '';
       case 'budget':       return row.budget ?? null;
@@ -1193,41 +1193,59 @@ export function KolDashboardTableView({
                                     </a>
                                   )}
                                 </div>
-                                {/* [2026-06-16] HHP Campaign Dashboard § 2 GAP —
-                                    KOL activation-recency badge (distinct from
-                                    hh_status relationship lifecycle). Source:
-                                    campaign_kol_activation_status view.
-                                    Green Active / gray Last active / amber
-                                    Onboarded — see spec for tone rule. */}
-                                {(() => {
-                                  const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
-                                  const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
-                                  if (aw != null) {
-                                    return (
-                                      <div className="mt-1">
+                                {/* [2026-07-01] Merged inline status strip — per
+                                    Andy: show hh_status + activation-recency
+                                    together beneath the name. Recency now sources
+                                    from approved contents (view rewritten), not
+                                    lineup membership — KOLs in a confirmed lineup
+                                    who never post no longer show as active.
+                                    "Last active Week X" recolored gray → light
+                                    green per the same request. */}
+                                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                  {(() => {
+                                    const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
+                                    const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
+                                    if (aw != null) {
+                                      return (
                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                                           Active Week {aw}
                                         </span>
-                                      </div>
-                                    );
-                                  }
-                                  if (lw != null) {
-                                    return (
-                                      <div className="mt-1">
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                      );
+                                    }
+                                    if (lw != null) {
+                                      return (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50/60 text-emerald-600 border border-emerald-100">
                                           Last active Week {lw}
                                         </span>
-                                      </div>
-                                    );
-                                  }
-                                  return (
-                                    <div className="mt-1">
+                                      );
+                                    }
+                                    return (
                                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                         Onboarded
                                       </span>
-                                    </div>
-                                  );
-                                })()}
+                                    );
+                                  })()}
+                                  {/* hh_status pill — click to edit inline. Mirrors
+                                      the standalone Status column but keeps status
+                                      visible at a glance next to the name. */}
+                                  <Select
+                                    value={campaignKOL.hh_status}
+                                    onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
+                                  >
+                                    <SelectTrigger
+                                      className={`border-none shadow-none bg-transparent w-auto h-auto px-1.5 py-0.5 rounded text-[10px] font-medium inline-flex items-center gap-0.5 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${getStatusColor(campaignKOL.hh_status)}`}
+                                      style={{ outline: 'none', boxShadow: 'none' }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {CampaignKOLService.getHHStatusOptions().map((status) => (
+                                        <SelectItem key={status} value={status || ''}>{status}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <MultiSelect

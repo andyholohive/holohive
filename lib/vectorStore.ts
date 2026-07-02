@@ -219,7 +219,9 @@ export class VectorStore {
 
       // Services and pricing
       kol.deliverables?.length ? `Services: ${kol.deliverables.join(', ')}. Can deliver ${kol.deliverables.join(', ')}` : '',
-      kol.pricing ? `Pricing: ${kol.pricing}. Costs ${kol.pricing}` : '',
+      kol.post_price != null ? `Post price: $${Number(kol.post_price).toLocaleString('en-US')} per sponsored post` : '',
+      kol.share_price != null ? `Share price: $${Number(kol.share_price).toLocaleString('en-US')} per share` : '',
+      kol.pricing_notes ? `Pricing notes: ${kol.pricing_notes}` : '',
       // tier text removed — column dropped (migration 071). Score will
       // populate this slot once Phase 3 ships kol_channel_snapshots +
       // the composite formula.
@@ -252,7 +254,9 @@ export class VectorStore {
       content_type: kol.content_type,
       niche_tags: kol.niche_tags,
       deliverables: kol.deliverables,
-      pricing: kol.pricing,
+      post_price: kol.post_price,
+      share_price: kol.share_price,
+      pricing_notes: kol.pricing_notes,
       // tier and rating removed from metadata — columns dropped in
       // migration 071. Search-result UI doesn't render these anymore.
       community_founder: kol.community_founder,

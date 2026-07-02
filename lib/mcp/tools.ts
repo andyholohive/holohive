@@ -1433,7 +1433,11 @@ export async function getKolDetail(
   if (Array.isArray(k.content_type) && k.content_type.length) out.push(`**Content type:** ${k.content_type.join(', ')}`);
   if (Array.isArray(k.creator_types) && k.creator_types.length) out.push(`**Creator type:** ${k.creator_types.join(', ')}`);
   if (Array.isArray(k.deliverables) && k.deliverables.length) out.push(`**Deliverables:** ${k.deliverables.join(', ')}`);
-  if (k.pricing) out.push(`**Pricing:** ${k.pricing}`);
+  const priceParts: string[] = [];
+  if (k.post_price != null) priceParts.push(`$${Number(k.post_price).toLocaleString('en-US')} / post`);
+  if (k.share_price != null) priceParts.push(`$${Number(k.share_price).toLocaleString('en-US')} / share`);
+  if (priceParts.length) out.push(`**Pricing:** ${priceParts.join(' · ')}`);
+  if (k.pricing_notes) out.push(`**Pricing notes:** ${k.pricing_notes}`);
   if (k.in_house) out.push(`**In-house:** ${k.in_house}`);
   if (k.link) out.push(`**Link:** ${k.link}`);
   if (k.wallet) out.push(`**Wallet:** ${k.wallet}`);

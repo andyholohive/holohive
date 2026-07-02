@@ -162,7 +162,9 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
         creator_types: kol.creator_types || [],
         content_type: kol.content_type || [],
         niche_tags: kol.niche_tags || [],
-        pricing: kol.pricing,
+        post_price: kol.post_price ?? null,
+        share_price: kol.share_price ?? null,
+        pricing_notes: kol.pricing_notes ?? null,
         in_house: kol.in_house,
         notes: kol.notes,
         wallet: kol.wallet,
@@ -324,20 +326,50 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="mk-pricing">Pricing</Label>
-                <Select
-                  value={masterKolForm.pricing || ''}
-                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, pricing: v || null }))}
-                >
-                  <SelectTrigger id="mk-pricing" className="focus-brand">
-                    <SelectValue placeholder="Select pricing" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {((fieldOptions as any)?.pricingTiers || []).map((p: string) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="mk-post-price">Post Price ($) <RequiredAsterisk /></Label>
+                <Input
+                  id="mk-post-price"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={masterKolForm.post_price ?? ''}
+                  onChange={(e) => setMasterKolForm(f => ({
+                    ...f,
+                    post_price: e.target.value === '' ? null : Number(e.target.value),
+                  }))}
+                  placeholder="e.g. 1250"
+                  className="focus-brand"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="mk-share-price">Share Price ($)</Label>
+                <Input
+                  id="mk-share-price"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={masterKolForm.share_price ?? ''}
+                  onChange={(e) => setMasterKolForm(f => ({
+                    ...f,
+                    share_price: e.target.value === '' ? null : Number(e.target.value),
+                  }))}
+                  placeholder="Optional"
+                  className="focus-brand"
+                />
+              </div>
+
+              <div className="space-y-1.5 col-span-2">
+                <Label htmlFor="mk-pricing-notes">Pricing Notes</Label>
+                <Input
+                  id="mk-pricing-notes"
+                  value={masterKolForm.pricing_notes || ''}
+                  onChange={(e) => setMasterKolForm(f => ({ ...f, pricing_notes: e.target.value || null }))}
+                  placeholder="Free-text carry-over (barter, revshare, etc.)"
+                  className="focus-brand"
+                />
               </div>
 
               {/* Tier select removed — column dropped in migration 071.
