@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -26,6 +26,11 @@ import { Send, Search, Users } from 'lucide-react';
 
 type KolChoice = { id: string; name: string; hasGc: boolean };
 
+/** Insertable per-recipient placeholders. Server substitutes at send. */
+const VARIABLES: Array<{ token: string; description: string }> = [
+  { token: '{name}', description: 'Replaced with each KOL\'s name at send time.' },
+];
+
 export function SendAnnouncementDialog({
   open,
   onOpenChange,
@@ -42,6 +47,31 @@ export function SendAnnouncementDialog({
   const [showPreview, setShowPreview] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  /**
+   * Insert a template token at the current cursor position (or at the end
+   * if the textarea hasn't been focused yet). Restores focus + moves the
+   * caret to just after the inserted token so successive inserts stack
+   * naturally.
+   */
+  const insertAtCursor = (token: string) => {
+    const el = textareaRef.current;
+    if (!el) {
+      setText(prev => prev + token);
+      return;
+    }
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const next = el.value.slice(0, start) + token + el.value.slice(end);
+    setText(next);
+    // Restore caret + focus after the state flush.
+    requestAnimationFrame(() => {
+      el.focus();
+      const caret = start + token.length;
+      el.setSelectionRange(caret, caret);
+    });
+  };
 
   // Reset picker state each time the dialog opens so a prior draft
   // doesn't linger between sessions.
@@ -212,8 +242,26 @@ export function SendAnnouncementDialog({
           </div>
 
           <div>
-            <Label>Message <span className="text-[11px] text-ink-warm-500">(Markdown supported · use {'{name}'} for KOL name)</span></Label>
+            <Label>Message <span className="text-[11px] text-ink-warm-500">(Markdown supported)</span></Label>
+            {/* Variables toolbar — click a chip to insert the token at the
+                cursor position. One-token list today; grows as we add more
+                per-KOL variables (campaign name, wallet, tier, etc.). */}
+            <div className="flex items-center gap-2 mb-1.5 mt-1 flex-wrap">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-ink-warm-500">Insert</span>
+              {VARIABLES.map(v => (
+                <button
+                  key={v.token}
+                  type="button"
+                  onClick={() => insertAtCursor(v.token)}
+                  className="text-[11px] px-2 py-0.5 rounded border border-cream-200 bg-cream-50 text-ink-warm-800 hover:bg-brand-light hover:border-brand hover:text-brand transition-colors font-mono"
+                  title={v.description}
+                >
+                  {v.token}
+                </button>
+              ))}
+            </div>
             <Textarea
+              ref={textareaRef}
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder={"Hey {name},\n\nQuick heads-up on next week's content push — brief coming Monday.\n\n[HHP dashboard](https://app.holohive.io)"}
