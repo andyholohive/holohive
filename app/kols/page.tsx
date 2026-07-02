@@ -1805,6 +1805,19 @@ export default function KOLsPage() {
         kickerDot="violet"
         actions={
           <div className="flex items-center gap-2">
+            {/* [2026-07-02 ANN.5] Standalone Send Announcement — no table
+                selection required. Picker lives inside the dialog and
+                only lists KOLs with a linked GC. Super_admin only. */}
+            {userProfile?.role === 'super_admin' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAnnounceDialogOpen(true)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send Announcement
+              </Button>
+            )}
             {userProfile?.role === 'super_admin' && (
               <Button
                 variant="outline"
@@ -1881,7 +1894,7 @@ export default function KOLsPage() {
             <div className="h-4 w-px bg-cream-200"></div>
             <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">Bulk Edit Fields</span>
           </div>
-          <div className="mb-4 pb-4 border-b border-cream-200 flex items-center gap-2 flex-wrap">
+          <div className="mb-4 pb-4 border-b border-cream-200">
             <Button
               size="sm"
               variant="outline"
@@ -1897,19 +1910,6 @@ export default function KOLsPage() {
             >
               {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
             </Button>
-            {/* [2026-07-02 ANN.4] Send Announcement — super_admin only.
-                Composer resolves KOL→chat server-side; recipients without
-                a linked GC are surfaced as skipped in the dialog + toast. */}
-            {userProfile?.role === 'super_admin' && (
-              <Button
-                size="sm"
-                variant="brand"
-                onClick={() => setAnnounceDialogOpen(true)}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Send Announcement
-              </Button>
-            )}
           </div>
           <div className="flex flex-wrap items-end gap-2">
           {/* Platform */}
@@ -3589,16 +3589,15 @@ export default function KOLsPage() {
         kolName={kols.find(k => k.id === activationsDialogKolId)?.name}
       />
 
-      {/* [2026-07-02 ANN.4] Send Announcement composer. Recipients derived
-          from the current bulk-selection; hasGc comes from the master_kols
-          group_chat boolean (server does the definitive telegram_chats
-          lookup and surfaces true-skip in the result). */}
+      {/* [2026-07-02 ANN.5] Send Announcement composer. Standalone flow —
+          picker lives inside the dialog and lists KOLs with a linked GC.
+          Table selection is not required. hasGc from the master_kols
+          group_chat boolean; server does the definitive telegram_chats
+          lookup and reports any true-skip in the result. */}
       <SendAnnouncementDialog
         open={announceDialogOpen}
         onOpenChange={setAnnounceDialogOpen}
-        recipients={kols
-          .filter(k => selectedKOLs.includes(k.id))
-          .map(k => ({ id: k.id, name: k.name || 'KOL', hasGc: k.group_chat === true }))}
+        allKols={kols.map(k => ({ id: k.id, name: k.name || 'KOL', hasGc: k.group_chat === true }))}
       />
 
       {/* 4. Add Dialog for single delete at the bottom of the component */}
