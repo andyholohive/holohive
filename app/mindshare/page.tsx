@@ -24,7 +24,7 @@ import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown,
   Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
-  XCircle, HelpCircle, ShieldAlert, ArrowRight,
+  XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 import { formatDateTime } from '@/lib/dateFormat';
@@ -64,6 +64,9 @@ interface MindshareProject {
   website_url: string | null;
   description: string | null;
   is_active: boolean;
+  // Nullable — populated by the "Share" action in the Projects tab.
+  // When set, /public/mindshare/[token] renders a client-facing report.
+  public_share_token?: string | null;
   client?: { id: string; name: string } | null;
 }
 
@@ -680,6 +683,53 @@ export default function MindsharePage() {
   // of the component. 2026-06-05.
   const [deleteProjectPending, setDeleteProjectPending] = useState<MindshareProject | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
+
+  /**
+   * Generate (or rotate) the public share token for a project, copy the
+   * client-facing URL to the clipboard, and refresh the projects list so
+   * the row's Share button flips from "Share" to "Rotate/Copy".
+   */
+  const generateShareLink = async (p: MindshareProject) => {
+    try {
+      const res = await fetch(`/api/mindshare/projects/${p.id}/share-link`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      const token = data.project?.public_share_token;
+      if (!token) throw new Error('No token returned');
+      const url = `${window.location.origin}/public/mindshare/${token}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast({ title: 'Share link copied', description: `${p.name} — anyone with this link can view the before/after report.` });
+      } catch {
+        toast({ title: 'Share link created', description: url });
+      }
+      await loadProjects();
+    } catch (err: any) {
+      toast({ title: 'Share link failed', description: err?.message?.slice(0, 300), variant: 'destructive' });
+    }
+  };
+
+  const copyExistingShareLink = async (p: MindshareProject) => {
+    if (!p.public_share_token) return;
+    const url = `${window.location.origin}/public/mindshare/${p.public_share_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Share link copied', description: p.name });
+    } catch {
+      toast({ title: 'Link', description: url });
+    }
+  };
+
+  const revokeShareLink = async (p: MindshareProject) => {
+    try {
+      const res = await fetch(`/api/mindshare/projects/${p.id}/share-link`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast({ title: 'Share link revoked', description: `${p.name} — the old URL no longer works.` });
+      await loadProjects();
+    } catch (err: any) {
+      toast({ title: 'Revoke failed', description: err?.message?.slice(0, 300), variant: 'destructive' });
+    }
+  };
 
   const deleteProject = (p: MindshareProject) => {
     setDeleteProjectPending(p);
@@ -1651,6 +1701,38 @@ export default function MindsharePage() {
                         await loadProjects();
                       }} /></TableCell>
                       <TableCell className="py-3.5 px-5 text-right">
+                        {p.public_share_token ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyExistingShareLink(p)}
+                              className="h-7 w-7 p-0 text-brand hover:text-brand"
+                              title="Copy client-facing share link"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => revokeShareLink(p)}
+                              className="h-7 w-7 p-0 text-ink-warm-400 hover:text-rose-500"
+                              title="Revoke share link"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => generateShareLink(p)}
+                            className="h-7 w-7 p-0"
+                            title="Create client-facing share link"
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => openEditProject(p)} className="h-7 w-7 p-0"><Edit className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => deleteProject(p)} className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </TableCell>

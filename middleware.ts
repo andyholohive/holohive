@@ -32,6 +32,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/webhooks/',              // External integration webhooks
   '/api/forms/submit',           // Public form intake
   '/api/version',                // Trivial liveness/version probe
+  '/api/public/',                // Token-gated client-facing endpoints (mindshare share reports, etc.)
   // ── MCP (Claude.ai connector) ──
   // The MCP route validates its own Bearer token against
   // mcp_oauth_access_tokens; OAuth endpoints are public by RFC design.
