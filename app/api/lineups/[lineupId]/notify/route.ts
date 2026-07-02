@@ -178,8 +178,19 @@ export async function POST(
   // ─── Dispatch by event ─────────────────────────────────────────
   try {
     if (event === 'proposed') {
-      const approvers = await findApproverContacts(supabase);
-      if (approvers.length === 0) {
+      // [2026-07-02] Approver DMs are opt-in via app_settings.
+      // lineup_dm_approvers_enabled. Default (unset) = true to preserve
+      // existing behavior; toggle to 'false' in /admin/telegram-comm
+      // when the broadcast chat covers everyone who needs to see it.
+      const { data: dmSetting } = await (supabase as any)
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'lineup_dm_approvers_enabled')
+        .maybeSingle();
+      const dmEnabled = ((dmSetting?.value as string) ?? 'true').toLowerCase() !== 'false';
+
+      const approvers = dmEnabled ? await findApproverContacts(supabase) : [];
+      if (dmEnabled && approvers.length === 0) {
         return NextResponse.json({
           ok: false,
           skipped: true,
@@ -187,7 +198,7 @@ export async function POST(
         });
       }
       const withTg = approvers.filter(a => a.telegramId);
-      if (withTg.length === 0) {
+      if (dmEnabled && withTg.length === 0) {
         const names = approvers.map(a => a.userName).join(', ');
         return NextResponse.json({
           ok: false,
@@ -201,7 +212,8 @@ export async function POST(
         `<a href="${reviewLink}">Review on HHP</a>`;
       // Fan out to all approvers with TG IDs. Failures per-recipient
       // don't fail the whole call — sent count + skipped list both
-      // surface in the response.
+      // surface in the response. Empty when dmEnabled is false; the
+      // broadcast-chat post below still fires so the team still sees it.
       const results = await Promise.all(
         withTg.map(async a => {
           try {

@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -79,6 +80,12 @@ export default function LineupSettingsPage() {
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [userSearch, setUserSearch] = useState('');
 
+  // Approver-DM toggle. Backed by app_settings.lineup_dm_approvers_enabled.
+  // Default (unset) = true to preserve existing behavior. When off, the
+  // notify route skips DMs but still posts to the broadcast chat.
+  const [dmEnabled, setDmEnabled] = useState(true);
+  const [dmTogglePending, setDmTogglePending] = useState(false);
+
   // ─── Campaigns + chats state ────────────────────────────────────
   const [campaignsLoading, setCampaignsLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
@@ -94,8 +101,50 @@ export default function LineupSettingsPage() {
     refreshCampaignsAndChats();
   }, []);
 
+  async function refreshDmSetting() {
+    const { data } = await (supabase as any)
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'lineup_dm_approvers_enabled')
+      .maybeSingle();
+    // Unset → true (default). Anything explicitly 'false' → off.
+    setDmEnabled(((data?.value as string) ?? 'true').toLowerCase() !== 'false');
+  }
+
+  async function saveDmSetting(next: boolean) {
+    setDmTogglePending(true);
+    // Optimistic — snap the UI immediately; roll back on error.
+    setDmEnabled(next);
+    try {
+      const { error } = await (supabase as any)
+        .from('app_settings')
+        .upsert(
+          { key: 'lineup_dm_approvers_enabled', value: next ? 'true' : 'false' },
+          { onConflict: 'key' },
+        );
+      if (error) throw error;
+      toast({
+        title: next ? 'Approver DMs enabled' : 'Approver DMs disabled',
+        description: next
+          ? 'Approvers will receive a DM when a lineup is proposed.'
+          : 'Only the broadcast chat will be posted to on propose.',
+      });
+    } catch (err: any) {
+      setDmEnabled(!next);
+      toast({
+        title: 'Failed to save setting',
+        description: err?.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDmTogglePending(false);
+    }
+  }
+
   async function refreshApprovers() {
     setApproversLoading(true);
+    // Fire the DM-setting fetch in parallel with the roster load.
+    refreshDmSetting();
     try {
       const [approverRes, usersRes] = await Promise.all([
         // FK hint: lineup_approvers has TWO references to users
@@ -283,9 +332,39 @@ export default function LineupSettingsPage() {
         title="Lineup Approvers"
         badge={!approversLoading ? <CountChip n={approvers.length} /> : null}
         subtitle={(
-          <>Every user listed below receives a TG DM when a lineup is proposed. Anyone in the list can confirm a proposed lineup. Empty list → falls back to <code className="bg-cream-100 px-1 rounded text-[10px]">LINEUP_APPROVER_EMAIL</code> env var, then <code className="bg-cream-100 px-1 rounded text-[10px]">jdot@holohive.io</code>.</>
+          <>When enabled below, every user listed receives a TG DM on propose. Anyone in the list can confirm a proposed lineup. Empty list → falls back to <code className="bg-cream-100 px-1 rounded text-[10px]">LINEUP_APPROVER_EMAIL</code> env var, then <code className="bg-cream-100 px-1 rounded text-[10px]">jdot@holohive.io</code>.</>
         )}
       >
+        {/* DM toggle. The broadcast to lineup_proposal_chat_id still fires
+            when this is off — this only controls the per-approver DM
+            fan-out. Useful when the broadcast chat already reaches
+            everyone who needs to see it. */}
+        <Card className="border-cream-200 mb-3">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="dm-approvers-toggle" className="text-sm font-medium text-ink-warm-900 m-0 cursor-pointer">
+                  DM approvers on propose
+                </Label>
+                <StatusBadge tone={dmEnabled ? 'brand' : 'neutral'} size="sm">
+                  {dmEnabled ? 'On' : 'Off'}
+                </StatusBadge>
+              </div>
+              <p className="text-[11px] text-ink-warm-500 mt-1">
+                {dmEnabled
+                  ? 'Each approver above receives a TG DM linking to the lineup for review.'
+                  : 'DMs suppressed. The broadcast chat post on propose still fires.'}
+              </p>
+            </div>
+            <Switch
+              id="dm-approvers-toggle"
+              checked={dmEnabled}
+              onCheckedChange={saveDmSetting}
+              disabled={dmTogglePending}
+            />
+          </CardContent>
+        </Card>
+
         {approversLoading ? (
           <Skeleton className="h-32 rounded-lg" />
         ) : (
@@ -356,7 +435,7 @@ export default function LineupSettingsPage() {
                       onAdd={handleAddApprover}
                     />
                     <p className="text-[11px] text-ink-warm-500 ml-2">
-                      {approvers.length} approver{approvers.length === 1 ? '' : 's'} · all get DM'd on propose
+                      {approvers.length} approver{approvers.length === 1 ? '' : 's'} · {dmEnabled ? "all get DM'd on propose" : 'DMs off — broadcast chat only'}
                     </p>
                   </div>
                 </>
