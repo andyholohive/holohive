@@ -615,24 +615,57 @@ export function EngagementTab({ clientId }: { clientId: string }) {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <DateField
-                label="Start Date"
-                required
-                value={stintForm.start_date}
-                onChange={(d) => setStintForm({ ...stintForm, start_date: d })}
-              />
-              <DateField
-                label="End Date"
-                allowClear
-                value={stintForm.end_date}
-                onChange={(d) => setStintForm({ ...stintForm, end_date: d })}
-              />
-            </div>
+            {(() => {
+              // Once a stint has terms, its dates are derived from term
+              // min/max by the client_engagement_periods sync trigger. Any
+              // date the user types here would be overwritten the next
+              // time a term is added/edited. Show read-only in that case
+              // instead of hiding them entirely — the user still needs to
+              // see what the current envelope is.
+              const stintWithPeriods = editingStint
+                ? stints.find(s => s.id === editingStint.id)
+                : null;
+              const hasPeriods = (stintWithPeriods?.periods?.length ?? 0) > 0;
+
+              if (hasPeriods) {
+                return (
+                  <div className="rounded-md border border-cream-200 bg-cream-50/60 p-3 text-xs text-ink-warm-700">
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-ink-warm-500 mb-1">Dates</div>
+                    <div className="flex items-baseline gap-2 tabular-nums">
+                      <span>{stintWithPeriods?.start_date ?? '—'}</span>
+                      <span className="text-ink-warm-400">→</span>
+                      <span>{stintWithPeriods?.end_date ?? '—'}</span>
+                    </div>
+                    <p className="text-[11px] text-ink-warm-500 mt-1.5">
+                      Auto-derived from this stint's terms. Edit the terms below to change the envelope.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-2 gap-3">
+                  <DateField
+                    label="Start Date"
+                    required
+                    value={stintForm.start_date}
+                    onChange={(d) => setStintForm({ ...stintForm, start_date: d })}
+                  />
+                  <DateField
+                    label="End Date"
+                    allowClear
+                    value={stintForm.end_date}
+                    onChange={(d) => setStintForm({ ...stintForm, end_date: d })}
+                  />
+                </div>
+              );
+            })()}
             {/* Status + ended_reason controls dropped per Andy 2026-06-30 —
-                status is now auto-derived from end_date by the
-                client_stints_derive_status DB trigger. Set an End Date
-                to mark a stint as ended; leave it blank to keep active. */}
+                status is now auto-derived from the sync trigger + the
+                client_stints_derive_status trigger. Add/edit terms to
+                change the stint envelope; stints with no terms yet can
+                still be seeded with dates (used as the initial envelope
+                until the first term lands). */}
             <div className="grid gap-1.5">
               <Label>Notes</Label>
               <Textarea
