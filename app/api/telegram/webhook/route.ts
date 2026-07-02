@@ -4,6 +4,7 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { extractAddressCandidate, hasValidChecksumIfMixed, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
 import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
 import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
+import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -2698,13 +2699,23 @@ async function sendSubmissionProgressAlert(opts: {
     return;
   }
 
-  // Compute this-week boundary (Monday-anchored — simple v1; F1
-  // refinement to stint-anchored is a v2 polish).
+  // Compute this-week boundary. Anchors to the campaign's start_date
+  // (which via the stint-derive trigger reflects the stint's earliest
+  // term). If the campaign has no start_date, fall back to the plain
+  // Monday-of-this-week anchor.
   const today = new Date();
-  const dow = today.getUTCDay() || 7; // 1-7 ISO
-  const weekStart = new Date(today);
-  weekStart.setUTCDate(today.getUTCDate() - (dow - 1));
-  weekStart.setUTCHours(0, 0, 0, 0);
+  let weekStart: Date;
+  const campaignWeek = campaign?.start_date ? getCampaignWeek(campaign.start_date, today) : null;
+  if (campaignWeek) {
+    weekStart = new Date(campaignWeek.week1Monday);
+    weekStart.setUTCDate(campaignWeek.week1Monday.getUTCDate() + (campaignWeek.weekNumber - 1) * 7);
+    weekStart.setUTCHours(0, 0, 0, 0);
+  } else {
+    const dow = today.getUTCDay() || 7; // 1-7 ISO
+    weekStart = new Date(today);
+    weekStart.setUTCDate(today.getUTCDate() - (dow - 1));
+    weekStart.setUTCHours(0, 0, 0, 0);
+  }
 
   // Live count: distinct content_items this week (F3 path) — fallback to
   // content_submissions if F3 isn't fully wired yet.
@@ -2761,7 +2772,14 @@ async function sendSubmissionProgressAlert(opts: {
     const pct = Math.round((liveCount / plannedCount) * 100);
     lines.push(`${liveCount} of ${plannedCount} live this week (${pct}%).`);
     lines.push(`Target: ${days}-day split, about ${dailyQuota}/day.`);
-    if (quotaMet) {
+    // 100% completion ping. Naturally fires exactly once per week: at
+    // the moment liveCount == plannedCount the count is queried live
+    // and includes the submission that just came in. Subsequent posts
+    // give liveCount > plannedCount so this branch skips.
+    if (liveCount === plannedCount) {
+      lines.push('');
+      lines.push(`🎉 Week goal hit — ${plannedCount}/${plannedCount} live.`);
+    } else if (quotaMet) {
       lines.push('');
       lines.push(`✅ Today's quota met (${todayCount} of ${dailyQuota}).`);
       lines.push('Push anyone still drafting today to post tomorrow.');
