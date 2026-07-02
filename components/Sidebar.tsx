@@ -693,6 +693,7 @@ export default function Sidebar({ children }: SidebarProps) {
                 <CollapsibleSection id="clients" icon={Users}>
                   {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
                   {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
+                  {!guestHide('/campaigns/overview') && <NavItem href="/campaigns/overview" icon={BarChart3} label="Campaign Overview" />}
                   {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
                 </CollapsibleSection>
               )}

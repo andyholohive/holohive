@@ -78,6 +78,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // Clients — Clients + Campaigns + Delivery Logs.
   { href: '/clients', label: 'Clients', icon: Users, section: 'Clients', pageKey: '/clients' },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone, section: 'Clients', pageKey: '/campaigns' },
+  { href: '/campaigns/overview', label: 'Campaign Overview', icon: BarChart3, section: 'Clients', pageKey: '/campaigns/overview' },
   { href: '/delivery-logs', label: 'Delivery Logs', icon: ClipboardList, section: 'Clients', pageKey: '/delivery-logs' },
 
   // KOLs — KOLs + Lists (Campaigns moved to Clients).
