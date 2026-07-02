@@ -53,6 +53,7 @@ export async function GET() {
       initiativeMilestonesRes,
       usersRes,
       mondayFormStatus,
+      quarterTasksRes,
     ] = await Promise.all([
       getStandardClients(sb),
       (sb as any)
@@ -90,6 +91,23 @@ export async function GET() {
         .from('users')
         .select('id, name, role, profile_photo_url'),
       getMondayFormStatus(sb, cfg.form_deadline_hour_utc),
+      // [2026-07-02] Current-quarter task set for the quarterly overdue
+      // rollup that feeds Jaymz + Quazo scorecards and the Overdue panel.
+      // Fetches BOTH open and completed tasks with due_date in the quarter
+      // — "was overdue" needs history, so a resolved-late task still
+      // counts and stays in the list. Deriving from existing fields, no
+      // schema change (was_overdue = completed_at > due_date OR still-open-past-due).
+      (async () => {
+        const now = new Date();
+        const q = Math.floor(now.getUTCMonth() / 3);
+        const qStart = new Date(Date.UTC(now.getUTCFullYear(), q * 3, 1));
+        const qEnd   = new Date(Date.UTC(now.getUTCFullYear(), q * 3 + 3, 1));
+        return (sb as any)
+          .from('tasks')
+          .select('id, task_name, status, due_date, assigned_to, assigned_to_name, completed_at, client_id')
+          .gte('due_date', qStart.toISOString().slice(0, 10))
+          .lt('due_date', qEnd.toISOString().slice(0, 10));
+      })(),
     ]);
 
     const openTasks = (tasksRes.data ?? []) as any[];
@@ -106,6 +124,94 @@ export async function GET() {
 
     const completedThisWeekRows = (completedThisWeekRes.data ?? []) as any[];
     const completedThisWeek = completedThisWeekRows.length;
+
+    // ─── Quarterly overdue rollup (Andy 2026-07-02) ─────────────────
+    // Persistent-history overdue metric. Every task with due_date in the
+    // current calendar quarter is a candidate; "was overdue" = the task
+    // slipped past its due date at any point. A resolved-late task stays
+    // in the numerator so the record survives completion — the whole
+    // point of the ask.
+    //
+    // was_overdue rule:
+    //   • Open past due: status != 'complete' AND due_date < today
+    //   • Resolved late: completed_at (date) > due_date
+    // Otherwise on-time (open with future due, or done on/before due).
+    const nowMs = Date.now();
+    const nowUTC = new Date();
+    const currentQuarter = Math.floor(nowUTC.getUTCMonth() / 3);
+    const currentQuarterYear = nowUTC.getUTCFullYear();
+    const quarterLabel = `Q${currentQuarter + 1} ${currentQuarterYear}`;
+    const quarterTasks = (quarterTasksRes.data ?? []) as any[];
+
+    type QuarterStats = { total: number; wasOverdue: number; stillOverdue: number; resolvedLate: number };
+    const quarterStatsByUser = new Map<string, QuarterStats>();
+    const quarterOverduePanelRows: Array<{
+      id: string;
+      task_name: string;
+      client_id: string | null;
+      client_name: string | null;
+      assignee_name: string | null;
+      due_date: string | null;
+      completed_at: string | null;
+      daysOverdue: number;
+      wasResolved: boolean;
+    }> = [];
+
+    for (const t of quarterTasks) {
+      if (!t.due_date) continue;
+      const dueMs = new Date(t.due_date as string).getTime();
+      const doneAt = t.completed_at ? new Date(t.completed_at as string) : null;
+      // Days late: peak. Resolved-late = completed_at - due_date. Still-
+      // overdue = now - due_date. Both floored to whole days.
+      let daysOverdue = 0;
+      let wasOverdue = false;
+      let wasResolved = false;
+      let stillOverdue = false;
+      if (doneAt) {
+        // Compare by whole-day boundary — a task due 07-01 and completed
+        // 07-01 later that day is on-time.
+        const doneDayMs = new Date(doneAt.toISOString().slice(0, 10)).getTime();
+        if (doneDayMs > dueMs) {
+          wasOverdue = true;
+          wasResolved = true;
+          daysOverdue = Math.floor((doneDayMs - dueMs) / 86_400_000);
+        }
+      } else if (t.status !== 'complete') {
+        if (dueMs < nowMs - (nowMs % 86_400_000)) {
+          // due_date is strictly before today (in UTC-day terms).
+          wasOverdue = true;
+          stillOverdue = true;
+          daysOverdue = Math.floor((nowMs - dueMs) / 86_400_000);
+        }
+      }
+      // Roll into the assignee bucket. Skip unassigned tasks — they'd
+      // dilute the on-time metric for named teammates. Anonymous work
+      // still shows up in the panel list (see below).
+      const uid = (t.assigned_to as string | null) ?? null;
+      if (uid) {
+        const cur = quarterStatsByUser.get(uid) ?? { total: 0, wasOverdue: 0, stillOverdue: 0, resolvedLate: 0 };
+        cur.total += 1;
+        if (wasOverdue) cur.wasOverdue += 1;
+        if (stillOverdue) cur.stillOverdue += 1;
+        if (wasResolved) cur.resolvedLate += 1;
+        quarterStatsByUser.set(uid, cur);
+      }
+      // Panel row: only include tasks that were overdue at some point.
+      // Filter to active-client / orphan later once clientNameById exists.
+      if (wasOverdue) {
+        quarterOverduePanelRows.push({
+          id: t.id as string,
+          task_name: (t.task_name as string) || '(no name)',
+          client_id: (t.client_id as string | null) ?? null,
+          client_name: null,
+          assignee_name: (t.assigned_to_name as string | null) ?? null,
+          due_date: t.due_date as string,
+          completed_at: (t.completed_at as string | null) ?? null,
+          daysOverdue,
+          wasResolved,
+        });
+      }
+    }
 
     // ─── Scorecards data (TD Scorecards block) ───────────────────────
     // Per HHP Team Dashboard Spec § Scorecards: one anchor metric per
@@ -270,17 +376,26 @@ export async function GET() {
     const scoreUserQuazo = findUserByFirstName('Quazo');
     const scoreUserAndy = findUserByFirstName('Andy');
 
-    // Helper: on-time rate for a given user from the workload roll-up.
-    // Denominator = open + completed-this-week (the recent-activity
-    // window). Returns null when the user has no activity in this
-    // window — UI shows "—" instead of a misleading 100%.
+    // Helper: quarter-scoped on-time rate. Denominator = every task
+    // assigned to userId with due_date in the current calendar quarter
+    // (open + completed). Numerator = tasks that were overdue at any
+    // point (open past due OR completed after their due date). This
+    // metric persists across completion: a task that slipped and got
+    // resolved still counts toward Was-Overdue for the whole quarter.
+    // Per Andy 2026-07-02. Returns null when the user has no tasks
+    // due in the quarter — UI shows "—" instead of a misleading 100%.
     const onTimeRateFor = (userId: string | null) => {
       if (!userId) return null;
-      const row = workload.find(w => w.id === userId);
-      if (!row) return null;
-      const denom = row.open + row.completed;
-      if (denom === 0) return null;
-      return Math.round((1 - row.overdue / denom) * 100);
+      const stats = quarterStatsByUser.get(userId);
+      if (!stats || stats.total === 0) return null;
+      return Math.round((1 - stats.wasOverdue / stats.total) * 100);
+    };
+    const quarterDetailFor = (userId: string | null) => {
+      if (!userId) return `No tasks due this quarter.`;
+      const stats = quarterStatsByUser.get(userId);
+      if (!stats || stats.total === 0) return `No tasks due this quarter.`;
+      return `${stats.wasOverdue} of ${stats.total} tasks due this quarter were overdue`
+        + (stats.stillOverdue > 0 ? ` (${stats.stillOverdue} still open, ${stats.resolvedLate} resolved late).` : ` (${stats.resolvedLate} resolved late).`);
     };
 
     // Renewal rate (Bolt): of clients whose stint ended in the last
@@ -347,17 +462,17 @@ export async function GET() {
         kind: 'on_time' as const,
         person: scoreUserJaymz,
         valuePct: onTimeRateFor(scoreUserJaymz.id),
-        formulaCaption: '1 − (Overdue ÷ Total)',
-        sourceCaption: 'Source · Team Workload',
-        detail: 'Open + completed (7d) as denominator.',
+        formulaCaption: `${quarterLabel} · 1 − (Was Overdue ÷ Total)`,
+        sourceCaption: `Source · tasks with due_date in ${quarterLabel}`,
+        detail: quarterDetailFor(scoreUserJaymz.id),
       },
       scoreUserQuazo && {
         kind: 'on_time' as const,
         person: scoreUserQuazo,
         valuePct: onTimeRateFor(scoreUserQuazo.id),
-        formulaCaption: '1 − (Overdue ÷ Total)',
-        sourceCaption: 'Source · Team Workload',
-        detail: 'Open + completed (7d) as denominator.',
+        formulaCaption: `${quarterLabel} · 1 − (Was Overdue ÷ Total)`,
+        sourceCaption: `Source · tasks with due_date in ${quarterLabel}`,
+        detail: quarterDetailFor(scoreUserQuazo.id),
       },
       scoreUserAndy && {
         kind: 'composite' as const,
@@ -384,24 +499,50 @@ export async function GET() {
     // here. Orphan tasks (no client_id) are kept too so they aren't lost.
     const clientNameById = new Map<string, string>();
     for (const c of standardClients) clientNameById.set(c.id, c.name);
-    const overdueWithClient = overdue.filter(
-      t => !t.client_id || clientNameById.has(t.client_id),
-    );
-    const overduePanel = overdueWithClient
-      .map(t => {
-        const due = t.due_date ? new Date(t.due_date) : null;
-        const daysOverdue = due ? Math.floor((Date.now() - due.getTime()) / 86_400_000) : 0;
-        return {
-          id: t.id as string,
-          task_name: (t.task_name as string) || '(no name)',
-          client_id: (t.client_id as string | null) ?? null,
-          client_name: t.client_id ? (clientNameById.get(t.client_id) ?? null) : null,
-          assignee_name: (t.assigned_to_name as string | null) ?? null,
-          due_date: (t.due_date as string | null) ?? null,
-          daysOverdue,
-        };
-      })
-      .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+    // Quarter-scoped panel: every task with a due_date in the current
+    // quarter that was overdue at any point. Resolved-late tasks stay
+    // so the record survives completion — per Andy 2026-07-02.
+    //
+    // No active-client filter: the panel is a record of what slipped,
+    // and dropping inactive-client rows would make the row list not
+    // match the subtitle count. Client name is populated from the
+    // standard-clients allowlist; unknown/inactive fall back to '(client
+    // not in active roster)'.
+    const overduePanel = quarterOverduePanelRows
+      .map(r => ({
+        ...r,
+        client_name: r.client_id ? (clientNameById.get(r.client_id) ?? '(inactive client)') : null,
+      }))
+      .sort((a, b) => {
+        // Still overdue rows first (more urgent), then resolved.
+        if (a.wasResolved !== b.wasResolved) return a.wasResolved ? 1 : -1;
+        return b.daysOverdue - a.daysOverdue;
+      });
+
+    // Team-wide quarter rollup for the panel subtitle: X of Y quarter
+    // tasks were overdue = Z% overdue.
+    let quarterTotal = 0;
+    let quarterWasOverdue = 0;
+    let quarterStillOverdue = 0;
+    let quarterResolvedLate = 0;
+    for (const [, s] of quarterStatsByUser) {
+      quarterTotal += s.total;
+      quarterWasOverdue += s.wasOverdue;
+      quarterStillOverdue += s.stillOverdue;
+      quarterResolvedLate += s.resolvedLate;
+    }
+    const quarterOverduePct = quarterTotal > 0
+      ? Math.round((quarterWasOverdue / quarterTotal) * 100)
+      : null;
+    const quarterRollup = {
+      label: quarterLabel,
+      total: quarterTotal,
+      wasOverdue: quarterWasOverdue,
+      stillOverdue: quarterStillOverdue,
+      resolvedLate: quarterResolvedLate,
+      overduePct: quarterOverduePct,
+    };
 
     // [2026-06-11] Per-initiative linked task counts. Pre-aggregate
     // once for the whole map below.
@@ -474,6 +615,7 @@ export async function GET() {
       workload,
       escalations,
       scorecards,
+      quarterRollup,
       overdueTasks: overduePanel,
       initiatives,
       adHocWork: {

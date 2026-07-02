@@ -26,6 +26,15 @@ import {
 } from 'lucide-react';
 
 type WorkloadRow = { id: string | null; name: string; photo: string | null; open: number; overdue: number; completed: number };
+type QuarterRollup = {
+  label: string;
+  total: number;
+  wasOverdue: number;
+  stillOverdue: number;
+  resolvedLate: number;
+  overduePct: number | null;
+};
+
 type OverdueTaskRow = {
   id: string;
   task_name: string;
@@ -34,6 +43,11 @@ type OverdueTaskRow = {
   assignee_name: string | null;
   due_date: string | null;
   daysOverdue: number;
+  // [2026-07-02] Quarterly-persistent overdue rows: resolved-late tasks
+  // stay in the list once they slip. wasResolved flips the row from
+  // "Still overdue" to "Resolved" but the record stays.
+  wasResolved?: boolean;
+  completed_at?: string | null;
 };
 type Initiative = {
   id: string;
@@ -109,6 +123,7 @@ type InternalPayload = {
   workload: WorkloadRow[];
   escalations: WorkloadRow[];
   scorecards: Scorecard[];
+  quarterRollup?: QuarterRollup;
   overdueTasks: OverdueTaskRow[];
   initiatives: Initiative[];
   adHocWork: { recentCount: number; recent: AdHocTask[] };
@@ -371,20 +386,37 @@ export default function InternalTab() {
             Replaces the prior per-person Attention card; per-person
             escalation signal is still legible from the rose-coloured
             Overdue column on the workload table to the left. */}
+        {/* [2026-07-02] Quarterly overdue panel: scoped to tasks with a
+            due_date in the current calendar quarter. Persists across
+            completion — a resolved-late task stays in the list so the
+            record survives (per Andy). Still-overdue rows sort first;
+            resolved-late rows fall to the bottom of the same quarter list. */}
         <Card className="border-cream-200 overflow-hidden">
           <CardHeaderEditorial
             icon={Flame}
             iconClassName="text-rose-500"
-            title="Attention Required"
-            subtitle={`${data.overdueTasks.length} overdue · sorted by days overdue`}
+            title={data.quarterRollup ? `${data.quarterRollup.label} Overdue` : 'Attention Required'}
+            subtitle={
+              data.quarterRollup && data.quarterRollup.total > 0
+                ? `${data.quarterRollup.wasOverdue} of ${data.quarterRollup.total} tasks overdue this quarter${
+                    data.quarterRollup.overduePct !== null ? ` · ${data.quarterRollup.overduePct}%` : ''
+                  }${
+                    data.quarterRollup.stillOverdue > 0
+                      ? ` · ${data.quarterRollup.stillOverdue} still open`
+                      : ''
+                  }`
+                : `${data.overdueTasks.length} overdue`
+            }
           />
 
           {data.overdueTasks.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 icon={CheckCircle2}
-                title="Nothing overdue"
-                description="Active client tasks are all on time."
+                title="Nothing overdue this quarter"
+                description={data.quarterRollup && data.quarterRollup.total > 0
+                  ? `${data.quarterRollup.total} tasks due in ${data.quarterRollup.label}, all on time.`
+                  : 'No overdue tasks on active clients this quarter.'}
               />
             </div>
           ) : (
@@ -392,14 +424,28 @@ export default function InternalTab() {
               {data.overdueTasks.slice(0, 20).map(t => (
                 <li key={t.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink-warm-900 truncate">{t.task_name}</div>
+                    <div className="text-sm font-medium text-ink-warm-900 truncate flex items-center gap-2">
+                      <span className="truncate">{t.task_name}</span>
+                      {/* Status pill: still-overdue = rose, resolved-late =
+                          neutral. Resolved rows persist so we can eyeball who
+                          slipped even if it got closed. */}
+                      {t.wasResolved ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-600 shrink-0">Resolved</span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 shrink-0">Still overdue</span>
+                      )}
+                    </div>
                     <div className="text-[11px] text-ink-warm-500 truncate">
                       {t.client_name ? <Link href={`/clients/${t.client_id}`} className="hover:text-brand">{t.client_name}</Link> : <span className="italic">No client</span>}
                       {t.assignee_name ? <> · {t.assignee_name}</> : null}
                     </div>
                   </div>
-                  <span className={`text-xs font-semibold tabular-nums shrink-0 ${t.daysOverdue >= data.thresholds.overdue_red_days ? 'text-rose-600' : 'text-amber-700'}`}>
-                    {t.daysOverdue}d
+                  <span className={`text-xs font-semibold tabular-nums shrink-0 ${
+                    t.wasResolved
+                      ? 'text-ink-warm-500'
+                      : t.daysOverdue >= data.thresholds.overdue_red_days ? 'text-rose-600' : 'text-amber-700'
+                  }`}>
+                    {t.daysOverdue}d {t.wasResolved ? 'late' : ''}
                   </span>
                 </li>
               ))}
