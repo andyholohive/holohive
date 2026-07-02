@@ -55,6 +55,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   KOL_AVATAR_REFRESH: 1,       // daily 05:00 UTC — KOL-AVATAR.10 staleness cron
   KOL_NICHE_DRIFT: 1,          // daily 04:30 UTC — PROF.6 / Doc 2 Q7b 30-day niche drift sweep
   TG_SCAN_NUDGE: 1,            // monthly (1st @ 03:00 UTC) — TG-CRON.1 manual scan reminder
+  COMMENT_SENTIMENT: 1,        // daily 07:00 UTC — SENT.7 sentiment scoring of ingested TG comments
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

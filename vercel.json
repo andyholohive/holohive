@@ -79,6 +79,10 @@
     {
       "path": "/api/cron/refresh-kol-avatars",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/score-comment-sentiment",
+      "schedule": "0 7 * * *"
     }
   ]
 }
