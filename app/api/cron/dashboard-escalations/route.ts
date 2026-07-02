@@ -118,7 +118,7 @@ export async function GET(request: Request) {
     // 4. Renewals in the red window
     const redRenewals = standardClients
       .map(c => {
-        const r = renewalToneFor(c.engagement_end_date, cfg.renewal_red_days, cfg.renewal_amber_days);
+        const r = renewalToneFor(c.covered_through, cfg.renewal_red_days, cfg.renewal_amber_days);
         return { name: c.name, daysLeft: r.daysLeft, tone: r.tone };
       })
       .filter(r => r.tone === 'red')

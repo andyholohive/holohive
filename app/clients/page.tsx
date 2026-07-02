@@ -4032,20 +4032,19 @@ export default function ClientsPage() {
                               <span className="font-semibold text-ink-warm-700">
                                 {weekN != null ? `Week ${weekN}` : 'Engagement live'}
                               </span>
-                              {/* Date range. Start prefers the earliest stint
-                                  start_date (Engagement tab is the source of
-                                  truth per Andy 2026-06-30); falls back to
-                                  client_context.start_date, then to
-                                  clients.engagement_start_date. End reads
-                                  clients.engagement_end_date; null → ongoing. */}
+                              {/* Date range.
+                                  [F1 2026-07-02] Sourced entirely from stint
+                                  substrate: earliest stint start + covered
+                                  through (MAX period end on active stint).
+                                  Legacy clients.engagement_start_date /
+                                  engagement_end_date columns dropped. */}
                               {(() => {
                                 const startRaw =
                                   earliestStintStartByClient[client.id]
-                                  || ctx?.start_date
-                                  || (client as any).engagement_start_date;
+                                  || ctx?.start_date;
                                 if (!startRaw) return null;
                                 const start = formatDate(new Date(startRaw + 'T00:00:00'));
-                                const endRaw = (client as any).engagement_end_date as string | null | undefined;
+                                const endRaw = coveredThroughByClient[client.id];
                                 const end = endRaw ? formatDate(new Date(endRaw + 'T00:00:00')) : 'ongoing';
                                 return (
                                   <span className="text-xs text-ink-warm-500 tabular-nums">

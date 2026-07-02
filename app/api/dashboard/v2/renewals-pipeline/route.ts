@@ -47,7 +47,7 @@ export async function GET() {
       // on the Clients page.
       (sb as any)
         .from('clients')
-        .select('id, engagement_status, engagement_start_date')
+        .select('id, engagement_status')
         .in('engagement_status', ['active', 'churned']),
       // All-time content posted count across all clients. Just a count,
       // not per-client — fed into the "Total Content Delivered" card.
@@ -78,15 +78,22 @@ export async function GET() {
     const renewalAnchor = (c: typeof clients[number]): string | null =>
       c.covered_through ?? null;
     const withEnd = clients.filter(c => renewalAnchor(c) !== null);
+    // Build map of client_id → earliest active stint start for week math.
+    const stintStartById = new Map<string, string>();
+    for (const s of ((activeStintsRaw.data ?? []) as Array<{ client_id: string; start_date: string }>)) {
+      if (s.client_id && s.start_date) stintStartById.set(s.client_id, s.start_date);
+    }
     const renewals = withEnd
       .map(c => {
         const anchor = renewalAnchor(c)!;
         const t = renewalToneFor(anchor, cfg.renewal_red_days, cfg.renewal_amber_days);
-        // Week number per TD §5.2 — continuous since engagement_start_date,
-        // doesn't reset on renewal (matches the §4.1 Client Health rule).
+        // [F1 cleanup 2026-07-02] Week number counts from active stint
+        // start_date, not the retired clients.engagement_start_date.
+        // Continuous per TD §5.2 — doesn't reset on renewal.
+        const stintStart = stintStartById.get(c.id) ?? null;
         let weekNumber: number | null = null;
-        if (c.engagement_start_date) {
-          const start = new Date(c.engagement_start_date + (c.engagement_start_date.includes('T') ? '' : 'T00:00:00Z'));
+        if (stintStart) {
+          const start = new Date(stintStart + (stintStart.includes('T') ? '' : 'T00:00:00Z'));
           const weeks = Math.floor((Date.now() - start.getTime()) / (7 * 86_400_000));
           weekNumber = weeks >= 0 ? weeks + 1 : null;
         }
@@ -94,10 +101,6 @@ export async function GET() {
           id: c.id,
           name: c.name,
           slug: c.slug,
-          engagement_start_date: c.engagement_start_date,
-          // engagement_end_date kept for callers that surface the actual
-          // contract end; renewal_anchor is what drives the badge.
-          engagement_end_date: c.engagement_end_date,
           renewal_anchor: anchor,
           weekNumber,
           tone: t.tone,
@@ -133,7 +136,6 @@ export async function GET() {
     const retentionRows = (retentionRaw.data ?? []) as Array<{
       id: string;
       engagement_status: string | null;
-      engagement_start_date: string | null;
     }>;
     const activeCountRet = retentionRows.filter(c => c.engagement_status === 'active').length;
     const churnedCountRet = retentionRows.filter(c => c.engagement_status === 'churned').length;
@@ -184,8 +186,10 @@ export async function GET() {
           green: renewals.filter(r => r.tone === 'green').length,
         },
         upcomingMonths,
+        // [F1 cleanup] "Without end date" now means "no coverage_through" —
+        // i.e. no active stint. Same semantic, sourced from the substrate.
         clientsWithoutEndDate: clients
-          .filter(c => !c.engagement_end_date)
+          .filter(c => c.covered_through == null)
           .map(c => ({ id: c.id, name: c.name, slug: c.slug })),
       },
       pipeline: {

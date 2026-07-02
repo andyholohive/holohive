@@ -28,19 +28,17 @@ export interface StandardClient {
   id: string;
   name: string;
   slug: string | null;
-  engagement_start_date: string | null;
-  engagement_end_date: string | null;
   engagement_status: string | null;
   is_whitelisted: boolean | null;
   /** v11: client logo for Dashboard / Client Health avatar tile. */
   logo_url: string | null;
   /**
-   * [Stint+Period substrate, 2026-06-16] Covered-through date from
-   * client_coverage_status view = MAX(period.end_date) per active stint.
-   * Preferred over engagement_end_date for renewal-tone math — falls
-   * back when client has no stint yet. Full F1 migration (dropping
-   * engagement_end_date) lives in the CRM rebuild.
+   * [F1 2026-07-02] Dates now sourced from client_coverage_status view,
+   * not from retired clients.engagement_start_date / engagement_end_date.
+   * stint_start = active stint's start_date. covered_through = latest
+   * term end within that stint. Both null when client has no active stint.
    */
+  stint_start: string | null;
   covered_through: string | null;
 }
 
@@ -59,24 +57,28 @@ export async function getStandardClients(
 ): Promise<StandardClient[]> {
   const { data, error } = await (sb as any)
     .from('clients')
-    .select('id, name, slug, engagement_start_date, engagement_end_date, engagement_status, is_whitelisted, logo_url')
+    .select('id, name, slug, engagement_status, is_whitelisted, logo_url')
     .eq('is_active', true)
     .eq('is_ad_hoc', false)
     .is('archived_at', null)
     .order('name');
   if (error || !data) return [];
-  // [Stint+Period substrate] Join covered_through from the view so the
-  // renewal-tone math can prefer it over engagement_end_date.
+  // [F1 2026-07-02] Source engagement dates from client_coverage_status
+  // view (active stint's start_date + latest term end). Legacy
+  // clients.engagement_start_date + engagement_end_date have been dropped.
   const { data: coverage } = await (sb as any)
     .from('client_coverage_status')
-    .select('client_id, covered_through, stint_status');
-  const coverageByClient = new Map<string, string | null>();
-  for (const row of (coverage ?? []) as Array<{ client_id: string; covered_through: string | null; stint_status: string }>) {
-    if (row.stint_status === 'active') coverageByClient.set(row.client_id, row.covered_through);
+    .select('client_id, stint_start, covered_through, stint_status');
+  const stintByClient = new Map<string, { stint_start: string | null; covered_through: string | null }>();
+  for (const row of (coverage ?? []) as Array<{ client_id: string; stint_start: string | null; covered_through: string | null; stint_status: string }>) {
+    if (row.stint_status === 'active') {
+      stintByClient.set(row.client_id, { stint_start: row.stint_start, covered_through: row.covered_through });
+    }
   }
-  return (data as StandardClient[]).map(c => ({
+  return (data as Array<Omit<StandardClient, 'stint_start' | 'covered_through'>>).map(c => ({
     ...c,
-    covered_through: coverageByClient.get(c.id) ?? null,
+    stint_start: stintByClient.get(c.id)?.stint_start ?? null,
+    covered_through: stintByClient.get(c.id)?.covered_through ?? null,
   }));
 }
 

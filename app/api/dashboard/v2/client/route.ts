@@ -324,10 +324,9 @@ export async function GET(request: Request) {
     };
     const clientMetaById = new Map<string, ClientMeta>();
     for (const c of standardClients) {
-      // [Stint+Period 2026-06-16] Prefer covered_through (latest period
-      // end_date per active stint) over the legacy engagement_end_date.
-      // F1 spec: alert reads from period coverage, not the frozen client field.
-      const renewalDate = c.covered_through ?? c.engagement_end_date;
+      // [F1 2026-07-02] Legacy engagement_end_date column dropped;
+      // renewal math sources purely from covered_through.
+      const renewalDate = c.covered_through;
       const renewal = renewalToneFor(renewalDate, cfg.renewal_red_days, cfg.renewal_amber_days);
       clientMetaById.set(c.id, {
         name: c.name,
@@ -374,8 +373,8 @@ export async function GET(request: Request) {
     // Build client health rows
     const clientHealth = standardClients.map(c => {
       const t = taskAgg.get(c.id) ?? { open: 0, overdue: 0, doneThisWeek: 0 };
-      // [Stint+Period 2026-06-16] Same precedence as above — covered_through first.
-      const renewalDate = c.covered_through ?? c.engagement_end_date;
+      // [F1 2026-07-02] Legacy engagement_end_date column dropped.
+      const renewalDate = c.covered_through;
       const renewal = renewalToneFor(renewalDate, cfg.renewal_red_days, cfg.renewal_amber_days);
       const delivery = deliveryByClient[c.id];
       return {
@@ -383,9 +382,11 @@ export async function GET(request: Request) {
         name: c.name,
         slug: c.slug,
         logo_url: c.logo_url,
-        engagement_start_date: c.engagement_start_date,
-        engagement_end_date: c.engagement_end_date,
-        weekNumber: weekNumberFor(c.engagement_start_date),
+        // Kept in response for callers that still surface engagement dates;
+        // now sourced from the active stint via client_coverage_status.
+        engagement_start_date: c.stint_start,
+        engagement_end_date: c.covered_through,
+        weekNumber: weekNumberFor(c.stint_start),
         // Renewal tone/days kept for callers that still read them
         // (e.g. callNotes header tints). The Client Success tab itself
         // no longer renders a Renewal column post-2026-06-25 — the
