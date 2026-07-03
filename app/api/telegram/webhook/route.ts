@@ -2396,7 +2396,8 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
     .from('campaign_kols')
     .select('id, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name))')
     .eq('master_kol_id', caller.id)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .neq('hidden', true);
 
   const activeCampaigns = ((assignments ?? []) as Array<{
     id: string;
@@ -2790,7 +2791,7 @@ async function forwardSubmissionToReviewChannel(opts: {
   const threadId = threadIdRaw ? parseInt(threadIdRaw, 10) : undefined;
 
   const body = [
-    '📥 <b>New content submission</b>',
+    '<b>New content submission</b>',
     `KOL: <b>${escapeHtml(opts.kolName)}</b>`,
     `Campaign: ${escapeHtml(opts.campaignName)}`,
     `Type: ${escapeHtml(opts.contentType)} · ${escapeHtml(opts.platform)}`,
