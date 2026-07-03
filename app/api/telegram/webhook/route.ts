@@ -2581,17 +2581,10 @@ async function finalizeSubmission(opts: {
   const submittedAt = new Date();
   const submittedLabel = formatDateTime(submittedAt);
 
-  // [2026-07-03] Short in-chat acknowledgment restored. The 2026-06-30
-  // removal made sense when /submit was DM-only (the DM ack was noisy);
-  // now that /submit lives in the per-KOL group chat, no reply reads as
-  // "did it even go through?" The one-line receipt below stays terse
-  // and doesn't ping the KOL personally — it's just a chat marker.
-  await sendTelegramMessage(
-    opts.chatId,
-    `✓ Submitted for review — <b>${escapeHtml(opts.campaignName)}</b>`,
-    'HTML',
-    opts.threadId,
-  );
+  // [2026-07-03] No success-path receipt to the KOL group chat per Andy.
+  // The submission card lands in the team review chat immediately; if the
+  // KOL wants confirmation they can check with the team. Dedup + error
+  // paths above still reply because those ARE actionable feedback.
 
   // Forward to the team review channel.
   await forwardSubmissionToReviewChannel({
