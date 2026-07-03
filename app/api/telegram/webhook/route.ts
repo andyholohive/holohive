@@ -2394,13 +2394,15 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   const todayIso = new Date().toISOString().slice(0, 10);
   const { data: assignments } = await (supabaseAdmin as any)
     .from('campaign_kols')
-    .select('id, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name))')
+    .select('id, hh_status, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name, is_active))')
     .eq('master_kol_id', caller.id)
     .is('deleted_at', null)
-    .neq('hidden', true);
+    .neq('hidden', true)
+    .eq('hh_status', 'Onboarded');
 
   const activeCampaigns = ((assignments ?? []) as Array<{
     id: string;
+    hh_status: string | null;
     campaign: {
       id: string;
       name: string;
@@ -2408,7 +2410,7 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
       start_date: string | null;
       end_date: string | null;
       archived_at: string | null;
-      client: { id: string; name: string } | null;
+      client: { id: string; name: string; is_active: boolean | null } | null;
     };
   }>)
     .map(a => a.campaign)
@@ -2418,6 +2420,7 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
       && !c.archived_at
       && (!c.start_date || c.start_date <= todayIso)
       && (!c.end_date || c.end_date >= todayIso)
+      && c.client?.is_active === true
     );
 
   if (activeCampaigns.length === 0) {
@@ -2941,7 +2944,7 @@ async function handleSubmPickerCallback(
       messageChatId,
       messageId,
       submissionId
-        ? `✅ Saved for <b>${escapeHtml(campaign.client?.name || campaign.name)}</b>.`
+        ? `✅ Submitted for <b>${escapeHtml(campaign.client?.name || campaign.name)}</b>.`
         : '↩ Submission not saved — see message above.',
     );
   }

@@ -43,7 +43,7 @@ export async function createApprovedContentsRow(
 ): Promise<ApproveResult> {
   const { data: campaignKol } = await (admin as any)
     .from('campaign_kols')
-    .select('id')
+    .select('id, agreed_rate, master_kol:master_kols(id, standard_rate, repost_rate)')
     .eq('campaign_id', input.campaignId)
     .eq('master_kol_id', input.kolId)
     .is('deleted_at', null)
@@ -53,6 +53,7 @@ export async function createApprovedContentsRow(
     return { contentId: null, error: 'KOL is not on this campaign (campaign_kols row missing).' };
   }
 
+  const contentsType = mapSubmissionTypeToContents(input.contentType);
   const nowIso = new Date().toISOString();
   const { data: contentRow, error: contentErr } = await (admin as any)
     .from('contents')
@@ -61,7 +62,7 @@ export async function createApprovedContentsRow(
       campaign_id: input.campaignId,
       content_link: input.link,
       platform: mapSubmissionPlatformToContents(input.platform),
-      type: mapSubmissionTypeToContents(input.contentType),
+      type: contentsType,
       status: 'pending_verification',
       activation_date: nowIso.slice(0, 10),
     })
@@ -84,7 +85,45 @@ export async function createApprovedContentsRow(
     return { contentId: null, error: (contentErr as any).message ?? 'contents insert failed' };
   }
 
-  return { contentId: (contentRow as any)?.id ?? null, error: null };
+  const contentId = (contentRow as any)?.id ?? null;
+
+  // [2026-07-03] Mirror the manual /campaigns/[id] add-content flow —
+  // auto-create a payment row keyed to this content. Amount priority
+  // (matches KolDashboardTableView):
+  //   1. QRT (repost): master_kol.repost_rate
+  //      → fallback master_kol.standard_rate * 0.5
+  //   2. campaign_kol.agreed_rate (set at onboarding)
+  //   3. master_kol.standard_rate (mastersheet)
+  //   4. 0 (team fills in manually)
+  // Payment insert is best-effort: failures are logged but do NOT roll
+  // back the contents row — team can add a payment manually if this
+  // silently fails.
+  if (contentId) {
+    const masterKol = (campaignKol as any).master_kol as { standard_rate: number | null; repost_rate: number | null } | null;
+    const stdRate = masterKol?.standard_rate != null ? Number(masterKol.standard_rate) : null;
+    const repostRate = masterKol?.repost_rate != null ? Number(masterKol.repost_rate) : null;
+    const agreedRate = (campaignKol as any).agreed_rate != null ? Number((campaignKol as any).agreed_rate) : null;
+    const amount = contentsType === 'QRT'
+      ? (repostRate ?? (stdRate != null ? Math.round(stdRate * 0.5 * 100) / 100 : 0))
+      : (agreedRate ?? stdRate ?? 0);
+
+    const { error: paymentErr } = await (admin as any)
+      .from('payments')
+      .insert({
+        campaign_id: input.campaignId,
+        campaign_kol_id: (campaignKol as any).id,
+        content_id: [contentId],
+        amount,
+        payment_date: null,
+        payment_method: 'Fiat',
+        notes: null,
+      });
+    if (paymentErr) {
+      console.warn('[approve] payment auto-insert failed:', paymentErr);
+    }
+  }
+
+  return { contentId, error: null };
 }
 
 /**
