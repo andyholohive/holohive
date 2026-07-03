@@ -937,10 +937,11 @@ async function resolveCaller(message: any): Promise<ResolvedCaller> {
 
   // 1. KOL via group chat takes PRECEDENCE [Andy 2026-06-12]. In a
   //    per-KOL group chat, the chat context wins — even if the sender is
-  //    also a team member (e.g., Andy in his own KOL test group). The
-  //    sender-verification step in handleSubmitCommand still rejects
-  //    anyone whose user_id doesn't match the stored KOL telegram_id, so
-  //    team-member-in-KOL-group can't /submit unless they ARE the KOL.
+  //    also a team member (e.g., Andy in his own KOL test group). Per
+  //    2026-07-03, /submit is attributed to the KOL that owns the chat
+  //    regardless of which group member typed the command — the sender-
+  //    verification gate was removed; the review-queue Approve + banner
+  //    Verify gates downstream are the real filters.
   if (tgChatId) {
     const { data: chatRow } = await (supabaseAdmin as any)
       .from('telegram_chats')
@@ -2357,43 +2358,13 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
     return;
   }
 
-  // [2026-06-12] Sender capture + verification per Andy's clarification.
-  // The /submit MUST come from the KOL themselves, not from a team member
-  // in their group. We auto-capture on the first /submit (matches the
-  // Appendix "auto-captured first time the payment bot interacts with the
-  // KOL" semantics) and verify on every subsequent /submit.
-  //
-  // Lookup current stored telegram_id for this KOL
-  const senderTgUserId = message?.from?.id?.toString();
-  const { data: kolRow } = await (supabaseAdmin as any)
-    .from('master_kols')
-    .select('telegram_id, name')
-    .eq('id', caller.id)
-    .maybeSingle();
-  const storedSenderId = (kolRow as any)?.telegram_id ?? null;
-
-  if (!storedSenderId) {
-    // First /submit ever — capture this sender as the authoritative KOL TG user_id
-    await (supabaseAdmin as any)
-      .from('master_kols')
-      .update({ telegram_id: senderTgUserId })
-      .eq('id', caller.id);
-    console.log('[/submit] auto-captured telegram_id for KOL:', { kol_id: caller.id, senderTgUserId });
-  } else if (storedSenderId !== senderTgUserId) {
-    // Mismatch — someone other than the recognized KOL is /submitting from
-    // this group. Reject + tell them to use the dashboard if they're team.
-    const kolName = (kolRow as any)?.name || caller.name || 'the KOL';
-    await sendTelegramMessage(
-      chatId,
-      `⚠️ Only <b>${escapeHtml(kolName)}</b> can <code>/submit</code> from this group.\n\n` +
-      `Team members: log content via <code>/campaigns</code>. ` +
-      `KOLs switching TG accounts: ask a team member to clear the stored TG ID.`,
-      'HTML',
-      threadId,
-    );
-    return;
-  }
-  // else: sender matches stored — proceed as the verified KOL.
+  // [2026-07-03] Sender-verification gate removed per Andy. The chat→KOL
+  // link is the sole source of truth for attribution: anyone in a KOL-linked
+  // group can /submit, and it's credited to the KOL that owns the chat. This
+  // matches KR agency workflows where managers handle paperwork for talent.
+  // Downstream gates (team Approve in the review queue → team Verify on the
+  // Content Dashboard banner) still catch anything wrong before it hits
+  // published metrics.
 
   const link = args.join(' ').trim();
   if (!link) {
