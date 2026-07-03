@@ -3081,20 +3081,10 @@ async function handleSubmReviewCallback(
     );
   }
 
-  // Notify the KOL per Andy's Q3 answer (option b: 👍 reaction on approval,
-  // text on rejection). Posted to the KOL's per-KOL group chat where they
-  // originally /submitted — matches the group-chat architecture.
-  if (kolChatId) {
-    if (action === 'approve') {
-      await sendTelegramMessage(kolChatId, '👍', 'HTML');
-    } else {
-      await sendTelegramMessage(
-        kolChatId,
-        `Submission issue: <i>Did not meet criteria.</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`,
-        'HTML',
-      );
-    }
-  }
+  // [2026-07-03] KOL-facing approve/reject notification removed per Andy.
+  // The review-channel message is already edited to show the decision
+  // (visible to the team); the KOL doesn't need a separate ping — the
+  // submitted-for-review ack at /submit time is enough.
 
   await answerCallbackQuery(callbackId, action === 'approve' ? 'Approved.' : 'Rejected.');
 }
