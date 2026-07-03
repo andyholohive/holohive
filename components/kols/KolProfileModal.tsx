@@ -1337,6 +1337,8 @@ function CallLogsTab({ kolId }: { kolId: string }) {
   const [list, setList] = useState<KolCallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  // [2026-07-03] Inline edit — one row editable at a time. `null` = no edit.
+  const [editingId, setEditingId] = useState<string | null>(null);
   // v11 destructive-Dialog state — replaces the native confirm() that
   // previously gated the call-log delete (2026-06-05). Holds the full
   // log row so the Dialog can include the call date if we want it later.
@@ -1366,6 +1368,12 @@ function CallLogsTab({ kolId }: { kolId: string }) {
     toast({ title: "Call log added" });
   };
 
+  const handleUpdated = (row: KolCallLog) => {
+    setList((prev) => prev.map((c) => (c.id === row.id ? row : c)));
+    setEditingId(null);
+    toast({ title: "Call log updated" });
+  };
+
   // Stage the call log for the v11 confirm Dialog; the actual delete
   // fires from confirmDeleteCallLog below.
   const handleDelete = (log: KolCallLog) => {
@@ -1393,8 +1401,8 @@ function CallLogsTab({ kolId }: { kolId: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-ink-warm-500">{list.length} call log{list.length === 1 ? "" : "s"}.</p>
-        {!showAddForm && (
-          <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
+        {!showAddForm && !editingId && (
+          <Button size="sm" variant="brand" onClick={() => setShowAddForm(true)}>
             <Plus className="h-3 w-3 mr-1" /> Add Call Log
           </Button>
         )}
@@ -1423,7 +1431,22 @@ function CallLogsTab({ kolId }: { kolId: string }) {
       ) : (
         <div className="space-y-2">
           {list.map((c) => (
-            <CallLogRow key={c.id} c={c} onDelete={() => handleDelete(c)} />
+            editingId === c.id ? (
+              <CallLogForm
+                key={c.id}
+                kolId={kolId}
+                initial={c}
+                onCancel={() => setEditingId(null)}
+                onSaved={handleUpdated}
+              />
+            ) : (
+              <CallLogRow
+                key={c.id}
+                c={c}
+                onEdit={() => { setEditingId(c.id); setShowAddForm(false); }}
+                onDelete={() => handleDelete(c)}
+              />
+            )
           ))}
         </div>
       )}
@@ -1458,15 +1481,15 @@ function CallLogsTab({ kolId }: { kolId: string }) {
   );
 }
 
-function CallLogRow({ c, onDelete }: { c: KolCallLog; onDelete: () => void }) {
+function CallLogRow({ c, onEdit, onDelete }: { c: KolCallLog; onEdit: () => void; onDelete: () => void }) {
   return (
-    <Card className="p-3">
+    <Card className="p-3 border-l-2 border-l-brand transition-colors hover:bg-brand-light/20">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-ink-warm-900">{formatDate(c.call_date)}</span>
             {c.call_type && (
-              <StatusBadge tone="purple" size="sm" bordered>
+              <StatusBadge tone="brand" size="sm" bordered>
                 {titleCase(c.call_type)}
               </StatusBadge>
             )}
@@ -1483,9 +1506,14 @@ function CallLogRow({ c, onDelete }: { c: KolCallLog; onDelete: () => void }) {
             {c.feedback_on_hh && <Section label="Feedback on HH" body={c.feedback_on_hh} />}
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={onDelete} title="Delete">
-          <Trash2 className="h-3 w-3 text-rose-500" />
-        </Button>
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          <Button size="sm" variant="ghost" onClick={onEdit} title="Edit" className="h-7 w-7 p-0">
+            <Pencil className="h-3 w-3 text-brand" />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onDelete} title="Delete" className="h-7 w-7 p-0">
+            <Trash2 className="h-3 w-3 text-rose-500" />
+          </Button>
+        </div>
       </div>
     </Card>
   );
@@ -1502,49 +1530,65 @@ function Section({ label, body }: { label: string; body: string }) {
 
 function CallLogForm({
   kolId,
+  initial,
   onCancel,
   onSaved,
 }: {
   kolId: string;
+  initial?: KolCallLog | null;
   onCancel: () => void;
   onSaved: (row: KolCallLog) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [callDate, setCallDate] = useState(today);
-  const [callType, setCallType] = useState<string>("");
-  const [project, setProject] = useState("");
-  const [notes, setNotes] = useState("");
-  const [marketIntel, setMarketIntel] = useState("");
-  const [recommendedAngle, setRecommendedAngle] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const isEdit = !!initial;
+  const [callDate, setCallDate] = useState(initial?.call_date ?? today);
+  const [callType, setCallType] = useState<string>(initial?.call_type ?? "");
+  const [project, setProject] = useState(initial?.project ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [marketIntel, setMarketIntel] = useState(initial?.market_intel ?? "");
+  const [recommendedAngle, setRecommendedAngle] = useState(initial?.recommended_angle ?? "");
+  const [feedback, setFeedback] = useState(initial?.feedback_on_hh ?? "");
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const input: CreateKolCallLogInput = {
-      kol_id: kolId,
-      call_date: callDate,
-      call_type: callType || null,
-      project: project.trim() || null,
-      notes: notes.trim() || null,
-      market_intel: marketIntel.trim() || null,
-      recommended_angle: recommendedAngle.trim() || null,
-      feedback_on_hh: feedback.trim() || null,
-    };
     try {
-      const row = await KolCallLogService.create(input);
+      let row: KolCallLog;
+      if (isEdit && initial) {
+        row = await KolCallLogService.update(initial.id, {
+          call_date: callDate,
+          call_type: callType || null,
+          project: project.trim() || null,
+          notes: notes.trim() || null,
+          market_intel: marketIntel.trim() || null,
+          recommended_angle: recommendedAngle.trim() || null,
+          feedback_on_hh: feedback.trim() || null,
+        });
+      } else {
+        const input: CreateKolCallLogInput = {
+          kol_id: kolId,
+          call_date: callDate,
+          call_type: callType || null,
+          project: project.trim() || null,
+          notes: notes.trim() || null,
+          market_intel: marketIntel.trim() || null,
+          recommended_angle: recommendedAngle.trim() || null,
+          feedback_on_hh: feedback.trim() || null,
+        };
+        row = await KolCallLogService.create(input);
+      }
       onSaved(row);
     } catch (err) {
-      toast({ title: "Failed to save call log", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: `Failed to ${isEdit ? 'update' : 'save'} call log`, description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-[14px] border border-cream-200 p-3 bg-cream-50 space-y-2">
+    <form onSubmit={handleSubmit} className="rounded-[14px] border-l-2 border-l-brand border border-cream-200 p-3 bg-cream-50 space-y-2">
       <div className="grid grid-cols-3 gap-2">
         <FormField label="Date *">
           {/* [2026-06-16] Canonical Popover + Calendar pattern per
@@ -1604,7 +1648,7 @@ function CallLogForm({
       </FormField>
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={saving}>Cancel</Button>
-        <Button type="submit" size="sm" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button type="submit" size="sm" variant="brand" disabled={saving}>{saving ? (isEdit ? "Updating…" : "Saving…") : (isEdit ? "Update" : "Save")}</Button>
       </div>
     </form>
   );
