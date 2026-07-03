@@ -2900,10 +2900,10 @@ async function handleSubmPickerCallback(
   }
   const { data: assignments } = await (supabaseAdmin as any)
     .from('campaign_kols')
-    .select('campaign:campaigns!inner(id, name)')
+    .select('campaign:campaigns!inner(id, name, client:clients(id, name))')
     .eq('master_kol_id', pending.kol_id)
     .is('deleted_at', null);
-  const campaign = ((assignments ?? []) as Array<{ campaign: { id: string; name: string } | null }>)
+  const campaign = ((assignments ?? []) as Array<{ campaign: { id: string; name: string; client: { id: string; name: string } | null } | null }>)
     .map(a => a.campaign)
     .find(c => c?.id?.startsWith(campaignIdPrefix));
   if (!campaign) {
@@ -2941,7 +2941,7 @@ async function handleSubmPickerCallback(
       messageChatId,
       messageId,
       submissionId
-        ? `✅ Saved for <b>${escapeHtml(campaign.name)}</b>.`
+        ? `✅ Saved for <b>${escapeHtml(campaign.client?.name || campaign.name)}</b>.`
         : '↩ Submission not saved — see message above.',
     );
   }
