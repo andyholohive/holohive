@@ -2742,7 +2742,7 @@ async function sendSubmissionProgressAlert(opts: {
 
   // Build the alert message
   const lines: string[] = [];
-  lines.push(`📥 <b>${escapeHtml(opts.campaignName)}</b>, post live`);
+  lines.push(`<b>${escapeHtml(opts.campaignName)}</b>, post live`);
   lines.push(`<b>${escapeHtml(opts.kolName)}</b> just posted.`);
   if (plannedCount > 0) {
     const pct = Math.round((liveCount / plannedCount) * 100);
