@@ -304,20 +304,31 @@ async function paymentReminder(
 
   if (!unpaid || unpaid.length === 0) return { items: [], isEmpty: true };
 
-  // Get campaign names to filter out excluded patterns
+  // Get campaign names + client status to filter out excluded patterns,
+  // inactive clients, and ad-hoc clients. [2026-07-03] Per Andy: only
+  // active, non-ad-hoc clients belong in the Saturday payment reminder.
   const campaignIds = Array.from(new Set(unpaid.map((p) => p.campaign_id)));
   const { data: campaigns } = await supabase
     .from('campaigns')
-    .select('id, name')
+    .select('id, name, client:clients(id, is_active, is_ad_hoc)')
     .in('id', campaignIds);
-  const campMap = new Map<string, string>();
-  for (const c of campaigns || []) campMap.set(c.id, c.name);
+  const campMap = new Map<string, { name: string; clientActive: boolean; clientAdHoc: boolean }>();
+  for (const c of (campaigns || []) as any[]) {
+    campMap.set(c.id, {
+      name: c.name,
+      clientActive: c.client?.is_active !== false,
+      clientAdHoc: c.client?.is_ad_hoc === true,
+    });
+  }
 
-  // Filter out excluded campaign patterns
+  // Filter out excluded campaign patterns + inactive + ad-hoc clients
   const filtered = unpaid.filter((p) => {
-    const campName = campMap.get(p.campaign_id) || '';
+    const camp = campMap.get(p.campaign_id);
+    if (!camp) return false;
+    if (!camp.clientActive) return false;
+    if (camp.clientAdHoc) return false;
     return !excludePatterns.some((pattern) =>
-      campName.toLowerCase().includes(pattern.toLowerCase())
+      camp.name.toLowerCase().includes(pattern.toLowerCase())
     );
   });
 
@@ -332,7 +343,7 @@ async function paymentReminder(
   // ordering across Saturday runs.
   const byCampaign = new Map<string, { campName: string; count: number; totalAmount: number }>();
   for (const p of filtered) {
-    const campName = campMap.get(p.campaign_id) || 'Unknown Campaign';
+    const campName = campMap.get(p.campaign_id)?.name || 'Unknown Campaign';
     const existing = byCampaign.get(p.campaign_id) || { campName, count: 0, totalAmount: 0 };
     existing.count++;
     existing.totalAmount += Number(p.amount) || 0;
