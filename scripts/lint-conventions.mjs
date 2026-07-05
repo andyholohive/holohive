@@ -84,8 +84,12 @@ const RULES = [
     description:
       '`toLocaleDateString` / `toLocaleString` for dates is forbidden. Canonical is ' +
       'mm/dd/yyyy via `formatDate` / `formatDateTime` from `@/lib/dateFormat`. (CLAUDE.md → Date formatting)',
-    // Catches raw .toLocaleDateString(...) and .toLocaleString('en-...', ...) on Date values.
-    pattern: /\.toLocaleDateString\s*\(|\.toLocaleString\s*\(\s*['"]en-/,
+    // Catches raw .toLocaleDateString(...) always, and .toLocaleString('en-…')
+    // only when the same line carries date-format option keys — plain
+    // `n.toLocaleString('en-US')` is NUMERIC formatting and is allowed
+    // per CLAUDE.md. [2026-07-05] Previously any en-* toLocaleString was
+    // flagged, which false-positived 6 numeric call sites.
+    pattern: /\.toLocaleDateString\s*\(|\.toLocaleString\s*\(\s*['"]en-(?=[^\n]*(?:month|day|year|weekday|hour|minute))/,
     // Number(x).toLocaleString('en-US') is numeric formatting and stays.
     excludeLineRegex: /Number\s*\(/,
     // The dateFormat module itself uses toLocaleDateString to *implement* the helpers.
@@ -201,6 +205,19 @@ function main() {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        // Skip comment-only lines — a comment MENTIONING a forbidden
+        // pattern isn't a violation. [2026-07-05] Previously flagged
+        // doc comments like "never <Input type=\"date\">".
+        const trimmed = line.trim();
+        if (
+          trimmed.startsWith('//') ||
+          trimmed.startsWith('*') ||
+          trimmed.startsWith('/*') ||
+          trimmed.startsWith('{/*') ||
+          // Continuation/closing lines of multi-line block comments.
+          trimmed.endsWith('*/') ||
+          trimmed.endsWith('*/}')
+        ) continue;
         if (rule.pattern.test(line)) {
           // Allow the rule itself to define line-level exceptions
           if (rule.excludeLineRegex && rule.excludeLineRegex.test(line)) continue;

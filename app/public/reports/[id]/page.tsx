@@ -348,12 +348,19 @@ export default function PublicReportPage({ params }: { params: { id: string } })
 
       setCampaign(campaignWithClient);
 
-      // Fetch campaign KOLs
+      // Fetch campaign KOLs. [2026-07-05 AUDIT-FIX] Exclude hidden +
+      // soft-removed roster rows — this is a CLIENT-facing report and
+      // previously listed KOLs the team had deliberately hidden or
+      // removed (the exact thing `hidden` exists to prevent). Matches
+      // the public campaign page + portal filters.
       const { data: kolsData } = await supabasePublic
         .from('campaign_kols')
         .select('id, master_kol:master_kol_id(name)')
-        .eq('campaign_id', campaignId);
+        .eq('campaign_id', campaignId)
+        .is('deleted_at', null)
+        .or('hidden.is.null,hidden.eq.false');
 
+      const visibleKolIds = new Set<string>((kolsData ?? []).map((k: any) => k.id));
       if (kolsData) {
         const formattedKOLs = kolsData.map((kol: any) => ({
           id: kol.id,
@@ -364,16 +371,34 @@ export default function PublicReportPage({ params }: { params: { id: string } })
         setCampaignKOLs(formattedKOLs as CampaignKOL[]);
       }
 
-      // Fetch contents (exclude pending_verification per TG Bot Phase 2 — public
-      // reports shouldn't surface bot-approved content until a human verifies).
+      // Fetch contents. [2026-07-05 AUDIT-FIX] posted-only (previously
+      // pending/scheduled rows counted into client-facing totals), drop
+      // content of hidden/removed KOLs, and collapse multipost groups to
+      // the best-performing row (same dedup rule as the company
+      // leaderboard) so cross-platform mirrors don't double-count.
       const { data: contentsData } = await supabasePublic
         .from('contents')
-        .select('id, campaign_kols_id, activation_date, impressions, likes, retweets, comments, bookmarks')
+        .select('id, campaign_kols_id, activation_date, impressions, likes, retweets, comments, bookmarks, multipost_group_id')
         .eq('campaign_id', campaignId)
-        .neq('status', 'pending_verification');
+        .eq('status', 'posted');
 
       if (contentsData) {
-        setContents(contentsData as ContentItem[]);
+        const visibleContents = (contentsData as any[]).filter(
+          (c) => !c.campaign_kols_id || visibleKolIds.has(c.campaign_kols_id)
+        );
+        const bestByGroup = new Map<string, any>();
+        const nonGrouped: any[] = [];
+        for (const c of visibleContents) {
+          if (c.multipost_group_id) {
+            const prev = bestByGroup.get(c.multipost_group_id);
+            if (!prev || (c.impressions ?? 0) > (prev.impressions ?? 0)) {
+              bestByGroup.set(c.multipost_group_id, c);
+            }
+          } else {
+            nonGrouped.push(c);
+          }
+        }
+        setContents([...nonGrouped, ...Array.from(bestByGroup.values())] as ContentItem[]);
       }
 
       // Fetch public report files

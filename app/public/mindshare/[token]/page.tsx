@@ -58,6 +58,11 @@ type MindshareData = {
   generated_at: string;
 };
 
+// Compact chart tick ("Jun 5") — full mm/dd/yyyy overflows the daily
+// mindshare X axis (CLAUDE.md chart-axis carve-out).
+// lint-conventions: disable-next-line no-raw-toLocaleDateString
+const formatChartTick = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
 export default function PublicMindsharePage() {
   const params = useParams<{ token: string }>();
   const searchParams = useSearchParams();
@@ -235,7 +240,7 @@ export default function PublicMindsharePage() {
             <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: -12 }}>
               <XAxis
                 dataKey="day"
-                tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                tickFormatter={formatChartTick}
                 tick={{ fontSize: 10, fill: '#6b7280' }}
                 axisLine={{ stroke: '#e5e7eb' }}
                 tickLine={false}

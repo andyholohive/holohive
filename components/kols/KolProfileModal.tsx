@@ -1100,6 +1100,9 @@ function SnapshotTrendChart({ rows }: { rows: KolChannelSnapshot[] }) {
         const d = new Date(r.snapshot_date + 'T00:00:00');
         return isNaN(d.getTime())
           ? r.snapshot_date
+          // Monthly chart axis — "Jun '26" style; mm/dd/yyyy would be
+          // misleading on a month-granularity series (CLAUDE.md carve-out).
+          // lint-conventions: disable-next-line no-raw-toLocaleDateString
           : d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       })(),
       followers: r.follower_count ?? null,

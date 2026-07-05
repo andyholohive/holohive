@@ -16,7 +16,9 @@
  *     percentage. Returns 0 when impressions is 0 to avoid NaN.
  *   - pending_verification rows are NOT filtered here — the caller
  *     decides whether to pass them in. Public fetch already excludes
- *     them; internal fetch keeps them so the team can verify.
+ *     them; the internal fetch keeps them for the table's Verify
+ *     workflow but ContentDashboardOverview filters them out before
+ *     calling these helpers (TGB-V2.4: excluded from ALL metric math).
  */
 
 export interface ContentMetricRow {

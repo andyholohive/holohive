@@ -46,10 +46,17 @@ const fmt = (n: number) =>
 export function ContentDashboardOverview() {
   const { contents } = useCampaignDetail();
 
-  const totals = computeContentTotals(contents);
-  const engagementRate = computeEngagementRate(contents);
-  const lineData = computeImpressionsByDateCumulative(contents, formatDate);
-  const pieData = computeImpressionsByPlatform(contents);
+  // [2026-07-05 AUDIT-FIX] The campaign page fetches contents with no
+  // status filter (the table needs pending_verification rows for the
+  // Verify workflow), but per TGB-V2.4 those rows must be excluded from
+  // ALL metric math. Without this the internal Overview disagreed with
+  // the public Overview for the same campaign.
+  const metricRows = contents.filter((c: any) => c.status !== 'pending_verification');
+
+  const totals = computeContentTotals(metricRows);
+  const engagementRate = computeEngagementRate(metricRows);
+  const lineData = computeImpressionsByDateCumulative(metricRows, formatDate);
+  const pieData = computeImpressionsByPlatform(metricRows);
 
   return (
     <div className="space-y-6">
