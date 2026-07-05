@@ -15,7 +15,7 @@ const supabaseAdmin = createClient(
 );
 
 // Telegram webhook secret for verification (optional but recommended)
-const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
+import { acceptedWebhookSecrets } from '@/lib/telegramWebhookSecret';
 
 // Content thread in HH Operations for KOL social links
 const CONTENT_THREAD_CHAT_ID = '-1002636253963';
@@ -30,10 +30,17 @@ const CONTENT_THREAD_ID = 4280;
  */
 export async function POST(request: NextRequest) {
   try {
-    // Optional: Verify webhook secret token
+    // [2026-07-05 AUDIT-FIX] Fail-closed webhook verification. Previously
+    // the check was skipped entirely when TELEGRAM_WEBHOOK_SECRET was unset
+    // (which it was in prod) — any anonymous POST with a forged update
+    // payload could drive the bot. Now the header must match one of the
+    // accepted secrets (configured env var OR sha256(bot token) fallback —
+    // see lib/telegramWebhookSecret.ts). The webhook is registered with
+    // the same derived secret, so Telegram always passes.
     const secretToken = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (WEBHOOK_SECRET && secretToken !== WEBHOOK_SECRET) {
-      console.error('[Telegram Webhook] Invalid secret token');
+    const acceptedSecrets = acceptedWebhookSecrets();
+    if (!secretToken || !acceptedSecrets.includes(secretToken)) {
+      console.error('[Telegram Webhook] Missing or invalid secret token');
       return NextResponse.json({ ok: false }, { status: 401 });
     }
 
@@ -2397,7 +2404,10 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
     .select('id, hh_status, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name, is_active))')
     .eq('master_kol_id', caller.id)
     .is('deleted_at', null)
-    .neq('hidden', true)
+    // NULL-safe hidden filter: `.neq('hidden', true)` would also exclude
+    // rows where hidden IS NULL (SQL: NULL <> true is not true). The
+    // column is backfilled to false today, but don't depend on that.
+    .or('hidden.is.null,hidden.eq.false')
     .eq('hh_status', 'Onboarded');
 
   const activeCampaigns = ((assignments ?? []) as Array<{
@@ -2897,20 +2907,37 @@ async function handleSubmPickerCallback(
   // Resolve the 8-char prefix back to the full campaign by walking the
   // KOL's active assignments. Constrains the search to ~1–10 rows so
   // collisions are functionally impossible.
+  //
+  // [2026-07-05] The requery applies the SAME eligibility chain as the
+  // initial /submit picker (handleSubmitCommand). Picker buttons never
+  // expire, so without this a tap on a stale message could submit to a
+  // campaign that has since ended / been archived, an assignment that
+  // was hidden or offboarded, or an inactive client.
   if (!campaignIdPrefix) {
     await answerCallbackQuery(callbackId, 'Missing campaign.');
     return;
   }
+  const pickTodayIso = new Date().toISOString().slice(0, 10);
   const { data: assignments } = await (supabaseAdmin as any)
     .from('campaign_kols')
-    .select('campaign:campaigns!inner(id, name, client:clients(id, name))')
+    .select('campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name, is_active))')
     .eq('master_kol_id', pending.kol_id)
-    .is('deleted_at', null);
-  const campaign = ((assignments ?? []) as Array<{ campaign: { id: string; name: string; client: { id: string; name: string } | null } | null }>)
+    .is('deleted_at', null)
+    .or('hidden.is.null,hidden.eq.false')
+    .eq('hh_status', 'Onboarded');
+  const campaign = ((assignments ?? []) as Array<{ campaign: { id: string; name: string; status: string; start_date: string | null; end_date: string | null; archived_at: string | null; client: { id: string; name: string; is_active: boolean | null } | null } | null }>)
     .map(a => a.campaign)
-    .find(c => c?.id?.startsWith(campaignIdPrefix));
+    .filter(c =>
+      c
+      && c.status === 'Active'
+      && !c.archived_at
+      && (!c.start_date || c.start_date <= pickTodayIso)
+      && (!c.end_date || c.end_date >= pickTodayIso)
+      && c.client?.is_active === true
+    )
+    .find(c => c!.id.startsWith(campaignIdPrefix));
   if (!campaign) {
-    await answerCallbackQuery(callbackId, 'Campaign not found.');
+    await answerCallbackQuery(callbackId, 'This campaign is no longer accepting submissions. Send /submit again.');
     return;
   }
 

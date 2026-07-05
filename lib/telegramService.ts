@@ -163,8 +163,11 @@ export class TelegramService {
         drop_pending_updates: true // Don't process old messages
       };
 
-      // Add secret token for webhook verification if configured
-      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      // [2026-07-05 AUDIT-FIX] Always register a secret token. Falls back
+      // to sha256(bot token) when TELEGRAM_WEBHOOK_SECRET is unset so the
+      // webhook route can fail closed without requiring a new env var.
+      const { primaryWebhookSecret } = await import('@/lib/telegramWebhookSecret');
+      const webhookSecret = primaryWebhookSecret();
       if (webhookSecret) {
         params.secret_token = webhookSecret;
       }
