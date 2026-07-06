@@ -3200,10 +3200,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 const kol = kols.find(k => k.id === content.campaign_kols_id);
                                 return (
                                   <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
                                       {index + 1}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                       <div className="flex items-center w-full h-full">
                                         <div className="truncate font-bold">{kol?.master_kol?.name || '-'}</div>
                                         {kol?.master_kol?.link && (
@@ -3219,7 +3219,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         )}
                                       </div>
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.platform ? (
                                         <div className="flex gap-1 items-center">
                                           <span className="flex items-center justify-center h-5 w-5" title={content.platform}>
@@ -3228,14 +3228,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         </div>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.type ? (
                                         <span className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(content.type)}`}>
                                           {content.type}
                                         </span>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
                                         const s = (content.status || '').toLowerCase();
                                         if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-emerald-100 text-emerald-800';
@@ -3247,33 +3247,33 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         {content.status ? content.status.charAt(0).toUpperCase() + content.status.slice(1).toLowerCase() : '-'}
                                       </span>
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.activation_date ? formatDate(content.activation_date) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.content_link ? (
                                         <a href={content.content_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
                                           Open
                                         </a>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.impressions ? formatFollowers(content.impressions) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.likes ? formatFollowers(content.likes) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.retweets ? formatFollowers(content.retweets) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.comments ? formatFollowers(content.comments) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
                                     </TableCell>
                                     {notesVisible && (
-                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 align-top`}>
+                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 align-top`}>
                                         {/* HHP Onboarding Overhaul Spec § 9 #11 —
                                             "Complimen Post" truncation fix.
                                             The cell used to have overflow-hidden
