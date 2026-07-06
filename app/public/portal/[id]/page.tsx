@@ -547,6 +547,29 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         }
         localStorage.removeItem(cacheKey);
       }
+
+      // [2026-07-06] Unified access — accept a sign-in from any other
+      // public surface (campaign tracker, reports) as long as that
+      // email passes THIS client's authorization rules. Completes the
+      // loop: the portal always WROTE portal_global_auth for the other
+      // pages but never read it back, so tracker-first visitors hit
+      // the gate twice.
+      const globalRaw = localStorage.getItem('portal_global_auth');
+      if (globalRaw) {
+        const { email: globalEmail, timestamp: globalTs } = JSON.parse(globalRaw);
+        if (globalEmail && Date.now() - globalTs < CACHE_DURATION && isEmailAuthorized(globalEmail)) {
+          setEmail(globalEmail);
+          setIsAuthenticated(true);
+          setWelcomePhase('enter');
+          setShowWelcome(true);
+          saveAuthToCache(globalEmail);
+          void logPortalAccess(globalEmail, 'cache');
+          requestAnimationFrame(() => {
+            setTimeout(() => setWelcomePhase('ready'), 50);
+          });
+          return;
+        }
+      }
     } catch (error) {
       console.error('Error checking cached auth:', error);
       localStorage.removeItem(cacheKey);

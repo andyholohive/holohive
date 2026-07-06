@@ -216,6 +216,14 @@ export default function PublicReportPage({ params }: { params: { id: string } })
         timestamp: Date.now()
       };
       localStorage.setItem(cacheKey, JSON.stringify(authData));
+      // [2026-07-06] Unified access — a report sign-in also unlocks the
+      // portal + campaign trackers (each re-validates the email against
+      // its own rules before accepting).
+      localStorage.setItem('portal_global_auth', JSON.stringify({
+        email,
+        clientEmail,
+        timestamp: Date.now(),
+      }));
     } catch (error) {
       console.error('Error saving auth to cache:', error);
     }
@@ -244,7 +252,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
 
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
-        .select('email, approved_domains')
+        .select('email, approved_emails, approved_domains')
         .eq('id', campaignData.client_id)
         .single();
 
@@ -258,8 +266,13 @@ export default function PublicReportPage({ params }: { params: { id: string } })
       }
 
       setClientEmail(clientData.email);
-      // Approved emails from campaign, approved domains from client
-      setApprovedEmails(campaignData.approved_emails || []);
+      // [2026-07-06] Unified access — client-level approved_emails (the
+      // portal's list) unlock reports too; campaign-level ones stay
+      // honored as legacy per-tracker grants.
+      setApprovedEmails([
+        ...(campaignData.approved_emails || []),
+        ...(((clientData as any).approved_emails as string[]) || []),
+      ]);
       setApprovedDomains(clientData.approved_domains || []);
     } catch (e: any) {
       console.error('Error fetching client email:', e);

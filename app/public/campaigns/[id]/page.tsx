@@ -679,8 +679,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           const clientEmailLower = clientEmail.toLowerCase();
           const portalClientEmailLower = portalClientEmail?.toLowerCase();
 
-          // If portal was authenticated with the same client email, auto-authenticate
-          if (portalEmail && (portalEmailLower === clientEmailLower || portalClientEmailLower === clientEmailLower)) {
+          // [2026-07-06] Unified access — a sign-in from any public
+          // surface (portal, reports, another tracker) passes here as
+          // long as the email clears THIS campaign's authorization
+          // rules (client email, approved emails, client domain,
+          // approved domains). Previously only an exact client-email
+          // match carried over, which made portal-approved guests
+          // re-authenticate per tracker.
+          const portalDomain = portalEmailLower?.split('@')[1];
+          const portalAuthorized = !!portalEmail && (
+            portalEmailLower === clientEmailLower
+            || portalClientEmailLower === clientEmailLower
+            || approvedEmails.some(a => a.toLowerCase() === portalEmailLower)
+            || (portalDomain && portalDomain === clientEmailLower.split('@')[1])
+            || approvedDomains.some(d => portalDomain === d.toLowerCase())
+          );
+          if (portalAuthorized) {
             setEmail(portalEmail);
             setIsAuthenticated(true);
             return;
@@ -735,6 +749,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         timestamp: Date.now()
       };
       localStorage.setItem(cacheKey, JSON.stringify(authData));
+      // [2026-07-06] Unified access — a tracker sign-in also unlocks the
+      // portal + reports (they validate this email against their own
+      // rules before accepting, so this never widens access).
+      localStorage.setItem('portal_global_auth', JSON.stringify({
+        email,
+        clientEmail,
+        timestamp: Date.now(),
+      }));
     } catch (error) {
       console.error('Error saving auth to cache:', error);
     }
@@ -787,12 +809,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       // Store the campaign UUID for logging
       setCampaignUuid(campaignData.id);
 
-      // Approved emails from campaign level
-      setApprovedEmails((campaignData.approved_emails as string[]) || []);
-
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
-        .select('email, approved_domains')
+        .select('email, approved_emails, approved_domains')
         .eq('id', campaignData.client_id)
         .single();
 
@@ -806,7 +825,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       }
 
       setClientEmail(clientData.email);
-      // Approved domains from client level only
+      // [2026-07-06] Unified access — portal + tracker share ONE approval
+      // system. The client-level approved_emails list (what the portal
+      // checks) now also unlocks the tracker; campaign-level
+      // approved_emails stay honored as legacy per-tracker grants.
+      setApprovedEmails([
+        ...((campaignData.approved_emails as string[]) || []),
+        ...(((clientData as any).approved_emails as string[]) || []),
+      ]);
       setApprovedDomains((clientData.approved_domains as string[]) || []);
     } catch (e: any) {
       console.error('Error fetching client email:', e);
