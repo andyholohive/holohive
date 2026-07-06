@@ -1838,14 +1838,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       }} suppressHydrationWarning>
                         <TableHeader>
                           <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
-                            <TableHead className="relative py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
-                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
+                            <TableHead className="relative py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
                               <button type="button" onClick={() => toggleKolSort('name')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by KOL name">
                                 <span>KOL</span>
                                 {sortIcon(kolSort.key === 'name', kolSort.dir)}
                               </button>
                             </TableHead>
-                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('platform')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Platform">
                                   <span>Platform</span>
@@ -1897,7 +1897,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('followers')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Followers">
                                   <span>Followers</span>
@@ -1954,7 +1954,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('region')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Region">
                                   <span>Region</span>
@@ -2008,7 +2008,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             {campaign?.share_creator_type && (
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleKolSort('creator_type')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Creator Type">
                                   <span>Creator Type</span>
                                   {sortIcon(kolSort.key === 'creator_type', kolSort.dir)}
@@ -2019,7 +2019,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 2026-07-06 — the KOL's status is already shown
                                 under the name in the KOL column. */}
                             {false && (
-                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
                                   <span>Status</span>
@@ -2072,14 +2072,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             )}
-                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <button type="button" onClick={() => toggleKolSort('content_count')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by content count">
                                 <span>Content</span>
                                 {sortIcon(kolSort.key === 'content_count', kolSort.dir)}
                               </button>
                             </TableHead>
                             {campaign?.share_kol_notes && (
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
                             )}
                           </TableRow>
                         </TableHeader>
@@ -2969,14 +2969,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
                             <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
-                              <TableHead className="relative py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
+                              <TableHead className="relative py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
                                 <button type="button" onClick={() => toggleContentSort('kol')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by KOL name">
                                   <span>KOL</span>
                                   {sortIcon(contentSort.key === 'kol', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('platform')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Platform">
                                     <span>Platform</span>
@@ -3028,7 +3028,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('type')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Type">
                                     <span>Type</span>
@@ -3078,7 +3078,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
                                     <span>Status</span>
@@ -3128,45 +3128,45 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('activation_date')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Activation Date">
                                   <span>Activation Date</span>
                                   {sortIcon(contentSort.key === 'activation_date', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Content Link</TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Content Link</TableHead>
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Views">
                                   <span>Views</span>
                                   {sortIcon(contentSort.key === 'impressions', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Reactions">
                                   <span>Reactions</span>
                                   {sortIcon(contentSort.key === 'likes', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Shares">
                                   <span>Shares</span>
                                   {sortIcon(contentSort.key === 'retweets', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                              <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Replies">
                                   <span>Replies</span>
                                   {sortIcon(contentSort.key === 'comments', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className={`relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500`}>
+                              <TableHead className={`relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500`}>
                                 <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Saves">
                                   <span>Saves</span>
                                   {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
                                 </button>
                               </TableHead>
                               {notesVisible && (
-                                <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
+                                <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
                               )}
                             </TableRow>
                           </TableHeader>
