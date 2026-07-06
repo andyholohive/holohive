@@ -379,6 +379,11 @@ export default function ClientsPage() {
   // Client context state
   const [clientContexts, setClientContexts] = useState<Record<string, ClientContext>>({});
   const [contextModalClient, setContextModalClient] = useState<ClientWithAccess | null>(null);
+  // [2026-07-06] Weekly Update hub — page-level dialog with one tab per
+  // Active client so the team fills every weekly update from one place
+  // instead of opening each client's Context modal in turn.
+  const [weeklyHubOpen, setWeeklyHubOpen] = useState(false);
+  const [weeklyHubClientId, setWeeklyHubClientId] = useState<string | null>(null);
   const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; telegram_chat_id: string; shared_drive_url: string; gtm_sync_url: string; kol_content_brief_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', telegram_chat_id: '', shared_drive_url: '', gtm_sync_url: '', kol_content_brief_url: '', onboarding_phase: '' });
   // [Phase edit in popup] The latest in-window campaign for the client
   // whose Context popup is currently open. Fetched lazily when the
@@ -2351,6 +2356,23 @@ export default function ClientsPage() {
     paused:   clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'paused').length,
     inactive: clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'inactive').length,
   };
+
+  // [2026-07-06] Weekly Update hub — per Andy: one popup with a tab per
+  // Active client so the whole week's updates can be filled in without
+  // opening each client's Context modal one by one. Reuses the exact
+  // same pane (renderWeeklyUpdatePane) and page-level weeklyV2* state;
+  // selecting a tab re-runs the same loaders the Context modal uses.
+  const weeklyHubClients = clientsWithStatus.filter(c => clientBucketOf(c) === 'active');
+  const handleWeeklyHubSelect = (clientId: string) => {
+    setWeeklyHubClientId(clientId);
+    loadWeeklyV2Row(clientId, weeklyV2Week);
+    fetchTopPostCandidates(clientId);
+  };
+  const openWeeklyHub = () => {
+    setWeeklyHubOpen(true);
+    const first = weeklyHubClients[0];
+    if (first) handleWeeklyHubSelect(first.id);
+  };
   // [2026-07-06] Deep-link support: /clients?clientId=<uuid> opens that
   // client's Edit dialog once the list has loaded. Used by the Team
   // Dashboard's Client Health table (its old /clients/{id} links 404'd —
@@ -2845,6 +2867,606 @@ export default function ClientsPage() {
       </ProtectedRoute>
     );
   }
+  // [2026-07-06] Weekly Update pane — extracted from the Context modal's
+  // weekly-update tab so the page-level Weekly Update hub dialog (one
+  // tab per Active client, per Andy) renders the exact same form. All
+  // weeklyV2* state stays page-level and single-client; only one
+  // surface is open at a time, so selecting a client just re-runs
+  // loadWeeklyV2Row + fetchTopPostCandidates for that client.
+  const renderWeeklyUpdatePane = (paneClient: ClientWithAccess) => (
+                <div className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
+                  {/* Week selector + save status */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-ink-warm-500 uppercase tracking-wider">Week of</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="focus-brand font-normal h-8">
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                            {formatDate(weeklyV2Week)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={weeklyV2Week}
+                            onSelect={(date) => {
+                              if (!date) return;
+                              const monday = getMondayOf(date);
+                              setWeeklyV2Week(monday);
+                              if (paneClient) loadWeeklyV2Row(paneClient.id, monday);
+                            }}
+                            classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {/* Quick-jump buttons for the most common cases —
+                          Andy mentioned "current week is 95% of opens." */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-ink-warm-500 hover:text-brand"
+                        onClick={() => {
+                          const monday = getMondayOf(new Date());
+                          setWeeklyV2Week(monday);
+                          if (paneClient) loadWeeklyV2Row(paneClient.id, monday);
+                        }}
+                      >
+                        This week
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {/* Save-status pill — flashes briefly after each
+                          autosave so the user knows their change landed. */}
+                      {weeklyV2SaveStatus === 'saving' && (
+                        <span className="text-xs text-ink-warm-500">Saving…</span>
+                      )}
+                      {weeklyV2SaveStatus === 'saved' && (
+                        <span className="text-xs text-emerald-600">Saved</span>
+                      )}
+                      {weeklyV2SaveStatus === 'error' && (
+                        <span className="text-xs text-rose-600">Save failed</span>
+                      )}
+                      {/* [2026-06-11] Q5 audit-log viewer. Same pattern as
+                          Lineup Manager's AuditLogButton — popover anchored
+                          to the action row, lazy-fetches on open. Hidden
+                          when the weekly update row doesn't exist yet
+                          (nothing to audit until first save). */}
+                      {weeklyV2Row?.id && (
+                        <Popover
+                          open={weeklyAuditOpen}
+                          onOpenChange={(open) => {
+                            setWeeklyAuditOpen(open);
+                            if (open && weeklyV2Row?.id) {
+                              fetchWeeklyAuditLog(weeklyV2Row.id);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 focus-brand" title="View edit history">
+                              <History className="h-3.5 w-3.5 mr-1" />
+                              History
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[420px] p-0 z-[80]" align="end">
+                            <div className="p-3 border-b border-cream-100">
+                              <p className="text-sm font-semibold text-ink-warm-900">Edit history</p>
+                              <p className="text-[11px] text-ink-warm-500">Reverse chronological. Latest 100 edits.</p>
+                            </div>
+                            <div className="max-h-[400px] overflow-y-auto">
+                              {weeklyAuditLoading ? (
+                                <div className="p-4 space-y-2">
+                                  {Array.from({ length: 3 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-10 rounded" />
+                                  ))}
+                                </div>
+                              ) : weeklyAuditRows.length === 0 ? (
+                                <p className="p-6 text-center text-xs text-ink-warm-500 italic">
+                                  No edits logged yet.
+                                </p>
+                              ) : (
+                                <ul className="divide-y divide-cream-100">
+                                  {weeklyAuditRows.map(r => (
+                                    <li key={r.id} className="px-3 py-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <StatusBadge tone={weeklyAuditKindTone(r.edit_kind)} size="sm">
+                                            {weeklyAuditKindLabel(r.edit_kind)}
+                                          </StatusBadge>
+                                          <span className="text-xs text-ink-warm-700 truncate">
+                                            {r.edited_by_name || 'Unknown'}
+                                          </span>
+                                        </div>
+                                        <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
+                                          {formatDateTime(new Date(r.edited_at))}
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                                        {summarizeWeeklyAudit(r)}
+                                      </p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
+                  </div>
+
+                  {weeklyV2Loading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-24 rounded-lg" />
+                      <Skeleton className="h-40 rounded-lg" />
+                      <Skeleton className="h-32 rounded-lg" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* ─── Section 1: Strategic Direction ─────────
+                          Amber background per spec — "distinct
+                          background (light amber/yellow)". Auto-saves
+                          on blur. Last-touched metadata shows below
+                          so Bolt knows when Jdot last edited it. */}
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">Strategic Direction</p>
+                            <p className="text-xs text-amber-700/80">Internal only · Jdot's guidance for this week</p>
+                          </div>
+                          {weeklyV2Row?.strategic_notes_updated_at && (
+                            <span className="text-[10px] text-amber-700/70 font-mono">
+                              edited {formatDateTime(new Date(weeklyV2Row.strategic_notes_updated_at))}
+                            </span>
+                          )}
+                        </div>
+                        <Textarea
+                          value={weeklyV2StrategicNotes}
+                          onChange={(e) => setWeeklyV2StrategicNotes(e.target.value)}
+                          onBlur={() => {
+                            if (!paneClient) return;
+                            // Skip the save if nothing changed — avoids
+                            // pointless writes when the user just
+                            // tabs through.
+                            if ((weeklyV2Row?.strategic_notes || '') === weeklyV2StrategicNotes) return;
+                            saveWeeklyV2(paneClient.id, weeklyV2Week, { strategic_notes: weeklyV2StrategicNotes });
+                          }}
+                          placeholder={"Strategic guidance for the week. e.g.\n• Read EWL gc for this week's activation context\n• Biweekly campaign report with the same format"}
+                          className="focus-brand bg-white border-amber-200 min-h-[80px]"
+                          rows={4}
+                        />
+                        {/* Previous-weeks history — disclose-to-view so
+                            the current-week form isn't cluttered. Lazy
+                            fetches on first open. Read-only quotes of
+                            the last ~8 weeks of Jdot's notes; clicking
+                            "Open" jumps the week picker to that week. */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !strategicHistoryOpen;
+                            setStrategicHistoryOpen(next);
+                            if (next && paneClient && strategicHistoryRows.length === 0) {
+                              fetchStrategicHistory(paneClient.id);
+                            }
+                          }}
+                          className="text-[11px] text-amber-800/80 hover:text-amber-900 underline-offset-2 hover:underline mt-1 inline-flex items-center gap-1"
+                        >
+                          <ChevronDown className={`h-3 w-3 transition-transform ${strategicHistoryOpen ? 'rotate-180' : ''}`} />
+                          {strategicHistoryOpen ? 'Hide previous notes' : 'View previous notes'}
+                        </button>
+                        {strategicHistoryOpen && (
+                          <div className="space-y-2 pt-2 border-t border-amber-200">
+                            {strategicHistoryLoading ? (
+                              <div className="space-y-2">
+                                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
+                              </div>
+                            ) : strategicHistoryRows.length === 0 ? (
+                              <p className="text-[11px] text-amber-800/70 italic">No prior strategic notes for this client yet.</p>
+                            ) : (
+                              strategicHistoryRows.map(row => (
+                                <div key={row.id} className="bg-white border border-amber-200 rounded-md p-2">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-900">
+                                      Week of {formatDate(new Date(row.week_of + 'T00:00:00'))}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const wk = new Date(row.week_of + 'T00:00:00');
+                                        setWeeklyV2Week(wk);
+                                        if (paneClient) loadWeeklyV2Row(paneClient.id, wk);
+                                        setStrategicHistoryOpen(false);
+                                      }}
+                                      className="text-[10px] text-brand hover:text-brand-dark"
+                                    >
+                                      Open
+                                    </button>
+                                  </div>
+                                  <p className="text-[11px] text-ink-warm-700 whitespace-pre-wrap line-clamp-4">{row.strategic_notes}</p>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ─── Section 2: Zone A — Execution Plan ─────
+                          Yellow background per spec. Structured rows
+                          (description + assignee + due date +
+                          deliverable type). On submit, each row
+                          becomes an HQ task. Locked after submit (rows
+                          render read-only). */}
+                      {(() => {
+                        const isLocked = !!weeklyV2Row?.execution_plan_submitted_at;
+                        // Approved team members for assignee dropdown
+                        // (excludes clients + inactive users — same
+                        // gate as elsewhere in the page).
+                        const teamMembers = allUsers.filter((u: any) => u.role !== 'client' && u.is_active !== false);
+                        return (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-semibold text-yellow-900 uppercase tracking-wider">Zone A · Execution Plan</p>
+                                <p className="text-xs text-yellow-800/80">
+                                  Internal only · Each row creates an HQ task on submit
+                                </p>
+                              </div>
+                              {isLocked && (
+                                <StatusBadge tone="success" size="sm" bordered withDot>Submitted</StatusBadge>
+                              )}
+                            </div>
+
+                            {weeklyV2ExecPlan.length === 0 && !isLocked && (
+                              <p className="text-xs text-yellow-800/70 italic">No tasks yet. Add a row to start.</p>
+                            )}
+
+                            <div className="space-y-2">
+                              {weeklyV2ExecPlan.map((row, idx) => (
+                                <div key={row.id} className="grid grid-cols-12 gap-2 items-start bg-white border border-yellow-200 rounded-md p-2">
+                                  {/* Type column hidden per Andy 2026-06-19 —
+                                      deliverable_type stays null on new rows
+                                      and is no longer surfaced in Zone A. */}
+                                  <Input
+                                    value={row.description}
+                                    onChange={(e) => {
+                                      const next = [...weeklyV2ExecPlan];
+                                      next[idx] = { ...row, description: e.target.value };
+                                      setWeeklyV2ExecPlan(next);
+                                    }}
+                                    onBlur={() => paneClient && saveWeeklyV2(paneClient.id, weeklyV2Week, { execution_plan: weeklyV2ExecPlan })}
+                                    placeholder="Task description"
+                                    className="focus-brand col-span-6 h-8"
+                                    disabled={isLocked}
+                                  />
+                                  <Select
+                                    value={row.assignee_id || ''}
+                                    onValueChange={(v) => {
+                                      const next = [...weeklyV2ExecPlan];
+                                      next[idx] = { ...row, assignee_id: v || null };
+                                      setWeeklyV2ExecPlan(next);
+                                      if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { execution_plan: next });
+                                    }}
+                                    disabled={isLocked}
+                                  >
+                                    <SelectTrigger className="focus-brand col-span-3 h-8 text-xs">
+                                      <SelectValue placeholder="Assignee" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {teamMembers.map((u: any) => (
+                                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start" disabled={isLocked}>
+                                        <CalendarIcon className="mr-1 h-3 w-3" />
+                                        {row.due_date
+                                          ? formatDate(new Date(row.due_date + 'T00:00:00'))
+                                          : 'Due'}
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                                      <Calendar
+                                        mode="single"
+                                        selected={row.due_date ? new Date(row.due_date + 'T00:00:00') : undefined}
+                                        onSelect={(date) => {
+                                          const next = [...weeklyV2ExecPlan];
+                                          next[idx] = { ...row, due_date: date ? formatLocalYMD(date) : null };
+                                          setWeeklyV2ExecPlan(next);
+                                          if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { execution_plan: next });
+                                        }}
+                                        classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                                        modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                  {!isLocked && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="col-span-1 h-8 w-8 p-0 text-ink-warm-400 hover:text-rose-600"
+                                      onClick={() => {
+                                        const next = weeklyV2ExecPlan.filter(r => r.id !== row.id);
+                                        setWeeklyV2ExecPlan(next);
+                                        if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { execution_plan: next });
+                                      }}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {!isLocked && (
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-8 border-yellow-300 text-yellow-900 hover:bg-yellow-100"
+                                  onClick={() => {
+                                    setWeeklyV2ExecPlan([
+                                      ...weeklyV2ExecPlan,
+                                      { id: localId(), description: '', assignee_id: null, due_date: null, deliverable_type: null },
+                                    ]);
+                                  }}
+                                >
+                                  <Plus className="h-3.5 w-3.5 mr-1" /> Add task
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="brand"
+                                  className="text-xs h-8"
+                                  onClick={() => paneClient && submitExecutionPlan(paneClient.id)}
+                                  disabled={weeklyV2ExecPlan.length === 0}
+                                >
+                                  Submit & create HQ tasks
+                                </Button>
+                              </div>
+                            )}
+
+                            {isLocked && weeklyV2Row?.execution_plan_submitted_at && (
+                              <p className="text-[11px] text-yellow-800/80 italic">
+                                Locked · {formatDateTime(new Date(weeklyV2Row.execution_plan_submitted_at))}. Add new tasks via HQ.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* ─── Section 3: Zone B — This Week Feed ─────
+                          Green per spec. Client-facing items that the
+                          portal renders. Status toggle (pending/done)
+                          updates the portal in real-time. */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone B · This Week (client-facing)</p>
+                          <p className="text-xs text-emerald-800/80">
+                            Drives the portal's "This Week" card · Toggle status as work completes
+                          </p>
+                        </div>
+
+                        {weeklyV2ThisWeekFeed.length === 0 && (
+                          <p className="text-xs text-emerald-800/70 italic">No items yet. Add 3–5 client-friendly bullets.</p>
+                        )}
+
+                        <div className="space-y-2">
+                          {weeklyV2ThisWeekFeed.map((item, idx) => (
+                            <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-white border border-emerald-200 rounded-md p-2">
+                              {/* Status dot + click-to-toggle */}
+                              <button
+                                type="button"
+                                className="col-span-1 flex items-center justify-center h-7"
+                                onClick={() => paneClient && toggleThisWeekItemStatus(paneClient.id, item.id)}
+                                title={item.status === 'done' ? 'Mark pending' : 'Mark done'}
+                              >
+                                <span className={`h-2.5 w-2.5 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                              </button>
+                              <Input
+                                value={item.text}
+                                onChange={(e) => {
+                                  const next = [...weeklyV2ThisWeekFeed];
+                                  next[idx] = { ...item, text: e.target.value };
+                                  setWeeklyV2ThisWeekFeed(next);
+                                }}
+                                onBlur={() => paneClient && saveWeeklyV2(paneClient.id, weeklyV2Week, { this_week_feed: weeklyV2ThisWeekFeed })}
+                                placeholder="Client-friendly item (e.g. Content Brief 2 shipping to creators)"
+                                className="focus-brand col-span-8 h-8 text-sm"
+                              />
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start">
+                                    <CalendarIcon className="mr-1 h-3 w-3" />
+                                    {item.date
+                                      ? formatDate(new Date(item.date + 'T00:00:00'))
+                                      : 'Date'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={item.date ? new Date(item.date + 'T00:00:00') : undefined}
+                                    onSelect={(date) => {
+                                      const next = [...weeklyV2ThisWeekFeed];
+                                      next[idx] = { ...item, date: date ? formatLocalYMD(date) : null };
+                                      setWeeklyV2ThisWeekFeed(next);
+                                      if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { this_week_feed: next });
+                                    }}
+                                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="col-span-1 h-8 w-8 p-0 text-ink-warm-400 hover:text-rose-600"
+                                onClick={() => {
+                                  const next = weeklyV2ThisWeekFeed.filter(it => it.id !== item.id);
+                                  setWeeklyV2ThisWeekFeed(next);
+                                  if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { this_week_feed: next });
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
+                          onClick={() => {
+                            const today = formatLocalYMD(new Date());
+                            setWeeklyV2ThisWeekFeed([
+                              ...weeklyV2ThisWeekFeed,
+                              { id: localId(), text: '', date: today, status: 'pending' },
+                            ]);
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add item
+                        </Button>
+                      </div>
+
+                      {/* ─── Section 4: Zone C — Top Post Review ────
+                          Per Andy 2026-06-19: render the top-3 candidate
+                          posts inline (was a separate Dialog popup before)
+                          so the CM can scan engagement + pin without a
+                          context switch. Each row is click-to-pin /
+                          click-again-to-unpin; the portal still reads a
+                          single content_id off top_post_override so the
+                          pinned row wins. "Show more" expands to ~30
+                          candidates for the edge case where the auto top-3
+                          aren't representative. */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone C · Top Post (client-facing)</p>
+                            <p className="text-xs text-emerald-800/80">
+                              {weeklyV2Row?.top_post_override
+                                ? 'Pinned post overrides the auto-pick on the portal. Click again to unpin.'
+                                : 'Top 3 by engagement. Click any row to pin it as this week’s feature.'}
+                            </p>
+                          </div>
+                          {topPostShowAll && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-xs h-8 text-emerald-900 hover:bg-emerald-100"
+                              onClick={() => setTopPostShowAll(false)}
+                            >
+                              Show Top 3
+                            </Button>
+                          )}
+                        </div>
+
+                        {topPostCandidatesLoading ? (
+                          <div className="space-y-2">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                              <Skeleton key={i} className="h-16 w-full rounded-md" />
+                            ))}
+                          </div>
+                        ) : topPostCandidates.length === 0 ? (
+                          <div className="bg-white border border-emerald-200 rounded-md p-4 text-center text-xs text-emerald-800/70">
+                            No posted content yet this week for this client.
+                          </div>
+                        ) : (() => {
+                          // Pinned row floats to the top regardless of
+                          // engagement rank, so the CM sees their override
+                          // even if it sits at position 14 by raw engagement.
+                          const pinnedId = weeklyV2Row?.top_post_override?.content_id || null;
+                          const pinnedRow = pinnedId
+                            ? topPostCandidates.find(c => c.id === pinnedId)
+                            : null;
+                          // Collapsed view stays at exactly 3 rows total.
+                          // If a pinned post sits outside the top 3, it floats
+                          // to position #1 and we drop the bottom of the slice
+                          // so we don't accidentally render 4. Expanded view
+                          // shows the full candidate list either way.
+                          const baseSlice = topPostShowAll
+                            ? topPostCandidates
+                            : topPostCandidates.slice(
+                                0,
+                                pinnedRow && !topPostCandidates.slice(0, 3).some(c => c.id === pinnedId) ? 2 : 3,
+                              );
+                          const rows = pinnedRow && !baseSlice.some(c => c.id === pinnedId)
+                            ? [pinnedRow, ...baseSlice]
+                            : baseSlice;
+                          return (
+                            <div className="space-y-2">
+                              {rows.map((c, idx) => {
+                                const isPinned = pinnedId === c.id;
+                                return (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => paneClient && pinTopPost(paneClient.id, c.id)}
+                                    className={`w-full text-left p-3 rounded-md border transition-colors ${
+                                      isPinned
+                                        ? 'bg-amber-50 border-amber-300'
+                                        : 'bg-white border-emerald-200 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                          <span className="text-xs font-semibold text-ink-warm-900">{c.kol_name}</span>
+                                          {c.platform && (
+                                            <span className="text-[10px] uppercase tracking-wider text-ink-warm-500">{c.platform}</span>
+                                          )}
+                                          {idx === 0 && !isPinned && !pinnedId && (
+                                            <StatusBadge tone="brand" size="sm" bordered>Auto-pick</StatusBadge>
+                                          )}
+                                          {isPinned && (
+                                            <StatusBadge tone="warning" size="sm" bordered withDot>Pinned</StatusBadge>
+                                          )}
+                                        </div>
+                                        {c.notes && (
+                                          <p className="text-xs text-ink-warm-700 line-clamp-2 italic">{c.notes}</p>
+                                        )}
+                                        <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
+                                          <span>{c.impressions.toLocaleString()} Views</span>
+                                          <span>{c.likes.toLocaleString()} Reactions</span>
+                                          <span>{c.retweets.toLocaleString()} Shares</span>
+                                          <span>{c.comments.toLocaleString()} Replies</span>
+                                        </div>
+                                      </div>
+                                      {c.content_link && (
+                                        <a
+                                          href={c.content_link}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="text-xs text-brand hover:text-brand-dark shrink-0"
+                                          title="Open post"
+                                        >
+                                          <ExternalLink className="h-3.5 w-3.5" />
+                                        </a>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                              {!topPostShowAll && topPostCandidates.length > 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTopPostShowAll(true)}
+                                  className="w-full text-xs text-emerald-900 hover:bg-emerald-100 rounded-md py-1.5 transition-colors"
+                                >
+                                  Show {Math.min(topPostCandidates.length - 3, 27)} more candidates
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </>
+                  )}
+                </div>
+  );
   return (
     <ProtectedRoute>
       <div className="space-y-6">
@@ -2860,7 +3482,15 @@ export default function ClientsPage() {
           subtitle="Manage your client relationships"
           kicker={filteredPartnerName ? `Clients · Partner · ${filteredPartnerName}` : 'Clients · Engagements'}
           kickerDot="sky"
-          actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
+          actions={(
+            <>
+              {/* [2026-07-06] Weekly Update hub — visible to every role
+                  (the per-card Weekly Update buttons already are). */}
+              <Button variant="outline" onClick={openWeeklyHub}>
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Weekly Update
+              </Button>
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
             <>
               {/* "Start Client" trigger hidden 2026-06-02 — Add Client is
                   the primary CTA. Dialog tree below still wired to
@@ -3758,7 +4388,9 @@ export default function ClientsPage() {
                 </DialogContent>
               </Dialog>
             </>
-          ) : undefined}
+              )}
+            </>
+          )}
         >
           {filteredPartnerName && (
             <Button
@@ -4817,6 +5449,56 @@ export default function ClientsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* [2026-07-06] Weekly Update hub — per Andy: one popup, one tab
+            per Active client, so the week's updates are filled in one
+            sitting instead of opening each client's Context modal.
+            Renders the same pane the Context modal uses (shared
+            single-client weeklyV2* state; tab switch = reload). */}
+        <Dialog open={weeklyHubOpen} onOpenChange={(open) => { if (!open) { setWeeklyHubOpen(false); setWeeklyHubClientId(null); } }}>
+          <DialogContent className="sm:max-w-[860px] h-[88vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-brand" />
+                Weekly Updates
+              </DialogTitle>
+              <DialogDescription>
+                Every active client in one place — fields auto-save as you go; each tab has its own submit.
+              </DialogDescription>
+            </DialogHeader>
+            {weeklyHubClients.length === 0 ? (
+              <EmptyState
+                icon={ClipboardList}
+                title="No active clients"
+                description="Clients in the Active bucket will show up here."
+              />
+            ) : (
+              <Tabs
+                value={weeklyHubClientId ?? ''}
+                onValueChange={handleWeeklyHubSelect}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                <TabsList className="w-fit max-w-full h-auto flex-wrap justify-start bg-cream-100 border border-cream-200 p-1">
+                  {weeklyHubClients.map(c => (
+                    <TabsTrigger
+                      key={c.id}
+                      value={c.id}
+                      className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
+                    >
+                      {c.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                <div className="flex-1 min-h-0 flex flex-col mt-3">
+                  {(() => {
+                    const hubClient = weeklyHubClients.find(c => c.id === weeklyHubClientId) ?? null;
+                    return hubClient ? renderWeeklyUpdatePane(hubClient) : null;
+                  })()}
+                </div>
+              </Tabs>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Client Context Modal */}
         <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } }}>
           <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
@@ -5437,598 +6119,7 @@ export default function ClientsPage() {
                   auto-selected post read-only — the picker UI to
                   override is queued for a follow-up. */}
               <TabsContent value="weekly-update" className="flex-1 flex flex-col min-h-0 mt-0">
-                <div className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
-                  {/* Week selector + save status */}
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-ink-warm-500 uppercase tracking-wider">Week of</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="focus-brand font-normal h-8">
-                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                            {formatDate(weeklyV2Week)}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={weeklyV2Week}
-                            onSelect={(date) => {
-                              if (!date) return;
-                              const monday = getMondayOf(date);
-                              setWeeklyV2Week(monday);
-                              if (contextModalClient) loadWeeklyV2Row(contextModalClient.id, monday);
-                            }}
-                            classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      {/* Quick-jump buttons for the most common cases —
-                          Andy mentioned "current week is 95% of opens." */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs text-ink-warm-500 hover:text-brand"
-                        onClick={() => {
-                          const monday = getMondayOf(new Date());
-                          setWeeklyV2Week(monday);
-                          if (contextModalClient) loadWeeklyV2Row(contextModalClient.id, monday);
-                        }}
-                      >
-                        This week
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 ml-auto">
-                      {/* Save-status pill — flashes briefly after each
-                          autosave so the user knows their change landed. */}
-                      {weeklyV2SaveStatus === 'saving' && (
-                        <span className="text-xs text-ink-warm-500">Saving…</span>
-                      )}
-                      {weeklyV2SaveStatus === 'saved' && (
-                        <span className="text-xs text-emerald-600">Saved</span>
-                      )}
-                      {weeklyV2SaveStatus === 'error' && (
-                        <span className="text-xs text-rose-600">Save failed</span>
-                      )}
-                      {/* [2026-06-11] Q5 audit-log viewer. Same pattern as
-                          Lineup Manager's AuditLogButton — popover anchored
-                          to the action row, lazy-fetches on open. Hidden
-                          when the weekly update row doesn't exist yet
-                          (nothing to audit until first save). */}
-                      {weeklyV2Row?.id && (
-                        <Popover
-                          open={weeklyAuditOpen}
-                          onOpenChange={(open) => {
-                            setWeeklyAuditOpen(open);
-                            if (open && weeklyV2Row?.id) {
-                              fetchWeeklyAuditLog(weeklyV2Row.id);
-                            }
-                          }}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 focus-brand" title="View edit history">
-                              <History className="h-3.5 w-3.5 mr-1" />
-                              History
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[420px] p-0 z-[80]" align="end">
-                            <div className="p-3 border-b border-cream-100">
-                              <p className="text-sm font-semibold text-ink-warm-900">Edit history</p>
-                              <p className="text-[11px] text-ink-warm-500">Reverse chronological. Latest 100 edits.</p>
-                            </div>
-                            <div className="max-h-[400px] overflow-y-auto">
-                              {weeklyAuditLoading ? (
-                                <div className="p-4 space-y-2">
-                                  {Array.from({ length: 3 }).map((_, i) => (
-                                    <Skeleton key={i} className="h-10 rounded" />
-                                  ))}
-                                </div>
-                              ) : weeklyAuditRows.length === 0 ? (
-                                <p className="p-6 text-center text-xs text-ink-warm-500 italic">
-                                  No edits logged yet.
-                                </p>
-                              ) : (
-                                <ul className="divide-y divide-cream-100">
-                                  {weeklyAuditRows.map(r => (
-                                    <li key={r.id} className="px-3 py-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                          <StatusBadge tone={weeklyAuditKindTone(r.edit_kind)} size="sm">
-                                            {weeklyAuditKindLabel(r.edit_kind)}
-                                          </StatusBadge>
-                                          <span className="text-xs text-ink-warm-700 truncate">
-                                            {r.edited_by_name || 'Unknown'}
-                                          </span>
-                                        </div>
-                                        <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
-                                          {formatDateTime(new Date(r.edited_at))}
-                                        </span>
-                                      </div>
-                                      <p className="text-[11px] text-ink-warm-500 mt-0.5">
-                                        {summarizeWeeklyAudit(r)}
-                                      </p>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    </div>
-                  </div>
-
-                  {weeklyV2Loading ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-24 rounded-lg" />
-                      <Skeleton className="h-40 rounded-lg" />
-                      <Skeleton className="h-32 rounded-lg" />
-                    </div>
-                  ) : (
-                    <>
-                      {/* ─── Section 1: Strategic Direction ─────────
-                          Amber background per spec — "distinct
-                          background (light amber/yellow)". Auto-saves
-                          on blur. Last-touched metadata shows below
-                          so Bolt knows when Jdot last edited it. */}
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-semibold text-amber-900 uppercase tracking-wider">Strategic Direction</p>
-                            <p className="text-xs text-amber-700/80">Internal only · Jdot's guidance for this week</p>
-                          </div>
-                          {weeklyV2Row?.strategic_notes_updated_at && (
-                            <span className="text-[10px] text-amber-700/70 font-mono">
-                              edited {formatDateTime(new Date(weeklyV2Row.strategic_notes_updated_at))}
-                            </span>
-                          )}
-                        </div>
-                        <Textarea
-                          value={weeklyV2StrategicNotes}
-                          onChange={(e) => setWeeklyV2StrategicNotes(e.target.value)}
-                          onBlur={() => {
-                            if (!contextModalClient) return;
-                            // Skip the save if nothing changed — avoids
-                            // pointless writes when the user just
-                            // tabs through.
-                            if ((weeklyV2Row?.strategic_notes || '') === weeklyV2StrategicNotes) return;
-                            saveWeeklyV2(contextModalClient.id, weeklyV2Week, { strategic_notes: weeklyV2StrategicNotes });
-                          }}
-                          placeholder={"Strategic guidance for the week. e.g.\n• Read EWL gc for this week's activation context\n• Biweekly campaign report with the same format"}
-                          className="focus-brand bg-white border-amber-200 min-h-[80px]"
-                          rows={4}
-                        />
-                        {/* Previous-weeks history — disclose-to-view so
-                            the current-week form isn't cluttered. Lazy
-                            fetches on first open. Read-only quotes of
-                            the last ~8 weeks of Jdot's notes; clicking
-                            "Open" jumps the week picker to that week. */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = !strategicHistoryOpen;
-                            setStrategicHistoryOpen(next);
-                            if (next && contextModalClient && strategicHistoryRows.length === 0) {
-                              fetchStrategicHistory(contextModalClient.id);
-                            }
-                          }}
-                          className="text-[11px] text-amber-800/80 hover:text-amber-900 underline-offset-2 hover:underline mt-1 inline-flex items-center gap-1"
-                        >
-                          <ChevronDown className={`h-3 w-3 transition-transform ${strategicHistoryOpen ? 'rotate-180' : ''}`} />
-                          {strategicHistoryOpen ? 'Hide previous notes' : 'View previous notes'}
-                        </button>
-                        {strategicHistoryOpen && (
-                          <div className="space-y-2 pt-2 border-t border-amber-200">
-                            {strategicHistoryLoading ? (
-                              <div className="space-y-2">
-                                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
-                              </div>
-                            ) : strategicHistoryRows.length === 0 ? (
-                              <p className="text-[11px] text-amber-800/70 italic">No prior strategic notes for this client yet.</p>
-                            ) : (
-                              strategicHistoryRows.map(row => (
-                                <div key={row.id} className="bg-white border border-amber-200 rounded-md p-2">
-                                  <div className="flex items-center justify-between gap-2 mb-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-900">
-                                      Week of {formatDate(new Date(row.week_of + 'T00:00:00'))}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const wk = new Date(row.week_of + 'T00:00:00');
-                                        setWeeklyV2Week(wk);
-                                        if (contextModalClient) loadWeeklyV2Row(contextModalClient.id, wk);
-                                        setStrategicHistoryOpen(false);
-                                      }}
-                                      className="text-[10px] text-brand hover:text-brand-dark"
-                                    >
-                                      Open
-                                    </button>
-                                  </div>
-                                  <p className="text-[11px] text-ink-warm-700 whitespace-pre-wrap line-clamp-4">{row.strategic_notes}</p>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ─── Section 2: Zone A — Execution Plan ─────
-                          Yellow background per spec. Structured rows
-                          (description + assignee + due date +
-                          deliverable type). On submit, each row
-                          becomes an HQ task. Locked after submit (rows
-                          render read-only). */}
-                      {(() => {
-                        const isLocked = !!weeklyV2Row?.execution_plan_submitted_at;
-                        // Approved team members for assignee dropdown
-                        // (excludes clients + inactive users — same
-                        // gate as elsewhere in the page).
-                        const teamMembers = allUsers.filter((u: any) => u.role !== 'client' && u.is_active !== false);
-                        return (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs font-semibold text-yellow-900 uppercase tracking-wider">Zone A · Execution Plan</p>
-                                <p className="text-xs text-yellow-800/80">
-                                  Internal only · Each row creates an HQ task on submit
-                                </p>
-                              </div>
-                              {isLocked && (
-                                <StatusBadge tone="success" size="sm" bordered withDot>Submitted</StatusBadge>
-                              )}
-                            </div>
-
-                            {weeklyV2ExecPlan.length === 0 && !isLocked && (
-                              <p className="text-xs text-yellow-800/70 italic">No tasks yet. Add a row to start.</p>
-                            )}
-
-                            <div className="space-y-2">
-                              {weeklyV2ExecPlan.map((row, idx) => (
-                                <div key={row.id} className="grid grid-cols-12 gap-2 items-start bg-white border border-yellow-200 rounded-md p-2">
-                                  {/* Type column hidden per Andy 2026-06-19 —
-                                      deliverable_type stays null on new rows
-                                      and is no longer surfaced in Zone A. */}
-                                  <Input
-                                    value={row.description}
-                                    onChange={(e) => {
-                                      const next = [...weeklyV2ExecPlan];
-                                      next[idx] = { ...row, description: e.target.value };
-                                      setWeeklyV2ExecPlan(next);
-                                    }}
-                                    onBlur={() => contextModalClient && saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: weeklyV2ExecPlan })}
-                                    placeholder="Task description"
-                                    className="focus-brand col-span-6 h-8"
-                                    disabled={isLocked}
-                                  />
-                                  <Select
-                                    value={row.assignee_id || ''}
-                                    onValueChange={(v) => {
-                                      const next = [...weeklyV2ExecPlan];
-                                      next[idx] = { ...row, assignee_id: v || null };
-                                      setWeeklyV2ExecPlan(next);
-                                      if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
-                                    }}
-                                    disabled={isLocked}
-                                  >
-                                    <SelectTrigger className="focus-brand col-span-3 h-8 text-xs">
-                                      <SelectValue placeholder="Assignee" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {teamMembers.map((u: any) => (
-                                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start" disabled={isLocked}>
-                                        <CalendarIcon className="mr-1 h-3 w-3" />
-                                        {row.due_date
-                                          ? formatDate(new Date(row.due_date + 'T00:00:00'))
-                                          : 'Due'}
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                                      <Calendar
-                                        mode="single"
-                                        selected={row.due_date ? new Date(row.due_date + 'T00:00:00') : undefined}
-                                        onSelect={(date) => {
-                                          const next = [...weeklyV2ExecPlan];
-                                          next[idx] = { ...row, due_date: date ? formatLocalYMD(date) : null };
-                                          setWeeklyV2ExecPlan(next);
-                                          if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
-                                        }}
-                                        classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                        modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                  {!isLocked && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="col-span-1 h-8 w-8 p-0 text-ink-warm-400 hover:text-rose-600"
-                                      onClick={() => {
-                                        const next = weeklyV2ExecPlan.filter(r => r.id !== row.id);
-                                        setWeeklyV2ExecPlan(next);
-                                        if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { execution_plan: next });
-                                      }}
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            {!isLocked && (
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-8 border-yellow-300 text-yellow-900 hover:bg-yellow-100"
-                                  onClick={() => {
-                                    setWeeklyV2ExecPlan([
-                                      ...weeklyV2ExecPlan,
-                                      { id: localId(), description: '', assignee_id: null, due_date: null, deliverable_type: null },
-                                    ]);
-                                  }}
-                                >
-                                  <Plus className="h-3.5 w-3.5 mr-1" /> Add task
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="brand"
-                                  className="text-xs h-8"
-                                  onClick={() => contextModalClient && submitExecutionPlan(contextModalClient.id)}
-                                  disabled={weeklyV2ExecPlan.length === 0}
-                                >
-                                  Submit & create HQ tasks
-                                </Button>
-                              </div>
-                            )}
-
-                            {isLocked && weeklyV2Row?.execution_plan_submitted_at && (
-                              <p className="text-[11px] text-yellow-800/80 italic">
-                                Locked · {formatDateTime(new Date(weeklyV2Row.execution_plan_submitted_at))}. Add new tasks via HQ.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* ─── Section 3: Zone B — This Week Feed ─────
-                          Green per spec. Client-facing items that the
-                          portal renders. Status toggle (pending/done)
-                          updates the portal in real-time. */}
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
-                        <div>
-                          <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone B · This Week (client-facing)</p>
-                          <p className="text-xs text-emerald-800/80">
-                            Drives the portal's "This Week" card · Toggle status as work completes
-                          </p>
-                        </div>
-
-                        {weeklyV2ThisWeekFeed.length === 0 && (
-                          <p className="text-xs text-emerald-800/70 italic">No items yet. Add 3–5 client-friendly bullets.</p>
-                        )}
-
-                        <div className="space-y-2">
-                          {weeklyV2ThisWeekFeed.map((item, idx) => (
-                            <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-white border border-emerald-200 rounded-md p-2">
-                              {/* Status dot + click-to-toggle */}
-                              <button
-                                type="button"
-                                className="col-span-1 flex items-center justify-center h-7"
-                                onClick={() => contextModalClient && toggleThisWeekItemStatus(contextModalClient.id, item.id)}
-                                title={item.status === 'done' ? 'Mark pending' : 'Mark done'}
-                              >
-                                <span className={`h-2.5 w-2.5 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                              </button>
-                              <Input
-                                value={item.text}
-                                onChange={(e) => {
-                                  const next = [...weeklyV2ThisWeekFeed];
-                                  next[idx] = { ...item, text: e.target.value };
-                                  setWeeklyV2ThisWeekFeed(next);
-                                }}
-                                onBlur={() => contextModalClient && saveWeeklyV2(contextModalClient.id, weeklyV2Week, { this_week_feed: weeklyV2ThisWeekFeed })}
-                                placeholder="Client-friendly item (e.g. Content Brief 2 shipping to creators)"
-                                className="focus-brand col-span-8 h-8 text-sm"
-                              />
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button variant="outline" size="sm" className="focus-brand col-span-2 h-8 px-2 font-normal text-xs justify-start">
-                                    <CalendarIcon className="mr-1 h-3 w-3" />
-                                    {item.date
-                                      ? formatDate(new Date(item.date + 'T00:00:00'))
-                                      : 'Date'}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={item.date ? new Date(item.date + 'T00:00:00') : undefined}
-                                    onSelect={(date) => {
-                                      const next = [...weeklyV2ThisWeekFeed];
-                                      next[idx] = { ...item, date: date ? formatLocalYMD(date) : null };
-                                      setWeeklyV2ThisWeekFeed(next);
-                                      if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { this_week_feed: next });
-                                    }}
-                                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="col-span-1 h-8 w-8 p-0 text-ink-warm-400 hover:text-rose-600"
-                                onClick={() => {
-                                  const next = weeklyV2ThisWeekFeed.filter(it => it.id !== item.id);
-                                  setWeeklyV2ThisWeekFeed(next);
-                                  if (contextModalClient) saveWeeklyV2(contextModalClient.id, weeklyV2Week, { this_week_feed: next });
-                                }}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-8 border-emerald-300 text-emerald-900 hover:bg-emerald-100"
-                          onClick={() => {
-                            const today = formatLocalYMD(new Date());
-                            setWeeklyV2ThisWeekFeed([
-                              ...weeklyV2ThisWeekFeed,
-                              { id: localId(), text: '', date: today, status: 'pending' },
-                            ]);
-                          }}
-                        >
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Add item
-                        </Button>
-                      </div>
-
-                      {/* ─── Section 4: Zone C — Top Post Review ────
-                          Per Andy 2026-06-19: render the top-3 candidate
-                          posts inline (was a separate Dialog popup before)
-                          so the CM can scan engagement + pin without a
-                          context switch. Each row is click-to-pin /
-                          click-again-to-unpin; the portal still reads a
-                          single content_id off top_post_override so the
-                          pinned row wins. "Show more" expands to ~30
-                          candidates for the edge case where the auto top-3
-                          aren't representative. */}
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div>
-                            <p className="text-xs font-semibold text-emerald-900 uppercase tracking-wider">Zone C · Top Post (client-facing)</p>
-                            <p className="text-xs text-emerald-800/80">
-                              {weeklyV2Row?.top_post_override
-                                ? 'Pinned post overrides the auto-pick on the portal. Click again to unpin.'
-                                : 'Top 3 by engagement. Click any row to pin it as this week’s feature.'}
-                            </p>
-                          </div>
-                          {topPostShowAll && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-xs h-8 text-emerald-900 hover:bg-emerald-100"
-                              onClick={() => setTopPostShowAll(false)}
-                            >
-                              Show Top 3
-                            </Button>
-                          )}
-                        </div>
-
-                        {topPostCandidatesLoading ? (
-                          <div className="space-y-2">
-                            {Array.from({ length: 3 }).map((_, i) => (
-                              <Skeleton key={i} className="h-16 w-full rounded-md" />
-                            ))}
-                          </div>
-                        ) : topPostCandidates.length === 0 ? (
-                          <div className="bg-white border border-emerald-200 rounded-md p-4 text-center text-xs text-emerald-800/70">
-                            No posted content yet this week for this client.
-                          </div>
-                        ) : (() => {
-                          // Pinned row floats to the top regardless of
-                          // engagement rank, so the CM sees their override
-                          // even if it sits at position 14 by raw engagement.
-                          const pinnedId = weeklyV2Row?.top_post_override?.content_id || null;
-                          const pinnedRow = pinnedId
-                            ? topPostCandidates.find(c => c.id === pinnedId)
-                            : null;
-                          // Collapsed view stays at exactly 3 rows total.
-                          // If a pinned post sits outside the top 3, it floats
-                          // to position #1 and we drop the bottom of the slice
-                          // so we don't accidentally render 4. Expanded view
-                          // shows the full candidate list either way.
-                          const baseSlice = topPostShowAll
-                            ? topPostCandidates
-                            : topPostCandidates.slice(
-                                0,
-                                pinnedRow && !topPostCandidates.slice(0, 3).some(c => c.id === pinnedId) ? 2 : 3,
-                              );
-                          const rows = pinnedRow && !baseSlice.some(c => c.id === pinnedId)
-                            ? [pinnedRow, ...baseSlice]
-                            : baseSlice;
-                          return (
-                            <div className="space-y-2">
-                              {rows.map((c, idx) => {
-                                const isPinned = pinnedId === c.id;
-                                return (
-                                  <button
-                                    key={c.id}
-                                    type="button"
-                                    onClick={() => contextModalClient && pinTopPost(contextModalClient.id, c.id)}
-                                    className={`w-full text-left p-3 rounded-md border transition-colors ${
-                                      isPinned
-                                        ? 'bg-amber-50 border-amber-300'
-                                        : 'bg-white border-emerald-200 hover:bg-emerald-50'
-                                    }`}
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                          <span className="text-xs font-semibold text-ink-warm-900">{c.kol_name}</span>
-                                          {c.platform && (
-                                            <span className="text-[10px] uppercase tracking-wider text-ink-warm-500">{c.platform}</span>
-                                          )}
-                                          {idx === 0 && !isPinned && !pinnedId && (
-                                            <StatusBadge tone="brand" size="sm" bordered>Auto-pick</StatusBadge>
-                                          )}
-                                          {isPinned && (
-                                            <StatusBadge tone="warning" size="sm" bordered withDot>Pinned</StatusBadge>
-                                          )}
-                                        </div>
-                                        {c.notes && (
-                                          <p className="text-xs text-ink-warm-700 line-clamp-2 italic">{c.notes}</p>
-                                        )}
-                                        <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-warm-500 font-mono">
-                                          <span>{c.impressions.toLocaleString()} Views</span>
-                                          <span>{c.likes.toLocaleString()} Reactions</span>
-                                          <span>{c.retweets.toLocaleString()} Shares</span>
-                                          <span>{c.comments.toLocaleString()} Replies</span>
-                                        </div>
-                                      </div>
-                                      {c.content_link && (
-                                        <a
-                                          href={c.content_link}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="text-xs text-brand hover:text-brand-dark shrink-0"
-                                          title="Open post"
-                                        >
-                                          <ExternalLink className="h-3.5 w-3.5" />
-                                        </a>
-                                      )}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                              {!topPostShowAll && topPostCandidates.length > 3 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setTopPostShowAll(true)}
-                                  className="w-full text-xs text-emerald-900 hover:bg-emerald-100 rounded-md py-1.5 transition-colors"
-                                >
-                                  Show {Math.min(topPostCandidates.length - 3, 27)} more candidates
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </>
-                  )}
-                </div>
+                {contextModalClient && renderWeeklyUpdatePane(contextModalClient)}
               </TabsContent>
 
               {/* [2026-06-15] Call Notes — HHP Team Dashboard Spec § 4.3.
