@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 import { createClient } from '@supabase/supabase-js';
-import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink, Signal, Zap } from 'lucide-react';
+import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink, Signal, Zap, Eye, MessageSquare, Repeat2, Heart, Activity, Bookmark } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -331,21 +331,24 @@ const getContentTypeColor = (type: string) => {
   return colorMap[type] || 'bg-cream-100 text-ink-warm-800';
 };
 
+// [2026-07-06] Palette kept in lockstep with the internal KOL Dashboard
+// table (components/campaign/KolDashboardTableView.tsx getStatusColor) so
+// the status pill reads the same colour on both surfaces.
 const getStatusColor = (status: string) => {
   const s = (status || '').toLowerCase();
   switch (s) {
     case 'curated':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-sky-100 text-sky-800';
     case 'contacted':
       return 'bg-purple-100 text-purple-800';
     case 'interested':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-amber-100 text-amber-800';
     case 'onboarded':
-      return 'bg-orange-100 text-orange-800';
+      return 'bg-amber-100 text-amber-800';
     case 'concluded':
       return 'bg-emerald-100 text-emerald-800';
     default:
-      return 'bg-cream-100 text-ink-warm-800';
+      return 'bg-cream-100 text-ink-warm-700';
   }
 };
 
@@ -1834,15 +1837,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         whiteSpace: 'nowrap'
                       }} suppressHydrationWarning>
                         <TableHeader>
-                          <TableRow className="bg-cream-50 border-b border-cream-200">
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 text-left select-none">
+                          <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                            <TableHead className="relative py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
+                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
                               <button type="button" onClick={() => toggleKolSort('name')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by KOL name">
                                 <span>KOL</span>
                                 {sortIcon(kolSort.key === 'name', kolSort.dir)}
                               </button>
                             </TableHead>
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('platform')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Platform">
                                   <span>Platform</span>
@@ -1894,7 +1897,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('followers')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Followers">
                                   <span>Followers</span>
@@ -1951,7 +1954,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('region')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Region">
                                   <span>Region</span>
@@ -2005,7 +2008,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             {campaign?.share_creator_type && (
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleKolSort('creator_type')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Creator Type">
                                   <span>Creator Type</span>
                                   {sortIcon(kolSort.key === 'creator_type', kolSort.dir)}
@@ -2016,7 +2019,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 2026-07-06 — the KOL's status is already shown
                                 under the name in the KOL column. */}
                             {false && (
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
                                   <span>Status</span>
@@ -2069,14 +2072,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             )}
-                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                            <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <button type="button" onClick={() => toggleKolSort('content_count')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by content count">
                                 <span>Content</span>
                                 {sortIcon(kolSort.key === 'content_count', kolSort.dir)}
                               </button>
                             </TableHead>
                             {campaign?.share_kol_notes && (
-                              <TableHead className="relative bg-cream-50 select-none">Notes</TableHead>
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
                             )}
                           </TableRow>
                         </TableHeader>
@@ -2116,10 +2119,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             sortedKOLs.map((campaignKOL, index) => {
                               return (
                                 <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
                                     {index + 1}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                     <div className="w-full h-full">
                                       <div className="flex items-center w-full">
                                         <div className="truncate font-bold">
@@ -2181,7 +2184,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                     <div className="flex gap-1 items-center">
                                       {(campaignKOL.master_kol.platform || []).map((platform: string) => (
                                         <span key={platform} className="flex items-center justify-center h-5 w-5" title={platform}>
@@ -2190,10 +2193,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       ))}
                                     </div>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                     {campaignKOL.master_kol.followers ? formatFollowers(campaignKOL.master_kol.followers) : '-'}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                     {campaignKOL.master_kol.region ? (
                                       <div className="flex items-center space-x-1">
                                         <span>{getRegionIcon(campaignKOL.master_kol.region).flag}</span>
@@ -2202,7 +2205,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     ) : '-'}
                                   </TableCell>
                                   {campaign?.share_creator_type && (
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
                                         <div className="flex flex-wrap gap-1">
                                           {campaignKOL.master_kol.creator_type.map((type: string) => (
@@ -2216,13 +2219,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                   {/* Status cell hidden on public — see header note. */}
                                   {false && (
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                     <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
                                       {campaignKOL.hh_status || 'Curated'}
                                     </span>
                                   </TableCell>
                                   )}
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} ${campaign?.share_kol_notes ? 'border-r border-cream-200' : ''} p-2 overflow-hidden text-center`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center`}>
                                     <div className="font-medium text-ink-warm-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
                                     </div>
@@ -2965,15 +2968,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <div className="border rounded-lg overflow-auto">
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
-                            <TableRow className="bg-cream-50 border-b border-cream-200">
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 text-left select-none">
+                            <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                              <TableHead className="relative py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
                                 <button type="button" onClick={() => toggleContentSort('kol')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by KOL name">
                                   <span>KOL</span>
                                   {sortIcon(contentSort.key === 'kol', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('platform')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Platform">
                                     <span>Platform</span>
@@ -3025,7 +3028,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('type')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Type">
                                     <span>Type</span>
@@ -3075,7 +3078,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
                                     <span>Status</span>
@@ -3125,45 +3128,45 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('activation_date')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Activation Date">
                                   <span>Activation Date</span>
                                   {sortIcon(contentSort.key === 'activation_date', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Content Link</TableHead>
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Views">
                                   <span>Views</span>
                                   {sortIcon(contentSort.key === 'impressions', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Reactions">
                                   <span>Reactions</span>
                                   {sortIcon(contentSort.key === 'likes', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Shares">
                                   <span>Shares</span>
                                   {sortIcon(contentSort.key === 'retweets', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
+                              <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                                 <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Replies">
                                   <span>Replies</span>
                                   {sortIcon(contentSort.key === 'comments', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className={`relative bg-cream-50 ${notesVisible ? 'border-r border-cream-200' : ''} select-none`}>
+                              <TableHead className={`relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500`}>
                                 <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Saves">
                                   <span>Saves</span>
                                   {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
                                 </button>
                               </TableHead>
                               {notesVisible && (
-                                <TableHead className="relative bg-cream-50 select-none">Notes</TableHead>
+                                <TableHead className="relative select-none py-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
                               )}
                             </TableRow>
                           </TableHeader>
@@ -3197,10 +3200,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 const kol = kols.find(k => k.id === content.campaign_kols_id);
                                 return (
                                   <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
                                       {index + 1}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                       <div className="flex items-center w-full h-full">
                                         <div className="truncate font-bold">{kol?.master_kol?.name || '-'}</div>
                                         {kol?.master_kol?.link && (
@@ -3216,7 +3219,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         )}
                                       </div>
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.platform ? (
                                         <div className="flex gap-1 items-center">
                                           <span className="flex items-center justify-center h-5 w-5" title={content.platform}>
@@ -3225,14 +3228,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         </div>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.type ? (
                                         <span className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(content.type)}`}>
                                           {content.type}
                                         </span>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
                                         const s = (content.status || '').toLowerCase();
                                         if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-emerald-100 text-emerald-800';
@@ -3244,29 +3247,29 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         {content.status ? content.status.charAt(0).toUpperCase() + content.status.slice(1).toLowerCase() : '-'}
                                       </span>
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.activation_date ? formatDate(content.activation_date) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.content_link ? (
                                         <a href={content.content_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
                                           Open
                                         </a>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.impressions ? formatFollowers(content.impressions) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.likes ? formatFollowers(content.likes) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.retweets ? formatFollowers(content.retweets) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.comments ? formatFollowers(content.comments) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} ${notesVisible ? 'border-r border-cream-200' : ''} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
                                     </TableCell>
                                     {notesVisible && (
@@ -3341,97 +3344,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       line + showcase mask). */}
                   {contentViewMode === 'overview' && (
                     <div className="space-y-6">
-                      {/* Metrics Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* Total Views */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{contentTotals.views === 1 ? 'Total View' : 'Total Views'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.views.toLocaleString()}</div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Replies */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{contentTotals.replies === 1 ? 'Total Reply' : 'Total Replies'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.replies.toLocaleString()}</div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Shares */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{contentTotals.shares === 1 ? 'Total Share' : 'Total Shares'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.shares.toLocaleString()}</div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Reactions */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{contentTotals.reactions === 1 ? 'Total Reaction' : 'Total Reactions'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.reactions.toLocaleString()}</div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Engagements */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{contentTotals.engagement === 1 ? 'Total Engagement' : 'Total Engagements'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.engagement.toLocaleString()}</div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Saves */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{contentTotals.saves === 1 ? 'Total Save' : 'Total Saves'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.saves.toLocaleString()}</div>
-                          </CardContent>
-                        </Card>
+                      {/* Metrics — shared KpiCard primitive, matching the internal
+                          ContentDashboardOverview (Views / Replies /
+                          Shares / Reactions / Engagement / Saves). */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <KpiCard icon={Eye}           label="Views"      value={formatFollowers(contentTotals.views)}      accent="brand"   />
+                        <KpiCard icon={MessageSquare} label="Replies"    value={formatFollowers(contentTotals.replies)}    accent="sky"     />
+                        <KpiCard icon={Repeat2}       label="Shares"     value={formatFollowers(contentTotals.shares)}     accent="purple"  />
+                        <KpiCard icon={Heart}         label="Reactions"  value={formatFollowers(contentTotals.reactions)}  accent="rose"    />
+                        <KpiCard icon={Activity}      label="Engagement" value={formatFollowers(contentTotals.engagement)} accent="amber"   />
+                        <KpiCard icon={Bookmark}      label="Saves"      value={formatFollowers(contentTotals.saves)}      accent="emerald" />
                       </div>
 
                       {/* Value Anchor — Spec section 10. One factual
@@ -3464,24 +3386,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         );
                       })()}
 
-                      {/* Average Engagement Rate */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold text-ink-warm-900">Average Engagement Rate</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-ink-warm-900">{contentEngagementRate.toFixed(2)}%</div>
-                          <p className="text-sm text-ink-warm-700 mt-1">Engagement Rate = (Reactions + Replies + Shares + Saves) / Views</p>
-                        </CardContent>
-                      </Card>
+                      {/* Average Engagement Rate — single-stat panel,
+                          matching the internal ContentDashboardOverview. */}
+                      <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
+                        <div className="flex items-baseline justify-between mb-2">
+                          <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Average Engagement Rate</h3>
+                        </div>
+                        <p className="text-[28px] font-semibold text-ink-warm-900 tabular-nums leading-none" style={{ letterSpacing: '-0.03em' }}>
+                          {contentEngagementRate.toFixed(2)}%
+                        </p>
+                        <p className="text-xs text-ink-warm-500 mt-3">
+                          ER = <span className="mono">(Reactions + Replies + Shares + Saves) / Views</span>
+                        </p>
+                      </div>
 
                       {/* Charts Section */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Total Views */}
-                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl display-serif text-ink-warm-900">Total Views</h3>
+                              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Total Views</h3>
                             </div>
                           </div>
                           <div className="h-96">
@@ -3534,10 +3459,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
 
                         {/* Views by Platform */}
-                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl display-serif text-ink-warm-900">Views by Platform</h3>
+                              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Views by Platform</h3>
                             </div>
                           </div>
                           <div className="h-96">
