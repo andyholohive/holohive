@@ -88,7 +88,7 @@ type TermRollover = {
 };
 
 export function BudgetDashboardV2() {
-  const { campaign, campaignKOLs, payments } = useCampaignDetail();
+  const { campaign, payments } = useCampaignDetail();
   const { userProfile } = useAuth();
   const isAdminOrOwner = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
 
@@ -140,30 +140,53 @@ export function BudgetDashboardV2() {
   // Team/client view: fold Expenses into Remaining (hidden tile).
   const remainingForRole = isAdminOrOwner ? remaining : remaining + totals.internal;
 
-  /** Aggregate metrics from campaign_kols content rows for CPM + CPE.
+  /** [2026-07-06 AUDIT-FIX] The efficiency tiles were dead since this
+   *  component shipped: CampaignDetailContext's campaignKOLs never
+   *  embeds `contents`, so the old loop over `row.contents` always saw
+   *  zero rows and every tile rendered "—". Self-fetch the campaign's
+   *  contents instead — the aggregation was global (flattened across
+   *  roster rows), so a flat by-campaign fetch is equivalent. */
+  const [contentRows, setContentRows] = useState<Array<{
+    status: string | null;
+    multipost_group_id: string | null;
+    impressions: number | null;
+    likes: number | null;
+    comments: number | null;
+    retweets: number | null;
+  }>>([]);
+  useEffect(() => {
+    if (!campaign?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('contents')
+        .select('status, multipost_group_id, impressions, likes, comments, retweets')
+        .eq('campaign_id', campaign.id);
+      if (!cancelled) setContentRows(data ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [campaign?.id]);
+
+  /** Aggregate metrics from the campaign's content rows for CPM + CPE.
    *  Billable-deliverable counting: rows sharing a multipost_group_id
    *  collapse to 1 deliverable (per spec: Multipost=1, Complimentary=0). */
   const contentMetrics = useMemo(() => {
-    const ck = (campaignKOLs ?? []) as Array<any>;
     let totalViews = 0, totalReactions = 0, totalReplies = 0, totalReposts = 0;
     const standaloneCount = { n: 0 };
     const multipostGroups = new Set<string>();
-    for (const row of ck) {
-      const contents = row?.contents ?? [];
-      for (const c of contents) {
-        if (c?.status === 'deleted') continue;
-        // Per TG Bot Content Submission Phase 2: pending_verification rows
-        // are bot-approved but not yet team-verified. Excluding them from
-        // CPM/CPE keeps cost-efficiency numbers from being skewed by
-        // unverified posts.
-        if (c?.status === 'pending_verification') continue;
-        if (c?.multipost_group_id) multipostGroups.add(c.multipost_group_id);
-        else standaloneCount.n++;
-        totalViews += Number(c?.impressions ?? c?.views ?? 0);
-        totalReactions += Number(c?.likes ?? c?.reactions ?? 0);
-        totalReplies += Number(c?.comments ?? c?.replies ?? 0);
-        totalReposts += Number(c?.retweets ?? c?.reposts ?? c?.forwards ?? 0);
-      }
+    for (const c of contentRows) {
+      if (c?.status === 'deleted') continue;
+      // Per TG Bot Content Submission Phase 2: pending_verification rows
+      // are bot-approved but not yet team-verified. Excluding them from
+      // CPM/CPE keeps cost-efficiency numbers from being skewed by
+      // unverified posts.
+      if (c?.status === 'pending_verification') continue;
+      if (c?.multipost_group_id) multipostGroups.add(c.multipost_group_id);
+      else standaloneCount.n++;
+      totalViews += Number(c?.impressions ?? 0);
+      totalReactions += Number(c?.likes ?? 0);
+      totalReplies += Number(c?.comments ?? 0);
+      totalReposts += Number(c?.retweets ?? 0);
     }
     const contentCount = standaloneCount.n + multipostGroups.size;
     const engagementSum = totalReactions + totalReplies + totalReposts;
@@ -171,7 +194,7 @@ export function BudgetDashboardV2() {
     const cpe = engagementSum > 0 ? totals.content / engagementSum : null;
     const costPerPiece = contentCount > 0 ? totals.content / contentCount : null;
     return { totalViews, engagementSum, contentCount, cpm, cpe, costPerPiece };
-  }, [campaignKOLs, totals.content]);
+  }, [contentRows, totals.content]);
 
   /** Burn vs pace. Per spec, burn calc can include all categories. */
   const burn = useMemo(() => {
