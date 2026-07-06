@@ -29,7 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2, Activity,
+  CheckCircle2, Activity, AlarmClock,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -617,6 +617,9 @@ export default function LineupSettingsPage() {
 
       {/* ─── Confirmed Lineups Channel section [2026-06-26] ─── */}
       <LineupConfirmedChannelSection />
+
+      {/* ─── Lineup Deadline Reminders section [2026-07-06] ─── */}
+      <LineupReminderChannelSection />
     </div>
   );
 }
@@ -1190,5 +1193,113 @@ function ApproverAddButton({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * LineupReminderChannelSection — destination for the weekly lineup
+ * deadline reminder pings (per Andy 2026-07-06):
+ *   Friday 12:00 UTC  — next week's lineup not yet proposed
+ *   Monday 12:00 UTC  — this week's lineup not yet approved
+ *   Thursday 12:00 UTC — this week's lineup not fully posted
+ * Fired by /api/cron/lineup-deadlines. Writes to
+ * app_settings.lineup_reminder_chat_id + lineup_reminder_chat_thread_id.
+ * When unset the cron skips silently — no pings anywhere.
+ */
+function LineupReminderChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'lineup_reminder_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'lineup_reminder_chat_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'lineup_reminder_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'lineup_reminder_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Reminder destination saved' : 'Reminders disabled',
+        description: chatId
+          ? 'Friday / Monday / Thursday lineup deadline pings will post here.'
+          : 'No chat set — the deadline cron will skip silently.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={AlarmClock}
+      title="Lineup Deadline Reminders"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="neutral" size="sm">Off</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Weekly deadline pings: <code className="bg-cream-100 px-1 rounded text-[10px]">Fri 12:00 UTC</code> next week not proposed · <code className="bg-cream-100 px-1 rounded text-[10px]">Mon 12:00 UTC</code> this week not approved · <code className="bg-cream-100 px-1 rounded text-[10px]">Thu 12:00 UTC</code> this week not fully posted. Only campaigns with lineup activity in the last 3 weeks are checked. Leave empty to turn the pings off.</>
+      )}
+    >
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Deadline-reminder destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
   );
 }

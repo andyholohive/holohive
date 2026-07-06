@@ -63,6 +63,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
+import { markLineupSlotPosted } from '@/lib/lineupSlotSync';
 import { CampaignService } from '@/lib/campaignService';
 import { KOLService } from '@/lib/kolService';
 import {
@@ -317,6 +318,15 @@ export function ContentDashboardTableView() {
             isNew: false,
           };
           setContents((prev: any[]) => prev.map(c => c.id === content.id ? contentWithKol : c));
+          // [2026-07-06] Best-effort: mark this KOL's slot in the current
+          // week's lineup as posted (feeds the Thursday deadline ping).
+          if (campaign?.id && newContent.campaign_kols_id) {
+            void markLineupSlotPosted(supabase as any, {
+              campaignId: campaign.id,
+              campaignKolsId: newContent.campaign_kols_id,
+              dateIso: newContent.activation_date || null,
+            });
+          }
         }
       } catch (err) {
         console.error('Error saving new content:', err);

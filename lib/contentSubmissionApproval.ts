@@ -14,6 +14,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { markLineupSlotPosted } from './lineupSlotSync';
 
 export interface ApproveSubmissionInput {
   submissionId: string;
@@ -92,6 +93,16 @@ export async function createApprovedContentsRow(
   }
 
   const contentId = (contentRow as any)?.id ?? null;
+
+  // [2026-07-06] Flip this KOL's slot in the current week's lineup to
+  // 'posted' (best-effort — powers the Thursday "not all posted" ping).
+  if (contentId) {
+    void markLineupSlotPosted(admin, {
+      campaignId: input.campaignId,
+      masterKolId: input.kolId,
+      dateIso: nowIso.slice(0, 10),
+    });
+  }
 
   // [2026-07-03] Mirror the manual /campaigns/[id] add-content flow —
   // auto-create a payment row keyed to this content. Amount priority
