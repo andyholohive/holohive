@@ -284,8 +284,8 @@ export default function ContactsPage() {
 
   // Get all unique categories (from contacts and affiliates), formatted
   const categories = [...new Set([
-    ...contacts.map(c => c.category).filter(Boolean).map(formatCategory),
-    ...affiliates.map(a => a.category).filter(Boolean).map(formatCategory)
+    ...contacts.map(c => c.category).filter((c): c is string => Boolean(c)).map(formatCategory),
+    ...affiliates.map(a => a.category).filter((c): c is string => Boolean(c)).map(formatCategory)
   ])] as string[];
 
   const filteredContacts = contacts

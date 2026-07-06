@@ -232,7 +232,7 @@ export class TaskService {
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .insert(task)
+        .insert(task as any)
         .select()
         .single();
 
@@ -1313,7 +1313,7 @@ export class TaskService {
     try {
       const { data, error } = await supabase
         .from('task_automations')
-        .insert(automation)
+        .insert(automation as any)
         .select()
         .single();
 

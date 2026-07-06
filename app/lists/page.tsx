@@ -858,7 +858,7 @@ export default function ListsPage() {
     try {
       const { error } = await supabase
         .from('lists')
-        .update({ sort_order: viewListSortOrder })
+        .update({ sort_order: viewListSortOrder as any })
         .eq('id', viewingList.id);
 
       if (error) throw error;

@@ -59,8 +59,13 @@ export async function GET(request: Request) {
       if (t.assigned_to) userIds.add(t.assigned_to);
     }
 
+    // [2026-07-05 AUDIT-FIX] was querying 'profiles', a table that does
+    // not exist in prod (verified via information_schema) — the lookup
+    // silently returned null so no alert could ever send. The real user
+    // table is 'users' (id, name, telegram_id all present). NOTE: this
+    // route is currently unwired (no vercel.json cron, no UI caller).
     const { data: profiles } = await supabase
-      .from('profiles')
+      .from('users')
       .select('id, name, telegram_id')
       .in('id', Array.from(userIds));
 
@@ -116,7 +121,7 @@ export async function GET(request: Request) {
         message += `🕰 <b>Stale Tasks (${userStale.length})</b>\n`;
         for (const t of userStale) {
           const daysSinceUpdate = Math.ceil(
-            (Date.now() - new Date(t.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+            (Date.now() - new Date(t.updated_at as string).getTime()) / (1000 * 60 * 60 * 24)
           );
           message += `• ${t.task_name} (no update in ${daysSinceUpdate}d)\n`;
         }

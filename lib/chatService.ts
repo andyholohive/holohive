@@ -10,7 +10,7 @@ export interface ChatSessionWithMessages extends ChatSession {
   messages: ChatMessage[];
 }
 
-export interface AgentChatMessage extends ChatMessage {
+export interface AgentChatMessage extends Omit<ChatMessage, 'agent_actions' | 'agent_status' | 'execution_time_ms' | 'is_agent_response'> {
   agent_actions?: any[];
   agent_status?: 'thinking' | 'executing' | 'completed' | 'error';
   execution_time_ms?: number;
@@ -341,7 +341,7 @@ export class ChatService {
         ...errorMessage,
         agent_status: 'error',
         is_agent_response: true,
-      };
+      } as AgentChatMessage;
     }
   }
 

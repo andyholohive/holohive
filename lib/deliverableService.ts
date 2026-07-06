@@ -654,7 +654,7 @@ export class DeliverableService {
   static async createTemplate(template: Partial<DeliverableTemplate>): Promise<DeliverableTemplate> {
     const { data, error } = await supabase
       .from('deliverable_templates')
-      .insert(template)
+      .insert(template as any)
       .select()
       .single();
     if (error) throw error;
@@ -692,7 +692,7 @@ export class DeliverableService {
   static async createStep(step: Partial<DeliverableTemplateStep>): Promise<DeliverableTemplateStep> {
     const { data, error } = await supabase
       .from('deliverable_template_steps')
-      .insert(step)
+      .insert(step as any)
       .select()
       .single();
     if (error) throw error;

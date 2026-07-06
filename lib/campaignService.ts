@@ -5,7 +5,7 @@ import { generateUniqueSlug } from './slugUtils';
 type Campaign = Database['public']['Tables']['campaigns']['Row'];
 type CampaignBudgetAllocation = Database['public']['Tables']['campaign_budget_allocations']['Row'];
 
-export interface CampaignWithDetails extends Campaign {
+export interface CampaignWithDetails extends Omit<Campaign, 'share_creator_type' | 'slug'> {
   client_name?: string;
   client_email?: string;
   client_logo_url?: string | null;
@@ -20,7 +20,7 @@ export interface CampaignWithDetails extends Campaign {
   client_covered_through?: string | null;
   budget_allocations?: CampaignBudgetAllocation[];
   total_allocated?: number;
-  share_creator_type?: boolean;
+  share_creator_type?: boolean | null;
   slug?: string | null;
 }
 

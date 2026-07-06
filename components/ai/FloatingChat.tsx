@@ -326,7 +326,7 @@ export default function FloatingChat() {
 
       setCurrentSession({
         ...currentSession,
-        messages: [...currentSession.messages, optimisticUserMessage],
+        messages: [...currentSession.messages, optimisticUserMessage as any],
       });
 
       // Use agent-powered response via API route

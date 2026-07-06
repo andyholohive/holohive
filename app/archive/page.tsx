@@ -190,7 +190,7 @@ export default function ArchivePage() {
         tableName = `${selectedItem.type}s`;
       }
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from(tableName)
         .update({ archived_at: null })
         .eq('id', selectedItem.id);
@@ -222,7 +222,7 @@ export default function ArchivePage() {
         tableName = `${selectedItem.type}s`;
       }
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from(tableName)
         .delete()
         .eq('id', selectedItem.id);

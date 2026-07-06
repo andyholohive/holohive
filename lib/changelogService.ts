@@ -151,7 +151,7 @@ export class ChangelogService {
       throw error;
     }
 
-    return changelog;
+    return changelog as Changelog;
   }
 
   /**
@@ -173,7 +173,7 @@ export class ChangelogService {
       throw error;
     }
 
-    return changelog;
+    return changelog as Changelog;
   }
 
   /**

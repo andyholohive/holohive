@@ -75,7 +75,7 @@ function parseDollarValue(raw: string | undefined): number | undefined {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const config = {
+  const config: { count: number; tab: string; withLinks: boolean; dryRun: boolean; headless: boolean; startPage?: number } = {
     count: 50,
     tab: 'all',
     withLinks: false,
@@ -126,7 +126,8 @@ async function scrapeDropstab(config: ReturnType<typeof parseArgs>): Promise<Scr
 
   try {
     // Single page load — dropstab shows up to 100 per tab
-    {
+    // TODO(type-audit): the bare `break` below was a syntax error (no enclosing loop — the pagination loop was replaced by this block), so this script could not have parsed/run as-is; labeled the block to preserve the intended "skip the rest of page processing" control flow.
+    singlePage: {
       const url = config.tab === 'all' ? DROPSTAB_URL : `${DROPSTAB_URL}/tab/${config.tab}`;
       console.log(`📄 Loading: ${url}`);
 
@@ -214,7 +215,7 @@ async function scrapeDropstab(config: ReturnType<typeof parseArgs>): Promise<Scr
         });
         console.log('\n   Page content preview:');
         console.log('   ' + bodyText.split('\n').slice(0, 20).join('\n   '));
-        break;
+        break singlePage;
       }
 
       // Process raw data

@@ -55,13 +55,16 @@ export class OracleAgent extends BaseAgent {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Fetch any active signals
+    // Fetch any active signals. [2026-07-05 AUDIT-FIX] was `.catch()`
+    // on the query builder, which has no catch method (thenable only) —
+    // it threw TypeError instead of the graceful fallback intended.
+    // Builders never reject anyway; a query error just yields data=null,
+    // which is exactly the fallback the old code wanted.
     const { data: signals } = await this.supabase
       .from('signals')
       .select('*')
       .eq('opportunity_id', opportunityId)
-      .eq('is_active', true)
-      .catch(() => ({ data: null }));
+      .eq('is_active', true);
 
     const prompt = this.buildResearchPrompt(opp, callType, existingIntel || [], activities || [], signals || []);
     const response = await this.callAgent(prompt, { maxTokens: 6144, temperature: 0.2 });
@@ -105,25 +108,24 @@ export class OracleAgent extends BaseAgent {
     if (brief.intel_summary) {
       for (const [intelType, content] of Object.entries(brief.intel_summary)) {
         if (content && typeof content === 'object' && Object.keys(content as object).length > 0) {
-          await this.supabase.from('prospect_intel').upsert(
-            {
-              opportunity_id: opportunityId,
-              intel_type: intelType,
-              content: content as Record<string, unknown>,
-              confidence: 0.75,
-              refreshed_at: new Date().toISOString(),
-            },
-            { onConflict: 'opportunity_id,intel_type', ignoreDuplicates: false }
-          ).catch(() => {
+          // [2026-07-05 AUDIT-FIX] was `.catch()` on the query builder
+          // (no such method — threw TypeError). Builders resolve
+          // { error } instead of rejecting; check it to run the
+          // intended insert fallback.
+          const intelRow = {
+            opportunity_id: opportunityId,
+            intel_type: intelType,
+            content: content as Record<string, unknown>,
+            confidence: 0.75,
+            refreshed_at: new Date().toISOString(),
+          };
+          const { error: upsertErr } = await this.supabase
+            .from('prospect_intel')
+            .upsert(intelRow, { onConflict: 'opportunity_id,intel_type', ignoreDuplicates: false });
+          if (upsertErr) {
             // If upsert fails (no unique constraint), just insert
-            this.supabase.from('prospect_intel').insert({
-              opportunity_id: opportunityId,
-              intel_type: intelType,
-              content: content as Record<string, unknown>,
-              confidence: 0.75,
-              refreshed_at: new Date().toISOString(),
-            });
-          });
+            await this.supabase.from('prospect_intel').insert(intelRow);
+          }
         }
       }
     }

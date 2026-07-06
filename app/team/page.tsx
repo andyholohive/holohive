@@ -445,7 +445,7 @@ export default function TeamPage() {
     const { data } = await supabase.from('guest_permissions').select('*').eq('user_id', userId);
     const perms: Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }> = {};
     for (const p of (data || [])) {
-      perms[p.page_key] = { can_view: p.can_view, can_edit: p.can_edit, can_delete: p.can_delete };
+      perms[p.page_key] = { can_view: p.can_view as boolean, can_edit: p.can_edit as boolean, can_delete: p.can_delete as boolean };
     }
     setGuestPerms(prev => ({ ...prev, [userId]: perms }));
   };

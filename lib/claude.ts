@@ -164,7 +164,7 @@ export async function callClaudeWithTools(
       temperature: options?.temperature ?? 0.3,
       system: systemPrompts.map((text) => ({ type: 'text' as const, text })),
       messages,
-      tools: toolDefinitions,
+      tools: toolDefinitions as Anthropic.ToolUnion[],
     });
 
     totalInputTokens += response.usage.input_tokens;

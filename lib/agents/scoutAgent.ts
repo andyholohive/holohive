@@ -199,9 +199,12 @@ Do NOT include any text outside the JSON object.`;
           expires_at: new Date(Date.now() + (s.tier === 1 ? 14 : s.tier === 2 ? 30 : 60) * 86400000).toISOString().split('T')[0],
         }));
 
-        await this.supabase.from('signals').insert(signalRecords).throwOnError().catch(() => {
-          // signals table may not exist yet (Phase 3), skip silently
-        });
+        // [2026-07-05 AUDIT-FIX] was `.throwOnError().catch()` on the
+        // query builder — builders have no catch method, so this threw
+        // TypeError instead of skipping silently. Builders resolve
+        // { error } without throwing; ignoring it skips silently as
+        // intended (signals table may not exist yet — Phase 3).
+        await this.supabase.from('signals').insert(signalRecords);
       }
 
       return data.id;

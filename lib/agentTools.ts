@@ -961,8 +961,9 @@ export const getBudgetRecommendationsTool: AgentTool = {
         maxBudget: Math.max(...userCampaigns.map(c => c.total_budget)),
         activeCampaigns: userCampaigns.filter(c => c.status === 'Active').length,
         completedCampaigns: userCampaigns.filter(c => c.status === 'Completed').length,
-        totalKOLs: userCampaigns.reduce((sum, c) => sum + (c.kol_count || 0), 0),
-        avgKOLsPerCampaign: Math.round(userCampaigns.reduce((sum, c) => sum + (c.kol_count || 0), 0) / userCampaigns.length),
+        // TODO(type-audit): 'kol_count' does not exist on CampaignWithDetails and is never set by CampaignService — these totals are likely always 0 at runtime.
+        totalKOLs: userCampaigns.reduce((sum, c) => sum + ((c as any).kol_count || 0), 0),
+        avgKOLsPerCampaign: Math.round(userCampaigns.reduce((sum, c) => sum + ((c as any).kol_count || 0), 0) / userCampaigns.length),
       } : null;
 
       // Get detailed campaign breakdown for better context
@@ -970,7 +971,7 @@ export const getBudgetRecommendationsTool: AgentTool = {
         name: c.name,
         budget: c.total_budget,
         status: c.status,
-        kols: c.kol_count || 0,
+        kols: (c as any).kol_count || 0,
         client: c.client_name,
       }));
 

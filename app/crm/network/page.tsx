@@ -644,7 +644,7 @@ export default function NetworkPage() {
     try {
       await CRMService.updatePartner(linkingPartnerForAffiliate.id, {
         affiliate_id: selectedAffiliateForPartner || null
-      });
+      } as any);
       // Update local state
       const selectedAffiliate = affiliates.find(a => a.id === selectedAffiliateForPartner);
       setPartners(prev =>
@@ -668,7 +668,7 @@ export default function NetworkPage() {
     try {
       await CRMService.updatePartner(linkingPartnerForAffiliate.id, {
         affiliate_id: null
-      });
+      } as any);
       // Update local state
       setPartners(prev =>
         prev.map(p =>
@@ -950,7 +950,7 @@ export default function NetworkPage() {
     try {
       await CRMService.updatePartner(partnerId, {
         last_contacted_at: new Date().toISOString()
-      });
+      } as any);
       setPartners(prev =>
         prev.map(p => p.id === partnerId ? { ...p, last_contacted_at: new Date().toISOString() } : p)
       );
@@ -963,7 +963,7 @@ export default function NetworkPage() {
     try {
       await CRMService.updateAffiliate(affiliateId, {
         last_contacted_at: new Date().toISOString()
-      });
+      } as any);
       setAffiliates(prev =>
         prev.map(a => a.id === affiliateId ? { ...a, last_contacted_at: new Date().toISOString() } : a)
       );
@@ -1629,10 +1629,11 @@ export default function NetworkPage() {
                                           <span>@{primaryContact.telegram_id}</span>
                                         </div>
                                       )}
-                                      {primaryContact.phone && (
+                                      {/* TODO(type-audit): 'phone' does not exist on CRMContact (lib/crmService.ts) — this block likely never renders */}
+                                      {(primaryContact as any).phone && (
                                         <div className="flex items-center gap-2 text-ink-warm-700">
                                           <Phone className="h-3.5 w-3.5" />
-                                          <span>{primaryContact.phone}</span>
+                                          <span>{(primaryContact as any).phone}</span>
                                         </div>
                                       )}
                                     </div>
@@ -2131,10 +2132,11 @@ export default function NetworkPage() {
                                           <span>@{primaryContact.telegram_id}</span>
                                         </div>
                                       )}
-                                      {primaryContact.phone && (
+                                      {/* TODO(type-audit): 'phone' does not exist on CRMContact (lib/crmService.ts) — this block likely never renders */}
+                                      {(primaryContact as any).phone && (
                                         <div className="flex items-center gap-2 text-ink-warm-700">
                                           <Phone className="h-3.5 w-3.5" />
-                                          <span>{primaryContact.phone}</span>
+                                          <span>{(primaryContact as any).phone}</span>
                                         </div>
                                       )}
                                     </div>

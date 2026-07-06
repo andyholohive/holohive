@@ -671,7 +671,7 @@ export class ConversationMemoryManager {
 
       console.log(`[ConversationMemoryManager] Loaded ${(data || []).length} messages for session ${sessionId}`);
 
-      return (data || []).map(msg => ({
+      return (data || []).map((msg: any) => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
         function_call: (msg.metadata && typeof msg.metadata === 'object' && !Array.isArray(msg.metadata) && 'function_call' in msg.metadata) ? msg.metadata.function_call as any : undefined,

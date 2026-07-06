@@ -3,7 +3,7 @@ import { generateUniqueSlug } from './slugUtils';
 
 // TypeScript types for Forms
 export type FormStatus = 'draft' | 'published' | 'closed';
-export type FieldType = 'text' | 'textarea' | 'email' | 'number' | 'select' | 'radio' | 'checkbox' | 'date' | 'section' | 'description';
+export type FieldType = 'text' | 'textarea' | 'email' | 'number' | 'select' | 'radio' | 'checkbox' | 'date' | 'section' | 'description' | 'link' | 'yes_no' | 'long_text';
 
 export interface Form {
   id: string;
@@ -14,6 +14,7 @@ export interface Form {
   status: FormStatus;
   subdomain_enabled: boolean | null;
   subdomain_url: string | null;
+  enable_thank_you_page?: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +71,7 @@ export interface UpdateFormData {
   status?: FormStatus;
   subdomain_enabled?: boolean | null;
   subdomain_url?: string | null;
+  enable_thank_you_page?: boolean | null;
 }
 
 export interface CreateFieldData {
@@ -593,7 +595,7 @@ export class FormService {
    * Get field type icon
    */
   static getFieldTypeIcon(fieldType: FieldType): string {
-    const icons: Record<FieldType, string> = {
+    const icons: Partial<Record<FieldType, string>> = {
       text: '📝',
       textarea: '📄',
       email: '📧',
@@ -612,7 +614,7 @@ export class FormService {
    * Get field type label
    */
   static getFieldTypeLabel(fieldType: FieldType): string {
-    const labels: Record<FieldType, string> = {
+    const labels: Partial<Record<FieldType, string>> = {
       text: 'Short Text',
       textarea: 'Long Text',
       email: 'Email',

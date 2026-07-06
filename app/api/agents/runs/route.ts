@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         failed: runs?.filter(r => r.status === 'failed').length || 0,
         running: runs?.filter(r => r.status === 'running').length || 0,
         total_tokens: runs?.reduce((sum, r) => sum + (r.tokens_used || 0), 0) || 0,
-        total_cost_usd: runs?.reduce((sum, r) => sum + parseFloat(r.cost_usd || '0'), 0) || 0,
+        total_cost_usd: runs?.reduce((sum, r) => sum + parseFloat(String(r.cost_usd || '0')), 0) || 0,
         avg_duration_ms: runs?.length
           ? Math.round(runs.reduce((sum, r) => sum + (r.duration_ms || 0), 0) / runs.length)
           : 0,
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
         stats.by_agent[run.agent_name].runs++;
         if (run.status === 'completed') stats.by_agent[run.agent_name].completed++;
         if (run.status === 'failed') stats.by_agent[run.agent_name].failed++;
-        stats.by_agent[run.agent_name].cost += parseFloat(run.cost_usd || '0');
+        stats.by_agent[run.agent_name].cost += parseFloat(String(run.cost_usd || '0'));
       }
 
       return NextResponse.json({ stats });

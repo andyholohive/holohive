@@ -279,7 +279,7 @@ export class BookingService {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    return data as BookingPage;
+    return data as unknown as BookingPage;
   }
 
   /**
@@ -291,13 +291,13 @@ export class BookingService {
   ): Promise<BookingPage> {
     const { data, error } = await supabase
       .from('booking_pages')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...updates, updated_at: new Date().toISOString() } as any)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
-    return data as BookingPage;
+    return data as unknown as BookingPage;
   }
 
   /**
@@ -371,6 +371,6 @@ export class BookingService {
       if (error.code === 'PGRST116') return null;
       return null;
     }
-    return data as BookingPage;
+    return data as unknown as BookingPage;
   }
 }

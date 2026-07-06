@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .single();
 
   // Extract client name - handle both possible response structures
-  const clientName = campaign?.clients?.name || 'Client';
+  const clientName = (campaign?.clients as any)?.name || 'Client';
 
   // Construct the base URL for the logo
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL

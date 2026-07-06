@@ -46,7 +46,7 @@ export class MessageTrainingService {
       return [];
     }
 
-    return (data as MessageTemplate[]) || [];
+    return (data as unknown as MessageTemplate[]) || [];
   }
 
   // Create a new message template
@@ -58,7 +58,7 @@ export class MessageTrainingService {
         usage_count: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      })
+      } as any)
       .select()
       .single();
 
@@ -67,7 +67,7 @@ export class MessageTrainingService {
       return null;
     }
 
-    return data as MessageTemplate;
+    return data as unknown as MessageTemplate;
   }
 
   // Update message template usage count
