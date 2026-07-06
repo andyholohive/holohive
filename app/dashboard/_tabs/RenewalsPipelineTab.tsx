@@ -53,6 +53,7 @@ type Renewal = {
 type Retention = {
   clientRetentionPct: number;
   activeClients: number;
+  pausedClients: number;
   churnedClients: number;
   avgEngagementWeeks: number;
   totalContentDelivered: number;
@@ -150,7 +151,7 @@ export default function RenewalsPipelineTab() {
             icon={Heart}
             label="Client Retention"
             value={`${data.retention.clientRetentionPct}%`}
-            sub={`${data.retention.activeClients} active / ${data.retention.churnedClients} churned`}
+            sub={`${data.retention.activeClients} active${data.retention.pausedClients > 0 ? ` · ${data.retention.pausedClients} paused` : ''} / ${data.retention.churnedClients} churned`}
             accent="emerald"
             topAccent
           />

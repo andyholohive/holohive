@@ -133,14 +133,17 @@ export async function GET() {
     const activeCount = activeStages.reduce((sum, s) => sum + s.count, 0);
     const activeValue = activeStages.reduce((sum, s) => sum + s.totalValue, 0);
 
-    // [2026-07-06] Retention block — spec § 5.1, now sourced from the
-    // relevant-client universe instead of the unreliable
-    // clients.engagement_status column. Active = every live client
-    // (standard ∪ ad-hoc, non-archived, non-test). Churned = real
-    // clients that ended (is_active=false, still non-archived/non-test).
-    // Previously counted all 31 rows in the engagement_status enum,
-    // ~19 of which were archived brands and test/seed junk.
-    const activeCountRet = relevant.liveIds.length;
+    // [2026-07-06] Retention block — spec § 5.1, now keyed off the SAME
+    // 4-bucket derivation the Clients page uses (Active / Paused / Ad-hoc
+    // / Inactive), so "active clients" here matches what /clients shows.
+    //   Active  = coverage-current standard clients (the Clients "Active" tab).
+    //   Churned = Inactive tab (is_active=false, non-archived, non-test).
+    // Paused (coverage lapsed, renewal pending) is surfaced separately —
+    // it's neither renewed nor churned, so it stays out of the ratio.
+    // Previously this counted all live clients (standard + ad-hoc + paused)
+    // as "active", which read 5 while /clients showed 2.
+    const activeCountRet = relevant.activeIds.length;
+    const pausedCountRet = relevant.pausedIds.length;
     const churnedCountRet = relevant.churnedIds.length;
     const denomRet = activeCountRet + churnedCountRet;
     const clientRetentionPct = denomRet > 0 ? Math.round((activeCountRet / denomRet) * 100) : 100;
@@ -154,7 +157,7 @@ export async function GET() {
     for (const s of ((activeStintsRaw.data ?? []) as Array<{ client_id: string; start_date: string }>)) {
       if (s.client_id && s.start_date) stintStartByClient.set(s.client_id, s.start_date);
     }
-    const weekSpans = relevant.liveIds
+    const weekSpans = relevant.activeIds
       .map(id => stintStartByClient.get(id) ?? null)
       .filter((s): s is string => s != null)
       .map(s => {
@@ -181,6 +184,7 @@ export async function GET() {
     const retention = {
       clientRetentionPct,
       activeClients: activeCountRet,
+      pausedClients: pausedCountRet,
       churnedClients: churnedCountRet,
       avgEngagementWeeks,
       totalContentDelivered,

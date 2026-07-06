@@ -66,6 +66,16 @@ export async function GET(request: Request) {
     ]);
 
     const standardClientIds = standardClients.map(c => c.id);
+    // [2026-07-06] Coverage-aware status per the Clients page — a standard
+    // client whose coverage has lapsed is Paused, not Active. Used to scope
+    // the "Active Campaigns" KPI and to badge each Client Health row so the
+    // dashboard matches what /clients shows.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const clientStatusOf = (c: { covered_through: string | null }): 'active' | 'paused' =>
+      c.covered_through && c.covered_through >= todayIso ? 'active' : 'paused';
+    const activeStandardIdSet = new Set(
+      standardClients.filter(c => clientStatusOf(c) === 'active').map(c => c.id),
+    );
     // [2026-06-16] Recent Call Notes spans ALL live clients (standard +
     // ad-hoc). KPI rollups stay standard-only — the spec only excludes
     // ad-hoc from "average client" math, not from conversation logs.
@@ -231,9 +241,13 @@ export async function GET(request: Request) {
       const acts = (c as any).activations as string[] | null | undefined;
       if (Array.isArray(acts) && acts.length > 0) activationNames.push(...acts);
     }
+    // [2026-07-06] Only campaigns of ACTIVE-bucket clients count toward the
+    // "Active Campaigns" KPI — a Paused client's campaign shouldn't inflate
+    // it, matching the Clients page (which shows that client under Paused).
+    const activeCampaignsScoped = activeCampaigns.filter(c => activeStandardIdSet.has(c.client_id));
     const outputSignals = {
       contentPostedLast7d: contentsThisWeek.length,
-      activeCampaigns: activeCampaigns.length,
+      activeCampaigns: activeCampaignsScoped.length,
       activationsLive: {
         count: activationNames.length,
         names: activationNames,
@@ -392,6 +406,9 @@ export async function GET(request: Request) {
         name: c.name,
         slug: c.slug,
         logo_url: c.logo_url,
+        // [2026-07-06] Coverage-aware status matching the Clients page so
+        // the UI can badge Paused engagements distinctly from Active.
+        status: clientStatusOf(c),
         // Kept in response for callers that still surface engagement dates;
         // now sourced from the active stint via client_coverage_status.
         engagement_start_date: c.stint_start,

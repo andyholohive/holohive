@@ -85,6 +85,9 @@ type ClientHealthRow = {
   totalContentPosted: number;
   extVisitsLast7d: number;
   healthTone: HealthTone;
+  // [2026-07-06] Coverage-aware engagement status matching the Clients
+  // page (active = covered today, paused = coverage lapsed).
+  status: 'active' | 'paused';
   is_whitelisted: boolean;
   // [2026-06-25] This-week KOL delivery roll-up. Populated from the
   // current week's confirmed lineup per active campaign, joined to
@@ -210,6 +213,11 @@ function FragmentRow({
               <span className="ml-1 text-[10px] uppercase tracking-wider text-emerald-700 font-semibold shrink-0">whitelisted</span>
             )}
           </Link>
+          {/* [2026-07-06] Paused chip matching the Clients page — coverage
+              has lapsed (renewal pending), so it isn't counted as Active. */}
+          {client.status === 'paused' && (
+            <StatusBadge tone="warning" size="sm" className="mt-1">Paused</StatusBadge>
+          )}
         </TableCell>
         <TableCell className="py-3.5 px-5 text-ink-warm-700 tabular-nums">
           {client.weekNumber !== null ? `Wk ${client.weekNumber}` : '—'}
@@ -398,7 +406,16 @@ export default function ClientTab() {
         <CardHeaderEditorial
           icon={Users}
           title="Client Health"
-          subtitle={`${data.clientHealth.length} standard engagement${data.clientHealth.length === 1 ? '' : 's'}${data.adHocClients.length > 0 ? ` · ${data.adHocClients.length} ad-hoc excluded` : ''}`}
+          subtitle={(() => {
+            // [2026-07-06] Mirror the Clients page split: N active · M paused
+            // (paused = coverage lapsed), then ad-hoc excluded.
+            const active = data.clientHealth.filter(c => c.status === 'active').length;
+            const paused = data.clientHealth.filter(c => c.status === 'paused').length;
+            const parts = [`${active} active`];
+            if (paused > 0) parts.push(`${paused} paused`);
+            if (data.adHocClients.length > 0) parts.push(`${data.adHocClients.length} ad-hoc excluded`);
+            return parts.join(' · ');
+          })()}
         />
 
         {data.clientHealth.length === 0 ? (
