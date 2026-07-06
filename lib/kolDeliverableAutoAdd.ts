@@ -5,8 +5,8 @@
  * type isn't a recognized contents.type value).
  *
  * Maps contents.type → master_kols.deliverables label:
- *   - QRT     → 'Repost' (QRT stays in contents.type for now per
- *               Andy's TBC; the KOL-side picker uses 'Repost')
+ *   - Repost  → 'Repost' (renamed from QRT 2026-07-06 per Andy;
+ *               'QRT' kept as a legacy alias for old rows)
  *   - Post    → 'Post'
  *   - Video   → 'Video'
  *   - Article → 'Article'
@@ -25,7 +25,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 const CONTENT_TYPE_TO_DELIVERABLE: Record<string, string> = {
   Post: 'Post',
-  QRT: 'Repost',
+  Repost: 'Repost',
+  QRT: 'Repost', // legacy alias — contents.type migrated to 'Repost' 2026-07-06
   Video: 'Video',
   Article: 'Article',
   AMA: 'AMA',

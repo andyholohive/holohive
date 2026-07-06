@@ -1613,7 +1613,7 @@ export function KolDashboardTableView({
                                                   }
 
                                                   // Auto-add the content type to the KOL's master_kols.deliverables.
-                                                  // Idempotent — silently appends 'Repost' (for QRT), 'Post', 'Video',
+                                                  // Idempotent — silently appends 'Repost', 'Post', 'Video',
                                                   // etc. so /kols Content Type column reflects every type the KOL
                                                   // has actually delivered.
                                                   if (campaignKOL.master_kol?.id) {
@@ -1622,7 +1622,7 @@ export function KolDashboardTableView({
 
                                                   // Auto-create payments for each content.
                                                   // Amount priority:
-                                                  //   1. QRT (repost): master_kol.repost_rate
+                                                  //   1. Repost: master_kol.repost_rate
                                                   //      → fallback master_kol.standard_rate * 0.5
                                                   //   2. campaign_kol.agreed_rate (set at onboarding)
                                                   //   3. master_kol.standard_rate (mastersheet)
@@ -1634,7 +1634,7 @@ export function KolDashboardTableView({
                                                   const repostRate = (campaignKOL.master_kol as any)?.repost_rate != null
                                                     ? Number((campaignKOL.master_kol as any).repost_rate)
                                                     : null;
-                                                  const defaultAmount = type === 'QRT'
+                                                  const defaultAmount = type === 'Repost'
                                                     ? (repostRate ?? (stdRate != null ? Math.round(stdRate * 0.5 * 100) / 100 : 0))
                                                     : (campaignKOL.agreed_rate ?? null) !== null
                                                       ? Number(campaignKOL.agreed_rate)

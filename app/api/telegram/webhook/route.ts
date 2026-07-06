@@ -3968,11 +3968,11 @@ async function handleRepostCommand(chatId: string, args: string[], message: any)
 
   // [2026-07-02] Per Andy: opting in should also add "Repost" to the KOL's
   // Content Type list on /kols so the profile reflects the offering. Same
-  // mapping used by contents-side auto-add (QRT → Repost). Fire-and-forget;
+  // mapping used by contents-side auto-add. Fire-and-forget;
   // failure here is non-fatal for the opt-in flow — we still confirm the
   // primary flag was saved.
   if (next === true) {
-    ensureKolDeliverable(supabaseAdmin as any, masterKolId, 'QRT').catch(err => {
+    ensureKolDeliverable(supabaseAdmin as any, masterKolId, 'Repost').catch(err => {
       console.warn('[/repost] deliverable append failed:', err?.message ?? err);
     });
   }

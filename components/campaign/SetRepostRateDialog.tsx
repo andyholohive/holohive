@@ -34,14 +34,14 @@ export interface SetRepostRateDialogProps {
 
 /**
  * Prompt to set master_kols.repost_rate when a content is flipped to
- * QRT (repost) for the first time. Mirrors the SetPaymentTermsDialog
+ * Repost for the first time. Mirrors the SetPaymentTermsDialog
  * pattern but is simpler — repost is a global per-KOL rate, not per
  * campaign, so there's only one column to write.
  *
  * Behavior:
  *  - First-time: pre-filled with 50% of master_kols.standard_rate
  *  - Edit: pre-filled with currentRepostRate
- *  - Cancel: leaves repost_rate null (caller's QRT is still saved,
+ *  - Cancel: leaves repost_rate null (caller's Repost is still saved,
  *    but the budget falls back to standard_rate * 0.5 until set).
  *
  * Writes to: master_kols.repost_rate
@@ -136,14 +136,14 @@ export default function SetRepostRateDialog({
               <>Confirm the repost rate for <strong>{kolName}</strong>.</>
             ) : masterStandardRate != null ? (
               <>
-                <strong>{kolName}</strong> just had content marked as a repost (QRT).
+                <strong>{kolName}</strong> just had content marked as a Repost.
                 Default suggestion is 50% of their standard rate — confirm or edit
                 below to save as their repost rate for future budget calcs.
               </>
             ) : (
               <>
                 Enter the repost rate for <strong>{kolName}</strong>. This rate
-                will apply to every future QRT/repost in the Budget Dashboard.
+                will apply to every future Repost in the Budget Dashboard.
               </>
             )}
           </DialogDescription>

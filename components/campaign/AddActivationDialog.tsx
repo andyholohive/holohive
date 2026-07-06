@@ -27,7 +27,7 @@ interface Props {
 type DeliverableRow = { platform: string; type: string; count: number };
 
 const PLATFORMS = ['X', 'Telegram', 'YouTube', 'Instagram', 'TikTok'];
-const DELIVERABLE_TYPES = ['Post', 'Thread', 'Video', 'Repost', 'QRT', 'Livestream', 'Newsletter'];
+const DELIVERABLE_TYPES = ['Post', 'Thread', 'Video', 'Repost', 'Livestream', 'Newsletter'];
 
 export function AddActivationDialog({ open, onOpenChange, campaignId, campaignName }: Props) {
   const { toast } = useToast();

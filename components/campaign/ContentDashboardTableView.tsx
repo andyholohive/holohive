@@ -103,9 +103,9 @@ export function ContentDashboardTableView() {
   const [globalTags, setGlobalTags] = useState<ContentTag[]>([]);
 
   // First-time repost-rate confirm dialog. Opens when a content row's
-  // type is changed to 'QRT' and the linked KOL has no repost_rate set
+  // type is changed to 'Repost' and the linked KOL has no repost_rate set
   // on master_kols yet. Pre-fills with 50% of standard_rate per spec.
-  // Once accepted, future QRT flips for the same KOL skip the dialog.
+  // Once accepted, future Repost flips for the same KOL skip the dialog.
   const [repostRateDialog, setRepostRateDialog] = useState<{
     open: boolean;
     masterKolId: string;
@@ -330,11 +330,11 @@ export function ContentDashboardTableView() {
     }
 
     // First-time repost-rate prompt — when a content type flips to
-    // 'QRT' and the linked KOL has no master_kols.repost_rate yet,
+    // 'Repost' and the linked KOL has no master_kols.repost_rate yet,
     // open the confirm dialog pre-filled with 50% of standard_rate.
-    // Subsequent QRTs for the same KOL skip the dialog (the rate is
+    // Subsequent Reposts for the same KOL skip the dialog (the rate is
     // already locked in for the budget to use).
-    if (field === 'type' && newValue === 'QRT') {
+    if (field === 'type' && newValue === 'Repost') {
       const mk = (content as any).master_kol;
       if (mk?.id && mk?.repost_rate == null) {
         setRepostRateDialog({
@@ -348,7 +348,7 @@ export function ContentDashboardTableView() {
 
     // Auto-add the content type to the KOL's master_kols.deliverables
     // list (idempotent). When a KOL gets their first Post / Repost
-    // (QRT) / Video / etc. on any campaign, the corresponding label
+    // / Video / etc. on any campaign, the corresponding label
     // appears in /kols → Content Type column without manual entry.
     // Mirror in local state so the next inline read sees the new value.
     if (field === 'type' && typeof newValue === 'string') {
@@ -457,10 +457,10 @@ export function ContentDashboardTableView() {
       setContents((prev: any[]) => prev.map(c => selectedContents.includes(c.id) ? { ...c, type: bulkContentType } : c));
 
       // First-time repost-rate prompt — fire once for the first
-      // selected-and-bulk-typed-to-QRT KOL that has no repost_rate yet.
-      // Bulk path is rare so a single prompt is fine; the second QRT
+      // selected-and-bulk-typed-to-Repost KOL that has no repost_rate yet.
+      // Bulk path is rare so a single prompt is fine; the second Repost
       // for the same KOL silently uses the just-saved rate.
-      if (bulkContentType === 'QRT') {
+      if (bulkContentType === 'Repost') {
         const affected = contents.filter((c: any) => selectedContents.includes(c.id));
         const needs = affected.find((c: any) => c.master_kol?.id && c.master_kol?.repost_rate == null);
         if (needs) {
@@ -1858,9 +1858,9 @@ export function ContentDashboardTableView() {
       </Dialog>
 
       {/* First-time repost-rate confirm — fires when a content type is
-          set to 'QRT' for a KOL whose repost_rate isn't on file yet.
+          set to 'Repost' for a KOL whose repost_rate isn't on file yet.
           Pre-fills with 50% of standard_rate. Once saved, the Budget
-          Dashboard picks up the new rate for every QRT row. */}
+          Dashboard picks up the new rate for every Repost row. */}
       {repostRateDialog && (
         <SetRepostRateDialog
           open={repostRateDialog.open}
@@ -1872,7 +1872,7 @@ export function ContentDashboardTableView() {
           masterStandardRate={repostRateDialog.standardRate}
           onSaved={(rate) => {
             // Reflect the saved repost_rate locally so the budget +
-            // future QRT flips on the same KOL pick it up without a
+            // future Repost flips on the same KOL pick it up without a
             // page refresh. campaignKOLs[].master_kol is the source
             // of truth that contents[].master_kol points at.
             setContents((prev: any[]) => prev.map((c) =>

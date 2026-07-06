@@ -96,7 +96,7 @@ export async function createApprovedContentsRow(
   // [2026-07-03] Mirror the manual /campaigns/[id] add-content flow —
   // auto-create a payment row keyed to this content. Amount priority
   // (matches KolDashboardTableView):
-  //   1. QRT (repost): master_kol.repost_rate
+  //   1. Repost: master_kol.repost_rate
   //      → fallback master_kol.standard_rate * 0.5
   //   2. campaign_kol.agreed_rate (set at onboarding)
   //   3. master_kol.standard_rate (mastersheet)
@@ -109,7 +109,7 @@ export async function createApprovedContentsRow(
     const stdRate = masterKol?.standard_rate != null ? Number(masterKol.standard_rate) : null;
     const repostRate = masterKol?.repost_rate != null ? Number(masterKol.repost_rate) : null;
     const agreedRate = (campaignKol as any).agreed_rate != null ? Number((campaignKol as any).agreed_rate) : null;
-    const amount = contentsType === 'QRT'
+    const amount = contentsType === 'Repost'
       ? (repostRate ?? (stdRate != null ? Math.round(stdRate * 0.5 * 100) / 100 : 0))
       : (agreedRate ?? stdRate ?? 0);
 
@@ -144,7 +144,7 @@ export function mapSubmissionPlatformToContents(p: string | null | undefined): s
 
 /**
  * contents.type CHECK: ('Post', 'Video', 'Article', 'AMA', 'Ambassadorship',
- *                       'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter')
+ *                       'Alpha', 'Repost', 'Thread', 'Spaces', 'Newsletter') — QRT renamed 2026-07-06
  */
 export function mapSubmissionTypeToContents(t: string | null | undefined): string {
   const s = (t ?? '').toLowerCase();
@@ -153,7 +153,7 @@ export function mapSubmissionTypeToContents(t: string | null | undefined): strin
   if (s === 'article') return 'Article';
   if (s === 'ama') return 'AMA';
   if (s === 'thread') return 'Thread';
-  if (s === 'qrt' || s === 'quote_rt') return 'QRT';
+  if (s === 'qrt' || s === 'quote_rt' || s === 'repost') return 'Repost';
   if (s === 'spaces') return 'Spaces';
   return 'Post';
 }

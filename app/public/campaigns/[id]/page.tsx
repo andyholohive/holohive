@@ -322,7 +322,8 @@ const getContentTypeColor = (type: string) => {
     AMA: 'bg-purple-100 text-purple-800',
     Ambassadorship: 'bg-orange-100 text-orange-800',
     Alpha: 'bg-yellow-100 text-yellow-800',
-    QRT: 'bg-cyan-100 text-cyan-800',
+    Repost: 'bg-cyan-100 text-cyan-800',
+    QRT: 'bg-cyan-100 text-cyan-800', // legacy alias
     Thread: 'bg-teal-100 text-teal-800',
     Spaces: 'bg-pink-100 text-pink-800',
     Newsletter: 'bg-slate-100 text-slate-800',

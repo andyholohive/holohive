@@ -51,7 +51,7 @@ export interface MasterKOL {
   telegram_id?: string | null;
   /** Standard per-content rate (USD). Source of truth for the budget. */
   standard_rate?: number | null;
-  /** Per-KOL repost (QRT) rate (USD). Defaults to 50% of standard_rate on first-time confirm. Per REPOST-RATE.1. */
+  /** Per-KOL repost rate (USD). Defaults to 50% of standard_rate on first-time confirm. Per REPOST-RATE.1. */
   repost_rate?: number | null;
   /** AI-inferred posting style summary (Doc 2 Q7a). Written by the Telegram MCP scan via /api/mcp/kol-profile/update. */
   style_summary?: string | null;
@@ -337,7 +337,7 @@ export class KOLService {
     return {
       platforms: ['X', 'Telegram', 'YouTube', 'Facebook', 'TikTok'],
       regions: ['Vietnam', 'Turkey', 'SEA', 'Philippines', 'Korea', 'Global', 'China', 'Brazil'],
-      deliverables: ['Post', 'Repost', 'Video', 'Article', 'AMA', 'QRT', 'Thread', 'Spaces', 'Newsletter'],
+      deliverables: ['Post', 'Repost', 'Video', 'Article', 'AMA', 'Thread', 'Spaces', 'Newsletter'],
       // [2026-06-10] HHP Creator Taxonomy Spec — fully migrated. All
       // legacy values cleared from data via SQL passes (Research →
       // Analyst, Crypto → niche Trading, 6 topic words → niche moves,
