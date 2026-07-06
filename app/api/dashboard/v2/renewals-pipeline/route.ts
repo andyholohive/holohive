@@ -51,9 +51,11 @@ export async function GET() {
         .in('engagement_status', ['active', 'churned']),
       // All-time content posted count across all clients. Just a count,
       // not per-client — fed into the "Total Content Delivered" card.
+      // [2026-07-05 AUDIT-FIX] fetch multipost_group_id instead of a raw
+      // head-count so cross-platform mirrors count as one delivery.
       (sb as any)
         .from('contents')
-        .select('id', { count: 'exact', head: true })
+        .select('id, multipost_group_id')
         .eq('status', 'posted'),
       // [2026-06-19] Active client_stints — used to anchor Average
       // Engagement to the current stint per TD §5.1 "anchors to the
@@ -164,7 +166,17 @@ export async function GET() {
       ? Math.round((weekSpans.reduce((s, w) => s + w, 0) / weekSpans.length) * 10) / 10
       : 0;
 
-    const totalContentDelivered = (contentTotalRaw as any).count ?? 0;
+    // Dedup multipost mirrors: one counted delivery per group.
+    const contentRowsAll = ((contentTotalRaw as any).data ?? []) as Array<{ id: string; multipost_group_id: string | null }>;
+    const seenContentGroups = new Set<string>();
+    let totalContentDelivered = 0;
+    for (const c of contentRowsAll) {
+      if (c.multipost_group_id) {
+        if (seenContentGroups.has(c.multipost_group_id)) continue;
+        seenContentGroups.add(c.multipost_group_id);
+      }
+      totalContentDelivered++;
+    }
 
     const retention = {
       clientRetentionPct,

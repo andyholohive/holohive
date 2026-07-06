@@ -113,14 +113,18 @@ async function cdlNeedsUpdate(
   const threshold = params.threshold_days || 14;
   const cutoff = daysAgo(threshold);
 
-  // Get active clients
-  const { data: clients } = await supabase
+  // Get active clients. [2026-07-05 AUDIT-FIX] Also exclude ad-hoc
+  // clients — their delivery cadence is off-cycle, so the "no CDL in
+  // 14 days" nag was pure noise for them (same doctrine as
+  // getStandardClients + the Saturday paymentReminder).
+  const { data: allClients } = await supabase
     .from('clients')
-    .select('id, name')
+    .select('id, name, is_ad_hoc')
     .eq('is_active', true)
     .is('archived_at', null);
+  const clients = (allClients || []).filter((c: any) => c.is_ad_hoc !== true);
 
-  if (!clients || clients.length === 0) return { items: [], isEmpty: true };
+  if (clients.length === 0) return { items: [], isEmpty: true };
 
   // Get latest CDL entry per client
   const clientIds = clients.map((c) => c.id);
@@ -162,10 +166,15 @@ async function contentMetricsStale(
   const threshold = params.threshold_days || 7;
   const cutoff = daysAgo(threshold);
 
-  // Content with activation_date set (published) but no metrics, older than threshold
+  // Content with activation_date set (published) but no metrics, older
+  // than threshold. [2026-07-05 AUDIT-FIX] posted-only — previously
+  // pending / scheduled / pending_verification rows with an
+  // activation_date were nagged as "Published …, no metrics recorded"
+  // even though they were never live.
   const { data: staleContent } = await supabase
     .from('contents')
     .select('id, activation_date, campaign_id, campaign_kols_id, impressions, likes, comments, retweets, bookmarks')
+    .eq('status', 'posted')
     .not('activation_date', 'is', null)
     .lt('activation_date', cutoff)
     .is('impressions', null)
@@ -193,16 +202,25 @@ async function contentMetricsStale(
   const ckToKol = new Map<string, string>();
   for (const ck of ckData || []) ckToKol.set(ck.id, kolMap.get(ck.master_kol_id) || 'Unknown');
 
-  // Get campaign names
+  // Get campaign names + client status. [2026-07-05 AUDIT-FIX] Archived
+  // campaigns and inactive / ad-hoc clients drop out of the nag — same
+  // scoping the Saturday paymentReminder applies.
   const campaignIds = Array.from(new Set(staleContent.map((c) => c.campaign_id)));
-  const { data: campaigns } = await supabase
+  const { data: campaigns } = await (supabase as any)
     .from('campaigns')
-    .select('id, name')
+    .select('id, name, archived_at, client:clients(is_active, is_ad_hoc)')
     .in('id', campaignIds);
   const campMap = new Map<string, string>();
-  for (const c of campaigns || []) campMap.set(c.id, c.name);
+  const eligibleCampaigns = new Set<string>();
+  for (const c of (campaigns || []) as any[]) {
+    campMap.set(c.id, c.name);
+    const clientOk = c.client ? (c.client.is_active !== false && c.client.is_ad_hoc !== true) : false;
+    if (!c.archived_at && clientOk) eligibleCampaigns.add(c.id);
+  }
+  const eligibleContent = staleContent.filter((c) => eligibleCampaigns.has(c.campaign_id));
+  if (eligibleContent.length === 0) return { items: [], isEmpty: true };
 
-  const items: ReminderItem[] = staleContent.map((c) => {
+  const items: ReminderItem[] = eligibleContent.map((c) => {
     const kolName = ckToKol.get(c.campaign_kols_id) || 'Unknown KOL';
     const campName = campMap.get(c.campaign_id) || 'Unknown Campaign';
     const pubDate = c.activation_date ? new Date(c.activation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -310,21 +328,27 @@ async function paymentReminder(
   const campaignIds = Array.from(new Set(unpaid.map((p) => p.campaign_id)));
   const { data: campaigns } = await supabase
     .from('campaigns')
-    .select('id, name, client:clients(id, is_active, is_ad_hoc)')
+    .select('id, name, archived_at, client:clients(id, is_active, is_ad_hoc)')
     .in('id', campaignIds);
-  const campMap = new Map<string, { name: string; clientActive: boolean; clientAdHoc: boolean }>();
+  // [2026-07-05 AUDIT-FIX] Clientless campaigns no longer pass as
+  // "active" (c.client?.is_active !== false was true for null client),
+  // and archived campaigns are excluded like the peer evaluators.
+  const campMap = new Map<string, { name: string; clientActive: boolean; clientAdHoc: boolean; archived: boolean }>();
   for (const c of (campaigns || []) as any[]) {
     campMap.set(c.id, {
       name: c.name,
-      clientActive: c.client?.is_active !== false,
+      clientActive: c.client ? c.client.is_active !== false : false,
       clientAdHoc: c.client?.is_ad_hoc === true,
+      archived: !!c.archived_at,
     });
   }
 
-  // Filter out excluded campaign patterns + inactive + ad-hoc clients
+  // Filter out excluded campaign patterns + archived campaigns +
+  // inactive + ad-hoc clients
   const filtered = unpaid.filter((p) => {
     const camp = campMap.get(p.campaign_id);
     if (!camp) return false;
+    if (camp.archived) return false;
     if (!camp.clientActive) return false;
     if (camp.clientAdHoc) return false;
     return !excludePatterns.some((pattern) =>

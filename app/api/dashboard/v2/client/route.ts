@@ -100,9 +100,12 @@ export async function GET(request: Request) {
       // Embed the campaign so we can derive the client_id via campaign_id.
       // Previously the query silently errored (.in('client_id', ...) on a
       // non-existent column), zeroing out the entire KPI.
+      // [2026-07-05 AUDIT-FIX] multipost_group_id included so the
+      // aggregation below can collapse cross-platform mirrors to one
+      // counted post (same dedup rule as the company leaderboard).
       (sb as any)
         .from('contents')
-        .select('id, status, activation_date, campaign_id, campaigns!inner(client_id)')
+        .select('id, status, activation_date, campaign_id, multipost_group_id, campaigns!inner(client_id)')
         .eq('status', 'posted')
         .gte('activation_date', weekStartIso.slice(0, 10))
         .in('campaigns.client_id', standardClientIds),
@@ -111,7 +114,7 @@ export async function GET(request: Request) {
       // [2026-06-17] Same client_id-via-campaign fix as above.
       (sb as any)
         .from('contents')
-        .select('id, campaign_id, campaigns!inner(client_id)')
+        .select('id, campaign_id, multipost_group_id, campaigns!inner(client_id)')
         .eq('status', 'posted')
         .in('campaigns.client_id', standardClientIds),
       // [2026-06-11] Active campaigns for the Output Signals KPI row — spec
@@ -192,18 +195,25 @@ export async function GET(request: Request) {
     // Per-client content posted-this-week + all-time counts.
     // [2026-06-17] client_id resolves via the embedded campaigns row
     // (contents has no client_id column — fixed in the fetch above).
-    const contentThisWeekByClient = new Map<string, number>();
-    for (const c of contentsThisWeek) {
-      const clientId = c.campaigns?.client_id;
-      if (!clientId) continue;
-      contentThisWeekByClient.set(clientId, (contentThisWeekByClient.get(clientId) ?? 0) + 1);
-    }
-    const contentAllTimeByClient = new Map<string, number>();
-    for (const c of contentsAllTime) {
-      const clientId = c.campaigns?.client_id;
-      if (!clientId) continue;
-      contentAllTimeByClient.set(clientId, (contentAllTimeByClient.get(clientId) ?? 0) + 1);
-    }
+    // [2026-07-05 AUDIT-FIX] multipost dedup — a cross-platform mirror
+    // group counts as ONE post (first row per multipost_group_id wins;
+    // counts don't care which group member represents it).
+    const countDeduped = (rows: any[]): Map<string, number> => {
+      const byClient = new Map<string, number>();
+      const seenGroups = new Set<string>();
+      for (const c of rows) {
+        const clientId = c.campaigns?.client_id;
+        if (!clientId) continue;
+        if (c.multipost_group_id) {
+          if (seenGroups.has(c.multipost_group_id)) continue;
+          seenGroups.add(c.multipost_group_id);
+        }
+        byClient.set(clientId, (byClient.get(clientId) ?? 0) + 1);
+      }
+      return byClient;
+    };
+    const contentThisWeekByClient = countDeduped(contentsThisWeek);
+    const contentAllTimeByClient = countDeduped(contentsAllTime);
 
     // Per-client external visit counts this week.
     const extVisitsByClient = new Map<string, number>();

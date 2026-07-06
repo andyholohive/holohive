@@ -489,6 +489,7 @@ export default function KOLsPage() {
       const { data, error } = await (supabase as any)
         .from('campaign_kols')
         .select('master_kol_id, hidden, campaign:campaigns!inner(id, name, slug, archived_at, created_at)')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error || !data) return;
 

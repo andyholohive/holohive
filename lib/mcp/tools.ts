@@ -1150,7 +1150,9 @@ export async function getCampaignDetail(
   // Campaign + linked client name + roster size + payment summary in parallel
   const [campRes, kolsRes, paymentsRes] = await Promise.all([
     (supabase as any).from('campaigns').select('*, clients(name, email, location)').eq('id', args.campaign_id).single(),
-    (supabase as any).from('campaign_kols').select('id, hh_status, client_status, allocated_budget, paid', { count: 'exact' }).eq('campaign_id', args.campaign_id),
+    // [2026-07-05 AUDIT-FIX] Exclude soft-removed roster rows — their
+    // allocated_budget/paid were inflating the totals the agent quotes.
+    (supabase as any).from('campaign_kols').select('id, hh_status, client_status, allocated_budget, paid', { count: 'exact' }).eq('campaign_id', args.campaign_id).is('deleted_at', null),
     (supabase as any).from('payments').select('amount, payment_date').eq('campaign_id', args.campaign_id),
   ]);
 
@@ -1230,8 +1232,11 @@ export async function listCampaignKols(
   let q = (supabase as any)
     .from('campaign_kols')
     // tier removed from joined select (migration 071 dropped the column).
+    // [2026-07-05 AUDIT-FIX] deleted_at filter — soft-removed KOLs were
+    // listed with no marker (hidden rows at least got "(hidden)").
     .select('id, hh_status, client_status, allocated_budget, paid, hidden, master_kols(id, name, region, followers, link, platform)')
     .eq('campaign_id', args.campaign_id)
+    .is('deleted_at', null)
     .order('allocated_budget', { ascending: false, nullsFirst: false })
     .limit(args.limit);
 

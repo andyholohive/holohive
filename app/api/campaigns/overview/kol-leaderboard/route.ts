@@ -129,11 +129,13 @@ export async function GET(request: Request) {
   for (const set of campaignsByKolId.values()) for (const cid of set) campaignIdSet.add(cid);
   const { data: campaignRows } = await (admin as any)
     .from('campaigns')
-    .select('id, client_id')
+    .select('id, client_id, archived_at')
     .in('id', Array.from(campaignIdSet));
   const clientByCampaign = new Map<string, string | null>();
-  for (const c of (campaignRows ?? []) as Array<{ id: string; client_id: string | null }>) {
+  const archivedCampaigns = new Set<string>();
+  for (const c of (campaignRows ?? []) as Array<{ id: string; client_id: string | null; archived_at: string | null }>) {
     clientByCampaign.set(c.id, c.client_id);
+    if (c.archived_at) archivedCampaigns.add(c.id);
   }
 
   // 5. Aggregate per KOL. Bucket contents by kol_id via campaign_kols_id.
@@ -169,10 +171,15 @@ export async function GET(request: Request) {
 
   // Also fold in campaign_kols → activation count & clients for KOLs that
   // have zero posted content but did participate (curated / pending).
+  // [2026-07-05 AUDIT-FIX] archived campaigns count only when the KOL
+  // actually posted content there (historical activation, added above);
+  // curated/pending participation on archived campaigns no longer
+  // inflates activation + client counts.
   for (const [kolId, camps] of campaignsByKolId.entries()) {
     const a = ensure(kolId);
-    for (const cid of camps) a.activations.add(cid);
     for (const cid of camps) {
+      if (archivedCampaigns.has(cid) && !a.activations.has(cid)) continue;
+      a.activations.add(cid);
       const clientId = clientByCampaign.get(cid);
       if (clientId) a.clients.add(clientId);
     }
