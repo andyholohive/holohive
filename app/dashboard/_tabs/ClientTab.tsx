@@ -196,7 +196,7 @@ function FragmentRow({
         </TableCell>
         <TableCell className="py-3.5 px-5">
           <Link
-            href={`/clients/${client.id}`}
+            href={`/clients?clientId=${client.id}`}
             className="group flex items-center gap-2.5"
             onClick={(e) => e.stopPropagation()}
           >
@@ -498,7 +498,7 @@ export default function ClientTab() {
               {data.adHocClients.map(c => (
                 <li key={c.id} className="px-4 py-3 flex items-center justify-between">
                   <Link
-                    href={`/clients/${c.id}`}
+                    href={`/clients?clientId=${c.id}`}
                     className="text-sm font-medium text-ink-warm-900 hover:text-brand transition-colors"
                   >
                     {c.name}
@@ -700,7 +700,7 @@ function CallNoteCard({ note }: { note: CallNote }) {
             )}
             <div className="min-w-0">
               <Link
-                href={`/clients/${note.client_id}`}
+                href={`/clients?clientId=${note.client_id}`}
                 className="text-sm font-semibold text-ink-warm-900 hover:text-brand transition-colors block leading-tight"
               >
                 {note.client_name || 'Client'}

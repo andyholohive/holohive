@@ -2340,6 +2340,22 @@ export default function ClientsPage() {
     paused:   clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'paused').length,
     inactive: clientsWithStatus.filter(c => inPartnerScope(c) && clientBucketOf(c) === 'inactive').length,
   };
+  // [2026-07-06] Deep-link support: /clients?clientId=<uuid> opens that
+  // client's Edit dialog once the list has loaded. Used by the Team
+  // Dashboard's Client Health table (its old /clients/{id} links 404'd —
+  // that route only has the delivery-log sub-page, no page.tsx).
+  const clientIdParam = searchParams.get('clientId');
+  const openedFromParamRef = useRef(false);
+  useEffect(() => {
+    if (!clientIdParam || openedFromParamRef.current || clients.length === 0) return;
+    const target = clients.find(c => c.id === clientIdParam);
+    if (target) {
+      openedFromParamRef.current = true;
+      handleEditClient(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientIdParam, clients]);
+
   const handleEditClient = (client: ClientWithAccess) => {
     setEditingClient(client);
     // Pull start_date from client_context (the table that actually stores
@@ -3477,10 +3493,14 @@ export default function ClientsPage() {
                         gets both. Tabs sit above the scroll body so the
                         DialogFooter Save / Cancel still pin below. */}
                     <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
-                      <TabsList className="bg-cream-100/40 mt-1">
-                        <TabsTrigger value="details" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Details</TabsTrigger>
+                      {/* [2026-07-06] Per Andy: match the standard tab strip
+                          used across the app (bg-cream-100 + p-1 + border,
+                          white active pill via shadow) instead of the
+                          washed-out bg-cream-100/40 variant. */}
+                      <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 mt-1 w-fit">
+                        <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">Details</TabsTrigger>
                         {isEditMode && (
-                          <TabsTrigger value="engagement" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Engagement</TabsTrigger>
+                          <TabsTrigger value="engagement" className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">Engagement</TabsTrigger>
                         )}
                       </TabsList>
                       <TabsContent value="details" className="flex-1 flex flex-col min-h-0 mt-0">

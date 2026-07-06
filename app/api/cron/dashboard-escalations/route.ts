@@ -5,14 +5,15 @@
  * escalations as a single Telegram message to the configured terminal
  * chat. Replaces the old Daily Standup Bot (killed per spec section 2.2).
  *
- * Five categories per Jdot's spec, plus one new (Monday form) added
+ * Five categories per Jdot's spec (Monday-form escalation removed
  * 2026-06-01 per the conversation:
  *
  *   1. Tasks ≥ overdue_red_days
  *   2. Active initiatives ≥ initiative_stale_red_days idle
  *   3. People with ≥ person_escalation_threshold overdue tasks
  *   4. Standard clients renewing in ≤ renewal_red_days
- *   5. Monday Form: team members not submitted by deadline
+ *   2026-07-06 per Andy — 'remove monday form entirely from
+ *   dashboard and notifications for now')
  *
  * Healthy days send nothing — keeps the channel quiet so the alert
  * means something when it fires. Same pattern as cron-health-check.
@@ -25,7 +26,6 @@ import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { getDashboardConfig } from '@/lib/dashboard/config';
 import { getStandardClients, renewalToneFor, overdueToneFor } from '@/lib/dashboard/queries';
-import { getMondayFormStatus } from '@/lib/dashboard/monday-form';
 import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     //   to super_admins for "lead" targeting per §7.2/§7.3 (we don't have
     //   a per-client account-lead field; users.is_lead was dropped per
     //   Jdot's Q4 call).
-    const [standardClients, openTasksRes, initiativesRes, mondayStatus, usersRes] = await Promise.all([
+    const [standardClients, openTasksRes, initiativesRes, usersRes] = await Promise.all([
       getStandardClients(sb),
       (sb as any)
         .from('tasks')
@@ -74,7 +74,6 @@ export async function GET(request: Request) {
         .select('id, name, updated_at, owner_user_id')
         .eq('status', 'active')
         .is('deleted_at', null),
-      getMondayFormStatus(sb, cfg.form_deadline_hour_utc),
       (sb as any)
         .from('users')
         .select('id, name, role, telegram_id'),
@@ -130,17 +129,11 @@ export async function GET(request: Request) {
       .filter(r => r.tone === 'red')
       .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
 
-    // 5. Monday form: only escalate if deadline passed AND someone hasn't submitted
-    const mondayMisses = mondayStatus.deadlinePassed
-      ? mondayStatus.entries.filter(e => !e.submitted)
-      : [];
-
     const findingsCount =
       redOverdueTasks.length +
       staleInitiatives.length +
       personEscalations.length +
-      redRenewals.length +
-      mondayMisses.length;
+      redRenewals.length;
 
     // ─── Healthy day? Stay quiet. ─────────────────────────────────────
     if (findingsCount === 0) {
@@ -188,14 +181,6 @@ export async function GET(request: Request) {
       lines.push(`🧭 <b>Stale initiatives ≥ ${cfg.initiative_stale_red_days}d (${staleInitiatives.length})</b>`);
       for (const i of staleInitiatives.slice(0, 5)) {
         lines.push(`  • ${escapeHtml(i.name)} — ${i.daysIdle}d idle`);
-      }
-      lines.push('');
-    }
-
-    if (mondayMisses.length) {
-      lines.push(`📝 <b>Monday form · ${mondayMisses.length} not submitted</b>`);
-      for (const m of mondayMisses) {
-        lines.push(`  • ${escapeHtml(m.name)}`);
       }
       lines.push('');
     }
@@ -331,7 +316,6 @@ export async function GET(request: Request) {
         staleInitiatives: staleInitiatives.length,
         personEscalations: personEscalations.length,
         redRenewals: redRenewals.length,
-        mondayMisses: mondayMisses.length,
       },
       dms: {
         sent: dmSent,

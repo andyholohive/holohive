@@ -459,73 +459,10 @@ export default function InternalTab() {
         </Card>
       </div>
 
-      {/* Monday Check-in */}
-      <Card className="border-cream-200 overflow-hidden">
-        <CardHeaderEditorial
-          icon={ClipboardCheck}
-          title="Monday Check-In"
-          subtitle={`Week of ${data.mondayForm.weekOf} · deadline ${data.mondayForm.deadlineHourUtc}:00 UTC${data.mondayForm.deadlinePassed ? ' · DEADLINE PASSED' : ''}`}
-          action={
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-ink-warm-700 tabular-nums">
-                <span className="font-semibold text-ink-warm-900">{data.mondayForm.submittedCount}</span>
-                <span className="text-ink-warm-400"> / {data.mondayForm.totalTeamMembers}</span>
-                <span className="text-ink-warm-500 ml-1">submitted</span>
-              </span>
-              <Link
-                href={`/forms/${data.mondayForm.formSlug}`}
-                className="text-xs font-medium text-brand hover:text-brand-dark transition-colors"
-              >
-                Open form →
-              </Link>
-            </div>
-          }
-        />
-
-        {data.mondayForm.entries.length === 0 ? (
-          <div className="p-8">
-            <EmptyState
-              icon={ClipboardCheck}
-              title="No team members configured"
-              description="Add admin or super_admin users to track check-ins."
-            />
-          </div>
-        ) : (
-          <ul className="divide-y divide-cream-100">
-            {data.mondayForm.entries.map(e => (
-              <li key={e.user_id} className="px-4 py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {e.submitted ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  ) : e.isLate ? (
-                    <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                  ) : (
-                    <div className="h-4 w-4 rounded-full border-2 border-cream-300 shrink-0" />
-                  )}
-                  <div>
-                    <div className="text-sm font-medium text-ink-warm-900">{e.name}</div>
-                    {e.submitted_at && (
-                      <div className="text-[11px] text-ink-warm-500 tabular-nums">
-                        submitted {formatDateTime(new Date(e.submitted_at))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {/* "No submission" label per TD §6: visible to everyone
-                    when deadline has passed and member hasn't filed.
-                    Replaces the prior "Late" wording to match spec. */}
-                {e.submitted ? (
-                  <StatusBadge tone="success" size="sm" bordered withDot>Submitted</StatusBadge>
-                ) : e.isLate ? (
-                  <StatusBadge tone="danger" size="sm" bordered withDot="pulse">No submission</StatusBadge>
-                ) : (
-                  <StatusBadge tone="neutral" size="sm" bordered withDot>Pending</StatusBadge>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      {/* [2026-07-06] Monday Check-In card removed per Andy ('remove
+          monday form entirely from dashboard and notifications for now').
+          Data plumbing (internal route mondayForm field, lib/dashboard/
+          monday-form.ts) left intact for easy restore. */}
       </div>
 
       {/* ── 03 Strategy ─────────────────────────────────────────────── */}
