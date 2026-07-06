@@ -171,7 +171,11 @@ export function KolDashboardOverview() {
         <KpiCard icon={Flag}      label={regionSet.size === 1 ? 'Region' : 'Regions'}                     value={regionSet.size}    accent="purple"  />
       </div>
 
-      {/* Charts row */}
+      {/* Charts row — Platform + Region distribution hidden per Andy
+          2026-07-06. Kept in code (behind a false gate) in case the
+          breakdown is wanted again; the KPI strip above still surfaces
+          the Unique Platforms / Regions counts. */}
+      {false && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Platform Distribution */}
         <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
@@ -250,6 +254,7 @@ export function KolDashboardOverview() {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── KOL Performance Leaderboard ────────────────────────────
           Lives on the KOL Dashboard Overview per Andy 2026-06-19.

@@ -1283,7 +1283,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-cream-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading campaign...</p>
@@ -1295,8 +1295,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
   if (error || !campaign) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
+      <div className="min-h-screen bg-cream-50">
+        <div className="bg-white border-b border-cream-200">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center space-x-4">
               <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
@@ -1307,7 +1307,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           </div>
         </div>
         <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
+          <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-8 text-center">
             <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
             <p className="text-gray-600 mb-4">This campaign doesn't exist or is not publicly accessible.</p>
@@ -1374,9 +1374,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-cream-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-cream-200">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-4">
             <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
@@ -1420,7 +1420,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           }
           const initial = (campaign.client_name || campaign.name || 'C').trim().charAt(0).toUpperCase();
           return (
-            <div className="bg-white rounded-lg shadow-sm border mb-6 overflow-hidden">
+            <div className="bg-white rounded-[14px] border border-cream-200 shadow-card mb-6 overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-3 flex-wrap">
                 {/* Client logo — replaces the old generic Megaphone.
                     Falls back to a brand-tinted letter tile when no
@@ -1432,7 +1432,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <Megaphone className="h-5 w-5" />
                   </div>
                 ) : campaign.client_logo_url ? (
-                  <div className="w-10 h-10 rounded-md overflow-hidden border border-gray-200 bg-white shrink-0">
+                  <div className="w-10 h-10 rounded-md overflow-hidden border border-cream-200 bg-white shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={campaign.client_logo_url} alt={`${campaign.client_name || 'Client'} logo`} className="w-full h-full object-contain" />
                   </div>
@@ -1475,7 +1475,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
               {/* Week progress bar — only when we have a valid date
                   range. Thin so it reads as ambient, not a CTA. */}
               {weekOf > 0 && (
-                <div className="border-t border-gray-100 px-5 py-2.5 bg-gray-50/60">
+                <div className="border-t border-cream-100 px-5 py-2.5 bg-cream-50/60">
                   <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
                     <span>Week {weekN} of {weekOf}</span>
                     <span className="tabular-nums">{Math.round(progressPct * 100)}%</span>
@@ -1493,7 +1493,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         })()}
 
         {/* Tabs for KOLs and Contents */}
-        <Tabs defaultValue="kols" className="bg-white rounded-lg shadow-sm border">
+        <Tabs defaultValue="kols" className="bg-white rounded-[14px] border border-cream-200 shadow-card">
           <div className="px-6 pt-4">
             <TabsList>
               <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
@@ -1503,8 +1503,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           </div>
           <div className="px-6 pb-4">
             <TabsContent value="kols">
-              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-                <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+              <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+                <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="bg-gray-100 p-2 rounded-lg">
                       <Users className="h-5 w-5 text-gray-600" />
@@ -1680,9 +1680,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </Card>
                       </div>
 
-                      {/* Charts row — Platform Distribution +
-                          Region Distribution. Bar charts mirror
-                          the internal KolDashboardOverview. */}
+                      {/* Charts row — Platform + Region distribution
+                          hidden per Andy 2026-07-06 (mirrors the internal
+                          KolDashboardOverview, which also hides these). */}
+                      {false && (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
@@ -1759,6 +1760,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           </div>
                         </div>
                       </div>
+                      )}
 
                       {/* ── KOL Performance Leaderboard ─────────────
                           Lives on the KOL Dashboard Overview per Andy
@@ -1767,8 +1769,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           views desc; unactivated KOLs sink to the
                           bottom so the client sees the activation
                           gap at a glance. */}
-                      <Card className="border border-gray-200 overflow-hidden">
-                        <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+                      <Card className="border border-cream-200 overflow-hidden">
+                        <CardHeader className="border-b border-cream-100 bg-cream-50/60">
                           <CardTitle className="text-base font-semibold text-gray-900">KOL Performance Leaderboard</CardTitle>
                           <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
                         </CardHeader>
@@ -1778,7 +1780,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           ) : (
                             <div className="overflow-x-auto">
                               <table className="w-full text-sm">
-                                <thead className="bg-gray-50/80 text-[10px] uppercase tracking-wider text-gray-500">
+                                <thead className="bg-cream-50/80 text-[10px] uppercase tracking-wider text-gray-500">
                                   <tr>
                                     <th className="text-left py-2.5 px-4 w-12">#</th>
                                     <th className="text-left py-2.5 px-4">KOL</th>
@@ -1793,7 +1795,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     const sharePct = totalLeaderboardViews > 0 ? (r.stats.views / totalLeaderboardViews) * 100 : 0;
                                     const avatar = (r.kol.master_kol as any)?.profile_picture_url as string | null | undefined;
                                     return (
-                                      <tr key={r.kol.id} className="border-t border-gray-100 hover:bg-gray-50/40">
+                                      <tr key={r.kol.id} className="border-t border-cream-100 hover:bg-cream-50/40">
                                         <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
                                         <td className="py-3 px-4">
                                           <div className="flex items-center gap-2.5 min-w-0">
@@ -1872,15 +1874,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         whiteSpace: 'nowrap'
                       }} suppressHydrationWarning>
                         <TableHeader>
-                          <TableRow className="bg-gray-50 border-b border-gray-200">
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
+                          <TableRow className="bg-cream-50 border-b border-cream-200">
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 text-left select-none">
                               <button type="button" onClick={() => toggleKolSort('name')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by KOL name">
                                 <span>KOL</span>
                                 {sortIcon(kolSort.key === 'name', kolSort.dir)}
                               </button>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('platform')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Platform">
                                   <span>Platform</span>
@@ -1932,7 +1934,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('followers')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Followers">
                                   <span>Followers</span>
@@ -1989,7 +1991,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('region')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Region">
                                   <span>Region</span>
@@ -2043,14 +2045,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             {campaign?.share_creator_type && (
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button type="button" onClick={() => toggleKolSort('creator_type')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Creator Type">
                                   <span>Creator Type</span>
                                   {sortIcon(kolSort.key === 'creator_type', kolSort.dir)}
                                 </button>
                               </TableHead>
                             )}
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            {/* Status column hidden on the public view per Andy
+                                2026-07-06 — the KOL's status is already shown
+                                under the name in the KOL column. */}
+                            {false && (
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Status">
                                   <span>Status</span>
@@ -2102,14 +2108,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            )}
+                            <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <button type="button" onClick={() => toggleKolSort('content_count')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by content count">
                                 <span>Content</span>
                                 {sortIcon(kolSort.key === 'content_count', kolSort.dir)}
                               </button>
                             </TableHead>
                             {campaign?.share_kol_notes && (
-                              <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
+                              <TableHead className="relative bg-cream-50 select-none">Notes</TableHead>
                             )}
                           </TableRow>
                         </TableHeader>
@@ -2148,11 +2155,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           ) : (
                             sortedKOLs.map((campaignKOL, index) => {
                               return (
-                                <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
+                                <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-gray-100 transition-colors border-b border-cream-200`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
                                     {index + 1}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                     <div className="w-full h-full">
                                       <div className="flex items-center w-full">
                                         <div className="truncate font-bold">
@@ -2214,7 +2221,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                     <div className="flex gap-1 items-center">
                                       {(campaignKOL.master_kol.platform || []).map((platform: string) => (
                                         <span key={platform} className="flex items-center justify-center h-5 w-5" title={platform}>
@@ -2223,10 +2230,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       ))}
                                     </div>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                     {campaignKOL.master_kol.followers ? formatFollowers(campaignKOL.master_kol.followers) : '-'}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                     {campaignKOL.master_kol.region ? (
                                       <div className="flex items-center space-x-1">
                                         <span>{getRegionIcon(campaignKOL.master_kol.region).flag}</span>
@@ -2235,7 +2242,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     ) : '-'}
                                   </TableCell>
                                   {campaign?.share_creator_type && (
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
                                         <div className="flex flex-wrap gap-1">
                                           {campaignKOL.master_kol.creator_type.map((type: string) => (
@@ -2247,18 +2254,21 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       ) : '-'}
                                     </TableCell>
                                   )}
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  {/* Status cell hidden on public — see header note. */}
+                                  {false && (
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                     <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
                                       {campaignKOL.hh_status || 'Curated'}
                                     </span>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${campaign?.share_kol_notes ? 'border-r border-gray-200' : ''} p-2 overflow-hidden text-center`}>
+                                  )}
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} ${campaign?.share_kol_notes ? 'border-r border-cream-200' : ''} p-2 overflow-hidden text-center`}>
                                     <div className="font-medium text-gray-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
                                     </div>
                                   </TableCell>
                                   {campaign?.share_kol_notes && (
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                       <div className="text-sm text-gray-600 max-w-xs whitespace-pre-wrap">
                                         {campaignKOL.notes || <span className="text-gray-400 italic">-</span>}
                                       </div>
@@ -2391,8 +2401,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
             {/* Performance Tab */}
             <TabsContent value="performance">
-              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-                <CardHeader className="pb-6 border-b border-gray-100">
+              <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+                <CardHeader className="pb-6 border-b border-cream-100">
                   <div className="flex items-center gap-3">
                     <div className="bg-gray-100 p-2 rounded-lg">
                       <BarChart3 className="h-5 w-5 text-gray-600" />
@@ -2467,7 +2477,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   {/* Charts Section */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Top KOLs by Reactions */}
-                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                       <div className="mb-6">
                         <h3 className="text-xl font-bold text-gray-900">Top KOLs by Reactions</h3>
                         <p className="text-sm text-gray-500 mt-1">KOLs ranked by total likes</p>
@@ -2530,7 +2540,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     </div>
 
                     {/* Top KOLs by Views */}
-                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                       <div className="mb-6">
                         <h3 className="text-xl font-bold text-gray-900">Top KOLs by Views</h3>
                         <p className="text-sm text-gray-500 mt-1">KOLs ranked by total impressions</p>
@@ -2597,8 +2607,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             </TabsContent>
 
             <TabsContent value="contents">
-              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-                <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+              <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+                <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="bg-gray-100 p-2 rounded-lg">
                       <FileText className="h-5 w-5 text-gray-600" />
@@ -2721,7 +2731,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             return (
                               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                                 {cards.map(c => (
-                                  <div key={c.key} className="bg-white border border-gray-200 rounded-lg p-3">
+                                  <div key={c.key} className="bg-white border border-cream-200 rounded-lg p-3">
                                     <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{c.label}</p>
                                     <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatNum(c.value)}</p>
                                     {s.context_sublabels?.[c.key] && (
@@ -2736,7 +2746,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* ─── Daily entries chart ──────────── */}
                             {daily && daily.length > 0 && (
-                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <div className="bg-white border border-cream-200 rounded-lg p-4">
                                 <p className="text-sm font-semibold text-gray-900 mb-3">Daily Entries</p>
                                 <div className="h-56">
                                   <ResponsiveContainer width="100%" height="100%">
@@ -2757,7 +2767,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                             {/* ─── Entries by KOL channel donut ── */}
                             {byKol && byKol.length > 0 && (
-                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <div className="bg-white border border-cream-200 rounded-lg p-4">
                                 <p className="text-sm font-semibold text-gray-900 mb-3">Entries by KOL Channel</p>
                                 <div className="h-56">
                                   <ResponsiveContainer width="100%" height="100%">
@@ -2789,14 +2799,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                           {/* ─── KOL performance breakdown ──────── */}
                           {byKol && byKol.length > 0 && (
-                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+                            <div className="bg-white border border-cream-200 rounded-lg overflow-hidden">
+                              <div className="px-4 py-3 border-b border-cream-100 bg-cream-50/60">
                                 <p className="text-sm font-semibold text-gray-900">KOL Performance</p>
                                 <p className="text-[11px] text-gray-500 mt-0.5">Ranked by entries · share-of-pie shown below name.</p>
                               </div>
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
-                                  <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+                                  <thead className="bg-cream-50 text-[10px] uppercase tracking-wider text-gray-500">
                                     <tr>
                                       <th className="text-left py-2 px-4 w-12">#</th>
                                       <th className="text-left py-2 px-4">KOL</th>
@@ -2808,7 +2818,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     {sortedByKol.map((e, idx) => {
                                       const sharePct = totalEntries > 0 ? (e.entries / totalEntries) * 100 : 0;
                                       return (
-                                        <tr key={`${e.kol_id || e.label || idx}`} className="border-t border-gray-100">
+                                        <tr key={`${e.kol_id || e.label || idx}`} className="border-t border-cream-100">
                                           <td className="py-2 px-4 text-gray-500 tabular-nums">{idx + 1}</td>
                                           <td className="py-2 px-4 font-medium text-gray-900 truncate">{labelForKol(e, idx)}</td>
                                           <td className="py-2 px-4 text-right tabular-nums text-gray-900 font-medium">{formatNum(e.entries)}</td>
@@ -2832,7 +2842,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* ─── Ecosystem engagement ─────────── */}
                             {clicks && (clicks.by_protocol?.length || clicks.by_source?.length || clicks.total_referrals) && (
-                              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+                              <div className="bg-white border border-cream-200 rounded-lg p-4 space-y-3">
                                 <p className="text-sm font-semibold text-gray-900">Ecosystem Engagement</p>
                                 {typeof clicks.total_referrals === 'number' && (
                                   <div className="flex items-baseline gap-1.5">
@@ -2871,7 +2881,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                             {/* ─── Points and prizes ────────────── */}
                             {s && (s.prize_pool || s.draw_structure || s.points_by_source) && (
-                              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+                              <div className="bg-white border border-cream-200 rounded-lg p-4 space-y-3">
                                 <p className="text-sm font-semibold text-gray-900">Points & Prizes</p>
                                 {s.prize_pool && (
                                   <div>
@@ -2904,7 +2914,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                           {/* ─── UGC performance ──────────────── */}
                           {ugc && (ugc.posts_approved || ugc.creators || ugc.views || ugc.top_post) && (
-                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="bg-white border border-cream-200 rounded-lg p-4">
                               <p className="text-sm font-semibold text-gray-900 mb-3">UGC Performance</p>
                               {/* Headline stats */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -2935,7 +2945,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                               {/* Top post */}
                               {ugc.top_post && (
-                                <div className="border-t border-gray-100 pt-3">
+                                <div className="border-t border-cream-100 pt-3">
                                   <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Top Post</p>
                                   <div className="flex items-start gap-3">
                                     <div className="min-w-0 flex-1">
@@ -2995,15 +3005,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <div className="border rounded-lg overflow-auto">
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
-                            <TableRow className="bg-gray-50 border-b border-gray-200">
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
+                            <TableRow className="bg-cream-50 border-b border-cream-200">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 text-left select-none">
                                 <button type="button" onClick={() => toggleContentSort('kol')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by KOL name">
                                   <span>KOL</span>
                                   {sortIcon(contentSort.key === 'kol', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('platform')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Platform">
                                     <span>Platform</span>
@@ -3055,7 +3065,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('type')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Type">
                                     <span>Type</span>
@@ -3105,7 +3115,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button type="button" onClick={() => toggleContentSort('status')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Status">
                                     <span>Status</span>
@@ -3155,45 +3165,45 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button type="button" onClick={() => toggleContentSort('activation_date')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Activation Date">
                                   <span>Activation Date</span>
                                   {sortIcon(contentSort.key === 'activation_date', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Views">
                                   <span>Views</span>
                                   {sortIcon(contentSort.key === 'impressions', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Reactions">
                                   <span>Reactions</span>
                                   {sortIcon(contentSort.key === 'likes', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Shares">
                                   <span>Shares</span>
                                   {sortIcon(contentSort.key === 'retweets', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Replies">
                                   <span>Replies</span>
                                   {sortIcon(contentSort.key === 'comments', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              <TableHead className={`relative bg-gray-50 ${notesVisible ? 'border-r border-gray-200' : ''} select-none`}>
+                              <TableHead className={`relative bg-cream-50 ${notesVisible ? 'border-r border-cream-200' : ''} select-none`}>
                                 <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Saves">
                                   <span>Saves</span>
                                   {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
                                 </button>
                               </TableHead>
                               {notesVisible && (
-                                <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
+                                <TableHead className="relative bg-cream-50 select-none">Notes</TableHead>
                               )}
                             </TableRow>
                           </TableHeader>
@@ -3226,11 +3236,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               sortedContents.map((content, index) => {
                                 const kol = kols.find(k => k.id === content.campaign_kols_id);
                                 return (
-                                  <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
+                                  <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-gray-100 transition-colors border-b border-cream-200`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
                                       {index + 1}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                       <div className="flex items-center w-full h-full">
                                         <div className="truncate font-bold">{kol?.master_kol?.name || '-'}</div>
                                         {kol?.master_kol?.link && (
@@ -3246,7 +3256,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         )}
                                       </div>
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.platform ? (
                                         <div className="flex gap-1 items-center">
                                           <span className="flex items-center justify-center h-5 w-5" title={content.platform}>
@@ -3255,14 +3265,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         </div>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.type ? (
                                         <span className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(content.type)}`}>
                                           {content.type}
                                         </span>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
                                         const s = (content.status || '').toLowerCase();
                                         if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-emerald-100 text-emerald-800';
@@ -3274,33 +3284,33 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         {content.status ? content.status.charAt(0).toUpperCase() + content.status.slice(1).toLowerCase() : '-'}
                                       </span>
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.activation_date ? formatDate(content.activation_date) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.content_link ? (
                                         <a href={content.content_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
                                           Open
                                         </a>
                                       ) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.impressions ? formatFollowers(content.impressions) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.likes ? formatFollowers(content.likes) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.retweets ? formatFollowers(content.retweets) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                       {content.comments ? formatFollowers(content.comments) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${notesVisible ? 'border-r border-gray-200' : ''} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} ${notesVisible ? 'border-r border-cream-200' : ''} p-2 overflow-hidden`}>
                                       {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
                                     </TableCell>
                                     {notesVisible && (
-                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 align-top`}>
+                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 align-top`}>
                                         {/* HHP Onboarding Overhaul Spec § 9 #11 —
                                             "Complimen Post" truncation fix.
                                             The cell used to have overflow-hidden
@@ -3508,7 +3518,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       {/* Charts Section */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Total Views */}
-                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
                               <h3 className="text-xl font-bold text-gray-900">Total Views</h3>
@@ -3564,7 +3574,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
 
                         {/* Views by Platform */}
-                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
                               <h3 className="text-xl font-bold text-gray-900">Views by Platform</h3>
