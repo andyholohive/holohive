@@ -68,6 +68,9 @@ type RecurringRow = {
 
 export async function GET(request: Request) {
   // Auth — same Bearer + query-param fallback as the other crons
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization') || '';

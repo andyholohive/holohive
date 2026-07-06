@@ -25,7 +25,7 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -38,8 +38,23 @@ export async function GET(request: Request) {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
+  const runStart = Date.now();
+
   try {
     const result = await runMindshareScan(supabase, { backfill });
+
+    // agent_runs log for cron-health-check coverage.
+    try {
+      await (supabase as any).from('agent_runs').insert({
+        agent_name: 'MINDSHARE_SCAN',
+        run_type: 'cron',
+        started_at: new Date(runStart).toISOString(),
+        completed_at: new Date().toISOString(),
+        status: 'success',
+        output_summary: `Scanned ${result.messages_scanned} message(s), added ${result.mentions_added} mention(s).`,
+      });
+    } catch { /* swallow */ }
+
     return NextResponse.json({ ok: true, backfill, ...result });
   } catch (err: any) {
     console.error('[cron/mindshare-scan] error:', err);

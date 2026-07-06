@@ -41,12 +41,19 @@ export async function createApprovedContentsRow(
   admin: SupabaseClient,
   input: ApproveSubmissionInput,
 ): Promise<ApproveResult> {
+  // [2026-07-05 AUDIT-FIX] order+limit(1) instead of bare .maybeSingle():
+  // a duplicate (campaign, kol) roster pair would make .maybeSingle()
+  // error out AFTER the submission was already marked approved, producing
+  // a spurious "KOL is not on this campaign" with no retry path. No dups
+  // exist in prod today; this is a cheap guard against the edge.
   const { data: campaignKol } = await (admin as any)
     .from('campaign_kols')
     .select('id, agreed_rate, master_kol:master_kols(id, standard_rate, repost_rate)')
     .eq('campaign_id', input.campaignId)
     .eq('master_kol_id', input.kolId)
     .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   if (!campaignKol?.id) {

@@ -19,6 +19,9 @@ export const maxDuration = 60;
  */
 
 export async function GET(request: Request) {
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   if (process.env.CRON_SECRET) {
     const auth = request.headers.get('authorization') || '';
     if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -113,6 +116,18 @@ export async function GET(request: Request) {
   if (revokeErr) {
     console.error('[cron list-access-cleanup] grants update failed:', revokeErr.message);
   }
+
+  // agent_runs log for cron-health-check coverage.
+  try {
+    await (supabase as any).from('agent_runs').insert({
+      agent_name: 'LIST_ACCESS_CLEANUP',
+      run_type: 'cron',
+      started_at: new Date(startedAt).toISOString(),
+      completed_at: new Date().toISOString(),
+      status: 'success',
+      output_summary: `Revoked ${expired.length} expired grant(s) across ${listsTouched} list(s).`,
+    });
+  } catch { /* swallow */ }
 
   return NextResponse.json({
     ok: true,

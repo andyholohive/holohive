@@ -29,6 +29,9 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   // Auth
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization') || '';

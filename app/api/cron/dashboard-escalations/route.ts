@@ -32,6 +32,9 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   // ─── Auth ───────────────────────────────────────────────────────────
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization') || '';
@@ -46,6 +49,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'missing supabase config' }, { status: 500 });
   }
   const sb = createClient(supabaseUrl, supabaseServiceKey);
+
+  const runStart = Date.now();
 
   try {
     const cfg = await getDashboardConfig();
@@ -303,6 +308,18 @@ export async function GET(request: Request) {
     }
     const dmSent = dmResults.filter(d => d.sent).length;
     const dmSkipped = dmResults.filter(d => !d.sent).length;
+
+    // agent_runs log for cron-health-check coverage.
+    try {
+      await (sb as any).from('agent_runs').insert({
+        agent_name: 'DASHBOARD_ESCALATIONS',
+        run_type: 'cron',
+        started_at: new Date(runStart).toISOString(),
+        completed_at: new Date().toISOString(),
+        status: 'success',
+        output_summary: `${findingsCount} finding(s); ${dmSent} DM(s) sent, ${dmSkipped} skipped.`,
+      });
+    } catch { /* swallow */ }
 
     return NextResponse.json({
       sentMessage: sent,

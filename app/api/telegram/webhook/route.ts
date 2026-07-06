@@ -2465,6 +2465,15 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
 
   // Multi-campaign — stash and ask. Telegram callback_data caps at 64 bytes
   // so we use a pending_submissions row to hold the link.
+  // [2026-07-05 AUDIT-FIX] Opportunistic cleanup: abandoned pickers used
+  // to accumulate forever (rows were only deleted on pick/cancel taps).
+  // Sweep anything older than 7 days on each new /submit — cheap, and
+  // keeps the table from growing unbounded without needing a cron.
+  await (supabaseAdmin as any)
+    .from('pending_submissions')
+    .delete()
+    .lt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
   const { data: pending, error: pErr } = await (supabaseAdmin as any)
     .from('pending_submissions')
     .insert({
@@ -2526,25 +2535,26 @@ async function finalizeSubmission(opts: {
   // row so the rest of HHP (dashboards, leaderboards, lineup_slots.status)
   // can read a single source. content_submissions stays for v1 review
   // queue compat; eventually approval there will just flip status here.
-  await (supabaseAdmin as any)
-    .from('content_items')
-    .insert({
-      kol_id: opts.kolId,
-      campaign_id: opts.campaignId,
-      type: opts.contentType,
-      link: opts.link,
-      status: 'submitted',
-    })
-    .select('id')
-    .single()
-    .then(() => {/* idempotent — dup-link is fine, the unique index catches */})
-    .catch((err: any) => {
-      // Most expected error is 23505 (duplicate link) — the staging row
-      // path below handles user feedback. Log anything else for debug.
-      if (err?.code !== '23505') {
-        console.warn('[/submit F3] content_items mirror insert failed:', err);
-      }
-    });
+  // [2026-07-05 AUDIT-FIX] supabase-js builders resolve {data, error} and
+  // never reject — the previous .then()/.catch() chain silently swallowed
+  // EVERY mirror-insert failure (including non-dup CHECK violations),
+  // which also skewed the SPA live counts that read content_items.
+  {
+    const { error: mirrorErr } = await (supabaseAdmin as any)
+      .from('content_items')
+      .insert({
+        kol_id: opts.kolId,
+        campaign_id: opts.campaignId,
+        type: opts.contentType,
+        link: opts.link,
+        status: 'submitted',
+      });
+    // 23505 (duplicate link) is expected + idempotent; the staging-row
+    // dup path below handles user feedback. Warn on anything else.
+    if (mirrorErr && mirrorErr.code !== '23505') {
+      console.warn('[/submit F3] content_items mirror insert failed:', mirrorErr);
+    }
+  }
 
   // [2026-06-12] Per Appendix v3 F2 + Andy: kol_id + campaign_id FKs are
   // the only authoritative identity. Display names render live via JOIN.
@@ -2883,10 +2893,22 @@ async function handleSubmPickerCallback(
   const tapperTgUserId = cq.from?.id?.toString();
   const { data: pending } = await (supabaseAdmin as any)
     .from('pending_submissions')
-    .select('id, kol_telegram_id, kol_id, link')
+    .select('id, kol_telegram_id, kol_id, link, created_at')
     .eq('id', pendingId)
     .maybeSingle();
   if (!pending) {
+    await answerCallbackQuery(callbackId, 'Picker expired. Send /submit again.');
+    return;
+  }
+  // [2026-07-05 AUDIT-FIX] Picker TTL — buttons on old messages never
+  // expire client-side, so cap server-side at 48h (same spirit as the
+  // PSG 10-min confirm window, scaled for the KOL workflow).
+  const PICKER_TTL_MS = 48 * 60 * 60 * 1000;
+  if (pending.created_at && Date.now() - new Date(pending.created_at).getTime() > PICKER_TTL_MS) {
+    await (supabaseAdmin as any).from('pending_submissions').delete().eq('id', pendingId);
+    if (messageChatId && messageId) {
+      await editMessageText(messageChatId, messageId, '⌛ <i>Picker expired. Send /submit again.</i>');
+    }
     await answerCallbackQuery(callbackId, 'Picker expired. Send /submit again.');
     return;
   }
@@ -2993,9 +3015,7 @@ async function handleSubmReviewCallback(
     return;
   }
 
-  // [2026-06-12] Render live names via JOIN per Appendix F2. Also pull the
-  // KOL's per-KOL group chat_id so the reply 👍/reject DM lands in the
-  // same chat where they originally /submitted.
+  // [2026-06-12] Render live names via JOIN per Appendix F2.
   const { data: sub } = await (supabaseAdmin as any)
     .from('content_submissions')
     .select(`
@@ -3016,19 +3036,14 @@ async function handleSubmReviewCallback(
   const kolName: string = (sub as any).kol?.name ?? 'KOL';
   const campaignName: string = (sub as any).campaign?.name ?? 'Campaign';
 
-  // Look up the KOL's per-KOL group chat — the natural destination for
-  // approval/rejection replies (where they originally /submitted).
-  const { data: kolChat } = await (supabaseAdmin as any)
-    .from('telegram_chats')
-    .select('chat_id')
-    .eq('master_kol_id', (sub as any).kol_id)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-  const kolChatId: string | null = (kolChat as any)?.chat_id ?? null;
-
   const nextStatus = action === 'approve' ? 'approved' : 'rejected';
-  const { error: updErr } = await (supabaseAdmin as any)
+  // [2026-07-05 AUDIT-FIX] Conditional update — `.eq('status',
+  // 'pending_review')` makes the DB the arbiter for concurrent taps.
+  // The read-then-act check above can't stop two near-simultaneous
+  // taps; without this the second tap would re-run the approve side
+  // effects. `.select('id')` returns the rows actually updated: empty
+  // means someone else won the race.
+  const { data: updatedRows, error: updErr } = await (supabaseAdmin as any)
     .from('content_submissions')
     .update({
       status: nextStatus,
@@ -3041,17 +3056,24 @@ async function handleSubmReviewCallback(
         ? 'Did not meet criteria. Contact your HoloHive lead for details.'
         : null,
     })
-    .eq('id', submissionId);
+    .eq('id', submissionId)
+    .eq('status', 'pending_review')
+    .select('id');
   if (updErr) {
     console.error('[/submit] review update failed:', updErr);
     await answerCallbackQuery(callbackId, 'Update failed.');
     return;
   }
+  if (!updatedRows || updatedRows.length === 0) {
+    await answerCallbackQuery(callbackId, 'Already reviewed by someone else.');
+    return;
+  }
 
-  // [2026-06-12] F3 mirror: flip the content_items row matched by
-  // (campaign_id, link). Approve → status=approved + approved_at + approved_by.
-  // Reject → status=rejected. Best-effort; staging row is already the
-  // user-visible state.
+  // [2026-06-12] F3 mirror: flip the content_items row. Approve →
+  // status=approved + approved_at + approved_by. Reject → status=rejected.
+  // Best-effort; staging row is already the user-visible state.
+  // [2026-07-05 AUDIT-FIX] Scoped by campaign_id — matching on link alone
+  // flipped BOTH rows when the same link was submitted to two campaigns.
   await (supabaseAdmin as any)
     .from('content_items')
     .update(
@@ -3064,6 +3086,7 @@ async function handleSubmReviewCallback(
           }
         : { status: 'rejected', updated_at: new Date().toISOString() },
     )
+    .eq('campaign_id', sub.campaign_id)
     .eq('link', sub.link)
     .neq('status', 'rejected');
 
@@ -3072,6 +3095,7 @@ async function handleSubmReviewCallback(
   // the campaign — content_submissions + content_items got flipped but the
   // Dashboard reads from `contents`. Web fallback does the same insert via
   // the shared helper; we share the helper so they can't drift.
+  let approveSideEffectError: string | null = null;
   if (action === 'approve') {
     const result = await createApprovedContentsRow(supabaseAdmin as any, {
       submissionId,
@@ -3084,14 +3108,21 @@ async function handleSubmReviewCallback(
     });
     if (result.error) {
       console.error('[/submit] contents insert on approve failed:', result.error);
+      approveSideEffectError = result.error;
     }
   }
 
   // Edit the review-channel message to reflect the decision (replaces the
-  // buttons so it can't be tapped again).
+  // buttons so it can't be tapped again). [2026-07-05 AUDIT-FIX] If the
+  // contents insert failed, say so on the card — previously it read
+  // "Approved" while no contents/payment row existed and re-tapping said
+  // "Already approved" with no retry path. The warning tells the team to
+  // add the content manually on the campaign page.
   if (messageChatId && messageId) {
     const tag = action === 'approve'
-      ? `✅ <b>Approved</b> by ${escapeHtml(teamMember.name)}`
+      ? (approveSideEffectError
+          ? `⚠️ <b>Approved</b> by ${escapeHtml(teamMember.name)} — but the content row FAILED to create: <i>${escapeHtml(approveSideEffectError)}</i>. Add it manually on the campaign page.`
+          : `✅ <b>Approved</b> by ${escapeHtml(teamMember.name)}`)
       : `❌ <b>Rejected</b> by ${escapeHtml(teamMember.name)}`;
     await editMessageText(
       messageChatId,
@@ -3105,12 +3136,16 @@ async function handleSubmReviewCallback(
     );
   }
 
-  // [2026-07-03] KOL-facing approve/reject notification removed per Andy.
-  // The review-channel message is already edited to show the decision
-  // (visible to the team); the KOL doesn't need a separate ping — the
-  // submitted-for-review ack at /submit time is enough.
+  // No KOL-facing notification on approve/reject (removed 2026-07-03 per
+  // Andy — /submit is fully silent toward the KOL on the success path;
+  // the review-channel card is the team-facing record).
 
-  await answerCallbackQuery(callbackId, action === 'approve' ? 'Approved.' : 'Rejected.');
+  await answerCallbackQuery(
+    callbackId,
+    action === 'approve'
+      ? (approveSideEffectError ? 'Approved, but content row failed — see card.' : 'Approved.')
+      : 'Rejected.',
+  );
 }
 
 async function handleBacklogCommand(

@@ -32,7 +32,9 @@ const SCHEDULE_KEY = 'discovery_default';
 export async function GET(request: Request) {
   // Vercel sends Authorization: Bearer <CRON_SECRET> for cron-triggered
   // requests. Reject everything else so the endpoint can't be hit ad hoc.
-  // Allow unauth in dev (no CRON_SECRET set) for easier local testing.
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   if (process.env.CRON_SECRET) {
     const auth = request.headers.get('authorization') || '';
     if (auth !== `Bearer ${process.env.CRON_SECRET}`) {

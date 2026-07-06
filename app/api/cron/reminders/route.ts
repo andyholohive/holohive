@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -45,6 +45,18 @@ export async function GET(request: Request) {
     const rulesEvaluated = results.length;
     const messagesSent = results.filter((r) => r.message_sent).length;
     const totalItems = results.reduce((sum, r) => sum + r.items_found, 0);
+
+    // agent_runs log for cron-health-check coverage.
+    try {
+      await (supabase as any).from('agent_runs').insert({
+        agent_name: 'REMINDERS',
+        run_type: 'cron',
+        started_at: new Date(start).toISOString(),
+        completed_at: new Date().toISOString(),
+        status: 'success',
+        output_summary: `Evaluated ${rulesEvaluated} rule(s), sent ${messagesSent} message(s).`,
+      });
+    } catch { /* swallow */ }
 
     return NextResponse.json({
       success: true,

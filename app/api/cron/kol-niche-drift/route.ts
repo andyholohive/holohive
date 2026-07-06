@@ -44,6 +44,9 @@ const DELAY_MS = 100;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export async function GET(request: Request) {
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization') || '';

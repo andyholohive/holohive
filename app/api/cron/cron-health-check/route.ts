@@ -56,6 +56,11 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   KOL_NICHE_DRIFT: 1,          // daily 04:30 UTC — PROF.6 / Doc 2 Q7b 30-day niche drift sweep
   TG_SCAN_NUDGE: 1,            // monthly (1st @ 03:00 UTC) — TG-CRON.1 manual scan reminder
   COMMENT_SENTIMENT: 1,        // daily 07:00 UTC — SENT.7 sentiment scoring of ingested TG comments
+  CAMPAIGN_WEEKLY_SNAPSHOT: 1, // weekly (Monday) — Client Portal stats-row snapshots
+  LIST_ACCESS_CLEANUP: 1,      // daily 08:00 UTC — expired list-access grant revocation
+  REMINDERS: 1,                // daily 09:00 UTC — reminder rules sweep
+  SNAPSHOT_TG_FOLLOWERS: 1,    // monthly (1st) — KOL TG follower snapshots
+  CRON_HEALTH_CHECK: 1,        // daily 08:00 UTC — this sweep's own self-log
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;
@@ -63,6 +68,9 @@ const RUNAWAY_MULTIPLIER = 5;  // flag at 5× expected
 
 export async function GET(request: Request) {
   // Auth
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization') || '';
@@ -143,6 +151,16 @@ export async function GET(request: Request) {
 
     if (failureCount === 0 && anomalyCount === 0) {
       // Healthy — log + return without DMing
+      try {
+        await (supabase as any).from('agent_runs').insert({
+          agent_name: 'CRON_HEALTH_CHECK',
+          run_type: 'cron',
+          started_at: startedAt.toISOString(),
+          completed_at: new Date().toISOString(),
+          status: 'success',
+          output_summary: 'All clear — no failed runs or anomalies in last 24h.',
+        });
+      } catch { /* swallow */ }
       return NextResponse.json({
         ok: true,
         message: 'All clear — no failed runs or anomalies in last 24h.',
@@ -197,6 +215,18 @@ export async function GET(request: Request) {
 
     // ─── 5. Send DM ───────────────────────────────────────────────
     const sent = await TelegramService.sendMessage(message, 'HTML');
+
+    // agent_runs log — the watcher watches itself.
+    try {
+      await (supabase as any).from('agent_runs').insert({
+        agent_name: 'CRON_HEALTH_CHECK',
+        run_type: 'cron',
+        started_at: startedAt.toISOString(),
+        completed_at: new Date().toISOString(),
+        status: 'success',
+        output_summary: `${failureCount} failure(s), ${anomalyCount} anomaly(ies) flagged.`,
+      });
+    } catch { /* swallow */ }
 
     return NextResponse.json({
       ok: true,
