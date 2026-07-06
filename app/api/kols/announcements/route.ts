@@ -63,3 +63,37 @@ export async function POST(request: Request) {
     );
   }
 }
+
+/**
+ * GET /api/kols/announcements — sent-announcement history for the
+ * History tab in the Send Announcement dialog (per Andy 2026-07-06).
+ * Returns the latest 50 announcements with per-recipient receipts
+ * (KOL name, delivered/failed, error message). Service-role read
+ * because the announcement tables have no client RLS policies —
+ * writes AND reads both stay behind this super_admin-guarded route.
+ */
+export async function GET(request: Request) {
+  const guard = await requireSuperAdmin(request);
+  if (!guard.ok) return guard.response;
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+
+  const { data, error } = await (supabase as any)
+    .from('kol_announcements')
+    .select(`
+      id, body_text, sender_name, recipient_count, ok_count, failed_count, created_at,
+      recipients:kol_announcement_recipients(id, kol_id, sent_at, ok, error_message, kol:master_kols(name))
+    `)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error('[kols/announcements] history fetch failed', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ announcements: data ?? [] });
+}

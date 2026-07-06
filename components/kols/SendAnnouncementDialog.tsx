@@ -8,8 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/hooks/use-toast';
-import { Send, Search, Users } from 'lucide-react';
+import { formatDateTime } from '@/lib/dateFormat';
+import { Send, Search, Users, History, ChevronRight, RotateCcw } from 'lucide-react';
 
 /**
  * SendAnnouncementDialog — pick KOLs with linked GCs + write message + send.
@@ -25,6 +29,25 @@ import { Send, Search, Users } from 'lucide-react';
  */
 
 type KolChoice = { id: string; name: string; hasGc: boolean };
+
+/** Shape returned by GET /api/kols/announcements (History tab). */
+type AnnouncementHistoryRow = {
+  id: string;
+  body_text: string;
+  sender_name: string | null;
+  recipient_count: number;
+  ok_count: number;
+  failed_count: number;
+  created_at: string;
+  recipients: Array<{
+    id: string;
+    kol_id: string;
+    sent_at: string | null;
+    ok: boolean;
+    error_message: string | null;
+    kol: { name: string } | null;
+  }>;
+};
 
 /** Insertable per-recipient placeholders. Server substitutes at send. */
 const VARIABLES: Array<{ token: string; description: string }> = [
@@ -48,6 +71,60 @@ export function SendAnnouncementDialog({
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // [2026-07-06] History tab — past sends with per-KOL receipts.
+  const [tab, setTab] = useState<'compose' | 'history'>('compose');
+  const [historyRows, setHistoryRows] = useState<AnnouncementHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch('/api/kols/announcements');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setHistoryRows(data.announcements ?? []);
+      setHistoryLoaded(true);
+    } catch (err: any) {
+      toast({ title: 'Failed to load history', description: err?.message, variant: 'destructive' });
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Lazy-load history on first switch to the tab; refetch on re-open of
+  // the tab so a send made moments ago shows up.
+  useEffect(() => {
+    if (open && tab === 'history') fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tab]);
+
+  /** Re-fire the same message to just the recipients that failed. */
+  const resendToFailed = async (row: AnnouncementHistoryRow) => {
+    const failedKolIds = row.recipients.filter(r => !r.ok).map(r => r.kol_id);
+    if (failedKolIds.length === 0) return;
+    setResendingId(row.id);
+    try {
+      const res = await fetch('/api/kols/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: row.body_text, kolIds: failedKolIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      toast({
+        title: data.failedCount > 0 ? 'Resend partially delivered' : 'Resend delivered',
+        description: `${data.okCount} sent · ${data.failedCount} failed`,
+      });
+      await fetchHistory();
+    } catch (err: any) {
+      toast({ title: 'Resend failed', description: err?.message?.slice(0, 300), variant: 'destructive' });
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   /**
    * Insert a template token at the current cursor position (or at the end
@@ -81,6 +158,9 @@ export function SendAnnouncementDialog({
       setSearch('');
       setSelectedIds(new Set());
       setShowPreview(false);
+      setTab('compose');
+      setExpandedId(null);
+      setHistoryLoaded(false);
     }
   }, [open]);
 
@@ -168,6 +248,18 @@ export function SendAnnouncementDialog({
           </DialogTitle>
         </DialogHeader>
 
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'compose' | 'history')} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="w-fit bg-cream-100 border border-cream-200 p-1">
+            <TabsTrigger value="compose" className="px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+              Compose
+            </TabsTrigger>
+            <TabsTrigger value="history" className="px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+              <History className="h-3.5 w-3.5 mr-1.5" />
+              History
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="compose" className="flex-1 flex flex-col min-h-0 mt-0">
         <div className="flex-1 overflow-y-auto px-1 space-y-4 py-2">
           {/* Recipient picker — only KOLs with a linked GC show up.
               Chip shows how many are picked; search + Select All Visible
@@ -300,6 +392,91 @@ export function SendAnnouncementDialog({
             {sending ? 'Sending 1 / 1.1s…' : `Send to ${selectedCount}`}
           </Button>
         </DialogFooter>
+          </TabsContent>
+
+          {/* [2026-07-06] History — every past send with per-KOL delivery
+              receipts. Failed recipients keep their Telegram error message
+              and can be retried with the same body via Resend. */}
+          <TabsContent value="history" className="flex-1 min-h-0 overflow-y-auto mt-0 py-2 px-1">
+            {historyLoading && !historyLoaded ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 rounded-lg" />
+                ))}
+              </div>
+            ) : historyRows.length === 0 ? (
+              <EmptyState
+                icon={History}
+                title="No announcements sent yet"
+                description="Sends from the Compose tab will show up here with per-KOL delivery receipts."
+              />
+            ) : (
+              <ul className="space-y-2">
+                {historyRows.map(row => {
+                  const isExpanded = expandedId === row.id;
+                  const tone = row.failed_count === 0 ? 'success' : row.ok_count === 0 ? 'danger' : 'warning';
+                  return (
+                    <li key={row.id} className="rounded-lg border border-cream-200 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(isExpanded ? null : row.id)}
+                        className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-cream-50/60"
+                      >
+                        <ChevronRight className={`h-3.5 w-3.5 text-ink-warm-400 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-ink-warm-900 truncate">{row.body_text}</p>
+                          <p className="text-[11px] text-ink-warm-500">
+                            {formatDateTime(row.created_at)}
+                            {row.sender_name ? ` · ${row.sender_name}` : ''}
+                          </p>
+                        </div>
+                        <StatusBadge tone={tone} size="sm">
+                          {row.ok_count}/{row.recipient_count} delivered
+                        </StatusBadge>
+                      </button>
+                      {isExpanded && (
+                        <div className="border-t border-cream-100 bg-cream-50/40 px-3 py-2.5 space-y-2">
+                          <pre className="text-xs text-ink-warm-800 whitespace-pre-wrap font-sans bg-white border border-cream-200 rounded-md p-2.5">{row.body_text}</pre>
+                          <ul className="divide-y divide-cream-100 rounded-md border border-cream-200 bg-white">
+                            {row.recipients.map(r => (
+                              <li key={r.id} className="px-3 py-1.5 flex items-center gap-2 text-xs">
+                                <span className="flex-1 text-ink-warm-900 truncate">{r.kol?.name ?? r.kol_id.slice(0, 8)}</span>
+                                {r.ok ? (
+                                  <span className="text-ink-warm-500 tabular-nums">{r.sent_at ? formatDateTime(r.sent_at) : ''}</span>
+                                ) : (
+                                  <span className="text-rose-600 truncate max-w-[260px]" title={r.error_message ?? undefined}>
+                                    {r.error_message ?? 'failed'}
+                                  </span>
+                                )}
+                                <StatusBadge tone={r.ok ? 'success' : 'danger'} size="sm">
+                                  {r.ok ? 'Delivered' : 'Failed'}
+                                </StatusBadge>
+                              </li>
+                            ))}
+                          </ul>
+                          {row.failed_count > 0 && (
+                            <div className="flex justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => resendToFailed(row)}
+                                disabled={resendingId === row.id}
+                              >
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                {resendingId === row.id ? 'Resending…' : `Resend to ${row.failed_count} failed`}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
