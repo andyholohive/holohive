@@ -341,6 +341,7 @@ export default function ClientsPage() {
    *  client_context.start_date so the card always reflects the
    *  Engagement tab's truth. */
   const [earliestStintStartByClient, setEarliestStintStartByClient] = useState<Record<string, string>>({});
+  const [latestStintEndByClient, setLatestStintEndByClient] = useState<Record<string, string>>({});
   // [2026-07-01] MAX covered_through per client from the client_coverage view.
   // Drives auto-derived Paused status (covered_through < today or null while
   // is_active is still true = engagement lapsed but client not manually turned off).
@@ -807,15 +808,25 @@ export default function ClientsPage() {
       // ASC-sorted stints once and keep the first start per client.
       const stintsRes = await supabase
         .from('client_stints')
-        .select('client_id, start_date')
+        .select('client_id, start_date, end_date')
         .order('start_date', { ascending: true });
       const earliestStintStart: Record<string, string> = {};
-      for (const s of ((stintsRes as any).data ?? []) as Array<{ client_id: string; start_date: string }>) {
+      // [2026-07-06] Max end_date across ALL stints (ended included) —
+      // display fallback for the card's date range when the client has
+      // no active-stint coverage. Without it, fully-ended clients (e.g.
+      // Altura) read "ongoing" because client_coverage only surfaces
+      // active stints.
+      const latestStintEnd: Record<string, string> = {};
+      for (const s of ((stintsRes as any).data ?? []) as Array<{ client_id: string; start_date: string; end_date: string | null }>) {
         if (!earliestStintStart[s.client_id] && s.start_date) {
           earliestStintStart[s.client_id] = s.start_date;
         }
+        if (s.end_date && (!latestStintEnd[s.client_id] || s.end_date > latestStintEnd[s.client_id])) {
+          latestStintEnd[s.client_id] = s.end_date;
+        }
       }
       setEarliestStintStartByClient(earliestStintStart);
+      setLatestStintEndByClient(latestStintEnd);
 
       // [2026-07-01] Paused = auto-derived when engagement coverage has
       // passed today. Pull covered_through per client from the
@@ -4064,7 +4075,18 @@ export default function ClientsPage() {
                                   || ctx?.start_date;
                                 if (!startRaw) return null;
                                 const start = formatDate(new Date(startRaw + 'T00:00:00'));
-                                const endRaw = coveredThroughByClient[client.id];
+                                // [2026-07-06] client_coverage only has rows for
+                                // ACTIVE stints, so a fully-ended client (Altura)
+                                // has no entry at all — fall back to the max end
+                                // across all its stints. "ongoing" is reserved
+                                // for a live stint with no end date set, which is
+                                // why the fallback only kicks in when the client
+                                // is absent from the coverage map entirely (a
+                                // present-but-null entry IS a live open-ended
+                                // stint, even if an older ended stint has dates).
+                                const endRaw = client.id in coveredThroughByClient
+                                  ? coveredThroughByClient[client.id]
+                                  : latestStintEndByClient[client.id];
                                 const end = endRaw ? formatDate(new Date(endRaw + 'T00:00:00')) : 'ongoing';
                                 return (
                                   <span className="text-xs text-ink-warm-500 tabular-nums">
