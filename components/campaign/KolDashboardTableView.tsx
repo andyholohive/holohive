@@ -1201,50 +1201,50 @@ export function KolDashboardTableView({
                                     who never post no longer show as active.
                                     "Last active Week X" recolored gray → light
                                     green per the same request. */}
+                                {/* [2026-07-06] Single combined pill per Andy — the
+                                    hh_status chip and activation-recency chip merged
+                                    into ONE. Still click-to-edit (the pill IS the
+                                    hh_status Select trigger); recency renders as a
+                                    suffix. Active posting tints the whole pill
+                                    emerald (activity trumps the status palette);
+                                    no recency → plain status colors. */}
                                 <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                   {(() => {
                                     const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
                                     const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
-                                    if (aw != null) {
-                                      return (
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                          Active Week {aw}
-                                        </span>
-                                      );
-                                    }
-                                    if (lw != null) {
-                                      return (
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50/60 text-emerald-600 border border-emerald-100">
-                                          Last active Week {lw}
-                                        </span>
-                                      );
-                                    }
+                                    const recency = aw != null
+                                      ? `Active Wk ${aw}`
+                                      : lw != null
+                                        ? `Last active Wk ${lw}`
+                                        : null;
+                                    const pillColor = aw != null
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : lw != null
+                                        ? 'bg-emerald-50/60 text-emerald-600'
+                                        : getStatusColor(campaignKOL.hh_status);
                                     return (
-                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                        Onboarded
-                                      </span>
+                                      <Select
+                                        value={campaignKOL.hh_status}
+                                        onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
+                                      >
+                                        <SelectTrigger
+                                          className={`border-none shadow-none bg-transparent w-auto h-auto px-1.5 py-0.5 rounded text-[10px] font-medium inline-flex items-center gap-0.5 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${pillColor}`}
+                                          style={{ outline: 'none', boxShadow: 'none' }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                            {campaignKOL.hh_status}
+                                            {recency && <span className="opacity-75">· {recency}</span>}
+                                          </span>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {CampaignKOLService.getHHStatusOptions().map((status) => (
+                                            <SelectItem key={status} value={status || ''}>{status}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     );
                                   })()}
-                                  {/* hh_status pill — click to edit inline. Mirrors
-                                      the standalone Status column but keeps status
-                                      visible at a glance next to the name. */}
-                                  <Select
-                                    value={campaignKOL.hh_status}
-                                    onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
-                                  >
-                                    <SelectTrigger
-                                      className={`border-none shadow-none bg-transparent w-auto h-auto px-1.5 py-0.5 rounded text-[10px] font-medium inline-flex items-center gap-0.5 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${getStatusColor(campaignKOL.hh_status)}`}
-                                      style={{ outline: 'none', boxShadow: 'none' }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {CampaignKOLService.getHHStatusOptions().map((status) => (
-                                        <SelectItem key={status} value={status || ''}>{status}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
                                 </div>
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>

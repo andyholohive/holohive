@@ -2073,40 +2073,34 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                           </a>
                                         )}
                                       </div>
-                                      {/* [2026-07-01] Merged inline status strip —
-                                          same treatment as internal KOL Dashboard.
-                                          Recency chip sources from approved contents
-                                          (view rewritten), hh_status pill sits next
-                                          to it. Read-only on the public page (no
-                                          Select) — the client shouldn't be editing
-                                          KOL relationship status from the portal. */}
+                                      {/* [2026-07-06] Single combined pill — same
+                                          treatment as the internal KOL Dashboard
+                                          (per Andy: the two chips merged into one).
+                                          hh_status + activation recency in one span;
+                                          active posting tints it emerald. Read-only
+                                          on the public page — the client shouldn't
+                                          be editing KOL relationship status. */}
                                       <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                         {(() => {
                                           const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
                                           const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
-                                          if (aw != null) {
-                                            return (
-                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                Active Week {aw}
-                                              </span>
-                                            );
-                                          }
-                                          if (lw != null) {
-                                            return (
-                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50/60 text-emerald-600 border border-emerald-100">
-                                                Last active Week {lw}
-                                              </span>
-                                            );
-                                          }
+                                          const recency = aw != null
+                                            ? `Active Wk ${aw}`
+                                            : lw != null
+                                              ? `Last active Wk ${lw}`
+                                              : null;
+                                          const pillColor = aw != null
+                                            ? 'bg-emerald-50 text-emerald-700'
+                                            : lw != null
+                                              ? 'bg-emerald-50/60 text-emerald-600'
+                                              : getStatusColor(campaignKOL.hh_status || 'curated');
                                           return (
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                              Onboarded
+                                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${pillColor}`}>
+                                              {campaignKOL.hh_status || 'Curated'}
+                                              {recency && <span className="opacity-75">· {recency}</span>}
                                             </span>
                                           );
                                         })()}
-                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
-                                          {campaignKOL.hh_status || 'Curated'}
-                                        </span>
                                       </div>
                                       {/* Section 5 — approved client-facing profile
                                           note. Renders as a subtitle under the KOL
