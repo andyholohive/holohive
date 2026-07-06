@@ -470,18 +470,19 @@ export default function CampaignsPage() {
     }
   };
 
-  // Centralized BadgeTone mapping for campaign status pills — draws
-  // from the same StatusBadge palette as the rest of the app. Replaces
-  // the previous Badge variants + inline `style={{ backgroundColor:
-  // '#3e8692' }}` hack on the Active state.
-  const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
-    Active: 'brand',
-    Planning: 'info',
-    Paused: 'warning',
-    Completed: 'neutral',
+  // [2026-07-06] Card/list badges show the derived CLIENT bucket — the
+  // same taxonomy the tabs filter by — so the pill on a card always
+  // matches the tab it appears under (per Andy: they used to show the
+  // campaign's own lifecycle status, which read "Active" under the
+  // Paused tab). Labels + tones mirror the tab strip exactly. The
+  // campaign lifecycle field (Planning/Active/Paused/Completed) is
+  // still editable in the campaign dialogs — it's just not the badge.
+  const BUCKET_BADGE: Record<'active' | 'adhoc' | 'paused' | 'inactive', { label: string; tone: BadgeTone }> = {
+    active: { label: 'Active', tone: 'brand' },
+    adhoc: { label: 'Ad-Hoc', tone: 'purple' },
+    paused: { label: 'Paused', tone: 'warning' },
+    inactive: { label: 'Inactive', tone: 'neutral' },
   };
-  const getStatusTone = (status: string): BadgeTone =>
-    CAMPAIGN_STATUS_TONES[status] ?? 'neutral';
 
   // Structural skeleton mirroring the new v11 campaign card 1:1.
   // 40px logo tile + name + 2-icon hover cluster, status badge row,
@@ -1253,11 +1254,16 @@ export default function CampaignsPage() {
                       </Button>
                     </div>
                   </div>
-                  {/* Status badge row */}
+                  {/* Status badge row — derived client bucket, matches the tab */}
                   <div className="flex gap-2 flex-wrap">
-                    <StatusBadge tone={getStatusTone(campaign.status)} size="sm" bordered withDot={campaign.status === 'Active' ? 'pulse' : true}>
-                      {campaign.status}
-                    </StatusBadge>
+                    {(() => {
+                      const b = BUCKET_BADGE[clientBucket(campaign)];
+                      return (
+                        <StatusBadge tone={b.tone} size="sm" bordered withDot={b.label === 'Active' ? 'pulse' : true}>
+                          {b.label}
+                        </StatusBadge>
+                      );
+                    })()}
                   </div>
                   {/* KV info rows — Client, Budget, Dates */}
                   <div className="mt-2 space-y-1.5">
@@ -1376,9 +1382,14 @@ export default function CampaignsPage() {
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-ink-warm-700 truncate">{campaign.client_name}</TableCell>
                     <TableCell className="py-3.5 px-5">
-                      <StatusBadge tone={getStatusTone(campaign.status)} size="sm" bordered withDot={campaign.status === 'Active' ? 'pulse' : true}>
-                        {campaign.status}
-                      </StatusBadge>
+                      {(() => {
+                        const b = BUCKET_BADGE[clientBucket(campaign)];
+                        return (
+                          <StatusBadge tone={b.tone} size="sm" bordered withDot={b.label === 'Active' ? 'pulse' : true}>
+                            {b.label}
+                          </StatusBadge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
                     <TableCell className="py-3.5 px-5 text-ink-warm-700 text-sm tabular-nums">
