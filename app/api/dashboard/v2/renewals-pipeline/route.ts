@@ -19,7 +19,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { adminSupabase, getStandardClients, renewalToneFor } from '@/lib/dashboard/queries';
+import { adminSupabase, getStandardClients, getRelevantClients, renewalToneFor } from '@/lib/dashboard/queries';
 import { getDashboardConfig } from '@/lib/dashboard/config';
 import { getPipelineSnapshot, ACTIVE_PIPELINE_STAGES } from '@/lib/dashboard/pipeline-source';
 
@@ -37,31 +37,30 @@ export async function GET() {
     const sb = adminSupabase();
     const cfg = await getDashboardConfig();
 
-    const [clients, pipeline, retentionRaw, contentTotalRaw, activeStintsRaw] = await Promise.all([
+    // [2026-07-06] Relevant-client universe (live non-test + real churns).
+    // Retention + content + avg-engagement all scope to this so archived
+    // brands and test/seed clients stop inflating the numbers.
+    const relevant = await getRelevantClients(sb);
+    const liveClientIds = relevant.liveIds;
+
+    const [clients, pipeline, contentTotalRaw, activeStintsRaw] = await Promise.all([
       getStandardClients(sb),
       getPipelineSnapshot(),
-      // [2026-06-11] Retention metrics — spec § 5.1.
-      // Count active vs churned across ALL clients (including ad-hoc
-      // and whitelisted). Churned status is the manual signal — when
-      // an engagement ends without renewal, ops flips it to 'churned'
-      // on the Clients page.
-      (sb as any)
-        .from('clients')
-        .select('id, engagement_status')
-        .in('engagement_status', ['active', 'churned']),
-      // All-time content posted count across all clients. Just a count,
-      // not per-client — fed into the "Total Content Delivered" card.
-      // [2026-07-05 AUDIT-FIX] fetch multipost_group_id instead of a raw
-      // head-count so cross-platform mirrors count as one delivery.
-      (sb as any)
-        .from('contents')
-        .select('id, multipost_group_id')
-        .eq('status', 'posted'),
+      // [2026-07-06] Total content delivered — now scoped to campaigns of
+      // LIVE clients only (standard + real ad-hoc, non-archived, non-test).
+      // Previously counted all-time posted content across every campaign
+      // ever, so ~46% of the number came from archived test campaigns.
+      // contents has no client_id — embed the campaign to filter by client.
+      liveClientIds.length > 0
+        ? (sb as any)
+            .from('contents')
+            .select('id, multipost_group_id, campaigns!inner(client_id)')
+            .eq('status', 'posted')
+            .in('campaigns.client_id', liveClientIds)
+        : Promise.resolve({ data: [] }),
       // [2026-06-19] Active client_stints — used to anchor Average
       // Engagement to the current stint per TD §5.1 "anchors to the
-      // stint, fixing multi-term blur". For clients with no active
-      // stint row yet (un-migrated), the math falls back to
-      // engagement_start_date so we don't lose them from the average.
+      // stint, fixing multi-term blur".
       (sb as any)
         .from('client_stints')
         .select('client_id, start_date')
@@ -134,28 +133,29 @@ export async function GET() {
     const activeCount = activeStages.reduce((sum, s) => sum + s.count, 0);
     const activeValue = activeStages.reduce((sum, s) => sum + s.totalValue, 0);
 
-    // [2026-06-11] Retention block — spec § 5.1.
-    const retentionRows = (retentionRaw.data ?? []) as Array<{
-      id: string;
-      engagement_status: string | null;
-    }>;
-    const activeCountRet = retentionRows.filter(c => c.engagement_status === 'active').length;
-    const churnedCountRet = retentionRows.filter(c => c.engagement_status === 'churned').length;
+    // [2026-07-06] Retention block — spec § 5.1, now sourced from the
+    // relevant-client universe instead of the unreliable
+    // clients.engagement_status column. Active = every live client
+    // (standard ∪ ad-hoc, non-archived, non-test). Churned = real
+    // clients that ended (is_active=false, still non-archived/non-test).
+    // Previously counted all 31 rows in the engagement_status enum,
+    // ~19 of which were archived brands and test/seed junk.
+    const activeCountRet = relevant.liveIds.length;
+    const churnedCountRet = relevant.churnedIds.length;
     const denomRet = activeCountRet + churnedCountRet;
     const clientRetentionPct = denomRet > 0 ? Math.round((activeCountRet / denomRet) * 100) : 100;
 
     // Avg engagement weeks — anchored to the CURRENT active stint per
     // TD §5.1 ("anchors to the stint, fixing multi-term blur").
-    // [2026-07-02 F1 cleanup] Legacy engagement_start_date fallback removed.
-    // Clients without an active stint row are skipped — the metric
-    // is now purely stint-anchored.
+    // [2026-07-06] Scoped to live (relevant) clients only. Clients
+    // without an active stint row are skipped — the metric is purely
+    // stint-anchored.
     const stintStartByClient = new Map<string, string>();
     for (const s of ((activeStintsRaw.data ?? []) as Array<{ client_id: string; start_date: string }>)) {
       if (s.client_id && s.start_date) stintStartByClient.set(s.client_id, s.start_date);
     }
-    const weekSpans = retentionRows
-      .filter(c => c.engagement_status === 'active')
-      .map(c => stintStartByClient.get(c.id) ?? null)
+    const weekSpans = relevant.liveIds
+      .map(id => stintStartByClient.get(id) ?? null)
       .filter((s): s is string => s != null)
       .map(s => {
         const start = new Date(s + (s.includes('T') ? '' : 'T00:00:00Z'));

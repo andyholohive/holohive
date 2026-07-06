@@ -15,7 +15,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { adminSupabase, getStandardClients, overdueToneFor } from '@/lib/dashboard/queries';
+import { adminSupabase, getStandardClients, getRelevantClients, overdueToneFor } from '@/lib/dashboard/queries';
 import { getDashboardConfig } from '@/lib/dashboard/config';
 import { getMondayFormStatus, MONDAY_FORM_SLUG } from '@/lib/dashboard/monday-form';
 
@@ -46,6 +46,7 @@ export async function GET() {
 
     const [
       standardClients,
+      relevantClients,
       tasksRes,
       adHocTasksRes,
       initiativesRes,
@@ -56,6 +57,7 @@ export async function GET() {
       quarterTasksRes,
     ] = await Promise.all([
       getStandardClients(sb),
+      getRelevantClients(sb),
       (sb as any)
         .from('tasks')
         .select('id, task_name, status, due_date, assigned_to, assigned_to_name, completed_at, is_ad_hoc, client_id')
@@ -110,7 +112,17 @@ export async function GET() {
       })(),
     ]);
 
-    const openTasks = (tasksRes.data ?? []) as any[];
+    // [2026-07-06] Scope every task rollup to the relevant-client
+    // universe. A task counts if it's client-linked to a LIVE client
+    // (standard ∪ ad-hoc, non-archived, non-test) OR is orphan/internal
+    // (no client_id — team ops work, kept per TD §3). Tasks on archived,
+    // inactive, or test/seed clients are dropped so they can't inflate
+    // open/overdue/completed/workload numbers.
+    const relevantClientSet = new Set(relevantClients.liveIds);
+    const isRelevantTask = (t: { client_id?: string | null }) =>
+      !t.client_id || relevantClientSet.has(t.client_id);
+
+    const openTasks = ((tasksRes.data ?? []) as any[]).filter(isRelevantTask);
 
     // Tasks completed this week — keep the rows (not just count) so we
     // can roll up per-user completion counts for the workload table.
@@ -118,11 +130,11 @@ export async function GET() {
     // this week" in place of the old Status badge.
     const completedThisWeekRes = await (sb as any)
       .from('tasks')
-      .select('id, assigned_to, assigned_to_name')
+      .select('id, assigned_to, assigned_to_name, client_id')
       .eq('status', 'complete')
       .gte('completed_at', weekStart);
 
-    const completedThisWeekRows = (completedThisWeekRes.data ?? []) as any[];
+    const completedThisWeekRows = ((completedThisWeekRes.data ?? []) as any[]).filter(isRelevantTask);
     const completedThisWeek = completedThisWeekRows.length;
 
     // ─── Quarterly overdue rollup (Andy 2026-07-02) ─────────────────
@@ -141,7 +153,7 @@ export async function GET() {
     const currentQuarter = Math.floor(nowUTC.getUTCMonth() / 3);
     const currentQuarterYear = nowUTC.getUTCFullYear();
     const quarterLabel = `Q${currentQuarter + 1} ${currentQuarterYear}`;
-    const quarterTasks = (quarterTasksRes.data ?? []) as any[];
+    const quarterTasks = ((quarterTasksRes.data ?? []) as any[]).filter(isRelevantTask);
 
     type QuarterStats = { total: number; wasOverdue: number; stillOverdue: number; resolvedLate: number };
     const quarterStatsByUser = new Map<string, QuarterStats>();
@@ -260,28 +272,32 @@ export async function GET() {
     const weekStartDate = new Date(weekStart);
     const prevWeekStart = new Date(weekStartDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const weekStartDateStr = weekStart.slice(0, 10);
+    // [2026-07-06] Fetch client_id (not head-only counts) so the prior-week
+    // baseline is scoped to the same relevant-client universe as the
+    // current week — otherwise the WoW delta would compare a filtered
+    // "now" against an unfiltered "then".
     const [completedPrevRes, openPrevRes, overduePrevRes] = await Promise.all([
       (sb as any)
         .from('tasks')
-        .select('id', { count: 'exact', head: true })
+        .select('id, client_id')
         .eq('status', 'complete')
         .gte('completed_at', prevWeekStart)
         .lt('completed_at', weekStart),
       (sb as any)
         .from('tasks')
-        .select('id', { count: 'exact', head: true })
+        .select('id, client_id')
         .lte('created_at', weekStart)
         .or(`completed_at.is.null,completed_at.gte.${weekStart}`),
       (sb as any)
         .from('tasks')
-        .select('id', { count: 'exact', head: true })
+        .select('id, client_id')
         .lte('created_at', weekStart)
         .or(`completed_at.is.null,completed_at.gte.${weekStart}`)
         .lt('due_date', weekStartDateStr),
     ]);
-    const completedPrev = completedPrevRes.count ?? 0;
-    const openPrev = openPrevRes.count ?? 0;
-    const overduePrev = overduePrevRes.count ?? 0;
+    const completedPrev = ((completedPrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
+    const openPrev = ((openPrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
+    const overduePrev = ((overduePrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
     const openCount = openTasks.length;
 
     // KPI rollups
@@ -599,7 +615,7 @@ export async function GET() {
       };
     });
 
-    const adHocOpen = (adHocTasksRes.data ?? []) as any[];
+    const adHocOpen = ((adHocTasksRes.data ?? []) as any[]).filter(isRelevantTask);
 
     const payload = {
       asOf: new Date().toISOString(),

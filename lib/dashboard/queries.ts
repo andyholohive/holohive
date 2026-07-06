@@ -61,6 +61,11 @@ export async function getStandardClients(
     .eq('is_active', true)
     .eq('is_ad_hoc', false)
     .is('archived_at', null)
+    // [2026-07-06] Exclude test/seed clients ("Bot Test", "Quazo.TEST",
+    // "temp test", …) so they never contaminate dashboard rollups.
+    // Belt-and-suspenders — the standard set is clean today, but a new
+    // non-archived test client would otherwise leak straight in.
+    .not('name', 'ilike', '%test%')
     .order('name');
   if (error || !data) return [];
   // [F1 2026-07-02] Source engagement dates from client_coverage_status
@@ -94,9 +99,62 @@ export async function getAdHocClients(
     .eq('is_active', true)
     .eq('is_ad_hoc', true)
     .is('archived_at', null)
+    // [2026-07-06] Same test/seed exclusion as getStandardClients — this
+    // list feeds the dashboard's ad-hoc side-rail and Recent Call Notes,
+    // which were surfacing "Bot Test" and "Quazo.TEST".
+    .not('name', 'ilike', '%test%')
     .order('name');
   if (error || !data) return [];
   return data;
+}
+
+/**
+ * [2026-07-06] The "relevant client" universe for dashboard rollups —
+ * every live (is_active, non-archived, non-test) client, partitioned
+ * into standard vs ad-hoc, plus the churned set (recently-ended real
+ * clients) used by the retention metric.
+ *
+ * Task/content rollups scope to `liveIds` (standard ∪ ad-hoc) so work
+ * on archived, inactive, or test clients never inflates team KPIs.
+ * A task with no client_id is internal/ops work and is kept by callers
+ * separately — this helper only classifies client-linked rows.
+ */
+export interface RelevantClients {
+  standardIds: string[];
+  adHocIds: string[];
+  /** standard ∪ ad-hoc — the live, non-test client set. */
+  liveIds: string[];
+  /** Non-archived, non-test clients that are no longer active (real churns). */
+  churnedIds: string[];
+}
+
+export async function getRelevantClients(
+  sb: SupabaseClient = adminSupabase(),
+): Promise<RelevantClients> {
+  const { data, error } = await (sb as any)
+    .from('clients')
+    .select('id, is_active, is_ad_hoc')
+    .is('archived_at', null)
+    .not('name', 'ilike', '%test%');
+  if (error || !data) {
+    return { standardIds: [], adHocIds: [], liveIds: [], churnedIds: [] };
+  }
+  const standardIds: string[] = [];
+  const adHocIds: string[] = [];
+  const churnedIds: string[] = [];
+  for (const c of data as Array<{ id: string; is_active: boolean; is_ad_hoc: boolean }>) {
+    if (c.is_active) {
+      (c.is_ad_hoc ? adHocIds : standardIds).push(c.id);
+    } else {
+      churnedIds.push(c.id);
+    }
+  }
+  return {
+    standardIds,
+    adHocIds,
+    liveIds: [...standardIds, ...adHocIds],
+    churnedIds,
+  };
 }
 
 export type RenewalTone = 'red' | 'amber' | 'green';
