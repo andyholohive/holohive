@@ -59,6 +59,12 @@ export async function POST(request: Request) {
   const clientId: string | undefined = body?.client_id;
   const email: string | undefined = body?.email;
   const authorizedVia: string | undefined = body?.authorized_via;
+  // [2026-07-06] Unified visit tracking — campaign-tracker visits log
+  // here too, tagged with source='campaign' + the campaign id so the
+  // /clients Visit log can show which door the visitor used.
+  const source: string = body?.source === 'campaign' ? 'campaign' : 'portal';
+  const campaignId: string | null =
+    source === 'campaign' && typeof body?.campaign_id === 'string' ? body.campaign_id : null;
 
   if (!clientId || !email || !authorizedVia) {
     return NextResponse.json(
@@ -100,6 +106,8 @@ export async function POST(request: Request) {
       authorized_via: authorizedVia,
       user_agent: userAgent,
       ip_address: ipAddress,
+      source,
+      campaign_id: campaignId,
     });
 
   if (insertErr) {

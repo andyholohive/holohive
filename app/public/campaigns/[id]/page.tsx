@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 import { createClient } from '@supabase/supabase-js';
@@ -418,6 +418,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
   const [campaignUuid, setCampaignUuid] = useState<string | null>(null);
+  // [2026-07-06] Unified access — client identity for the portal-style
+  // gate (name + logo) and for logging visits into portal_access_log
+  // with source='campaign'.
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState<string | null>(null);
+  const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
+  // One visit-log write per page load — checkCachedAuth can re-run on
+  // dependency changes and must not double-log.
+  const accessLoggedRef = useRef(false);
 
   // KOL Table filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -662,6 +671,29 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     }
   }, [campaignId, isAuthenticated, showcaseToken]);
 
+  /**
+   * [2026-07-06] Unified visit tracking — record this tracker visit in
+   * portal_access_log (source='campaign') so the /clients Visit log
+   * shows portal + tracker visits side by side with a source badge.
+   * Fire-and-forget; logs at most once per page load (checkCachedAuth
+   * can re-run on dependency changes).
+   */
+  const logCampaignAccess = (visitorEmail: string, via: string) => {
+    if (accessLoggedRef.current || !clientId || !visitorEmail) return;
+    accessLoggedRef.current = true;
+    fetch('/api/portal/log-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: clientId,
+        email: visitorEmail,
+        authorized_via: via,
+        source: 'campaign',
+        campaign_id: campaignUuid,
+      }),
+    }).catch(() => { /* observability only — never block the page */ });
+  };
+
   // Check if user is already authenticated via cache
   const checkCachedAuth = () => {
     if (!clientEmail) return;
@@ -697,6 +729,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           if (portalAuthorized) {
             setEmail(portalEmail);
             setIsAuthenticated(true);
+            logCampaignAccess(portalEmail, 'cache');
             return;
           }
         }
@@ -727,6 +760,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           if (cachedEmail && (isClientEmail || isApprovedEmail || isSameDomain || isApprovedDomain)) {
             setEmail(cachedEmail);
             setIsAuthenticated(true);
+            logCampaignAccess(cachedEmail, 'cache');
             return;
           }
         }
@@ -809,9 +843,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       // Store the campaign UUID for logging
       setCampaignUuid(campaignData.id);
 
+      setClientId(campaignData.client_id);
+
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
-        .select('email, approved_emails, approved_domains')
+        .select('email, name, logo_url, approved_emails, approved_domains')
         .eq('id', campaignData.client_id)
         .single();
 
@@ -825,6 +861,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       }
 
       setClientEmail(clientData.email);
+      setClientName((clientData as any).name ?? null);
+      setClientLogoUrl((clientData as any).logo_url ?? null);
       // [2026-07-06] Unified access — portal + tracker share ONE approval
       // system. The client-level approved_emails list (what the portal
       // checks) now also unlocks the tracker; campaign-level
@@ -921,6 +959,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     if (campaignUuid) {
       await logEmailView(email, campaignUuid);
     }
+    // Unified visit tracking — mirror the portal's authorized_via taxonomy.
+    logCampaignAccess(
+      email,
+      isClientEmail ? 'exact' : isApprovedEmail ? 'approved_email' : isSameDomain ? 'same_domain' : 'approved_domain',
+    );
     setIsAuthenticated(true);
   };
 
@@ -1146,62 +1189,92 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     }
   }
 
-  // Email authentication gate
+  // Email authentication gate — [2026-07-06] per Andy: same entrance as
+  // the client portal (teal gradient + glass card + client logo) so the
+  // tracker feels like part of one product, not a separate tool.
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
+        {/* Background orbs — mirrors the portal gate */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute rounded-full" style={{ width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(91,163,173,0.2) 0%, transparent 60%)', top: '-100px', right: '-100px' }} />
+          <div className="absolute rounded-full" style={{ width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(62,134,146,0.15) 0%, transparent 60%)', bottom: '-80px', left: '-80px' }} />
+        </div>
+
+        <div className="relative z-10 max-w-md w-full">
+          {/* Logo area */}
           <div className="text-center mb-8">
-            <div className="bg-brand rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Megaphone className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Access</h1>
-            <p className="text-gray-600">
-              {loadingClientEmail ? 
-                'Loading campaign access information...' :
-                'Please enter the authorized email address to view this campaign'
-              }
+            {clientLogoUrl ? (
+              <img
+                src={clientLogoUrl}
+                alt={clientName ?? 'Client'}
+                className="h-16 w-16 object-cover rounded-2xl shadow-lg mx-auto mb-4"
+              />
+            ) : (
+              <Image
+                src="/images/logo.png"
+                alt="Holo Hive"
+                width={140}
+                height={46}
+                className="h-12 w-auto mx-auto mb-4"
+                style={{ filter: 'brightness(0) invert(1)', opacity: 0.9 }}
+              />
+            )}
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {clientName ? `${clientName} Campaign` : 'Campaign Tracker'}
+            </h1>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Enter your email to access the campaign tracker
             </p>
           </div>
-          
-          {loadingClientEmail ? (
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand mx-auto mb-4"></div>
-              <p className="text-gray-600">Verifying campaign access...</p>
-            </div>
-          ) : (
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Authorized Email Address
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter the authorized email address"
-                  className="w-full focus-brand"
-                  required
-                />
-                {emailError && (
-                  <p className="mt-2 text-sm text-rose-600">{emailError}</p>
-                )}
+
+          {/* Login card */}
+          <div className="rounded-2xl p-8" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            {loadingClientEmail ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/60 mx-auto mb-4"></div>
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Verifying campaign access…</p>
               </div>
-              
-              <Button
-                type="submit"
-                className="w-full bg-brand hover:bg-[#2d6470] text-white"
-              >
-                Access Campaign
-              </Button>
-            </form>
-          )}
-          
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              By accessing this campaign, you agree to our terms of service.
-            </p>
+            ) : (
+              <form onSubmit={handleEmailSubmit} className="space-y-5">
+                <div>
+                  <input
+                    type="email"
+                    placeholder="your.email@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 outline-none transition-all duration-200 focus:ring-2 focus:ring-white/30"
+                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+                  />
+                  {emailError && (
+                    <p className="text-sm mt-2" style={{ color: '#f87171' }}>{emailError}</p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-200 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 20px rgba(0,0,0,0.1)' }}
+                >
+                  Access Campaign
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* Powered by */}
+          <div className="text-center mt-6">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Powered by</span>
+              <Image
+                src="/images/logo.png"
+                alt="Holo Hive"
+                width={60}
+                height={20}
+                className="h-4 w-auto"
+                style={{ filter: 'brightness(0) invert(1)', opacity: 0.3 }}
+              />
+            </div>
           </div>
         </div>
       </div>

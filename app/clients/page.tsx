@@ -516,8 +516,11 @@ export default function ClientsPage() {
   const [hqTaskCounts, setHqTaskCounts] = useState<Record<string, number>>({});
   const [accessLogModalClient, setAccessLogModalClient] = useState<ClientWithAccess | null>(null);
   const [accessLogRows, setAccessLogRows] = useState<
-    Array<{ id: string; email: string; authorized_via: string; accessed_at: string; user_agent: string | null; ip_address: string | null }>
+    Array<{ id: string; email: string; authorized_via: string; accessed_at: string; user_agent: string | null; ip_address: string | null; source: string | null; campaign_id: string | null }>
   >([]);
+  // [2026-07-06] campaign_id → name lookup for tracker-visit rows, so
+  // the Source badge can say WHICH campaign tracker was opened.
+  const [accessLogCampaignNames, setAccessLogCampaignNames] = useState<Record<string, string>>({});
   const [accessLogLoading, setAccessLogLoading] = useState(false);
   // [2026-06-08] Audience filter for the portal-visits modal. Defaults
   // to 'external' so it matches the per-card "Visit log" badge (which
@@ -649,12 +652,26 @@ export default function ClientsPage() {
     try {
       const { data, error } = await (supabase as any)
         .from('portal_access_log')
-        .select('id, email, authorized_via, accessed_at, user_agent, ip_address')
+        .select('id, email, authorized_via, accessed_at, user_agent, ip_address, source, campaign_id')
         .eq('client_id', client.id)
         .order('accessed_at', { ascending: false })
         .limit(200);
       if (error) throw error;
       setAccessLogRows((data || []) as any);
+      // Resolve campaign names for tracker-visit rows so the Source
+      // badge can say which campaign tracker was opened.
+      const campaignIds = [...new Set(((data || []) as any[]).map(r => r.campaign_id).filter(Boolean))];
+      if (campaignIds.length > 0) {
+        const { data: campRows } = await (supabase as any)
+          .from('campaigns')
+          .select('id, name')
+          .in('id', campaignIds);
+        const nameMap: Record<string, string> = {};
+        for (const c of ((campRows || []) as Array<{ id: string; name: string }>)) nameMap[c.id] = c.name;
+        setAccessLogCampaignNames(nameMap);
+      } else {
+        setAccessLogCampaignNames({});
+      }
     } catch (err) {
       console.error('Error loading portal access log:', err);
       toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to load access log', variant: 'destructive' });
@@ -5021,6 +5038,7 @@ export default function ClientsPage() {
                             <TableRow className="bg-cream-50 hover:bg-cream-50">
                               <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">When</TableHead>
                               <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Email</TableHead>
+                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Source</TableHead>
                               <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Via</TableHead>
                               <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">IP</TableHead>
                             </TableRow>
@@ -5059,6 +5077,20 @@ export default function ClientsPage() {
                                         <StatusBadge tone="slate" size="sm" bordered>Internal</StatusBadge>
                                       )}
                                     </span>
+                                  </TableCell>
+                                  <TableCell className="px-3 py-2">
+                                    {/* [2026-07-06] Which door the visitor used —
+                                        the client portal or a campaign tracker
+                                        (with the campaign's name when known). */}
+                                    {row.source === 'campaign' ? (
+                                      <StatusBadge tone="purple" size="sm" bordered>
+                                        {row.campaign_id && accessLogCampaignNames[row.campaign_id]
+                                          ? accessLogCampaignNames[row.campaign_id]
+                                          : 'Campaign tracker'}
+                                      </StatusBadge>
+                                    ) : (
+                                      <StatusBadge tone="brand" size="sm" bordered>Portal</StatusBadge>
+                                    )}
                                   </TableCell>
                                   <TableCell className="px-3 py-2">
                                     <StatusBadge tone={viaTone} size="sm" bordered withDot>{viaLabel}</StatusBadge>
