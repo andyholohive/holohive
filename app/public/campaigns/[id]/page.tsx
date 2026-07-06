@@ -1194,11 +1194,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   // tracker feels like part of one product, not a separate tool.
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
-        {/* Background orbs — mirrors the portal gate */}
+      <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
+        {/* Animated glow orbs + grid overlay — matches the client portal
+            gate (app/public/portal/[id]) so the entrance is identical. */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute rounded-full" style={{ width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(91,163,173,0.2) 0%, transparent 60%)', top: '-100px', right: '-100px' }} />
-          <div className="absolute rounded-full" style={{ width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(62,134,146,0.15) 0%, transparent 60%)', bottom: '-80px', left: '-80px' }} />
+          <div className="absolute rounded-full" style={{ width: '800px', height: '800px', background: 'radial-gradient(circle, rgba(91,163,173,0.3) 0%, transparent 60%)', top: '-200px', right: '-200px', animation: 'pulse 4s ease-in-out infinite' }} />
+          <div className="absolute rounded-full" style={{ width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(62,134,146,0.25) 0%, transparent 60%)', bottom: '-150px', left: '-150px', animation: 'pulse 5s ease-in-out infinite 1s' }} />
+          <div className="absolute rounded-full" style={{ width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%)', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', animation: 'pulse 3s ease-in-out infinite 0.5s' }} />
+          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
         </div>
 
         <div className="relative z-10 max-w-md w-full">
