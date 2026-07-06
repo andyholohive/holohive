@@ -141,6 +141,7 @@ type ClientPayload = {
   thresholds: { renewal_red_days: number; renewal_amber_days: number };
   outputSignals: OutputSignals;
   clientHealth: ClientHealthRow[];
+  pausedExcludedCount: number;
   callNotes: CallNote[];
   adHocClients: Array<{ id: string; name: string; slug: string | null }>;
 };
@@ -407,13 +408,14 @@ export default function ClientTab() {
           icon={Users}
           title="Client Health"
           subtitle={(() => {
-            // [2026-07-06] Mirror the Clients page split: N active · M paused
-            // (paused = coverage lapsed), then ad-hoc excluded.
-            const active = data.clientHealth.filter(c => c.status === 'active').length;
-            const paused = data.clientHealth.filter(c => c.status === 'paused').length;
+            // [2026-07-06] Active-only table. Paused + ad-hoc clients are
+            // excluded; the counts are noted so the omission is explicit.
+            const active = data.clientHealth.length;
+            const excluded: string[] = [];
+            if (data.pausedExcludedCount > 0) excluded.push(`${data.pausedExcludedCount} paused`);
+            if (data.adHocClients.length > 0) excluded.push(`${data.adHocClients.length} ad-hoc`);
             const parts = [`${active} active`];
-            if (paused > 0) parts.push(`${paused} paused`);
-            if (data.adHocClients.length > 0) parts.push(`${data.adHocClients.length} ad-hoc excluded`);
+            if (excluded.length > 0) parts.push(`${excluded.join(' + ')} excluded`);
             return parts.join(' · ');
           })()}
         />

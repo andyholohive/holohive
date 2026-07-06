@@ -394,8 +394,10 @@ export async function GET(request: Request) {
     // Approved / In QA / Not submitted. See lib/clientDeliveryService.
     const deliveryByClient = await getThisWeekKolDelivery(sb as any, standardClientIds);
 
-    // Build client health rows
-    const clientHealth = standardClients.map(c => {
+    // Build client health rows — ACTIVE-bucket clients only. Per Andy
+    // 2026-07-06, Paused clients (coverage lapsed) are excluded from the
+    // health table entirely, matching the Clients page's Active tab.
+    const clientHealth = standardClients.filter(c => clientStatusOf(c) === 'active').map(c => {
       const t = taskAgg.get(c.id) ?? { open: 0, overdue: 0, doneThisWeek: 0 };
       // [F1 2026-07-02] Legacy engagement_end_date column dropped.
       const renewalDate = c.covered_through;
@@ -456,6 +458,9 @@ export async function GET(request: Request) {
       thresholds: cfg,
       outputSignals,
       clientHealth,
+      // Count of standard clients hidden from the health table because
+      // their coverage lapsed (Paused). Surfaced in the header subtitle.
+      pausedExcludedCount: standardClients.length - activeStandardIdSet.size,
       callNotes,
       adHocClients,
     };
