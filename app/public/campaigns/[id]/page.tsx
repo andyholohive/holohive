@@ -270,7 +270,7 @@ const getCreatorTypeColor = (creatorType: string) => {
     'Drama-Forward':  'bg-rose-100 text-rose-800',
     'Skeptic':        'bg-orange-100 text-orange-800',
     'Bridge Builder': 'bg-emerald-100 text-emerald-800',
-    'General':  'bg-gray-100 text-gray-800',
+    'General':  'bg-cream-100 text-ink-warm-800',
     'Gaming':   'bg-pink-100 text-pink-800',
     'Crypto':   'bg-yellow-100 text-yellow-800',
     'Memecoin': 'bg-orange-100 text-orange-800',
@@ -278,7 +278,7 @@ const getCreatorTypeColor = (creatorType: string) => {
     'Trading':  'bg-emerald-100 text-emerald-800',
     'AI':       'bg-blue-100 text-blue-800',
   };
-  return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
+  return colorMap[creatorType] || 'bg-cream-100 text-ink-warm-800';
 };
 
 const getPlatformIcon = (platform: string) => {
@@ -328,7 +328,7 @@ const getContentTypeColor = (type: string) => {
     Spaces: 'bg-pink-100 text-pink-800',
     Newsletter: 'bg-slate-100 text-slate-800',
   };
-  return colorMap[type] || 'bg-gray-100 text-gray-800';
+  return colorMap[type] || 'bg-cream-100 text-ink-warm-800';
 };
 
 const getStatusColor = (status: string) => {
@@ -345,7 +345,7 @@ const getStatusColor = (status: string) => {
     case 'concluded':
       return 'bg-emerald-100 text-emerald-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-cream-100 text-ink-warm-800';
   }
 };
 
@@ -358,9 +358,9 @@ const getStatusBadge = (status: string) => {
     case 'Paused':
       return 'bg-yellow-100 text-yellow-800';
     case 'Completed':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-cream-100 text-ink-warm-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-cream-100 text-ink-warm-800';
   }
 };
 
@@ -1286,8 +1286,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       <div className="min-h-screen bg-cream-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading campaign...</p>
-          <p className="text-gray-400 text-sm mt-2">Campaign ID: {campaignId}</p>
+          <p className="text-ink-warm-700">Loading campaign...</p>
+          <p className="text-ink-warm-400 text-sm mt-2">Campaign ID: {campaignId}</p>
         </div>
       </div>
     );
@@ -1301,24 +1301,24 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             <div className="flex items-center space-x-4">
               <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Holo Hive Campaign Manager</h1>
+                <h1 className="text-xl display-serif text-ink-warm-900">Holo Hive Campaign Manager</h1>
               </div>
             </div>
           </div>
         </div>
         <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-8 text-center">
-            <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
-            <p className="text-gray-600 mb-4">This campaign doesn't exist or is not publicly accessible.</p>
+            <Megaphone className="h-12 w-12 text-ink-warm-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-ink-warm-900 mb-2">Campaign Not Found</h2>
+            <p className="text-ink-warm-700 mb-4">This campaign doesn't exist or is not publicly accessible.</p>
             {error && (
               <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 mb-4 text-left">
                 <p className="text-rose-600 text-sm font-medium">Error Details:</p>
                 <p className="text-rose-600 text-sm mt-1">{error}</p>
-                <p className="text-gray-500 text-xs mt-2">Campaign ID: {campaignId}</p>
+                <p className="text-ink-warm-500 text-xs mt-2">Campaign ID: {campaignId}</p>
               </div>
             )}
-            <p className="text-gray-400 text-sm mt-2">Campaign ID: {campaignId}</p>
+            <p className="text-ink-warm-400 text-sm mt-2">Campaign ID: {campaignId}</p>
             <div className="mt-6">
               <Button 
                 onClick={() => {
@@ -1381,7 +1381,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           <div className="flex items-center space-x-4">
             <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Holo Hive Campaign Manager</h1>
+              <h1 className="text-xl display-serif text-ink-warm-900">Holo Hive Campaign Manager</h1>
             </div>
           </div>
         </div>
@@ -1428,7 +1428,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     by a generic placeholder when client identity is
                     masked. */}
                 {mask.clientIdentity ? (
-                  <div className="w-10 h-10 rounded-md flex items-center justify-center bg-gray-100 text-gray-400 shrink-0">
+                  <div className="w-10 h-10 rounded-md flex items-center justify-center bg-cream-100 text-ink-warm-400 shrink-0">
                     <Megaphone className="h-5 w-5" />
                   </div>
                 ) : campaign.client_logo_url ? (
@@ -1446,11 +1446,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     a project codename, not an identity leak); the
                     client name underneath is what gets masked. */}
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-bold text-gray-900 truncate">
+                  <h2 className="text-xl display-serif text-ink-warm-900 truncate">
                     {mask.clientIdentity ? 'Confidential campaign' : campaign.name}
                   </h2>
                   {!mask.clientIdentity && campaign.client_name && (
-                    <p className="text-xs text-gray-500 truncate">{campaign.client_name}</p>
+                    <p className="text-xs text-ink-warm-500 truncate">{campaign.client_name}</p>
                   )}
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadge(campaign.status)}`}>
@@ -1460,12 +1460,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     flag is set; dates always shown (engagement window
                     isn't sensitive). When budget is hidden and we
                     still have dates, just show dates without a pipe. */}
-                <div className="text-sm text-gray-700 font-medium shrink-0 whitespace-nowrap">
+                <div className="text-sm text-ink-warm-700 font-medium shrink-0 whitespace-nowrap">
                   {!mask.budget && formatCurrency(campaign.total_budget)}
                   {campaign.start_date && campaign.end_date && (
                     <>
-                      {!mask.budget && <span className="text-gray-300 mx-2">|</span>}
-                      <span className="text-gray-600">
+                      {!mask.budget && <span className="text-ink-warm-300 mx-2">|</span>}
+                      <span className="text-ink-warm-700">
                         {formatDate(campaign.start_date)} – {formatDate(campaign.end_date)}
                       </span>
                     </>
@@ -1476,11 +1476,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   range. Thin so it reads as ambient, not a CTA. */}
               {weekOf > 0 && (
                 <div className="border-t border-cream-100 px-5 py-2.5 bg-cream-50/60">
-                  <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+                  <div className="flex items-center justify-between text-[11px] text-ink-warm-500 mb-1">
                     <span>Week {weekN} of {weekOf}</span>
                     <span className="tabular-nums">{Math.round(progressPct * 100)}%</span>
                   </div>
-                  <div className="h-1 rounded-full bg-gray-200 overflow-hidden">
+                  <div className="h-1 rounded-full bg-cream-200 overflow-hidden">
                     <div
                       className="h-full bg-brand transition-all"
                       style={{ width: `${Math.round(progressPct * 100)}%` }}
@@ -1506,10 +1506,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
               <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
                 <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="bg-gray-100 p-2 rounded-lg">
-                      <Users className="h-5 w-5 text-gray-600" />
+                    <div className="bg-cream-100 p-2 rounded-lg">
+                      <Users className="h-5 w-5 text-ink-warm-700" />
                     </div>
-                    <h2 className="text-xl font-semibold text-gray-900">KOL Dashboard</h2>
+                    <h2 className="text-xl font-semibold text-ink-warm-900">KOL Dashboard</h2>
                   </div>
                 </CardHeader>
 
@@ -1629,11 +1629,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">Total KOLs</p>
+                              <p className="text-sm text-ink-warm-700">Total KOLs</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{totalKols}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{totalKols}</div>
                           </CardContent>
                         </Card>
 
@@ -1643,11 +1643,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">Avg Followers</p>
+                              <p className="text-sm text-ink-warm-700">Avg Followers</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{avgFollowersFmt}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{avgFollowersFmt}</div>
                           </CardContent>
                         </Card>
 
@@ -1657,11 +1657,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'}</p>
+                              <p className="text-sm text-ink-warm-700">{platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{platformSet.size}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{platformSet.size}</div>
                           </CardContent>
                         </Card>
 
@@ -1671,11 +1671,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{regionSet.size === 1 ? 'Region' : 'Regions'}</p>
+                              <p className="text-sm text-ink-warm-700">{regionSet.size === 1 ? 'Region' : 'Regions'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900 tabular-nums">{regionSet.size}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{regionSet.size}</div>
                           </CardContent>
                         </Card>
                       </div>
@@ -1771,16 +1771,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           gap at a glance. */}
                       <Card className="border border-cream-200 overflow-hidden">
                         <CardHeader className="border-b border-cream-100 bg-cream-50/60">
-                          <CardTitle className="text-base font-semibold text-gray-900">KOL Performance Leaderboard</CardTitle>
-                          <p className="text-xs text-gray-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
+                          <CardTitle className="text-base font-semibold text-ink-warm-900">KOL Performance Leaderboard</CardTitle>
+                          <p className="text-xs text-ink-warm-500 mt-0.5">Sorted by views — the highest-impact KOL is row 1.</p>
                         </CardHeader>
                         <CardContent className="p-0">
                           {leaderboardRows.length === 0 ? (
-                            <div className="p-8 text-center text-sm text-gray-500">No KOLs activated yet.</div>
+                            <div className="p-8 text-center text-sm text-ink-warm-500">No KOLs activated yet.</div>
                           ) : (
                             <div className="overflow-x-auto">
                               <table className="w-full text-sm">
-                                <thead className="bg-cream-50/80 text-[10px] uppercase tracking-wider text-gray-500">
+                                <thead className="bg-cream-50/80 text-[10px] uppercase tracking-wider text-ink-warm-500">
                                   <tr>
                                     <th className="text-left py-2.5 px-4 w-12">#</th>
                                     <th className="text-left py-2.5 px-4">KOL</th>
@@ -1796,38 +1796,38 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     const avatar = (r.kol.master_kol as any)?.profile_picture_url as string | null | undefined;
                                     return (
                                       <tr key={r.kol.id} className="border-t border-cream-100 hover:bg-cream-50/40">
-                                        <td className="py-3 px-4 text-gray-500 tabular-nums font-medium">{idx + 1}</td>
+                                        <td className="py-3 px-4 text-ink-warm-500 tabular-nums font-medium">{idx + 1}</td>
                                         <td className="py-3 px-4">
                                           <div className="flex items-center gap-2.5 min-w-0">
                                             {avatar ? (
                                               <img src={avatar} alt={r.kol.master_kol.name} className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
                                             ) : (
-                                              <div className="h-7 w-7 rounded-full bg-gray-100 flex-shrink-0" />
+                                              <div className="h-7 w-7 rounded-full bg-cream-100 flex-shrink-0" />
                                             )}
                                             <div className="min-w-0">
-                                              <div className="font-medium text-gray-900 truncate">{maskedKolName(r.kol.master_kol.name, idx)}</div>
+                                              <div className="font-medium text-ink-warm-900 truncate">{maskedKolName(r.kol.master_kol.name, idx)}</div>
                                               {r.kol.master_kol.platform && r.kol.master_kol.platform.length > 0 && (
-                                                <div className="text-[10px] text-gray-500 uppercase tracking-wider truncate">
+                                                <div className="text-[10px] text-ink-warm-500 uppercase tracking-wider truncate">
                                                   {r.kol.master_kol.platform.join(' · ')}
                                                 </div>
                                               )}
                                               {!mask.kolHandles && r.kol.profile_note && (
-                                                <div className="text-[11px] text-gray-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
+                                                <div className="text-[11px] text-ink-warm-500 italic mt-0.5 truncate max-w-xs" title={r.kol.profile_note}>
                                                   {r.kol.profile_note}
                                                 </div>
                                               )}
                                             </div>
                                           </div>
                                         </td>
-                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{r.stats.contentCount}</td>
-                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-900">{leaderboardFmt(r.stats.views)}</td>
-                                        <td className="py-3 px-4 text-right tabular-nums text-gray-700">{leaderboardFmt(r.stats.engagements)}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-ink-warm-700">{r.stats.contentCount}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums font-medium text-ink-warm-900">{leaderboardFmt(r.stats.views)}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-ink-warm-700">{leaderboardFmt(r.stats.engagements)}</td>
                                         <td className="py-3 px-4">
                                           <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                            <div className="flex-1 h-1.5 rounded-full bg-cream-100 overflow-hidden">
                                               <div className="h-full bg-brand" style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }} />
                                             </div>
-                                            <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
+                                            <span className="text-[11px] text-ink-warm-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
                                           </div>
                                         </td>
                                       </tr>
@@ -1856,7 +1856,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   <>
                     <div className="flex items-center justify-between mb-2">
                       <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                         <Input
                           placeholder="Search KOLs by name, region, or status..."
                           className="pl-10 focus-brand"
@@ -1877,14 +1877,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <TableRow className="bg-cream-50 border-b border-cream-200">
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 text-left select-none">
-                              <button type="button" onClick={() => toggleKolSort('name')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by KOL name">
+                              <button type="button" onClick={() => toggleKolSort('name')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by KOL name">
                                 <span>KOL</span>
                                 {sortIcon(kolSort.key === 'name', kolSort.dir)}
                               </button>
                             </TableHead>
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
-                                <button type="button" onClick={() => toggleKolSort('platform')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Platform">
+                                <button type="button" onClick={() => toggleKolSort('platform')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Platform">
                                   <span>Platform</span>
                                   {sortIcon(kolSort.key === 'platform', kolSort.dir)}
                                 </button>
@@ -1896,11 +1896,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[200px] p-0" align="start">
                                     <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                      <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Platform</div>
                                       {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
                                         <div
                                           key={platform}
-                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                           onClick={() => {
                                             const newPlatforms = kolFilters.platform.includes(platform)
                                               ? kolFilters.platform.filter(p => p !== platform)
@@ -1936,7 +1936,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             </TableHead>
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
-                                <button type="button" onClick={() => toggleKolSort('followers')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Followers">
+                                <button type="button" onClick={() => toggleKolSort('followers')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Followers">
                                   <span>Followers</span>
                                   {sortIcon(kolSort.key === 'followers', kolSort.dir)}
                                 </button>
@@ -1948,7 +1948,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[200px] p-0" align="start">
                                     <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                                      <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Followers</div>
                                       <div className="flex items-center gap-2 mb-2">
                                         <Select
                                           value={kolFilters.followers_operator}
@@ -1993,7 +1993,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             </TableHead>
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
-                                <button type="button" onClick={() => toggleKolSort('region')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Region">
+                                <button type="button" onClick={() => toggleKolSort('region')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Region">
                                   <span>Region</span>
                                   {sortIcon(kolSort.key === 'region', kolSort.dir)}
                                 </button>
@@ -2005,11 +2005,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[200px] p-0" align="start">
                                     <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                                      <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Region</div>
                                       {['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil'].map((region) => (
                                         <div
                                           key={region}
-                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                           onClick={() => {
                                             const newRegions = kolFilters.region.includes(region)
                                               ? kolFilters.region.filter(r => r !== region)
@@ -2046,7 +2046,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             </TableHead>
                             {campaign?.share_creator_type && (
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                                <button type="button" onClick={() => toggleKolSort('creator_type')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Creator Type">
+                                <button type="button" onClick={() => toggleKolSort('creator_type')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Creator Type">
                                   <span>Creator Type</span>
                                   {sortIcon(kolSort.key === 'creator_type', kolSort.dir)}
                                 </button>
@@ -2058,7 +2058,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {false && (
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                               <div className="flex items-center gap-1 group">
-                                <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Status">
+                                <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
                                   <span>Status</span>
                                   {sortIcon(kolSort.key === 'hh_status', kolSort.dir)}
                                 </button>
@@ -2070,11 +2070,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[200px] p-0" align="start">
                                     <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                      <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Status</div>
                                       {['Curated','Contacted','Interested','Onboarded','Concluded'].map((status) => (
                                         <div
                                           key={status}
-                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                           onClick={() => {
                                             const newStatuses = kolFilters.hh_status.includes(status)
                                               ? kolFilters.hh_status.filter(s => s !== status)
@@ -2110,7 +2110,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             </TableHead>
                             )}
                             <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                              <button type="button" onClick={() => toggleKolSort('content_count')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by content count">
+                              <button type="button" onClick={() => toggleKolSort('content_count')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by content count">
                                 <span>Content</span>
                                 {sortIcon(kolSort.key === 'content_count', kolSort.dir)}
                               </button>
@@ -2124,10 +2124,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           {sortedKOLs.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={(campaign?.share_creator_type ? 10 : 9) + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
-                                <div className="flex flex-col items-center justify-center text-gray-500">
-                                  <Users className="h-12 w-12 mb-4 text-gray-300" />
+                                <div className="flex flex-col items-center justify-center text-ink-warm-500">
+                                  <Users className="h-12 w-12 mb-4 text-ink-warm-300" />
                                   <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
-                                  <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                  <p className="text-sm text-ink-warm-400 mb-4">Try adjusting your filter criteria</p>
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -2155,11 +2155,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           ) : (
                             sortedKOLs.map((campaignKOL, index) => {
                               return (
-                                <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-gray-100 transition-colors border-b border-cream-200`}>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
+                                <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
                                     {index + 1}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                     <div className="w-full h-full">
                                       <div className="flex items-center w-full">
                                         <div className="truncate font-bold">
@@ -2215,7 +2215,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                           are masked (the note would re-identify
                                           the KOL even with a masked name). */}
                                       {!mask.kolHandles && campaignKOL.profile_note && (
-                                        <div className="text-xs text-gray-500 italic font-normal mt-0.5 leading-snug whitespace-normal max-w-md">
+                                        <div className="text-xs text-ink-warm-500 italic font-normal mt-0.5 leading-snug whitespace-normal max-w-md">
                                           {campaignKOL.profile_note}
                                         </div>
                                       )}
@@ -2263,14 +2263,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </TableCell>
                                   )}
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} ${campaign?.share_kol_notes ? 'border-r border-cream-200' : ''} p-2 overflow-hidden text-center`}>
-                                    <div className="font-medium text-gray-900">
+                                    <div className="font-medium text-ink-warm-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
                                     </div>
                                   </TableCell>
                                   {campaign?.share_kol_notes && (
                                     <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
-                                      <div className="text-sm text-gray-600 max-w-xs whitespace-pre-wrap">
-                                        {campaignKOL.notes || <span className="text-gray-400 italic">-</span>}
+                                      <div className="text-sm text-ink-warm-700 max-w-xs whitespace-pre-wrap">
+                                        {campaignKOL.notes || <span className="text-ink-warm-400 italic">-</span>}
                                       </div>
                                     </TableCell>
                                   )}
@@ -2404,11 +2404,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
               <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
                 <CardHeader className="pb-6 border-b border-cream-100">
                   <div className="flex items-center gap-3">
-                    <div className="bg-gray-100 p-2 rounded-lg">
-                      <BarChart3 className="h-5 w-5 text-gray-600" />
+                    <div className="bg-cream-100 p-2 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-ink-warm-700" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Performance</h2>
+                      <h2 className="text-xl font-semibold text-ink-warm-900">Performance</h2>
                     </div>
                   </div>
                 </CardHeader>
@@ -2426,10 +2426,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-ink-warm-900">
                           {kols.length}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">Total KOLs</p>
+                        <p className="text-sm text-ink-warm-700 mt-1">Total KOLs</p>
                       </CardContent>
                     </Card>
 
@@ -2443,13 +2443,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-ink-warm-900">
                           {(() => {
                             const totalViews = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
                             return totalViews.toLocaleString();
                           })()}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">Total Views</p>
+                        <p className="text-sm text-ink-warm-700 mt-1">Total Views</p>
                       </CardContent>
                     </Card>
 
@@ -2463,13 +2463,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">
+                        <div className="text-2xl font-bold text-ink-warm-900">
                           {(() => {
                             const totalReactions = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
                             return totalReactions.toLocaleString();
                           })()}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">Total Reactions</p>
+                        <p className="text-sm text-ink-warm-700 mt-1">Total Reactions</p>
                       </CardContent>
                     </Card>
                   </div>
@@ -2479,8 +2479,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     {/* Top KOLs by Reactions */}
                     <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                       <div className="mb-6">
-                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Reactions</h3>
-                        <p className="text-sm text-gray-500 mt-1">KOLs ranked by total likes</p>
+                        <h3 className="text-xl display-serif text-ink-warm-900">Top KOLs by Reactions</h3>
+                        <p className="text-sm text-ink-warm-500 mt-1">KOLs ranked by total likes</p>
                       </div>
                       <div className="h-96">
                         <ResponsiveContainer width="100%" height="100%">
@@ -2542,8 +2542,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     {/* Top KOLs by Views */}
                     <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                       <div className="mb-6">
-                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Views</h3>
-                        <p className="text-sm text-gray-500 mt-1">KOLs ranked by total impressions</p>
+                        <h3 className="text-xl display-serif text-ink-warm-900">Top KOLs by Views</h3>
+                        <p className="text-sm text-ink-warm-500 mt-1">KOLs ranked by total impressions</p>
                       </div>
                       <div className="h-96">
                         <ResponsiveContainer width="100%" height="100%">
@@ -2610,11 +2610,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
               <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
                 <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="bg-gray-100 p-2 rounded-lg">
-                      <FileText className="h-5 w-5 text-gray-600" />
+                    <div className="bg-cream-100 p-2 rounded-lg">
+                      <FileText className="h-5 w-5 text-ink-warm-700" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Content Dashboard</h2>
+                      <h2 className="text-xl font-semibold text-ink-warm-900">Content Dashboard</h2>
                     </div>
                   </div>
                 </CardHeader>
@@ -2673,10 +2673,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div className="min-w-0 flex-1">
                               <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-brand mb-1">Activation Results</p>
-                              <h3 className="text-2xl font-bold text-gray-900">
+                              <h3 className="text-2xl font-bold text-ink-warm-900">
                                 {activation.activation_name || 'Live Activation'}
                               </h3>
-                              <div className="flex items-center gap-3 mt-1.5 text-sm text-gray-600 flex-wrap">
+                              <div className="flex items-center gap-3 mt-1.5 text-sm text-ink-warm-700 flex-wrap">
                                 {activation.activation_type && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand">
                                     {activation.activation_type}
@@ -2688,7 +2688,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </span>
                                 )}
                                 {s?.target_market && (
-                                  <span className="text-gray-500">· {s.target_market}</span>
+                                  <span className="text-ink-warm-500">· {s.target_market}</span>
                                 )}
                               </div>
                             </div>
@@ -2732,10 +2732,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                                 {cards.map(c => (
                                   <div key={c.key} className="bg-white border border-cream-200 rounded-lg p-3">
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{c.label}</p>
-                                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatNum(c.value)}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500 mb-1">{c.label}</p>
+                                    <p className="text-2xl font-bold text-ink-warm-900 tabular-nums">{formatNum(c.value)}</p>
                                     {s.context_sublabels?.[c.key] && (
-                                      <p className="text-[10px] text-gray-500 mt-0.5">{s.context_sublabels[c.key]}</p>
+                                      <p className="text-[10px] text-ink-warm-500 mt-0.5">{s.context_sublabels[c.key]}</p>
                                     )}
                                   </div>
                                 ))}
@@ -2747,7 +2747,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {/* ─── Daily entries chart ──────────── */}
                             {daily && daily.length > 0 && (
                               <div className="bg-white border border-cream-200 rounded-lg p-4">
-                                <p className="text-sm font-semibold text-gray-900 mb-3">Daily Entries</p>
+                                <p className="text-sm font-semibold text-ink-warm-900 mb-3">Daily Entries</p>
                                 <div className="h-56">
                                   <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={daily} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -2768,7 +2768,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {/* ─── Entries by KOL channel donut ── */}
                             {byKol && byKol.length > 0 && (
                               <div className="bg-white border border-cream-200 rounded-lg p-4">
-                                <p className="text-sm font-semibold text-gray-900 mb-3">Entries by KOL Channel</p>
+                                <p className="text-sm font-semibold text-ink-warm-900 mb-3">Entries by KOL Channel</p>
                                 <div className="h-56">
                                   <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
@@ -2801,12 +2801,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           {byKol && byKol.length > 0 && (
                             <div className="bg-white border border-cream-200 rounded-lg overflow-hidden">
                               <div className="px-4 py-3 border-b border-cream-100 bg-cream-50/60">
-                                <p className="text-sm font-semibold text-gray-900">KOL Performance</p>
-                                <p className="text-[11px] text-gray-500 mt-0.5">Ranked by entries · share-of-pie shown below name.</p>
+                                <p className="text-sm font-semibold text-ink-warm-900">KOL Performance</p>
+                                <p className="text-[11px] text-ink-warm-500 mt-0.5">Ranked by entries · share-of-pie shown below name.</p>
                               </div>
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
-                                  <thead className="bg-cream-50 text-[10px] uppercase tracking-wider text-gray-500">
+                                  <thead className="bg-cream-50 text-[10px] uppercase tracking-wider text-ink-warm-500">
                                     <tr>
                                       <th className="text-left py-2 px-4 w-12">#</th>
                                       <th className="text-left py-2 px-4">KOL</th>
@@ -2819,15 +2819,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       const sharePct = totalEntries > 0 ? (e.entries / totalEntries) * 100 : 0;
                                       return (
                                         <tr key={`${e.kol_id || e.label || idx}`} className="border-t border-cream-100">
-                                          <td className="py-2 px-4 text-gray-500 tabular-nums">{idx + 1}</td>
-                                          <td className="py-2 px-4 font-medium text-gray-900 truncate">{labelForKol(e, idx)}</td>
-                                          <td className="py-2 px-4 text-right tabular-nums text-gray-900 font-medium">{formatNum(e.entries)}</td>
+                                          <td className="py-2 px-4 text-ink-warm-500 tabular-nums">{idx + 1}</td>
+                                          <td className="py-2 px-4 font-medium text-ink-warm-900 truncate">{labelForKol(e, idx)}</td>
+                                          <td className="py-2 px-4 text-right tabular-nums text-ink-warm-900 font-medium">{formatNum(e.entries)}</td>
                                           <td className="py-2 px-4">
                                             <div className="flex items-center gap-2">
-                                              <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                              <div className="flex-1 h-1.5 rounded-full bg-cream-100 overflow-hidden">
                                                 <div className="h-full bg-brand" style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }} />
                                               </div>
-                                              <span className="text-[11px] text-gray-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
+                                              <span className="text-[11px] text-ink-warm-500 tabular-nums w-12 text-right">{sharePct.toFixed(1)}%</span>
                                             </div>
                                           </td>
                                         </tr>
@@ -2843,21 +2843,21 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {/* ─── Ecosystem engagement ─────────── */}
                             {clicks && (clicks.by_protocol?.length || clicks.by_source?.length || clicks.total_referrals) && (
                               <div className="bg-white border border-cream-200 rounded-lg p-4 space-y-3">
-                                <p className="text-sm font-semibold text-gray-900">Ecosystem Engagement</p>
+                                <p className="text-sm font-semibold text-ink-warm-900">Ecosystem Engagement</p>
                                 {typeof clicks.total_referrals === 'number' && (
                                   <div className="flex items-baseline gap-1.5">
-                                    <span className="text-2xl font-bold text-gray-900 tabular-nums">{formatNum(clicks.total_referrals)}</span>
-                                    <span className="text-xs text-gray-500">total referrals</span>
+                                    <span className="text-2xl font-bold text-ink-warm-900 tabular-nums">{formatNum(clicks.total_referrals)}</span>
+                                    <span className="text-xs text-ink-warm-500">total referrals</span>
                                   </div>
                                 )}
                                 {clicks.by_protocol && clicks.by_protocol.length > 0 && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">dApp clicks by protocol</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500 mb-1.5">dApp clicks by protocol</p>
                                     <ul className="space-y-1.5">
                                       {clicks.by_protocol.map((p, idx) => (
                                         <li key={p.protocol + idx} className="flex items-center justify-between text-xs">
-                                          <span className="text-gray-700">{p.protocol}</span>
-                                          <span className="font-medium text-gray-900 tabular-nums">{formatNum(p.clicks)}</span>
+                                          <span className="text-ink-warm-700">{p.protocol}</span>
+                                          <span className="font-medium text-ink-warm-900 tabular-nums">{formatNum(p.clicks)}</span>
                                         </li>
                                       ))}
                                     </ul>
@@ -2865,12 +2865,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                                 {clicks.by_source && clicks.by_source.length > 0 && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">By source</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500 mb-1.5">By source</p>
                                     <ul className="space-y-1.5">
                                       {clicks.by_source.map((p, idx) => (
                                         <li key={p.source + idx} className="flex items-center justify-between text-xs">
-                                          <span className="text-gray-700">{p.source}</span>
-                                          <span className="font-medium text-gray-900 tabular-nums">{formatNum(p.clicks)}</span>
+                                          <span className="text-ink-warm-700">{p.source}</span>
+                                          <span className="font-medium text-ink-warm-900 tabular-nums">{formatNum(p.clicks)}</span>
                                         </li>
                                       ))}
                                     </ul>
@@ -2882,27 +2882,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {/* ─── Points and prizes ────────────── */}
                             {s && (s.prize_pool || s.draw_structure || s.points_by_source) && (
                               <div className="bg-white border border-cream-200 rounded-lg p-4 space-y-3">
-                                <p className="text-sm font-semibold text-gray-900">Points & Prizes</p>
+                                <p className="text-sm font-semibold text-ink-warm-900">Points & Prizes</p>
                                 {s.prize_pool && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Prize pool</p>
-                                    <p className="text-xl font-bold text-gray-900 tabular-nums">{s.prize_pool}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">Prize pool</p>
+                                    <p className="text-xl font-bold text-ink-warm-900 tabular-nums">{s.prize_pool}</p>
                                   </div>
                                 )}
                                 {s.draw_structure && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Draw structure</p>
-                                    <p className="text-xs text-gray-700">{s.draw_structure}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500 mb-0.5">Draw structure</p>
+                                    <p className="text-xs text-ink-warm-700">{s.draw_structure}</p>
                                   </div>
                                 )}
                                 {s.points_by_source && s.points_by_source.length > 0 && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Points by source</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500 mb-1.5">Points by source</p>
                                     <ul className="space-y-1.5">
                                       {s.points_by_source.map((p, idx) => (
                                         <li key={p.source + idx} className="flex items-center justify-between text-xs">
-                                          <span className="text-gray-700">{p.source}</span>
-                                          <span className="font-medium text-gray-900 tabular-nums">{formatNum(p.points)}</span>
+                                          <span className="text-ink-warm-700">{p.source}</span>
+                                          <span className="font-medium text-ink-warm-900 tabular-nums">{formatNum(p.points)}</span>
                                         </li>
                                       ))}
                                     </ul>
@@ -2915,47 +2915,47 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           {/* ─── UGC performance ──────────────── */}
                           {ugc && (ugc.posts_approved || ugc.creators || ugc.views || ugc.top_post) && (
                             <div className="bg-white border border-cream-200 rounded-lg p-4">
-                              <p className="text-sm font-semibold text-gray-900 mb-3">UGC Performance</p>
+                              <p className="text-sm font-semibold text-ink-warm-900 mb-3">UGC Performance</p>
                               {/* Headline stats */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                                 {typeof ugc.posts_approved === 'number' && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Posts Approved</p>
-                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{formatNum(ugc.posts_approved)}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">Posts Approved</p>
+                                    <p className="text-lg font-bold text-ink-warm-900 tabular-nums">{formatNum(ugc.posts_approved)}</p>
                                   </div>
                                 )}
                                 {typeof ugc.creators === 'number' && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Creators</p>
-                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{formatNum(ugc.creators)}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">Creators</p>
+                                    <p className="text-lg font-bold text-ink-warm-900 tabular-nums">{formatNum(ugc.creators)}</p>
                                   </div>
                                 )}
                                 {typeof ugc.approval_rate === 'number' && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Approval Rate</p>
-                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{(ugc.approval_rate * 100).toFixed(1)}%</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">Approval Rate</p>
+                                    <p className="text-lg font-bold text-ink-warm-900 tabular-nums">{(ugc.approval_rate * 100).toFixed(1)}%</p>
                                   </div>
                                 )}
                                 {typeof ugc.views === 'number' && (
                                   <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Views</p>
-                                    <p className="text-lg font-bold text-gray-900 tabular-nums">{formatNum(ugc.views)}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-ink-warm-500">Views</p>
+                                    <p className="text-lg font-bold text-ink-warm-900 tabular-nums">{formatNum(ugc.views)}</p>
                                   </div>
                                 )}
                               </div>
                               {/* Top post */}
                               {ugc.top_post && (
                                 <div className="border-t border-cream-100 pt-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Top Post</p>
+                                  <p className="text-[10px] uppercase tracking-wider text-ink-warm-500 mb-1.5">Top Post</p>
                                   <div className="flex items-start gap-3">
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-sm font-semibold text-gray-900">
+                                      <p className="text-sm font-semibold text-ink-warm-900">
                                         {mask.kolHandles ? 'Top creator' : (ugc.top_post.creator_label || 'Creator')}
                                       </p>
                                       {ugc.top_post.snippet && (
-                                        <p className="text-xs text-gray-600 italic mt-0.5 line-clamp-3">"{ugc.top_post.snippet}"</p>
+                                        <p className="text-xs text-ink-warm-700 italic mt-0.5 line-clamp-3">"{ugc.top_post.snippet}"</p>
                                       )}
-                                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-500 tabular-nums">
+                                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-ink-warm-500 tabular-nums">
                                         {typeof ugc.top_post.views === 'number' && <span>{formatNum(ugc.top_post.views)} views</span>}
                                         {typeof ugc.top_post.likes === 'number' && <span>{formatNum(ugc.top_post.likes)} reactions</span>}
                                       </div>
@@ -2992,7 +2992,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <>
                       <div className="flex items-center justify-between mb-2">
                         <div className="relative flex-1 max-w-sm">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                           <Input
                             placeholder="Search Contents by KOL, platform, or status..."
                             className="pl-10 focus-brand"
@@ -3008,14 +3008,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             <TableRow className="bg-cream-50 border-b border-cream-200">
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 text-left select-none">
-                                <button type="button" onClick={() => toggleContentSort('kol')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by KOL name">
+                                <button type="button" onClick={() => toggleContentSort('kol')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by KOL name">
                                   <span>KOL</span>
                                   {sortIcon(contentSort.key === 'kol', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
-                                  <button type="button" onClick={() => toggleContentSort('platform')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Platform">
+                                  <button type="button" onClick={() => toggleContentSort('platform')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Platform">
                                     <span>Platform</span>
                                     {sortIcon(contentSort.key === 'platform', contentSort.dir)}
                                   </button>
@@ -3027,11 +3027,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Platform</div>
                                         {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
                                           <div
                                             key={platform}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newPlatforms = contentFilters.platform.includes(platform)
                                                 ? contentFilters.platform.filter(p => p !== platform)
@@ -3067,7 +3067,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
-                                  <button type="button" onClick={() => toggleContentSort('type')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Type">
+                                  <button type="button" onClick={() => toggleContentSort('type')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Type">
                                     <span>Type</span>
                                     {sortIcon(contentSort.key === 'type', contentSort.dir)}
                                   </button>
@@ -3079,11 +3079,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Type</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Type</div>
                                         {['Video','Thread','Post','Story','Reel','Short'].map((type) => (
                                           <div
                                             key={type}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newTypes = contentFilters.type.includes(type)
                                                 ? contentFilters.type.filter(t => t !== type)
@@ -3117,7 +3117,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
-                                  <button type="button" onClick={() => toggleContentSort('status')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Status">
+                                  <button type="button" onClick={() => toggleContentSort('status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
                                     <span>Status</span>
                                     {sortIcon(contentSort.key === 'status', contentSort.dir)}
                                   </button>
@@ -3129,11 +3129,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Status</div>
                                         {['Published','Scheduled','Draft','Pending','Failed','Removed'].map((status) => (
                                           <div
                                             key={status}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newStatuses = contentFilters.status.includes(status)
                                                 ? contentFilters.status.filter(s => s !== status)
@@ -3166,38 +3166,38 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 </div>
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('activation_date')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Activation Date">
+                                <button type="button" onClick={() => toggleContentSort('activation_date')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Activation Date">
                                   <span>Activation Date</span>
                                   {sortIcon(contentSort.key === 'activation_date', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Views">
+                                <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Views">
                                   <span>Views</span>
                                   {sortIcon(contentSort.key === 'impressions', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Reactions">
+                                <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Reactions">
                                   <span>Reactions</span>
                                   {sortIcon(contentSort.key === 'likes', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Shares">
+                                <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Shares">
                                   <span>Shares</span>
                                   {sortIcon(contentSort.key === 'retweets', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-cream-50 border-r border-cream-200 select-none">
-                                <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Replies">
+                                <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Replies">
                                   <span>Replies</span>
                                   {sortIcon(contentSort.key === 'comments', contentSort.dir)}
                                 </button>
                               </TableHead>
                               <TableHead className={`relative bg-cream-50 ${notesVisible ? 'border-r border-cream-200' : ''} select-none`}>
-                                <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Saves">
+                                <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-ink-warm-900" title="Sort by Saves">
                                   <span>Saves</span>
                                   {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
                                 </button>
@@ -3211,10 +3211,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {sortedContents.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={12 + (notesVisible ? 1 : 0)} className="text-center py-12">
-                                  <div className="flex flex-col items-center justify-center text-gray-500">
-                                    <FileText className="h-12 w-12 mb-4 text-gray-300" />
+                                  <div className="flex flex-col items-center justify-center text-ink-warm-500">
+                                    <FileText className="h-12 w-12 mb-4 text-ink-warm-300" />
                                     <p className="text-lg font-medium mb-2">No content matches your filters</p>
-                                    <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                    <p className="text-sm text-ink-warm-400 mb-4">Try adjusting your filter criteria</p>
                                     <Button
                                       size="sm"
                                       variant="outline"
@@ -3236,11 +3236,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               sortedContents.map((content, index) => {
                                 const kol = kols.find(k => k.id === content.campaign_kols_id);
                                 return (
-                                  <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-gray-100 transition-colors border-b border-cream-200`}>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
+                                  <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-ink-warm-700`} style={{ verticalAlign: 'middle' }}>
                                       {index + 1}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                       <div className="flex items-center w-full h-full">
                                         <div className="truncate font-bold">{kol?.master_kol?.name || '-'}</div>
                                         {kol?.master_kol?.link && (
@@ -3279,7 +3279,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
                                         if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
                                         if (['failed', 'removed'].includes(s)) return 'bg-rose-100 text-rose-800';
-                                        return 'bg-gray-100 text-gray-800';
+                                        return 'bg-cream-100 text-ink-warm-800';
                                       })()}`}>
                                         {content.status ? content.status.charAt(0).toUpperCase() + content.status.slice(1).toLowerCase() : '-'}
                                       </span>
@@ -3321,7 +3321,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                             keeps the column from over-stretching
                                             on long notes; align-top so multi-
                                             line notes don't shift the row. */}
-                                        <div className="text-sm text-gray-600 max-w-[18rem] whitespace-pre-wrap break-words">
+                                        <div className="text-sm text-ink-warm-700 max-w-[18rem] whitespace-pre-wrap break-words">
                                           {/* [Spec 7.5] Client-facing tag
                                               badges render before notes
                                               text. Internal tags filtered
@@ -3358,7 +3358,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                           {content.notes || (
                                             ((content.content_tag_assignments || []).some(a => a.tag?.visibility === 'client'))
                                               ? null
-                                              : <span className="text-gray-400 italic">-</span>
+                                              : <span className="text-ink-warm-400 italic">-</span>
                                           )}
                                         </div>
                                       </TableCell>
@@ -3390,11 +3390,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{contentTotals.views === 1 ? 'Total View' : 'Total Views'}</p>
+                              <p className="text-sm text-ink-warm-700">{contentTotals.views === 1 ? 'Total View' : 'Total Views'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{contentTotals.views.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.views.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3405,11 +3405,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{contentTotals.replies === 1 ? 'Total Reply' : 'Total Replies'}</p>
+                              <p className="text-sm text-ink-warm-700">{contentTotals.replies === 1 ? 'Total Reply' : 'Total Replies'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{contentTotals.replies.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.replies.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3420,11 +3420,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{contentTotals.shares === 1 ? 'Total Share' : 'Total Shares'}</p>
+                              <p className="text-sm text-ink-warm-700">{contentTotals.shares === 1 ? 'Total Share' : 'Total Shares'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{contentTotals.shares.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.shares.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3435,11 +3435,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{contentTotals.reactions === 1 ? 'Total Reaction' : 'Total Reactions'}</p>
+                              <p className="text-sm text-ink-warm-700">{contentTotals.reactions === 1 ? 'Total Reaction' : 'Total Reactions'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{contentTotals.reactions.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.reactions.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3450,11 +3450,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{contentTotals.engagement === 1 ? 'Total Engagement' : 'Total Engagements'}</p>
+                              <p className="text-sm text-ink-warm-700">{contentTotals.engagement === 1 ? 'Total Engagement' : 'Total Engagements'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{contentTotals.engagement.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.engagement.toLocaleString()}</div>
                           </CardContent>
                         </Card>
 
@@ -3465,11 +3465,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
-                              <p className="text-sm text-gray-600">{contentTotals.saves === 1 ? 'Total Save' : 'Total Saves'}</p>
+                              <p className="text-sm text-ink-warm-700">{contentTotals.saves === 1 ? 'Total Save' : 'Total Saves'}</p>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{contentTotals.saves.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-ink-warm-900">{contentTotals.saves.toLocaleString()}</div>
                           </CardContent>
                         </Card>
                       </div>
@@ -3495,10 +3495,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         };
                         const budgetFmt = `$${campaign.total_budget.toLocaleString()}`;
                         return (
-                          <p className="text-sm text-gray-600 italic">
-                            <span className="font-semibold text-gray-900 not-italic">{formatShort(totalViews)} views</span>
+                          <p className="text-sm text-ink-warm-700 italic">
+                            <span className="font-semibold text-ink-warm-900 not-italic">{formatShort(totalViews)} views</span>
                             {' '}delivered against a{' '}
-                            <span className="font-semibold text-gray-900 not-italic">{budgetFmt}</span>
+                            <span className="font-semibold text-ink-warm-900 not-italic">{budgetFmt}</span>
                             {' '}engagement.
                           </p>
                         );
@@ -3507,11 +3507,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       {/* Average Engagement Rate */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader>
-                          <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
+                          <CardTitle className="text-lg font-semibold text-ink-warm-900">Average Engagement Rate</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-3xl font-bold text-gray-900">{contentEngagementRate.toFixed(2)}%</div>
-                          <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Reactions + Replies + Shares + Saves) / Views</p>
+                          <div className="text-3xl font-bold text-ink-warm-900">{contentEngagementRate.toFixed(2)}%</div>
+                          <p className="text-sm text-ink-warm-700 mt-1">Engagement Rate = (Reactions + Replies + Shares + Saves) / Views</p>
                         </CardContent>
                       </Card>
 
@@ -3521,7 +3521,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Total Views</h3>
+                              <h3 className="text-xl display-serif text-ink-warm-900">Total Views</h3>
                             </div>
                           </div>
                           <div className="h-96">
@@ -3577,7 +3577,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Views by Platform</h3>
+                              <h3 className="text-xl display-serif text-ink-warm-900">Views by Platform</h3>
                             </div>
                           </div>
                           <div className="h-96">
@@ -3671,7 +3671,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           }
           const stamp = fmtDateTime(mostRecent ? new Date(mostRecent) : new Date());
           return (
-            <p className="text-[11px] text-gray-400 text-center mt-8">
+            <p className="text-[11px] text-ink-warm-400 text-center mt-8">
               Data as of {stamp}
             </p>
           );
