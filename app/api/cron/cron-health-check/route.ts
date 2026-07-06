@@ -62,6 +62,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   REMINDERS: 1,                // daily 09:00 UTC — reminder rules sweep
   SNAPSHOT_TG_FOLLOWERS: 1,    // monthly (1st) — KOL TG follower snapshots
   CRON_HEALTH_CHECK: 1,        // daily 08:00 UTC — this sweep's own self-log
+  TASK_ALERTS: 1,              // weekdays 00:00 UTC (09:00 KST) — overdue/stale task DMs
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

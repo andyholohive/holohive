@@ -6,16 +6,24 @@ import { TelegramService } from '@/lib/telegramService';
 export const dynamic = 'force-dynamic';
 
 /**
- * Daily 9 AM cron: sends overdue task notifications to each user via TG.
- * Also notifies assignees of stale tasks (no update in 7+ days).
+ * Weekday 09:00 KST (00:00 UTC Mon-Fri) cron: sends overdue task
+ * notifications to each assignee via TG DM, plus a summary to the ops
+ * terminal chat. Also notifies assignees of stale tasks (no update in
+ * 7+ days).
  *
- * Secured by CRON_SECRET header check.
+ * [2026-07-06] Wired for the first time (audit follow-up): the route
+ * existed since the tasks build but had no vercel.json entry AND
+ * queried a nonexistent 'profiles' table, so it never ran and could
+ * never have sent. Moved from /api/tasks/alerts to /api/cron/task-alerts
+ * per cron conventions.
+ *
+ * Secured by CRON_SECRET header check (fail-closed).
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -155,6 +163,16 @@ export async function GET(request: Request) {
       }
     }
 
+    // Log to agent_runs so cron-health-check can watch this sweep.
+    await (supabase as any).from('agent_runs').insert({
+      agent_name: 'TASK_ALERTS',
+      run_type: 'cron',
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      status: 'completed',
+      output_summary: `${totalOverdue} overdue, ${totalStale} stale, ${notificationsSent} DMs sent`,
+    });
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
@@ -164,6 +182,14 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error('Alert cron error:', error);
+    await (supabase as any).from('agent_runs').insert({
+      agent_name: 'TASK_ALERTS',
+      run_type: 'cron',
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      status: 'failed',
+      error_message: error.message ?? 'unknown',
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
