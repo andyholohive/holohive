@@ -939,11 +939,24 @@ export default function KOLsPage() {
             if (res.ok && data.ok) {
               toast({
                 title: 'Scan queued',
-                description: 'Score will refresh in about a minute.',
+                description: 'Niche + score will refresh in about a minute.',
+              });
+            } else {
+              // Surface the failure instead of swallowing it — a silent
+              // no-op here (e.g. a missing GH_DISPATCH_TOKEN) was why new
+              // KOLs weren't getting auto-scanned for niche. 2026-07-06.
+              toast({
+                title: 'Auto-scan not queued',
+                description: data?.error || `Dispatch failed (${res.status}).`,
+                variant: 'destructive',
               });
             }
-          } catch {
-            /* non-blocking */
+          } catch (scanErr) {
+            toast({
+              title: 'Auto-scan not queued',
+              description: scanErr instanceof Error ? scanErr.message : 'Network error dispatching scan.',
+              variant: 'destructive',
+            });
           }
         }
 

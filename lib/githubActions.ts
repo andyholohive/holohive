@@ -10,11 +10,18 @@
  *   - New-KOL hook in /kols add-row     — auto-scan a freshly added KOL
  *
  * Env (set on Vercel):
- *   GH_DISPATCH_PAT   — fine-grained PAT with Actions: read+write on the repo
- *   GH_DISPATCH_REPO  — "owner/name", e.g. "andyholohive/kol-telegram-mcp"
+ *   GH_DISPATCH_TOKEN — fine-grained PAT with Actions: read+write on the repo.
+ *                       (GH_DISPATCH_PAT accepted as a legacy alias — the
+ *                       refresh-tg route + kol-niche-drift cron both read
+ *                       GH_DISPATCH_TOKEN, and Vercel only has that one set.
+ *                       Reading only GH_DISPATCH_PAT here is why the /kols
+ *                       inline-add auto-scan silently no-op'd — 2026-07-06.)
+ *   GH_DISPATCH_REPO  — "owner/name"; defaults to "andyholohive/kol-telegram-mcp"
+ *                       to match the other two dispatch call sites.
  */
 
 const WORKFLOW_FILE_SINGLE = 'scan-one.yml';
+const DEFAULT_REPO = 'andyholohive/kol-telegram-mcp';
 
 export interface DispatchResult {
   ok: boolean;
@@ -44,10 +51,10 @@ export async function triggerKolScan(rawHandle: string): Promise<DispatchResult>
     return { ok: false, error: 'Empty TG handle' };
   }
 
-  const repo = process.env.GH_DISPATCH_REPO;
-  const pat = process.env.GH_DISPATCH_PAT;
-  if (!repo || !pat) {
-    return { ok: false, error: 'GH_DISPATCH_REPO / GH_DISPATCH_PAT not set' };
+  const repo = process.env.GH_DISPATCH_REPO || DEFAULT_REPO;
+  const pat = process.env.GH_DISPATCH_TOKEN || process.env.GH_DISPATCH_PAT;
+  if (!pat) {
+    return { ok: false, error: 'GH_DISPATCH_TOKEN not set' };
   }
 
   const url = `https://api.github.com/repos/${repo}/actions/workflows/${WORKFLOW_FILE_SINGLE}/dispatches`;
