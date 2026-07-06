@@ -242,7 +242,7 @@ export default function InternalTab() {
             icon={ListTodo}
             label="Active Tasks"
             value={data.kpis.openTasks}
-            sub="to-do"
+            sub="created this week"
             accent="sky"
             topAccent
             trend={{ delta: data.kpis.openTasksDelta, upIsGood: false }}
