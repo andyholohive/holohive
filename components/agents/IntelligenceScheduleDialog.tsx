@@ -17,6 +17,7 @@ import {
   Loader2, AlertTriangle, CheckCircle, XCircle, Clock, Play,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatRelativeShort } from '@/lib/dateFormat';
 
 /**
  * Configures the daily auto-Discovery scan.
@@ -112,11 +113,7 @@ const WEEKDAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 function relativeTime(iso: string | null): string {
   if (!iso) return 'never';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return 'just now';
-  if (ms < 3_600_000) return `${Math.round(ms/60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.round(ms/3_600_000)}h ago`;
-  return `${Math.round(ms/86_400_000)}d ago`;
+  return formatRelativeShort(iso);
 }
 
 /** Rough monthly cost estimate based on chosen params + cadence.

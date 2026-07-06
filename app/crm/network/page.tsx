@@ -1629,13 +1629,6 @@ export default function NetworkPage() {
                                           <span>@{primaryContact.telegram_id}</span>
                                         </div>
                                       )}
-                                      {/* TODO(type-audit): 'phone' does not exist on CRMContact (lib/crmService.ts) — this block likely never renders */}
-                                      {(primaryContact as any).phone && (
-                                        <div className="flex items-center gap-2 text-ink-warm-700">
-                                          <Phone className="h-3.5 w-3.5" />
-                                          <span>{(primaryContact as any).phone}</span>
-                                        </div>
-                                      )}
                                     </div>
                                     {partnerContactLinks.length > 1 && (
                                       <div className="pt-2 border-t">
@@ -2130,13 +2123,6 @@ export default function NetworkPage() {
                                         <div className="flex items-center gap-2 text-ink-warm-700">
                                           <MessageSquare className="h-3.5 w-3.5" />
                                           <span>@{primaryContact.telegram_id}</span>
-                                        </div>
-                                      )}
-                                      {/* TODO(type-audit): 'phone' does not exist on CRMContact (lib/crmService.ts) — this block likely never renders */}
-                                      {(primaryContact as any).phone && (
-                                        <div className="flex items-center gap-2 text-ink-warm-700">
-                                          <Phone className="h-3.5 w-3.5" />
-                                          <span>{(primaryContact as any).phone}</span>
                                         </div>
                                       )}
                                     </div>

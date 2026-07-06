@@ -26,7 +26,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { formatDateTime } from '@/lib/dateFormat';
+import { formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
@@ -199,17 +199,7 @@ function formatSignalType(s: string): string {
 /** Compact "Nd ago" / "Nh ago" / "just now" for row-level timestamps. */
 function timeAgo(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return null;
-  const mins = Math.floor(ms / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  const mos = Math.floor(days / 30);
-  return `${mos}mo ago`;
+  return formatRelativeShort(iso) || null;
 }
 
 const DEEP_DIVE_COOLDOWN_HOURS = 24;

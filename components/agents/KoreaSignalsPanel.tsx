@@ -56,7 +56,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { formatDate } from '@/lib/dateFormat';
+import { formatDate, formatRelativeShort } from '@/lib/dateFormat';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuLabel,
@@ -570,15 +570,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
     return 'text-gray-400 bg-gray-100';
   };
 
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  };
+  const timeAgo = (dateStr: string) => formatRelativeShort(dateStr);
 
   // Computed: Korea opportunity signals (non-exchange, non-news)
   const koreaOpportunities = (byType.korea_partnership || 0) + (byType.korea_community || 0) +

@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
-import { formatDate as fmtDate } from '@/lib/dateFormat';
+import { formatDate as fmtDate, formatRelativeShort } from '@/lib/dateFormat';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -3989,16 +3989,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     <div className="max-h-[400px] overflow-y-auto">
                       <div className="p-3 space-y-1">
                         {recentActivities.map((activity) => {
-                          const timeAgo = (() => {
-                            const diff = Date.now() - new Date(activity.created_at).getTime();
-                            const mins = Math.floor(diff / 60000);
-                            if (mins < 60) return `${mins}m ago`;
-                            const hours = Math.floor(mins / 60);
-                            if (hours < 24) return `${hours}h ago`;
-                            const days = Math.floor(hours / 24);
-                            if (days < 7) return `${days}d ago`;
-                            return fmtDate(activity.created_at);
-                          })();
+                          const timeAgo = formatRelativeShort(activity.created_at);
 
                           // [Portal notification cleanup] task_added is the
                           // new type for client-court action items. Renders

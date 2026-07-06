@@ -953,6 +953,22 @@ export const getBudgetRecommendationsTool: AgentTool = {
       // Get historical campaign data for insights
       const userCampaigns = await CampaignService.getCampaignsForUser(context.userRole, context.userId, client);
 
+      // [2026-07-05 AUDIT-FIX] kol_count was read off CampaignWithDetails
+      // but never populated by CampaignService, so every KOL stat below
+      // was silently 0. Count roster rows per campaign explicitly.
+      const kolCountByCampaign = new Map<string, number>();
+      if (userCampaigns.length > 0) {
+        const { data: rosterRows } = await (client as any)
+          .from('campaign_kols')
+          .select('campaign_id')
+          .in('campaign_id', userCampaigns.map(c => c.id))
+          .is('deleted_at', null);
+        for (const r of (rosterRows ?? []) as Array<{ campaign_id: string }>) {
+          kolCountByCampaign.set(r.campaign_id, (kolCountByCampaign.get(r.campaign_id) ?? 0) + 1);
+        }
+      }
+      const kolCountOf = (c: { id: string }) => kolCountByCampaign.get(c.id) ?? 0;
+
       // Analyze existing campaigns for better insights
       const campaignAnalysis = userCampaigns.length > 0 ? {
         totalCampaigns: userCampaigns.length,
@@ -961,9 +977,8 @@ export const getBudgetRecommendationsTool: AgentTool = {
         maxBudget: Math.max(...userCampaigns.map(c => c.total_budget)),
         activeCampaigns: userCampaigns.filter(c => c.status === 'Active').length,
         completedCampaigns: userCampaigns.filter(c => c.status === 'Completed').length,
-        // TODO(type-audit): 'kol_count' does not exist on CampaignWithDetails and is never set by CampaignService — these totals are likely always 0 at runtime.
-        totalKOLs: userCampaigns.reduce((sum, c) => sum + ((c as any).kol_count || 0), 0),
-        avgKOLsPerCampaign: Math.round(userCampaigns.reduce((sum, c) => sum + ((c as any).kol_count || 0), 0) / userCampaigns.length),
+        totalKOLs: userCampaigns.reduce((sum, c) => sum + kolCountOf(c), 0),
+        avgKOLsPerCampaign: Math.round(userCampaigns.reduce((sum, c) => sum + kolCountOf(c), 0) / userCampaigns.length),
       } : null;
 
       // Get detailed campaign breakdown for better context
@@ -971,7 +986,7 @@ export const getBudgetRecommendationsTool: AgentTool = {
         name: c.name,
         budget: c.total_budget,
         status: c.status,
-        kols: (c as any).kol_count || 0,
+        kols: kolCountOf(c),
         client: c.client_name,
       }));
 

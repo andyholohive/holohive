@@ -16,6 +16,7 @@ import {
   Activity, Download,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatRelativeShort } from '@/lib/dateFormat';
 
 /**
  * The daily-review surface for Grok Deep Dive signals. Shows every Grok
@@ -68,18 +69,7 @@ function formatSignalType(s: string): string {
 }
 
 function timeAgo(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return '';
-  const mins = Math.floor(ms / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  const mos = Math.floor(days / 30);
-  return `${mos}mo ago`;
+  return iso ? formatRelativeShort(iso) : '';
 }
 
 type GroupMode = 'project' | 'poc';
