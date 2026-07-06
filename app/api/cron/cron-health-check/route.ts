@@ -75,8 +75,7 @@ export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization') || '';
-    const querySecret = new URL(request.url).searchParams.get('secret');
-    if (auth !== `Bearer ${cronSecret}` && querySecret !== cronSecret) {
+    if (auth !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
@@ -124,7 +123,7 @@ export async function GET(request: Request) {
     // before Vercel itself would rate-limit us.
     const { data: allRuns, error: countErr } = await (supabase as any)
       .from('agent_runs')
-      .select('agent_name')
+      .select('agent_name, run_type')
       .gte('started_at', since.toISOString())
       .range(0, 49999);
 
@@ -132,8 +131,17 @@ export async function GET(request: Request) {
       console.error('[cron-health-check] count query failed:', countErr);
     }
 
+    // [2026-07-05 AUDIT-FIX] User-triggered runs share agent_name with
+    // the scheduled cron (e.g. DISCOVERY logs on_demand scans + grok
+    // deep dives under the same name, expected max 2/day). Counting
+    // them tripped false "runaway" alerts on busy manual days — only
+    // machine-scheduled runs count against EXPECTED_DAILY_MAX.
+    const MANUAL_RUN_TYPES = new Set([
+      'on_demand', 'grok_deep_dive', 'poc_enrichment', 'grok_poc_enrichment', 'manual',
+    ]);
     const runCounts: Record<string, number> = {};
     for (const r of allRuns || []) {
+      if (MANUAL_RUN_TYPES.has(r.run_type)) continue;
       const name = r.agent_name || '(unknown)';
       runCounts[name] = (runCounts[name] || 0) + 1;
     }

@@ -2793,18 +2793,31 @@ async function forwardSubmissionToReviewChannel(opts: {
     .select('value')
     .eq('key', 'content_submissions_channel_id')
     .maybeSingle();
-  const channelId = (chanRow as any)?.value;
+  let channelId = (chanRow as any)?.value;
   if (!channelId) {
-    console.log('[/submit] content_submissions_channel_id not configured; skipping review forward');
-    return;
+    // [2026-07-05 AUDIT-FIX] Previously a silent black hole: the
+    // submission landed in the DB but nobody was notified, so it sat
+    // unreviewed forever. Fall back to the terminal chat (same one
+    // cron-health-check alerts) — the Approve/Reject callbacks work
+    // from any chat, so review still functions end-to-end.
+    const fallback = process.env.TELEGRAM_TERMINAL_CHAT_ID;
+    if (!fallback) {
+      console.error('[/submit] content_submissions_channel_id not configured AND no TELEGRAM_TERMINAL_CHAT_ID fallback — submission', opts.submissionId, 'has no review surface');
+      return;
+    }
+    console.warn('[/submit] content_submissions_channel_id not configured; forwarding review card to terminal chat');
+    channelId = fallback;
   }
+  const usingFallbackChat = !(chanRow as any)?.value;
   const { data: threadRow } = await (supabaseAdmin as any)
     .from('app_settings')
     .select('value')
     .eq('key', 'content_submissions_channel_thread_id')
     .maybeSingle();
   const threadIdRaw = (threadRow as any)?.value;
-  const threadId = threadIdRaw ? parseInt(threadIdRaw, 10) : undefined;
+  // The thread setting belongs to the configured channel — never apply
+  // it to the fallback terminal chat (wrong-thread sends fail outright).
+  const threadId = !usingFallbackChat && threadIdRaw ? parseInt(threadIdRaw, 10) : undefined;
 
   const body = [
     '<b>New content submission</b>',
