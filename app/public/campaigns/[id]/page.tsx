@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 import { createClient } from '@supabase/supabase-js';
-import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink } from 'lucide-react';
+import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink, Signal, Zap } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1495,10 +1495,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         {/* Tabs for KOLs and Contents */}
         <Tabs defaultValue="kols" className="bg-white rounded-[14px] border border-cream-200 shadow-card">
           <div className="px-6 pt-4">
-            <TabsList>
-              <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
-              {/* <TabsTrigger value="performance">Performance</TabsTrigger> */}
-              <TabsTrigger value="contents">Content Dashboard</TabsTrigger>
+            {/* [2026-07-06] Underline tab pattern — matches the internal
+                campaign view (app/campaigns/[id] TabsList/TabsTrigger). */}
+            <TabsList className="w-full justify-start gap-0.5 bg-transparent p-0 h-auto rounded-none border-b border-cream-200">
+              <TabsTrigger value="kols" className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t">KOL Dashboard</TabsTrigger>
+              <TabsTrigger value="contents" className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t">Content Dashboard</TabsTrigger>
             </TabsList>
           </div>
           <div className="px-6 pb-4">
@@ -1570,10 +1571,17 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     const total = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
                     return formatFollowers(Math.round(total / dashboardKOLs.length));
                   })();
+                  // [2026-07-06] Combined reach (sum of followers) + Active
+                  // this week (KOLs with a populated activation_active_week),
+                  // mirroring the internal KolDashboardOverview.
+                  const combinedReach = formatFollowers(
+                    dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0),
+                  );
+                  const activeThisWeek = dashboardKOLs.filter(
+                    (kol: any) => kol.activation_active_week != null,
+                  ).length;
                   const platformSet = new Set<string>();
                   dashboardKOLs.forEach(kol => (kol.master_kol.platform || []).forEach(p => platformSet.add(p)));
-                  const regionSet = new Set<string>();
-                  dashboardKOLs.forEach(kol => { if (kol.master_kol.region) regionSet.add(kol.master_kol.region); });
 
                   const platformChartData = (() => {
                     const counts: Record<string, number> = {};
@@ -1617,67 +1625,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                   return (
                     <div className="space-y-6">
-                      {/* KPI cards — gradient brand icon block to
-                          mirror the public Content Dashboard
-                          Overview's card style per Andy 2026-06-19.
-                          Same Card / CardHeader / CardContent rhythm
-                          + sentence-style label + text-2xl value. */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">Total KOLs</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{totalKols}</div>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">Avg Followers</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{avgFollowersFmt}</div>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{platformSet.size}</div>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                              <p className="text-sm text-ink-warm-700">{regionSet.size === 1 ? 'Region' : 'Regions'}</p>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-ink-warm-900 tabular-nums">{regionSet.size}</div>
-                          </CardContent>
-                        </Card>
+                      {/* [2026-07-06] KPI strip — now the shared KpiCard
+                          primitive (matches the internal KolDashboardOverview).
+                          Combined Reach + Active This Week added before Unique
+                          Platform; Region card removed. */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}     accent="brand"   />
+                        <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowersFmt} accent="sky"   />
+                        <KpiCard icon={Signal}    label="Combined Reach" value={combinedReach} accent="purple"  />
+                        <KpiCard icon={Zap}       label="Active This Week" value={activeThisWeek} accent="amber" />
+                        <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'} value={platformSet.size} accent="emerald" />
                       </div>
 
                       {/* Charts row — Platform + Region distribution

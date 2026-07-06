@@ -18,7 +18,7 @@
  * fact that recharts owns its own animation lifecycle internally.
  */
 
-import { BarChart3, Flag, Globe, Users } from 'lucide-react';
+import { BarChart3, Globe, Signal, Users, Zap } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -92,6 +92,16 @@ export function KolDashboardOverview() {
     const total = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
     return KOLService.formatFollowers(Math.round(total / dashboardKOLs.length));
   })();
+  // [2026-07-06] Combined reach = sum of all (non-hidden) KOL follower
+  // counts. Active this week = KOLs whose activation_active_week is set
+  // (the view only populates active_week_number when they posted in the
+  // current campaign week).
+  const combinedReach = KOLService.formatFollowers(
+    dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0),
+  );
+  const activeThisWeek = dashboardKOLs.filter(
+    (kol) => (kol as any).activation_active_week != null,
+  ).length;
   const platformSet = (() => {
     const s = new Set<string>();
     dashboardKOLs.forEach((kol) => {
@@ -99,14 +109,6 @@ export function KolDashboardOverview() {
     });
     return s;
   })();
-  const regionSet = (() => {
-    const s = new Set<string>();
-    dashboardKOLs.forEach((kol) => {
-      if (kol.master_kol.region) s.add(kol.master_kol.region);
-    });
-    return s;
-  })();
-
   // ── Chart data ───────────────────────────────────────────────────
   const platformChartData = (() => {
     const counts: { [key: string]: number } = {};
@@ -164,11 +166,14 @@ export function KolDashboardOverview() {
     <div className="space-y-6">
       {/* KPI strip — same KpiCard primitive as /dashboard,
           /lists Access & Visits, /analytics. */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}    accent="brand"   />
-        <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowers} accent="sky"     />
+      {/* [2026-07-06] Combined Reach + Active This Week added before
+          Unique Platform; Region card removed — per Andy. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}     accent="brand"   />
+        <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowers}  accent="sky"     />
+        <KpiCard icon={Signal}    label="Combined Reach" value={combinedReach} accent="purple"  />
+        <KpiCard icon={Zap}       label="Active This Week" value={activeThisWeek} accent="amber" />
         <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'} value={platformSet.size} accent="emerald" />
-        <KpiCard icon={Flag}      label={regionSet.size === 1 ? 'Region' : 'Regions'}                     value={regionSet.size}    accent="purple"  />
       </div>
 
       {/* Charts row — Platform + Region distribution hidden per Andy
