@@ -56,11 +56,20 @@ export async function POST(
   // `master_kols.link` (a t.me URL) and normalizes to @handle. The
   // separate `telegram_id` column stores the numeric user ID used by the
   // bot (/wallet, /submit) and is NOT a channel handle.
-  const link = typeof kol.link === 'string' ? kol.link : '';
-  if (!/t\.me\//i.test(link)) {
+  const link = (typeof kol.link === 'string' ? kol.link : '').trim();
+  if (!link) {
     return NextResponse.json({
       ok: false,
-      error: 'KOL link is not a t.me URL — cannot scan',
+      error: 'KOL has no link to scan',
+    }, { status: 400 });
+  }
+  // Accept t.me/ URLs, bare @handles, and bare handles — triggerKolScan
+  // normalizes all three. Only reject a link that's clearly a NON-Telegram
+  // URL (x.com, youtube, a website), since Telethon can't resolve those.
+  if (/^https?:\/\//i.test(link) && !/t\.me\//i.test(link)) {
+    return NextResponse.json({
+      ok: false,
+      error: 'KOL link is not a Telegram channel — cannot scan',
     }, { status: 400 });
   }
 

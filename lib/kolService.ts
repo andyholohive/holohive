@@ -149,6 +149,21 @@ export class KOLService {
   }
 
   /**
+   * Fetch a single KOL row by id. Lightweight — used by /kols to poll
+   * for the niche_tags an async Telethon scan writes back, so the row
+   * can refresh in place without reloading the whole roster.
+   */
+  static async getKOLById(id: string): Promise<MasterKOL | null> {
+    const { data, error } = await supabase
+      .from('master_kols')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? ((data as unknown) as MasterKOL) : null;
+  }
+
+  /**
    * Create a new KOL
    */
   static async createKOL(kolData: CreateKOLData): Promise<MasterKOL> {

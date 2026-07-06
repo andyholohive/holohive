@@ -58,6 +58,25 @@ import KolActivationsDialog from './_components/KolActivationsDialog';
 const effectiveCreatorTypes = (raw: string[] | null | undefined): string[] =>
   Array.isArray(raw) && raw.length > 0 ? raw : ['General'];
 
+/**
+ * Whether a `link` value points at a Telegram channel we can auto-scan.
+ * Accepts `t.me/foo`, `https://t.me/foo`, and `@foo`; also a bare `foo`
+ * when the KOL is already flagged as a Telegram-platform KOL. Anything
+ * that's clearly a different URL (x.com, youtube, a website) returns
+ * false so we don't dispatch a Telethon scan that can't resolve it.
+ */
+const looksLikeTgReference = (value: unknown, platform: unknown): boolean => {
+  if (typeof value !== 'string') return false;
+  const s = value.trim();
+  if (!s) return false;
+  if (/t\.me\//i.test(s)) return true;            // t.me/foo | https://t.me/foo
+  if (/^https?:\/\//i.test(s)) return false;      // some other URL — not TG
+  if (/^@[A-Za-z0-9_]{3,}$/.test(s)) return true; // @handle
+  const isTgKol = Array.isArray(platform) &&
+    platform.some(p => ['telegram', 'tg'].includes(String(p ?? '').toLowerCase().trim()));
+  return isTgKol && /^[A-Za-z0-9_]{3,}$/.test(s); // bare handle, TG KOLs only
+};
+
 export default function KOLsPage() {
   const { user, userProfile } = useAuth();
   const router = useRouter();
@@ -922,17 +941,19 @@ export default function KOLsPage() {
       try {
         await KOLService.updateKOL(updatedKOL);
 
-        // Auto-fire a Telethon scan when a t.me link is added or
-        // changed. The scanner reads `master_kols.link` (the channel
-        // URL), not the numeric `telegram_id` column. Non-blocking —
-        // the route returns immediately and a toast tells the user
-        // the score will refresh in about a minute.
+        // Auto-fire a Telethon scan when a Telegram channel reference is
+        // added or changed. The scanner reads `master_kols.link` (the
+        // channel URL / handle), not the numeric `telegram_id` column.
+        // Accepts t.me/ URLs, @handles, and bare handles (looksLikeTgReference)
+        // — not just t.me/ — so a KOL entered as "@cobling" scans too.
+        // Non-blocking — the route returns immediately; we then poll the
+        // row so the niche/score update in place ~1 min later.
         if (
           editingCell.field === 'link' &&
-          typeof editingValue === 'string' &&
-          /t\.me\//i.test(editingValue) &&
-          editingValue.trim() !== (kolToUpdate.link || '').trim()
+          looksLikeTgReference(editingValue, kolToUpdate.platform) &&
+          (editingValue as string).trim() !== (kolToUpdate.link || '').trim()
         ) {
+          const prevNiche = JSON.stringify(kolToUpdate.niche_tags || []);
           try {
             const res = await fetch(`/api/kols/${kolId}/rescan`, { method: 'POST' });
             const data = await res.json().catch(() => ({}));
@@ -941,6 +962,25 @@ export default function KOLsPage() {
                 title: 'Scan queued',
                 description: 'Niche + score will refresh in about a minute.',
               });
+              // Poll the row for the niche the scan writes back and update
+              // it in place when it lands — so it "updates right away"
+              // (~1 min) with no manual reload. Gives up quietly after ~2 min.
+              (async () => {
+                for (let attempt = 0; attempt < 12; attempt++) {
+                  await new Promise(r => setTimeout(r, 10000));
+                  try {
+                    const fresh = await KOLService.getKOLById(kolId);
+                    if (!fresh) continue;
+                    const freshNiche = JSON.stringify(fresh.niche_tags || []);
+                    if (freshNiche !== prevNiche && (fresh.niche_tags?.length ?? 0) > 0) {
+                      setKols(prev => prev.map(k => k.id === kolId ? { ...k, niche_tags: fresh.niche_tags } : k));
+                      setScoreRefreshNonce(n => n + 1); // recompute score column
+                      toast({ title: 'Niche updated', description: 'AI scan finished — niche + score refreshed.' });
+                      return;
+                    }
+                  } catch { /* keep polling */ }
+                }
+              })();
             } else {
               // Surface the failure instead of swallowing it — a silent
               // no-op here (e.g. a missing GH_DISPATCH_TOKEN) was why new
