@@ -15,6 +15,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { renderTemplate } from './messageTemplates';
 import {
   getCampaignWeek,
   mondayOfCampaignWeek as mondayOfCampaignWeekHelper,
@@ -660,6 +661,10 @@ export class LineupManagerService {
     lineupId: string,
     campaignName: string,
     confirmedByName: string,
+    // [2026-07-06] Optional custom header line (Markdown; vars
+    // {campaign} {week} {by}) — resolved from app_settings by the
+    // notify route. Omitted → the original hardcoded header.
+    headerTemplate?: string,
   ): Promise<string> {
     const full = await this.getLineupFull(lineupId);
     if (!full) throw new Error('Lineup not found for group post.');
@@ -676,7 +681,13 @@ export class LineupManagerService {
     }
 
     const lines: string[] = [];
-    lines.push(`*${campaignName}* Week ${full.week_number} Lineup Confirmed`);
+    lines.push(headerTemplate
+      ? renderTemplate(headerTemplate, {
+          campaign: campaignName,
+          week: String(full.week_number),
+          by: confirmedByName,
+        })
+      : `*${campaignName}* Week ${full.week_number} Lineup Confirmed`);
     lines.push('');
     for (const angle of full.angles) {
       lines.push(`*${angle.angle_name}* (${angle.slots.length} KOL${angle.slots.length === 1 ? '' : 's'})`);

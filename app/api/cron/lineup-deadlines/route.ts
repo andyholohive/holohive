@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { escapeHtml } from '@/lib/telegramHtml';
+import { getTemplate, renderTemplate } from '@/lib/messageTemplates';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -122,11 +123,20 @@ export async function GET(request: Request) {
     const nextMonday = mondayOf(new Date(now.getTime() + 7 * 86_400_000));
 
     const offenders: string[] = [];
-    let header = '';
+
+    // Header line is template-driven per check — editable on
+    // /admin/telegram-comm; the offender list below stays generated.
+    const templateKey = check === 'proposal'
+      ? 'tmpl_lineup_reminder_friday' as const
+      : check === 'approval'
+        ? 'tmpl_lineup_reminder_monday' as const
+        : 'tmpl_lineup_reminder_thursday' as const;
+    const header = renderTemplate(await getTemplate(supabase, templateKey), {
+      week: check === 'proposal' ? nextMonday : thisMonday,
+    });
 
     if (check === 'proposal') {
       // Friday: next week's lineup should at least be proposed by now.
-      header = `⏰ <b>Lineup deadline — Friday check</b>\nNext week's lineup (week of ${nextMonday}) not yet proposed:`;
       for (const c of inScope) {
         const next = (lineupsByCampaign.get(c.id) ?? []).find(l => l.week_of === nextMonday);
         if (!next || next.status === 'draft') {
@@ -135,7 +145,6 @@ export async function GET(request: Request) {
       }
     } else if (check === 'approval') {
       // Monday: this week's lineup should be confirmed by now.
-      header = `⏰ <b>Lineup deadline — Monday check</b>\nThis week's lineup (week of ${thisMonday}) not yet approved:`;
       for (const c of inScope) {
         const cur = (lineupsByCampaign.get(c.id) ?? []).find(l => l.week_of === thisMonday);
         if (!cur || cur.status === 'draft' || cur.status === 'proposed') {
@@ -145,7 +154,6 @@ export async function GET(request: Request) {
       }
     } else {
       // Thursday: this week's confirmed lineup should be fully posted.
-      header = `⏰ <b>Lineup deadline — Thursday check</b>\nThis week's lineup (week of ${thisMonday}) not fully posted:`;
       for (const c of inScope) {
         const cur = (lineupsByCampaign.get(c.id) ?? []).find(
           l => l.week_of === thisMonday && (l.status === 'confirmed' || l.status === 'completed'),

@@ -29,12 +29,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2, Activity, AlarmClock,
+  CheckCircle2, Activity, AlarmClock, Clock,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
+import { MessageTemplateEditor } from '@/components/telegram/MessageTemplateEditor';
 
 type UserRow = {
   id: string;
@@ -335,6 +336,11 @@ export default function LineupSettingsPage() {
           <>When enabled below, every user listed receives a TG DM on propose. Anyone in the list can confirm a proposed lineup. Empty list → falls back to <code className="bg-cream-100 px-1 rounded text-[10px]">LINEUP_APPROVER_EMAIL</code> env var, then <code className="bg-cream-100 px-1 rounded text-[10px]">jdot@holohive.io</code>.</>
         )}
       >
+        <WhenItSends>
+          Instantly when a lineup is proposed — each approver below gets a
+          TG DM (if the toggle is on).
+        </WhenItSends>
+
         {/* DM toggle. The broadcast to lineup_proposal_chat_id still fires
             when this is off — this only controls the per-approver DM
             fan-out. Useful when the broadcast chat already reaches
@@ -443,6 +449,12 @@ export default function LineupSettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="border-cream-200">
+          <CardContent className="p-4">
+            <MessageTemplateEditor settingKey="tmpl_lineup_proposed_dm" label="Approver DM message" />
+          </CardContent>
+        </Card>
       </CollapsibleSection>
 
       {/* ─── Submission-Progress Alert section [2026-06-30] ─── */}
@@ -457,6 +469,11 @@ export default function LineupSettingsPage() {
           <>Per-campaign fallback chat. Used only when the global Submission-Progress Alert destination above is empty. Going forward, leave this blank and configure the single global chat instead.</>
         )}
       >
+        <WhenItSends>
+          Nothing directly — this is a fallback destination. The
+          Submission-Progress Alert and Confirmed Lineup posts land here
+          only when their global channels are unset.
+        </WhenItSends>
         <Card className="border-cream-200">
           <div className="p-3 border-b border-cream-100">
             <div className="relative">
@@ -699,6 +716,10 @@ function LineupProposalChannelSection() {
         <>Optional shared chat that receives a copy of every <code className="bg-cream-100 px-1 rounded text-[10px]">proposed</code> lineup notification. Approvers still get their DMs — this is for team-wide visibility. Pick a chat (or a specific forum topic inside it). Leave empty to only DM approvers.</>
       )}
     >
+      <WhenItSends>
+        Instantly when a lineup is proposed — a copy of the proposal
+        notification posts here alongside the approver DMs.
+      </WhenItSends>
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
@@ -723,6 +744,11 @@ function LineupProposalChannelSection() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+      <Card className="border-cream-200">
+        <CardContent className="p-4">
+          <MessageTemplateEditor settingKey="tmpl_lineup_proposed_broadcast" label="Broadcast message" />
         </CardContent>
       </Card>
     </CollapsibleSection>
@@ -807,6 +833,10 @@ function LineupConfirmedChannelSection() {
         <>Global chat that receives the formatted post when a lineup is <code className="bg-cream-100 px-1 rounded text-[10px]">confirmed</code>. Replaces the legacy per-campaign client ops chat — confirm is an internal team milestone, so one shared feed beats fanning into each client&apos;s chat. Leave empty to fall back to <code className="bg-cream-100 px-1 rounded text-[10px]">campaigns.tg_ops_group_id</code>.</>
       )}
     >
+      <WhenItSends>
+        Instantly when a proposed lineup is approved (confirmed) — the
+        full lineup roster posts here.
+      </WhenItSends>
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
@@ -831,6 +861,11 @@ function LineupConfirmedChannelSection() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+      <Card className="border-cream-200">
+        <CardContent className="p-4">
+          <MessageTemplateEditor settingKey="tmpl_lineup_confirmed_header" label="Post header line" />
         </CardContent>
       </Card>
     </CollapsibleSection>
@@ -914,6 +949,10 @@ function SubmissionProgressChannelSection() {
         <>Global chat that receives the post-live alert after every approved <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> ("X just posted, N live this week"). Replaces the legacy per-campaign client ops chat — every campaign&apos;s alerts now feed one shared team channel. Leave empty to fall back to <code className="bg-cream-100 px-1 rounded text-[10px]">campaigns.tg_ops_group_id</code>.</>
       )}
     >
+      <WhenItSends>
+        Instantly when a KOL&apos;s submitted content is approved — the
+        post-live progress alert fires here.
+      </WhenItSends>
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
@@ -938,6 +977,11 @@ function SubmissionProgressChannelSection() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+      <Card className="border-cream-200">
+        <CardContent className="p-4">
+          <MessageTemplateEditor settingKey="tmpl_spa_header" label="Alert header" />
         </CardContent>
       </Card>
     </CollapsibleSection>
@@ -1018,6 +1062,10 @@ function ContentReviewChannelSection() {
         <>Central TG channel where KOL <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> forwards land with Approve/Reject buttons. Per the TG Bot Content Submission spec — one channel for the whole team, not per-campaign. Pick a chat (or a specific forum topic inside it). Approve/Reject reply goes back to the KOL&apos;s per-KOL group chat.</>
       )}
     >
+      <WhenItSends>
+        Instantly when a KOL sends <code className="bg-cream-100 px-1 rounded text-[10px]">/submit</code> — the
+        review card with Approve/Reject buttons lands here.
+      </WhenItSends>
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
@@ -1057,7 +1105,28 @@ function ContentReviewChannelSection() {
           )}
         </CardContent>
       </Card>
+      <Card className="border-cream-200">
+        <CardContent className="p-4">
+          <MessageTemplateEditor settingKey="tmpl_content_review_card" label="Review card message" />
+        </CardContent>
+      </Card>
     </CollapsibleSection>
+  );
+}
+
+// ─── "When it sends" info line ────────────────────────────────────────
+
+/**
+ * Per Andy 2026-07-06: every Telegram Comm section states plainly WHEN
+ * its notification fires (event-driven vs cron schedule), so nobody
+ * has to reverse-engineer the trigger from the section subtitle.
+ */
+function WhenItSends({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-1.5 text-[11px] text-ink-warm-600 bg-cream-50 border border-cream-200 rounded-md px-2.5 py-1.5">
+      <Clock className="h-3 w-3 mt-0.5 text-brand shrink-0" />
+      <span><span className="font-semibold">Sends:</span> {children}</span>
+    </div>
   );
 }
 
@@ -1271,9 +1340,15 @@ function LineupReminderChannelSection() {
             : <StatusBadge tone="neutral" size="sm">Off</StatusBadge>)
         : null}
       subtitle={(
-        <>Weekly deadline pings: <code className="bg-cream-100 px-1 rounded text-[10px]">Fri 12:00 UTC</code> next week not proposed · <code className="bg-cream-100 px-1 rounded text-[10px]">Mon 12:00 UTC</code> this week not approved · <code className="bg-cream-100 px-1 rounded text-[10px]">Thu 12:00 UTC</code> this week not fully posted. Only campaigns with lineup activity in the last 3 weeks are checked. Leave empty to turn the pings off.</>
+        <>Weekly deadline pings. Only campaigns with lineup activity in the last 3 weeks are checked. Leave empty to turn the pings off.</>
       )}
     >
+      <WhenItSends>
+        On a schedule — <code className="bg-cream-100 px-1 rounded text-[10px]">Fri 12:00 UTC</code> if next
+        week&apos;s lineup isn&apos;t proposed, <code className="bg-cream-100 px-1 rounded text-[10px]">Mon 12:00 UTC</code> if
+        this week&apos;s isn&apos;t approved, <code className="bg-cream-100 px-1 rounded text-[10px]">Thu 12:00 UTC</code> if
+        this week&apos;s isn&apos;t fully posted. Quiet when all clear.
+      </WhenItSends>
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
@@ -1298,6 +1373,13 @@ function LineupReminderChannelSection() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-5">
+          <MessageTemplateEditor settingKey="tmpl_lineup_reminder_friday" label="Friday ping (proposal deadline)" />
+          <MessageTemplateEditor settingKey="tmpl_lineup_reminder_monday" label="Monday ping (approval deadline)" />
+          <MessageTemplateEditor settingKey="tmpl_lineup_reminder_thursday" label="Thursday ping (posting deadline)" />
         </CardContent>
       </Card>
     </CollapsibleSection>

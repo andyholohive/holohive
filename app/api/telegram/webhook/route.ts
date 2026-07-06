@@ -17,6 +17,7 @@ const supabaseAdmin = createClient(
 // Telegram webhook secret for verification (optional but recommended)
 import { acceptedWebhookSecrets } from '@/lib/telegramWebhookSecret';
 import { escapeHtml } from '@/lib/telegramHtml';
+import { getTemplate, renderTemplate } from '@/lib/messageTemplates';
 
 // Content thread in HH Operations for KOL social links
 const CONTENT_THREAD_CHAT_ID = '-1002636253963';
@@ -2750,10 +2751,13 @@ async function sendSubmissionProgressAlert(opts: {
   const dailyQuota = plannedCount > 0 ? Math.ceil(plannedCount / days) : 0;
   const quotaMet = todayCount >= dailyQuota && dailyQuota > 0;
 
-  // Build the alert message
-  const lines: string[] = [];
-  lines.push(`<b>${escapeHtml(opts.campaignName)}</b>, post live`);
-  lines.push(`<b>${escapeHtml(opts.kolName)}</b> just posted.`);
+  // Build the alert message. Header is template-driven — editable on
+  // /admin/telegram-comm; the progress breakdown below stays generated.
+  const spaTemplate = await getTemplate(supabaseAdmin, 'tmpl_spa_header');
+  const lines: string[] = renderTemplate(spaTemplate, {
+    campaign: escapeHtml(opts.campaignName),
+    kol: escapeHtml(opts.kolName),
+  }).split('\n');
   if (plannedCount > 0) {
     const pct = Math.round((liveCount / plannedCount) * 100);
     lines.push(`${liveCount} of ${plannedCount} live this week (${pct}%).`);
@@ -2819,14 +2823,17 @@ async function forwardSubmissionToReviewChannel(opts: {
   // it to the fallback terminal chat (wrong-thread sends fail outright).
   const threadId = !usingFallbackChat && threadIdRaw ? parseInt(threadIdRaw, 10) : undefined;
 
-  const body = [
-    '<b>New content submission</b>',
-    `KOL: <b>${escapeHtml(opts.kolName)}</b>`,
-    `Campaign: ${escapeHtml(opts.campaignName)}`,
-    `Type: ${escapeHtml(opts.contentType)} · ${escapeHtml(opts.platform)}`,
-    `Link: ${escapeHtml(opts.link)}`,
-    `Submitted: ${escapeHtml(opts.submittedAt)}`,
-  ].join('\n');
+  // Review card body is template-driven — editable on /admin/telegram-comm.
+  // The Approve/Reject buttons are attached below regardless of template.
+  const cardTemplate = await getTemplate(supabaseAdmin, 'tmpl_content_review_card');
+  const body = renderTemplate(cardTemplate, {
+    kol: escapeHtml(opts.kolName),
+    campaign: escapeHtml(opts.campaignName),
+    type: escapeHtml(opts.contentType),
+    platform: escapeHtml(opts.platform),
+    link: escapeHtml(opts.link),
+    submitted: escapeHtml(opts.submittedAt),
+  });
 
   const buttons = [[
     { text: '✅ Approve', callback_data: `subm:approve:${opts.submissionId}` },

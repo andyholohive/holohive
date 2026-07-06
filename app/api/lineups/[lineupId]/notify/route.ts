@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { LineupManagerService } from '@/lib/lineupManagerService';
+import { escapeHtml } from '@/lib/telegramHtml';
+import { getTemplate, renderTemplate } from '@/lib/messageTemplates';
 
 export const dynamic = 'force-dynamic';
 
@@ -206,10 +208,15 @@ export async function POST(
           reason: `No telegram_id on any approver (${names}). They need to DM the bot first to receive notifications.`,
         });
       }
+      // [2026-07-06] Message body is template-driven — editable on
+      // /admin/telegram-comm. The review link is always appended.
+      const dmTemplate = await getTemplate(supabase, 'tmpl_lineup_proposed_dm');
       const text =
-        `<b>${campaign.name}</b>\n` +
-        `Week ${lineup.week_number} lineup proposed for your review.\n\n` +
-        `<a href="${reviewLink}">Review on HHP</a>`;
+        renderTemplate(dmTemplate, {
+          campaign: escapeHtml(campaign.name),
+          week: String(lineup.week_number),
+        }) +
+        `\n\n<a href="${reviewLink}">Review on HHP</a>`;
       // Fan out to all approvers with TG IDs. Failures per-recipient
       // don't fail the whole call — sent count + skipped list both
       // surface in the response. Empty when dmEnabled is false; the
@@ -242,11 +249,15 @@ export async function POST(
       const broadcastChatId = (chatSetting.data as any)?.value as string | undefined;
       const broadcastThreadId = (threadSetting.data as any)?.value as string | undefined;
       if (broadcastChatId) {
-        // Broadcast variant: shared chat, so "your review" → "review".
+        // Broadcast variant: shared chat, so the default wording drops
+        // "your". Template-driven like the DM above.
+        const broadcastTemplate = await getTemplate(supabase, 'tmpl_lineup_proposed_broadcast');
         const broadcastText =
-          `<b>${campaign.name}</b>\n` +
-          `Week ${lineup.week_number} lineup proposed for review.\n\n` +
-          `<a href="${reviewLink}">Review on HHP</a>`;
+          renderTemplate(broadcastTemplate, {
+            campaign: escapeHtml(campaign.name),
+            week: String(lineup.week_number),
+          }) +
+          `\n\n<a href="${reviewLink}">Review on HHP</a>`;
         try {
           chatPosted = await TelegramService.sendToChat(
             broadcastChatId,
@@ -308,12 +319,16 @@ export async function POST(
         confirmedByName = u?.telegram_username || u?.email?.split('@')[0] || 'Jdot';
       }
       // The service has the formatter — reuse it so the message
-      // shape stays consistent with the test fixture.
+      // shape stays consistent with the test fixture. Header line is
+      // template-driven (editable on /admin/telegram-comm); the roster
+      // body + footer stay generated.
+      const headerTemplate = await getTemplate(supabase, 'tmpl_lineup_confirmed_header');
       const svc = new LineupManagerService(supabase as any);
       const text = await svc.formatLineupForGroupPost(
         lineupId,
         campaign.name,
         confirmedByName,
+        headerTemplate,
       );
       const sent = await TelegramService.sendToChat(
         targetChatId,
