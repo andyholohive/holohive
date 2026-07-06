@@ -16,6 +16,7 @@ const supabaseAdmin = createClient(
 
 // Telegram webhook secret for verification (optional but recommended)
 import { acceptedWebhookSecrets } from '@/lib/telegramWebhookSecret';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 // Content thread in HH Operations for KOL social links
 const CONTENT_THREAD_CHAT_ID = '-1002636253963';
@@ -987,12 +988,6 @@ async function resolveCaller(message: any): Promise<ResolvedCaller> {
   return { kind: 'unknown', tgUserId };
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 /**
  * Handle the /tasks slash command — list open tasks with one-tap
@@ -2451,7 +2446,6 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
     await finalizeSubmission({
       chatId,
       threadId,
-      kolTgId: caller.tgUserId,
       kolId: caller.id,
       kolName: caller.name,
       campaignId: activeCampaigns[0].id,
@@ -2522,7 +2516,6 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
 async function finalizeSubmission(opts: {
   chatId: string;
   threadId: number | undefined;
-  kolTgId: string;
   kolId: string;
   kolName: string;
   campaignId: string;
@@ -2977,7 +2970,6 @@ async function handleSubmPickerCallback(
   const submissionId = await finalizeSubmission({
     chatId: messageChatId,
     threadId: undefined,
-    kolTgId: pending.kol_telegram_id,
     kolId: pending.kol_id,
     kolName,
     campaignId: campaign.id,
@@ -3104,7 +3096,6 @@ async function handleSubmReviewCallback(
       link: (sub as any).link,
       platform: (sub as any).platform,
       contentType: (sub as any).content_type,
-      approverId: teamMember.id,
     });
     if (result.error) {
       console.error('[/submit] contents insert on approve failed:', result.error);

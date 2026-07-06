@@ -662,15 +662,19 @@ and `.is('deleted_at', null)` in Supabase JS.
 
 ## File sizes — don't make giant page files
 
-These are the bug magnets in this codebase:
-- `app/campaigns/[id]/page.tsx` (~11,000 lines) — the biggest. Cosmetic-
-  only conformance applied in the May 2026 audit; structural refactor
-  is a tracked follow-up.
-- `app/crm/sales-pipeline/page.tsx` (~9,000 lines)
-- `app/public/portal/[id]/page.tsx` (~2,800 lines)
-- `app/crm/network/page.tsx` (~3,400 lines)
-- `app/forms/[id]/page.tsx` (~3,200 lines)
-- `app/crm/telegram/page.tsx` (~3,000 lines)
+These are the bug magnets in this codebase (line counts as of the
+July 2026 audit):
+- `app/clients/page.tsx` (~6,000 lines) — now the biggest.
+- `app/public/portal/[id]/page.tsx` (~4,100 lines)
+- `app/kols/page.tsx` (~3,900 lines)
+- `app/crm/telegram/page.tsx` (~3,800 lines)
+- `app/public/campaigns/[id]/page.tsx` (~3,600 lines)
+- `app/crm/network/page.tsx` (~3,500 lines)
+- `app/forms/[id]/page.tsx` (~3,400 lines)
+- `app/crm/sales-pipeline/page.tsx` (~3,200 lines)
+- `app/campaigns/[id]/page.tsx` (~2,900 lines) — was ~11,000 before
+  the May 2026 audit; the structural split happened. Don't let it
+  regrow.
 
 When adding new pages, **target <1,500 lines**. Extract:
 - Component-level pieces (dialogs, slide-overs, table cells) into separate functions in the same file

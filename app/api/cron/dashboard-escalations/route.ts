@@ -26,6 +26,7 @@ import { TelegramService } from '@/lib/telegramService';
 import { getDashboardConfig } from '@/lib/dashboard/config';
 import { getStandardClients, renewalToneFor, overdueToneFor } from '@/lib/dashboard/queries';
 import { getMondayFormStatus } from '@/lib/dashboard/monday-form';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -346,6 +347,3 @@ export async function GET(request: Request) {
   }
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

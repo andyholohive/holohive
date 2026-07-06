@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { formatDate } from '@/lib/dateFormat';
 import { z } from 'zod';
 import { getKolScore as getKolScoreFromService } from '@/lib/kolScoreService';
 import { mcpAuthStorage } from '@/lib/mcp/context';
@@ -1816,6 +1817,8 @@ export async function getKolChannelSnapshot(
 
   const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString() : '—');
   const lines = rows.map((s) => {
+    // Month+year-only header ("Jun 2026"); mm/dd/yyyy would imply day precision snapshots don't have.
+    // lint-conventions: disable-next-line no-raw-toLocaleDateString
     const month = new Date(s.snapshot_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     // Computed columns (mig 075). engagement_rate is a ratio (0.0234
     // = 2.34%) so display as a pct; follower_growth_pct is already a
@@ -1858,7 +1861,7 @@ export async function getKolCallLog(
   if (rows.length === 0) return `No call logs for this KOL yet.`;
 
   const lines = rows.map((c) => {
-    const date = new Date(c.call_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = formatDate(c.call_date + 'T00:00:00');
     const tags = [c.call_type, c.project].filter(Boolean).join(' · ');
     const sections = [
       c.notes && `notes: ${c.notes}`,

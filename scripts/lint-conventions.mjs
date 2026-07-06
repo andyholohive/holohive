@@ -151,7 +151,9 @@ function matchDisable(line, pattern, ruleId) {
  * Get the list of files to check.
  *
  * - If files are passed as argv, check those (pre-commit hook use case).
- * - Otherwise, find all *.tsx files under app/ and components/.
+ * - Otherwise, find all *.tsx files under app/ and components/, plus
+ *   *.ts under lib/ (services export className strings — e.g. STAGE_COLORS
+ *   in salesPipelineService — so the color rules apply there too).
  *
  * Skips node_modules, .next, dist, build.
  */
@@ -166,7 +168,7 @@ function listFiles() {
   // find via git ls-files, fall back to find
   try {
     const out = execSync(
-      `git ls-files 'app/*.tsx' 'app/**/*.tsx' 'components/*.tsx' 'components/**/*.tsx'`,
+      `git ls-files 'app/*.tsx' 'app/**/*.tsx' 'components/*.tsx' 'components/**/*.tsx' 'lib/*.ts' 'lib/**/*.ts'`,
       { cwd: REPO_ROOT, encoding: 'utf-8' }
     );
     return out

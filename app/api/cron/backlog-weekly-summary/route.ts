@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAppSetting } from '@/lib/appSettings';
 import { formatDate } from '@/lib/dateFormat';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -256,7 +257,3 @@ export async function GET(request: Request) {
   }
 }
 
-/** Minimal HTML escaper. */
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

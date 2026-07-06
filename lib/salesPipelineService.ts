@@ -83,7 +83,7 @@ export const STAGE_COLORS: Record<SalesPipelineStage, { bg: string; text: string
   v2_contract: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', solid: 'bg-cyan-500' },
   v2_closed_won: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', solid: 'bg-emerald-500' },
   orbit: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', solid: 'bg-orange-500' },
-  v2_closed_lost: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', solid: 'bg-red-500' },
+  v2_closed_lost: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', solid: 'bg-rose-500' },
   nurture: { bg: 'bg-lime-50', text: 'text-lime-700', border: 'border-lime-200', solid: 'bg-lime-500' },
 };
 

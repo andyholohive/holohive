@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { formatDate } from '@/lib/dateFormat';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 
@@ -158,9 +159,3 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, notified: assignee.id });
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}

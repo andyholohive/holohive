@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { formatDate as fmtDate } from '@/lib/dateFormat';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 
@@ -159,12 +160,6 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 function formatStatus(s: string | null | undefined): string {
   if (!s) return 'none';

@@ -128,7 +128,6 @@ export async function POST(
       link: sub.link,
       platform: sub.platform,
       contentType: sub.content_type,
-      approverId: user.id,
     });
     createdContentId = result.contentId;
     createContentError = result.error;

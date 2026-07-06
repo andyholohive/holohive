@@ -185,7 +185,7 @@ function ActionItem({ action, index, reversibleActions, onUndo }: {
           {action.result.error && (
             <div className="overflow-hidden">
               <div className="font-medium text-rose-600 dark:text-rose-400 mb-1">Error:</div>
-              <div className="bg-rose-50 dark:bg-red-950 text-rose-700 dark:text-rose-300 p-2 rounded text-xs break-words overflow-wrap-anywhere">
+              <div className="bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 p-2 rounded text-xs break-words overflow-wrap-anywhere">
                 {action.result.error}
               </div>
             </div>

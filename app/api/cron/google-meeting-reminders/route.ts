@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { getValidAccessToken, listUpcomingMeetEvents, type MeetEvent } from '@/lib/googleCalendarService';
 import { TelegramService } from '@/lib/telegramService';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -265,9 +266,3 @@ async function sendReminder(
   return TelegramService.sendToChat(chatId, text, 'HTML');
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}

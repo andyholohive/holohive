@@ -183,6 +183,8 @@ export async function parseBulkTasks(input: BulkParseInput): Promise<ParsedBulk>
   const nowUtcMs = Date.now();
   const kstNow = new Date(nowUtcMs + 9 * 60 * 60 * 1000);
   const todayKst = kstNow.toISOString().slice(0, 10);
+  // Weekday-name lookup ("Monday"), not a date display.
+  // lint-conventions: disable-next-line no-raw-toLocaleDateString
   const dayOfWeekKst = kstNow.toLocaleDateString('en-US', { weekday: 'long' });
 
   const teamRoster = input.teamMembers

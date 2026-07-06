@@ -359,6 +359,8 @@ export class AgentOrchestrator {
     // Get current date in YYYY-MM-DD format
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
+    // Verbose weekday+month prose for the AI system prompt, not a UI date display.
+    // lint-conventions: disable-next-line no-raw-toLocaleDateString
     const todayFormatted = today.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',

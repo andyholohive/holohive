@@ -3,6 +3,7 @@
  * Each evaluator queries Supabase and returns items that need attention.
  */
 import { SupabaseClient } from '@supabase/supabase-js';
+import { formatDate } from '@/lib/dateFormat';
 import { Database } from '@/lib/database.types';
 
 export interface ReminderItem {
@@ -93,7 +94,7 @@ async function clientCheckin(
   }
 
   const items: ReminderItem[] = (opps || []).map((o) => {
-    const meetDate = o.next_meeting_at ? new Date(o.next_meeting_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const meetDate = o.next_meeting_at ? formatDate(o.next_meeting_at) : '';
     const owner = o.owner_id ? ownerMap.get(o.owner_id) || '' : '';
     const meetType = o.next_meeting_type || 'check-in';
     return {
@@ -223,7 +224,7 @@ async function contentMetricsStale(
   const items: ReminderItem[] = eligibleContent.map((c) => {
     const kolName = ckToKol.get(c.campaign_kols_id) || 'Unknown KOL';
     const campName = campMap.get(c.campaign_id) || 'Unknown Campaign';
-    const pubDate = c.activation_date ? new Date(c.activation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const pubDate = c.activation_date ? formatDate(c.activation_date) : '';
     return {
       label: `${kolName} — ${campName}`,
       detail: `Published ${pubDate}, no metrics recorded`,
@@ -406,7 +407,7 @@ async function newKolNoGc(
 
   const items: ReminderItem[] = (newKols || []).map((k) => ({
     label: k.name,
-    detail: `Added ${k.created_at ? new Date(k.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'recently'} — no GC connected`,
+    detail: `Added ${k.created_at ? formatDate(k.created_at) : 'recently'} — no GC connected`,
   }));
 
   return { items, isEmpty: items.length === 0 };
@@ -429,7 +430,7 @@ async function newCrmNoGc(
 
   const items: ReminderItem[] = (newOpps || []).map((o) => ({
     label: o.name,
-    detail: `Added ${o.created_at ? new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'recently'} — no GC connected${o.tg_handle ? ` (TG: ${o.tg_handle})` : ''}`,
+    detail: `Added ${o.created_at ? formatDate(o.created_at) : 'recently'} — no GC connected${o.tg_handle ? ` (TG: ${o.tg_handle})` : ''}`,
   }));
 
   return { items, isEmpty: items.length === 0 };

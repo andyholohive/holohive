@@ -28,10 +28,9 @@ import { Plus, Trash2, ExternalLink, Pencil, Save, X, Calendar as CalendarIcon, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { MasterKOL, KOLService } from "@/lib/kolService";
-// [May 2026 KOL overhaul follow-up] The Deliverables tab now reads
-// directly from the campaign-side `contents` table (instead of the
-// orphan kol_deliverables table). KolDeliverableService is still used
-// by MCP tools — those are out of scope for this change.
+// [May 2026 KOL overhaul follow-up] The Deliverables tab reads directly
+// from the campaign-side `contents` table (the orphan kol_deliverables
+// table's KolDeliverableService was deleted in the July 2026 audit).
 import {
   KolCallLogService,
   CALL_TYPES,

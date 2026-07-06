@@ -22,7 +22,6 @@ export interface ApproveSubmissionInput {
   link: string;
   platform: string | null | undefined;
   contentType: string | null | undefined;
-  approverId: string;
 }
 
 export interface ApproveResult {
