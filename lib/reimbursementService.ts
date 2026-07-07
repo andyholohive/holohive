@@ -1,23 +1,24 @@
 /**
- * Reimbursement requests — user-submitted expense reimbursements that
- * super-admins review on the /expenses page.
+ * Reimbursement requests — submitted through a PUBLIC form (no login) at
+ * /public/reimbursements, reviewed by super-admins on /expenses.
  *
  * Flow:
- *   1. Any authenticated team member submits a request from /reimbursements
- *      (amount, category, date, description, receipt attachment).
- *   2. Super-admins see the pending queue on /expenses → "Requests" tab.
- *   3. On APPROVE, a one_time row is created in `expenses` (is_paid=false,
- *      user_id = the requester), its receipts are copied into
- *      expense_attachments, and the request is stamped approved + linked to
- *      the new expense_id. From there it flows through the normal expense
- *      paid/unpaid + CSV pipeline.
+ *   1. Anyone with the link submits a request (name, email, amount,
+ *      category, date, description, receipt) via POST /api/public/reimbursements.
+ *   2. Super-admins see the pending queue on /expenses → "Reimbursement
+ *      Requests" tab.
+ *   3. On APPROVE, a one_time row is created in `expenses` (is_paid=false),
+ *      its receipts are copied into expense_attachments, and the request is
+ *      stamped approved + linked to the new expense. The expense's user_id
+ *      resolves from the submitter's email when it matches a team member,
+ *      otherwise falls back to the approving admin (requester name/email is
+ *      preserved in the expense notes either way).
  *   4. On REJECT, the request is stamped rejected with an optional note.
  *
  * Receipts reuse the existing `expense-attachments` storage bucket under a
- * `reimbursements/{request_id}/...` prefix, so no new bucket / storage
- * policy is needed. All storage + DB access runs with the service role via
- * the API routes in /api/reimbursements/* — never call this from a client
- * component (it would bypass the auth gate).
+ * `reimbursements/{request_id}/...` prefix. All storage + DB access runs
+ * with the service role via the API routes — never call this from a client
+ * component.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -34,7 +35,9 @@ export type ReimbursementStatus = 'pending' | 'approved' | 'rejected';
 
 export interface ReimbursementRequest {
   id: string;
-  requested_by: string;
+  requested_by: string | null;       // legacy authed submitter; null for public
+  requester_name: string | null;
+  requester_email: string | null;
   amount_usd: number;
   expense_type: ExpenseType;
   description: string;
@@ -61,7 +64,8 @@ export interface ReimbursementAttachment {
 }
 
 export interface CreateReimbursementInput {
-  requested_by: string;              // session user id
+  requester_name: string;
+  requester_email: string;
   amount_usd: number;
   expense_type: ExpenseType;
   description: string;
@@ -91,20 +95,6 @@ export class ReimbursementService {
     return (data || []) as ReimbursementRequest[];
   }
 
-  /** Submitter view: only the caller's own requests. */
-  static async listMine(userId: string): Promise<ReimbursementRequest[]> {
-    const sb = adminClient();
-    const { data, error } = await (sb as any)
-      .from('reimbursement_requests')
-      .select('*')
-      .eq('requested_by', userId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(500);
-    if (error) throw error;
-    return (data || []) as ReimbursementRequest[];
-  }
-
   static async getById(id: string): Promise<ReimbursementRequest | null> {
     const sb = adminClient();
     const { data, error } = await (sb as any)
@@ -121,7 +111,8 @@ export class ReimbursementService {
     const { data, error } = await (sb as any)
       .from('reimbursement_requests')
       .insert({
-        requested_by: input.requested_by,
+        requester_name: input.requester_name,
+        requester_email: input.requester_email,
         amount_usd: input.amount_usd,
         expense_type: input.expense_type,
         description: input.description,
@@ -216,9 +207,9 @@ export class ReimbursementService {
   // ─── Review transitions ─────────────────────────────────────────────
 
   /**
-   * Approve a pending request: creates a one_time expense (unpaid) owned by
-   * the requester, copies each receipt into expense_attachments, then stamps
-   * the request approved + linked to the new expense. Returns both rows.
+   * Approve a pending request: creates a one_time (unpaid) expense, copies
+   * receipts into expense_attachments, then stamps the request approved +
+   * linked to the new expense. Returns the new expense id.
    */
   static async approve(id: string, reviewerId: string, note?: string | null): Promise<{ expenseId: string }> {
     const sb = adminClient();
@@ -227,22 +218,36 @@ export class ReimbursementService {
     if (!req) throw new Error('Request not found');
     if (req.status !== 'pending') throw new Error(`Request is already ${req.status}`);
 
-    // 1. Create the expense (one_time, unpaid) owned by the requester.
+    // Resolve the expense owner: legacy authed submitter → email match →
+    // reviewer fallback (FK requires a real user id either way).
+    let userId: string | null = req.requested_by;
+    if (!userId && req.requester_email) {
+      const { data: match } = await (sb as any)
+        .from('users')
+        .select('id')
+        .ilike('email', req.requester_email.trim())
+        .maybeSingle();
+      if (match?.id) userId = match.id;
+    }
+    if (!userId) userId = reviewerId;
+
+    // Preserve requester attribution in the expense notes.
+    const who = `${req.requester_name || 'Unknown'}${req.requester_email ? ` <${req.requester_email}>` : ''}`;
+    const attributedNotes = `Reimbursement — ${who}${req.notes ? `\n${req.notes}` : ''}`;
+
+    // 1. Create the expense (one_time, unpaid).
     const expense = await ExpenseService.create({
-      user_id: req.requested_by,
+      user_id: userId,
       amount_usd: Number(req.amount_usd),
       frequency: 'one_time',
       expense_type: req.expense_type,
       description: req.description,
-      notes: req.notes ?? null,
+      notes: attributedNotes,
       expense_date: req.expense_date,
       created_by: reviewerId,
     });
 
-    // 2. Copy receipts into the expense's attachment set. The blobs live in
-    //    the same bucket, so we copy each object to the expense's path and
-    //    insert an expense_attachments row pointing at the new key. Copy
-    //    failures are non-fatal — the expense + review still stand.
+    // 2. Copy receipts into the expense's attachment set.
     const attachments = await this.listAttachments(id);
     for (const att of attachments) {
       try {

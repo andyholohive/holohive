@@ -23,14 +23,16 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate as fmtDate } from '@/lib/dateFormat';
-import { Receipt, Check, X, Filter as FilterIcon, Paperclip, Loader2 } from 'lucide-react';
+import { Receipt, Check, X, Filter as FilterIcon, Paperclip, Loader2, Link2 } from 'lucide-react';
 
 type ExpenseType = 'travel' | 'software' | 'meals_drinks' | 'others';
 type Status = 'pending' | 'approved' | 'rejected';
 
 interface ReimbursementRequest {
   id: string;
-  requested_by: string;
+  requested_by: string | null;
+  requester_name: string | null;
+  requester_email: string | null;
   amount_usd: number;
   expense_type: ExpenseType;
   description: string;
@@ -71,6 +73,14 @@ export function ReimbursementReviewPanel({
   const [rejectTarget, setRejectTarget] = useState<ReimbursementRequest | null>(null);
 
   const userName = useCallback((id: string) => users.find(u => u.id === id)?.name || 'Unknown', [users]);
+
+  function copyFormLink() {
+    const url = `${window.location.origin}/public/reimbursements`;
+    navigator.clipboard?.writeText(url).then(
+      () => toast({ title: 'Public form link copied', description: url }),
+      () => toast({ title: 'Copy failed', description: url, variant: 'destructive' }),
+    );
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,7 +187,10 @@ export function ReimbursementReviewPanel({
               <SelectItem value="all">All</SelectItem>
             </SelectContent>
           </Select>
-          <div className="ml-auto text-xs text-ink-warm-500">
+          <Button variant="outline" size="sm" className="ml-auto h-8" onClick={copyFormLink}>
+            <Link2 className="h-3.5 w-3.5 mr-1.5" /> Copy form link
+          </Button>
+          <div className="text-xs text-ink-warm-500">
             {requests.length} request{requests.length === 1 ? '' : 's'}
             {statusFilter === 'pending' && totalPending > 0 ? ` · ${formatUSD(totalPending)} awaiting` : ''}
           </div>
@@ -214,7 +227,10 @@ export function ReimbursementReviewPanel({
                 return (
                   <TableRow key={r.id} className="border-gray-100">
                     <TableCell className="py-3 whitespace-nowrap text-ink-warm-500">{formatDate(r.created_at)}</TableCell>
-                    <TableCell className="py-3 whitespace-nowrap font-medium">{userName(r.requested_by)}</TableCell>
+                    <TableCell className="py-3 whitespace-nowrap">
+                      <div className="font-medium">{r.requester_name || (r.requested_by ? userName(r.requested_by) : 'Unknown')}</div>
+                      {r.requester_email && <div className="text-[11px] text-ink-warm-400">{r.requester_email}</div>}
+                    </TableCell>
                     <TableCell className="py-3 whitespace-nowrap">{formatDate(r.expense_date)}</TableCell>
                     <TableCell className="py-3">{TYPE_LABEL[r.expense_type]}</TableCell>
                     <TableCell className="py-3 max-w-[280px]">

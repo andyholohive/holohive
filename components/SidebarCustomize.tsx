@@ -30,7 +30,7 @@ import {
   FileText, ClipboardList, Sliders, TrendingUp, Handshake, UserPlus,
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
   Calendar, Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
-  DollarSign, Receipt,
+  DollarSign,
 } from 'lucide-react';
 
 export type NavItemDef = {
@@ -97,8 +97,6 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Resources', requiredRole: 'admin' },
   { href: '/initiatives', label: 'Initiatives', icon: Target, section: 'Resources', notForGuest: true },
   { href: '/team', label: 'Team', icon: Shield, section: 'Resources', notForGuest: true },
-  // [Reimbursements v1, 2026-07-07] Any team member submits here; admins review on /expenses.
-  { href: '/reimbursements', label: 'Reimbursements', icon: Receipt, section: 'Resources', notForGuest: true },
   // [Expenses v1, 2026-05-29] Super-admin only.
   { href: '/expenses', label: 'Expenses', icon: DollarSign, section: 'Resources', requiredRole: 'super_admin' },
   { href: '/links', label: 'Links', icon: Link2, section: 'Resources', pageKey: '/links' },
