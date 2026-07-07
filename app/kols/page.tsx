@@ -954,6 +954,13 @@ export default function KOLsPage() {
           (editingValue as string).trim() !== (kolToUpdate.link || '').trim()
         ) {
           const prevNiche = JSON.stringify(kolToUpdate.niche_tags || []);
+          // New KOL just got its channel (link went from empty → set) →
+          // DM the ops chat with the link + a "Joined — Scan now" button.
+          // The scanner can only read channels it has joined, so this lets
+          // Andy join first, then tap to trigger the scan. Fire-and-forget.
+          if (!(kolToUpdate.link || '').trim()) {
+            fetch(`/api/kols/${kolId}/notify-join`, { method: 'POST' }).catch(() => {});
+          }
           try {
             const res = await fetch(`/api/kols/${kolId}/rescan`, { method: 'POST' });
             const data = await res.json().catch(() => ({}));

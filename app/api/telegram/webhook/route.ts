@@ -4,6 +4,7 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { extractAddressCandidate, hasValidChecksumIfMixed, isValidEvmAddress, toChecksumAddress } from '@/lib/walletAddress';
 import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
 import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
+import { triggerKolScan } from '@/lib/githubActions';
 import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 
 export const dynamic = 'force-dynamic';
@@ -1409,8 +1410,65 @@ async function handleCallbackQuery(cq: any) {
     return;
   }
 
+  // `kolscan:<kolId>` — the "✅ Joined — Scan now" button on the new-KOL
+  // DM. Andy joins the channel from the scanner account, taps this, and
+  // we fire the single-KOL Telethon scan so niche + score populate.
+  if (data.startsWith('kolscan:')) {
+    await handleKolScanCallback(cq);
+    return;
+  }
+
   // Unknown callback — dismiss the spinner so the button doesn't hang.
   await answerCallbackQuery(callbackId);
+}
+
+/**
+ * `kolscan:<kolId>` — new-KOL "Joined — Scan now" button. Dispatches the
+ * on-demand single-KOL scan (GH Actions) for the KOL's channel now that
+ * the scanner account has joined it. Non-blocking: the scan lands in
+ * Supabase ~1 min later via the MCP write endpoints. See lib/githubActions
+ * + /api/kols/[id]/notify-join (which sends the button-bearing DM).
+ */
+async function handleKolScanCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const data: string = cq.data || '';
+  const chatId = String(cq.message?.chat?.id ?? '');
+  const messageId: number | undefined = cq.message?.message_id;
+
+  const kolId = data.split(':')[1];
+  if (!kolId) {
+    await answerCallbackQuery(callbackId, 'Invalid button.');
+    return;
+  }
+
+  const { data: kol } = await (supabaseAdmin as any)
+    .from('master_kols')
+    .select('id, name, link')
+    .eq('id', kolId)
+    .maybeSingle();
+  if (!kol) {
+    await answerCallbackQuery(callbackId, 'KOL not found.');
+    return;
+  }
+
+  const link = typeof kol.link === 'string' ? kol.link.trim() : '';
+  // Accept t.me/ URLs, @handles and bare handles; reject non-TG URLs.
+  if (!link || (/^https?:\/\//i.test(link) && !/t\.me\//i.test(link))) {
+    await answerCallbackQuery(callbackId, 'No Telegram channel on this KOL.');
+    return;
+  }
+
+  const result = await triggerKolScan(link);
+  await answerCallbackQuery(callbackId, result.ok ? 'Scan queued — ~1 min.' : 'Dispatch failed.');
+  if (chatId && messageId) {
+    await editMessageText(
+      chatId,
+      messageId,
+      result.ok
+        ? `🔄 Scanning <b>${escapeHtml(kol.name || 'KOL')}</b> — niche + score will update in ~1 min.`
+        : `⚠️ Couldn't queue the scan: ${escapeHtml(result.error || 'unknown error')}`,
+    );
+  }
 }
 
 /**

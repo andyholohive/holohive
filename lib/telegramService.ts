@@ -97,6 +97,49 @@ export class TelegramService {
   }
 
   /**
+   * Send a message to the configured Telegram chat with an inline-keyboard.
+   * Same target/thread as sendMessage; adds tap-able buttons whose
+   * callback_data is routed by the /api/telegram/webhook dispatcher.
+   */
+  static async sendMessageWithButtons(
+    text: string,
+    buttons: Array<Array<{ text: string; callback_data: string }>>,
+    parseMode: 'HTML' | 'Markdown' = 'HTML',
+  ): Promise<boolean> {
+    const botToken = this.botToken;
+    const chatId = this.chatId;
+    const threadId = this.threadId;
+    if (!botToken || !chatId) {
+      console.error('[Telegram] sendMessageWithButtons: config missing', {
+        hasToken: !!botToken, hasChatId: !!chatId,
+      });
+      return false;
+    }
+    try {
+      const body: Record<string, any> = {
+        chat_id: chatId,
+        text,
+        parse_mode: parseMode,
+        disable_web_page_preview: false,
+        reply_markup: { inline_keyboard: buttons },
+      };
+      if (threadId) body.message_thread_id = parseInt(threadId);
+      const response = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      );
+      if (!response.ok) {
+        console.error('[Telegram] sendMessageWithButtons API error:', await response.json().catch(() => ({})));
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[Telegram] sendMessageWithButtons threw:', error);
+      return false;
+    }
+  }
+
+  /**
    * Format and send form submission notification
    */
   static async sendFormSubmissionNotification(
