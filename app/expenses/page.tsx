@@ -45,8 +45,9 @@ import { formatDate as fmtDate } from '@/lib/dateFormat';
 import {
   DollarSign, Plus, Trash2, Upload, X, FileText, Image as ImageIcon,
   Check, Download, Filter as FilterIcon, AlertCircle, Calendar as CalendarIcon,
-  CreditCard, RefreshCw, Eye, TrendingUp,
+  CreditCard, RefreshCw, Eye, TrendingUp, Receipt,
 } from 'lucide-react';
+import { ReimbursementReviewPanel } from '@/components/expenses/ReimbursementReviewPanel';
 
 // ─── Types (mirror lib/expenseService.ts) ────────────────────────────
 type Frequency = 'one_time' | 'daily' | 'weekly' | 'monthly';
@@ -146,6 +147,10 @@ export default function ExpensesPage() {
   const [detailAttachments, setDetailAttachments] = useState<Attachment[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Expenses ledger vs Reimbursement requests review queue
+  const [view, setView] = useState<'expenses' | 'requests'>('expenses');
+  const [pendingReqCount, setPendingReqCount] = useState(0);
+
   // ─── Fetchers ──────────────────────────────────────────────────
   const fetchExpenses = useCallback(async () => {
     if (!isSuperAdmin) return;
@@ -202,6 +207,19 @@ export default function ExpensesPage() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
+
+  // Pending reimbursement count for the tab badge (independent of active view).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/reimbursements?scope=all&status=pending');
+        const json = await res.json();
+        if (!cancelled && res.ok) setPendingReqCount((json.requests || []).length);
+      } catch { /* non-fatal */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ─── Derived ──────────────────────────────────────────────────
   const totalThisMonth = useMemo(() => {
@@ -371,6 +389,39 @@ export default function ExpensesPage() {
         )}
       />
 
+      {/* ─── View switch: Expenses ledger vs Reimbursement requests ─── */}
+      <div className="flex items-center gap-1 border-b border-cream-200">
+        <button
+          type="button"
+          onClick={() => setView('expenses')}
+          className={`relative -mb-px px-4 py-2 text-sm font-medium transition-colors ${view === 'expenses' ? 'text-brand border-b-2 border-brand' : 'text-ink-warm-500 hover:text-ink-warm-800'}`}
+        >
+          Expenses
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('requests')}
+          className={`relative -mb-px px-4 py-2 text-sm font-medium transition-colors inline-flex items-center gap-2 ${view === 'requests' ? 'text-brand border-b-2 border-brand' : 'text-ink-warm-500 hover:text-ink-warm-800'}`}
+        >
+          <Receipt className="h-3.5 w-3.5" />
+          Reimbursement Requests
+          {pendingReqCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-light text-brand text-[10px] font-semibold">
+              {pendingReqCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {view === 'requests' && (
+        <ReimbursementReviewPanel
+          users={users}
+          onApproved={fetchExpenses}
+          onPendingCountChange={setPendingReqCount}
+        />
+      )}
+
+      {view === 'expenses' && (<>
       {/* ─── KPI strip — matches /wallets KpiCard pattern ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard
@@ -570,6 +621,7 @@ export default function ExpensesPage() {
           </Table>
         )}
       </Card>
+      </>)}
 
       {/* ─── Add Expense dialog ─── */}
       <AddExpenseDialog
