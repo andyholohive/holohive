@@ -125,7 +125,10 @@ export default function PublicReimbursementPage() {
 
         {/* Form Content */}
         <div className="max-w-xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Section header — matches the titled section + divider used on the other public forms */}
+            <div className="text-2xl font-bold text-brand border-b-2 border-gray-300 pb-2">Reimbursement Details</div>
+
             <div className="space-y-2">
               <Label htmlFor="rb-name">Your name<Req /></Label>
               <Input id="rb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="focus-brand" />
