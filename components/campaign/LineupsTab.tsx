@@ -491,7 +491,7 @@ export default function LineupsTab({
     try {
       await service.propose(lineup.id, currentUserId);
       await refreshAll();
-      toast({ title: 'Lineup proposed', description: 'Sending TG DM to the approver…' });
+      toast({ title: 'Lineup proposed', description: 'Posting to the lineup channel…' });
       await notifyTransition(lineup.id, 'proposed', toast);
     } catch (err: any) {
       toast({ title: 'Propose failed', description: err?.message, variant: 'destructive' });
@@ -1673,7 +1673,7 @@ async function notifyTransition(
     }
     if (json?.ok) {
       const label =
-        event === 'proposed' ? 'Approver DM' :
+        event === 'proposed' ? 'Lineup channel post' :
         event === 'confirmed' ? 'Ops chat post' :
         'Proposer DM';
       toast({

@@ -13,8 +13,8 @@ export const dynamic = 'force-dynamic';
  * HHP Lineup Manager Spec § 7 — Telegram notifications on lineup
  * state transitions:
  *
- *   • event=proposed  → DM the lineup approver (per spec: Jdot) with
- *                       a review link to the campaign page
+ *   • event=proposed  → Post the proposal to the shared lineup channel
+ *                       (app_settings.lineup_proposal_chat_id). No DMs.
  *   • event=confirmed → Post the formatted lineup to the campaign's
  *                       internal TG ops group chat (campaigns.tg_ops_group_id)
  *   • event=unlocked  → DM the original proposer that their lineup
@@ -31,80 +31,6 @@ export const dynamic = 'force-dynamic';
  */
 
 type Event = 'proposed' | 'confirmed' | 'unlocked';
-
-/**
- * Lineup approvers — multi-user support. The lineup_approvers table
- * is the source of truth; falls back to legacy app_settings single
- * value, then env var, then jdot. Every resolved approver gets a DM.
- */
-const APPROVER_SETTING_KEY = 'lineup_approver_user_id';
-const APPROVER_EMAIL_FALLBACK = process.env.LINEUP_APPROVER_EMAIL || 'jdot@holohive.io';
-
-type ApproverContact = {
-  userId: string;
-  telegramId: string | null;
-  userName: string;
-};
-
-async function findApproverContacts(supabase: any): Promise<ApproverContact[]> {
-  // Primary: dedicated lineup_approvers table. FK hint required
-  // because lineup_approvers has two refs to users (user_id +
-  // added_by) — PostgREST can't auto-pick.
-  const { data: approverRows } = await supabase
-    .from('lineup_approvers')
-    .select('user_id, users!lineup_approvers_user_id_fkey(id, telegram_id, telegram_username, email)');
-  const rows = (approverRows || []) as Array<{
-    user_id: string;
-    users: { id: string; telegram_id: string | null; telegram_username: string | null; email: string } | null;
-  }>;
-  if (rows.length > 0) {
-    return rows
-      .filter(r => r.users)
-      .map(r => ({
-        userId: r.users!.id,
-        telegramId: r.users!.telegram_id || null,
-        userName: r.users!.telegram_username || r.users!.email || 'Approver',
-      }));
-  }
-
-  // Legacy fallback: app_settings single-value (pre-migration deployments).
-  const { data: setting } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', APPROVER_SETTING_KEY)
-    .maybeSingle();
-  const legacyId = setting?.value as string | undefined;
-  if (legacyId) {
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, telegram_id, telegram_username, email')
-      .eq('id', legacyId)
-      .maybeSingle();
-    if (user) {
-      return [{
-        userId: user.id,
-        telegramId: user.telegram_id || null,
-        userName: user.telegram_username || user.email || 'Approver',
-      }];
-    }
-  }
-
-  // Last-resort fallback: email lookup.
-  const { data: byEmail } = await supabase
-    .from('users')
-    .select('id, telegram_id, telegram_username, email')
-    .ilike('email', APPROVER_EMAIL_FALLBACK)
-    .maybeSingle();
-  if (byEmail) {
-    return [{
-      userId: byEmail.id,
-      telegramId: byEmail.telegram_id || null,
-      userName: byEmail.telegram_username || byEmail.email || 'Approver',
-    }];
-  }
-
-  return [];
-}
 
 async function findUserChatId(
   supabase: any,
@@ -180,109 +106,48 @@ export async function POST(
   // ─── Dispatch by event ─────────────────────────────────────────
   try {
     if (event === 'proposed') {
-      // [2026-07-02] Approver DMs are opt-in via app_settings.
-      // lineup_dm_approvers_enabled. Default (unset) = true to preserve
-      // existing behavior; toggle to 'false' in /admin/telegram-comm
-      // when the broadcast chat covers everyone who needs to see it.
-      const { data: dmSetting } = await (supabase as any)
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'lineup_dm_approvers_enabled')
-        .maybeSingle();
-      const dmEnabled = ((dmSetting?.value as string) ?? 'true').toLowerCase() !== 'false';
-
-      const approvers = dmEnabled ? await findApproverContacts(supabase) : [];
-      if (dmEnabled && approvers.length === 0) {
-        return NextResponse.json({
-          ok: false,
-          skipped: true,
-          reason: `No approvers configured (lineup_approvers table empty + ${APPROVER_SETTING_KEY} setting + email fallback ${APPROVER_EMAIL_FALLBACK} all empty).`,
-        });
-      }
-      const withTg = approvers.filter(a => a.telegramId);
-      if (dmEnabled && withTg.length === 0) {
-        const names = approvers.map(a => a.userName).join(', ');
-        return NextResponse.json({
-          ok: false,
-          skipped: true,
-          reason: `No telegram_id on any approver (${names}). They need to DM the bot first to receive notifications.`,
-        });
-      }
-      // [2026-07-06] Message body is template-driven — editable on
-      // /admin/telegram-comm. The review link is always appended.
-      const dmTemplate = await getTemplate(supabase, 'tmpl_lineup_proposed_dm');
-      const text =
-        renderTemplate(dmTemplate, {
-          campaign: escapeHtml(campaign.name),
-          week: String(lineup.week_number),
-        }) +
-        `\n\n<a href="${reviewLink}">Review on HHP</a>`;
-      // Fan out to all approvers with TG IDs. Failures per-recipient
-      // don't fail the whole call — sent count + skipped list both
-      // surface in the response. Empty when dmEnabled is false; the
-      // broadcast-chat post below still fires so the team still sees it.
-      const results = await Promise.all(
-        withTg.map(async a => {
-          try {
-            const sent = await TelegramService.sendToChat(a.telegramId!, text, 'HTML');
-            return { userName: a.userName, sent };
-          } catch (err: any) {
-            return { userName: a.userName, sent: false, error: err?.message };
-          }
-        }),
-      );
-      const successCount = results.filter(r => r.sent).length;
-      const skippedNoTg = approvers
-        .filter(a => !a.telegramId)
-        .map(a => a.userName);
-
-      // ─── Also broadcast to the global lineup-proposals chat ─────
-      // app_settings.lineup_proposal_chat_id (+ optional _thread_id).
-      // Per Andy 2026-06-19: approvers still get DMs (above) AND a
-      // copy goes to this shared chat for team-wide visibility.
-      let chatPosted: boolean | null = null;
-      let chatPostError: string | null = null;
+      // [2026-07-08] Per Andy: proposals post to the shared lineup channel
+      // ONLY — no more approver DMs. The channel post is the single
+      // notification, so a DM issue can never suppress it.
+      // Destination: app_settings.lineup_proposal_chat_id (+ optional
+      // _thread_id), set in /admin/telegram-comm.
       const [chatSetting, threadSetting] = await Promise.all([
         (supabase as any).from('app_settings').select('value').eq('key', 'lineup_proposal_chat_id').maybeSingle(),
         (supabase as any).from('app_settings').select('value').eq('key', 'lineup_proposal_chat_thread_id').maybeSingle(),
       ]);
       const broadcastChatId = (chatSetting.data as any)?.value as string | undefined;
       const broadcastThreadId = (threadSetting.data as any)?.value as string | undefined;
-      if (broadcastChatId) {
-        // Broadcast variant: shared chat, so the default wording drops
-        // "your". Template-driven like the DM above.
-        const broadcastTemplate = await getTemplate(supabase, 'tmpl_lineup_proposed_broadcast');
-        const broadcastText =
-          renderTemplate(broadcastTemplate, {
-            campaign: escapeHtml(campaign.name),
-            week: String(lineup.week_number),
-          }) +
-          `\n\n<a href="${reviewLink}">Review on HHP</a>`;
-        try {
-          chatPosted = await TelegramService.sendToChat(
-            broadcastChatId,
-            broadcastText,
-            'HTML',
-            broadcastThreadId ? parseInt(broadcastThreadId, 10) : undefined,
-          );
-        } catch (err: any) {
-          chatPosted = false;
-          chatPostError = err?.message || 'unknown';
-        }
+      if (!broadcastChatId) {
+        return NextResponse.json({
+          ok: false,
+          skipped: true,
+          reason: 'No lineup proposal channel configured. Set app_settings.lineup_proposal_chat_id in /admin/telegram-comm.',
+        });
+      }
+      // Message body is template-driven — editable on /admin/telegram-comm.
+      // The review link is always appended.
+      const broadcastTemplate = await getTemplate(supabase, 'tmpl_lineup_proposed_broadcast');
+      const broadcastText =
+        renderTemplate(broadcastTemplate, {
+          campaign: escapeHtml(campaign.name),
+          week: String(lineup.week_number),
+        }) +
+        `\n\n<a href="${reviewLink}">Review on HHP</a>`;
+      let chatPosted = false;
+      let chatPostError: string | null = null;
+      try {
+        chatPosted = await TelegramService.sendToChat(
+          broadcastChatId,
+          broadcastText,
+          'HTML',
+          broadcastThreadId ? parseInt(broadcastThreadId, 10) : undefined,
+        );
+      } catch (err: any) {
+        chatPosted = false;
+        chatPostError = err?.message || 'unknown';
       }
 
-      return NextResponse.json({
-        ok: successCount > 0,
-        recipient: results
-          .filter(r => r.sent)
-          .map(r => r.userName)
-          .join(', '),
-        sentCount: successCount,
-        totalApprovers: approvers.length,
-        skipped: skippedNoTg.length > 0 ? skippedNoTg : undefined,
-        chatPosted,
-        chatPostError,
-      });
+      return NextResponse.json({ ok: chatPosted, chatPosted, chatPostError });
     }
 
     if (event === 'confirmed') {
