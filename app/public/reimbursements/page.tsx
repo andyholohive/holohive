@@ -22,12 +22,20 @@ import { formatDate as fmtDate } from '@/lib/dateFormat';
 import { Check, Loader2, Calendar as CalendarIcon, Upload, FileText, X } from 'lucide-react';
 
 type ExpenseType = 'travel' | 'software' | 'meals_drinks' | 'others';
+type Frequency = 'one_time' | 'daily' | 'weekly' | 'monthly';
 
 const CATEGORIES: { value: ExpenseType; label: string }[] = [
   { value: 'travel', label: 'Travel' },
   { value: 'software', label: 'Software' },
   { value: 'meals_drinks', label: 'Meals / Drinks' },
   { value: 'others', label: 'Others' },
+];
+
+const FREQUENCIES: { value: Frequency; label: string }[] = [
+  { value: 'one_time', label: 'One-time' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
 ];
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
@@ -43,14 +51,18 @@ export default function ReimbursementSubmitPage() {
     email: '',
     amount: '',
     expense_type: 'travel' as ExpenseType,
+    frequency: 'one_time' as Frequency,
     expense_date: '',
+    recurrence_end: '',
     description: '',
     notes: '',
   });
   const [file, setFile] = useState<File | null>(null);
 
+  const isRecurring = formData.frequency !== 'one_time';
+
   const resetForm = () => {
-    setFormData({ name: '', email: '', amount: '', expense_type: 'travel', expense_date: '', description: '', notes: '' });
+    setFormData({ name: '', email: '', amount: '', expense_type: 'travel', frequency: 'one_time', expense_date: '', recurrence_end: '', description: '', notes: '' });
     setFile(null);
   };
 
@@ -69,7 +81,10 @@ export default function ReimbursementSubmitPage() {
     if (!formData.name.trim()) { setError('Name is required'); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email.trim())) { setError('A valid email is required'); return; }
     if (!formData.amount || Number(formData.amount) <= 0) { setError('Amount must be greater than 0'); return; }
-    if (!formData.expense_date) { setError('Date of expense is required'); return; }
+    if (!formData.expense_date) { setError(isRecurring ? 'Start date is required' : 'Date of expense is required'); return; }
+    if (isRecurring && formData.recurrence_end && formData.recurrence_end < formData.expense_date) {
+      setError('End date must be on or after the start date'); return;
+    }
     if (!formData.description.trim()) { setError('Description is required'); return; }
 
     setIsSubmitting(true);
@@ -82,6 +97,8 @@ export default function ReimbursementSubmitPage() {
       fd.append('description', formData.description.trim());
       fd.append('notes', formData.notes.trim());
       fd.append('expense_date', formData.expense_date);
+      fd.append('frequency', formData.frequency);
+      if (isRecurring && formData.recurrence_end) fd.append('recurrence_end_date', formData.recurrence_end);
       if (file) fd.append('file', file);
 
       const response = await fetch('/api/public/reimbursements', { method: 'POST', body: fd });
@@ -190,13 +207,40 @@ export default function ReimbursementSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Date of expense <span className="text-rose-500">*</span></Label>
+              <Label>Frequency <span className="text-rose-500">*</span></Label>
+              <Select
+                value={formData.frequency}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, frequency: value as Frequency, recurrence_end: value === 'one_time' ? '' : prev.recurrence_end }))}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{isRecurring ? 'Start date' : 'Date of expense'} <span className="text-rose-500">*</span></Label>
               <DateField
                 value={formData.expense_date}
                 onChange={(v) => setFormData(prev => ({ ...prev, expense_date: v }))}
                 disabled={isSubmitting}
               />
             </div>
+
+            {isRecurring && (
+              <div className="space-y-2">
+                <Label>End date (Optional)</Label>
+                <DateField
+                  value={formData.recurrence_end}
+                  onChange={(v) => setFormData(prev => ({ ...prev, recurrence_end: v }))}
+                  disabled={isSubmitting}
+                  placeholder="No end date"
+                  allowClear
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description <span className="text-rose-500">*</span></Label>
@@ -262,14 +306,24 @@ export default function ReimbursementSubmitPage() {
 }
 
 // ─── DateField (Popover + Calendar, brand-teal selection) ────────────────
-function DateField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+function DateField({ value, onChange, disabled, placeholder, allowClear }: { value: string; onChange: (v: string) => void; disabled?: boolean; placeholder?: string; allowClear?: boolean }) {
   const selectedDate = value ? new Date(value + 'T00:00:00') : undefined;
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" disabled={disabled} className="w-full justify-start font-normal focus-brand" style={{ color: value ? '#111827' : '#6b7280' }}>
           <CalendarIcon className="mr-2 h-4 w-4 opacity-70" />
-          {value ? fmtDate(selectedDate!) : 'Select date'}
+          {value ? fmtDate(selectedDate!) : (placeholder || 'Select date')}
+          {allowClear && value && (
+            <span
+              role="button"
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(''); }}
+              className="ml-auto opacity-50 hover:opacity-100"
+              aria-label="Clear date"
+            >
+              <X className="h-4 w-4" />
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">

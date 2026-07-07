@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReimbursementService } from '@/lib/reimbursementService';
-import { ExpenseType, ALLOWED_ATTACHMENT_MIME, MAX_ATTACHMENT_SIZE_BYTES } from '@/lib/expenseService';
+import { ExpenseType, ExpenseFrequency, ALLOWED_ATTACHMENT_MIME, MAX_ATTACHMENT_SIZE_BYTES } from '@/lib/expenseService';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -14,6 +14,7 @@ export const maxDuration = 60;
  *   description, notes?, expense_date, file? (receipt)
  */
 const VALID_TYPES: ExpenseType[] = ['travel', 'software', 'meals_drinks', 'others'];
+const VALID_FREQ: ExpenseFrequency[] = ['one_time', 'daily', 'weekly', 'monthly'];
 
 export async function POST(request: NextRequest) {
   let form: FormData;
@@ -27,6 +28,8 @@ export async function POST(request: NextRequest) {
   const description = String(form.get('description') || '').trim();
   const notes = String(form.get('notes') || '').trim();
   const expenseDate = String(form.get('expense_date') || '');
+  const frequency = (String(form.get('frequency') || 'one_time') || 'one_time') as ExpenseFrequency;
+  const recurrenceEnd = String(form.get('recurrence_end_date') || '');
 
   if (!requesterName) return NextResponse.json({ error: 'Your name is required' }, { status: 400 });
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(requesterEmail)) {
@@ -41,6 +44,15 @@ export async function POST(request: NextRequest) {
   if (!description) return NextResponse.json({ error: 'Description is required' }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expenseDate)) {
     return NextResponse.json({ error: 'A valid expense date is required' }, { status: 400 });
+  }
+  if (!VALID_FREQ.includes(frequency)) {
+    return NextResponse.json({ error: 'Invalid frequency' }, { status: 400 });
+  }
+  if (recurrenceEnd && !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceEnd)) {
+    return NextResponse.json({ error: 'Invalid end date' }, { status: 400 });
+  }
+  if (frequency !== 'one_time' && recurrenceEnd && recurrenceEnd < expenseDate) {
+    return NextResponse.json({ error: 'End date must be on or after the start date' }, { status: 400 });
   }
 
   // Validate the optional receipt before creating anything.
@@ -64,6 +76,8 @@ export async function POST(request: NextRequest) {
       description,
       notes: notes || null,
       expense_date: expenseDate,
+      frequency,
+      recurrence_end_date: frequency !== 'one_time' && recurrenceEnd ? recurrenceEnd : null,
     });
 
     if (hasFile) {

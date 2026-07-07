@@ -35,6 +35,8 @@ interface ReimbursementRequest {
   requester_email: string | null;
   amount_usd: number;
   expense_type: ExpenseType;
+  frequency: 'one_time' | 'daily' | 'weekly' | 'monthly';
+  recurrence_end_date: string | null;
   description: string;
   notes: string | null;
   expense_date: string;
@@ -49,6 +51,7 @@ interface SimpleUser { id: string; name: string; email: string }
 const TYPE_LABEL: Record<ExpenseType, string> = {
   travel: 'Travel', software: 'Software', meals_drinks: 'Meals / Drinks', others: 'Others',
 };
+const FREQ_LABEL: Record<string, string> = { one_time: 'One-time', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 const STATUS_TONES: Record<Status, BadgeTone> = { pending: 'warning', approved: 'success', rejected: 'danger' };
 const STATUS_LABEL: Record<Status, string> = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
 
@@ -232,7 +235,12 @@ export function ReimbursementReviewPanel({
                       {r.requester_email && <div className="text-[11px] text-ink-warm-400">{r.requester_email}</div>}
                     </TableCell>
                     <TableCell className="py-3 whitespace-nowrap">{formatDate(r.expense_date)}</TableCell>
-                    <TableCell className="py-3">{TYPE_LABEL[r.expense_type]}</TableCell>
+                    <TableCell className="py-3">
+                      <div>{TYPE_LABEL[r.expense_type]}</div>
+                      {r.frequency && r.frequency !== 'one_time' && (
+                        <div className="text-[11px] text-brand">Recurring · {FREQ_LABEL[r.frequency]}{r.recurrence_end_date ? ` → ${formatDate(r.recurrence_end_date)}` : ''}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="py-3 max-w-[280px]">
                       <div className="truncate" title={r.description}>{r.description}</div>
                       {r.notes && <div className="text-[11px] text-ink-warm-400 truncate" title={r.notes}>{r.notes}</div>}

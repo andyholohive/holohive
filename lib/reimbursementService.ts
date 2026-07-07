@@ -25,6 +25,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   ExpenseService,
   ExpenseType,
+  ExpenseFrequency,
   ATTACHMENTS_BUCKET,
   MAX_ATTACHMENT_SIZE_BYTES,
   MAX_ATTACHMENTS_PER_EXPENSE,
@@ -42,7 +43,9 @@ export interface ReimbursementRequest {
   expense_type: ExpenseType;
   description: string;
   notes: string | null;
-  expense_date: string;              // 'YYYY-MM-DD'
+  expense_date: string;              // 'YYYY-MM-DD' — date, or start date when recurring
+  frequency: ExpenseFrequency;       // one_time | daily | weekly | monthly
+  recurrence_end_date: string | null;// optional end date for recurring
   status: ReimbursementStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -70,7 +73,9 @@ export interface CreateReimbursementInput {
   expense_type: ExpenseType;
   description: string;
   notes?: string | null;
-  expense_date: string;              // 'YYYY-MM-DD'
+  expense_date: string;              // 'YYYY-MM-DD' — date, or start date when recurring
+  frequency?: ExpenseFrequency;      // defaults to one_time
+  recurrence_end_date?: string | null;
 }
 
 function adminClient(): SupabaseClient {
@@ -118,6 +123,8 @@ export class ReimbursementService {
         description: input.description,
         notes: input.notes ?? null,
         expense_date: input.expense_date,
+        frequency: input.frequency ?? 'one_time',
+        recurrence_end_date: input.recurrence_end_date ?? null,
       })
       .select('*')
       .single();
@@ -235,16 +242,21 @@ export class ReimbursementService {
     const who = `${req.requester_name || 'Unknown'}${req.requester_email ? ` <${req.requester_email}>` : ''}`;
     const attributedNotes = `Reimbursement — ${who}${req.notes ? `\n${req.notes}` : ''}`;
 
-    // 1. Create the expense (one_time, unpaid).
+    // 1. Create the expense. Recurring requests become an expense template
+    //    (+ first instance); one_time requests become a single dated expense.
+    //    `expense_date` holds the recurrence start date for recurring requests.
+    const freq = req.frequency ?? 'one_time';
     const expense = await ExpenseService.create({
       user_id: userId,
       amount_usd: Number(req.amount_usd),
-      frequency: 'one_time',
+      frequency: freq,
       expense_type: req.expense_type,
       description: req.description,
       notes: attributedNotes,
-      expense_date: req.expense_date,
       created_by: reviewerId,
+      ...(freq === 'one_time'
+        ? { expense_date: req.expense_date }
+        : { recurrence_start_date: req.expense_date, recurrence_end_date: req.recurrence_end_date }),
     });
 
     // 2. Copy receipts into the expense's attachment set.
