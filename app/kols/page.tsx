@@ -729,9 +729,15 @@ export default function KOLsPage() {
           return true;
         })()) &&
         (!filters.region.length || filters.region.some(r => kol.region === r)) &&
-        // Empty creator_type matches the "General" filter chip so the
-        // filter bucket actually contains every implicitly-General KOL.
-        (!filters.creator_type.length || filters.creator_type.some(ct => effectiveCreatorTypes(kol.creator_type).includes(ct))) &&
+        // Creator Type is AND (every selected type must be present) per Jdot:
+        // selecting Native + Builder returns only KOLs that are BOTH, not
+        // every Native. Empty creator_type → 'General' so the General chip
+        // still buckets implicitly-General KOLs.
+        (!filters.creator_type.length || filters.creator_type.every(ct => effectiveCreatorTypes(kol.creator_type).includes(ct))) &&
+        // Niche is OR (match any selected tag). Reads canonical niche_tags,
+        // falls back to the deprecated `niche` mirror. This predicate was
+        // missing entirely, so the Niche filter did nothing before.
+        (!filters.niche.length || filters.niche.some(n => (kol.niche_tags?.length ? kol.niche_tags : (kol.niche || [])).includes(n))) &&
         (!filters.content_type.length || filters.content_type.some(ct => kol.content_type?.includes(ct))) &&
         (!filters.deliverables.length || filters.deliverables.some(d => kol.deliverables?.includes(d))) &&
         // Pricing filter dropped 2026-07-01 — schema switched to numeric
@@ -755,7 +761,9 @@ export default function KOLsPage() {
 
   const STALE_THRESHOLD_MS = 90 * 24 * 60 * 60 * 1000;
 
-  // Apply tab filter on top of filteredKOLs
+  // Apply tab filter on top of filteredKOLs. [2026-07-08] Web3/Web2 tabs
+  // per Jdot — legacy KOLs are all Web3 (DB default), so `?? 'Web3'` keeps
+  // any pre-migration in-memory row in the Web3 bucket.
   const tabbedKOLs = useMemo(() => {
     if (kolTab === 'need_update') {
       return filteredKOLs.filter(kol => {
@@ -763,6 +771,8 @@ export default function KOLsPage() {
         return (Date.now() - new Date(kol.updated_at).getTime()) > STALE_THRESHOLD_MS;
       });
     }
+    if (kolTab === 'web3') return filteredKOLs.filter(k => (k.kol_category ?? 'Web3') === 'Web3');
+    if (kolTab === 'web2') return filteredKOLs.filter(k => k.kol_category === 'Web2');
     return filteredKOLs;
   }, [filteredKOLs, kolTab]);
 
@@ -773,6 +783,9 @@ export default function KOLsPage() {
       return (Date.now() - new Date(kol.updated_at).getTime()) > STALE_THRESHOLD_MS;
     }).length;
   }, [filteredKOLs]);
+
+  const web3Count = useMemo(() => filteredKOLs.filter(k => (k.kol_category ?? 'Web3') === 'Web3').length, [filteredKOLs]);
+  const web2Count = useMemo(() => filteredKOLs.filter(k => k.kol_category === 'Web2').length, [filteredKOLs]);
 
   // Reset to page 1 when filters, search, or tab changes
   useEffect(() => {
@@ -2588,7 +2601,7 @@ export default function KOLsPage() {
         <SectionHeader
           label="Roster"
           dot="amber"
-          counter={`${kolTab === 'need_update' ? needUpdateCount : filteredKOLs.length} ${kolTab === 'need_update' ? 'need update' : 'of total'}`}
+          counter={`${tabbedKOLs.length} ${kolTab === 'all' ? 'of total' : kolTab === 'need_update' ? 'need update' : kolTab === 'web2' ? 'Web2' : 'Web3'}`}
           first
         />
 
@@ -2601,6 +2614,20 @@ export default function KOLsPage() {
               >
                 All
                 <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none data-[state=active]:bg-brand-light data-[state=active]:text-brand">{filteredKOLs.length}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="web3"
+                className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+              >
+                Web3
+                <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none data-[state=active]:bg-brand-light data-[state=active]:text-brand">{web3Count}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="web2"
+                className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+              >
+                Web2
+                <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none data-[state=active]:bg-brand-light data-[state=active]:text-brand">{web2Count}</span>
               </TabsTrigger>
               <TabsTrigger
                 value="need_update"

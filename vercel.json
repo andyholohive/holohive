@@ -86,7 +86,7 @@
     },
     {
       "path": "/api/cron/task-alerts",
-      "schedule": "0 0 * * 1-5"
+      "schedule": "0 23 * * 1-5"
     },
     {
       "path": "/api/cron/lineup-deadlines",

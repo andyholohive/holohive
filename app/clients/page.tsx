@@ -5770,26 +5770,12 @@ export default function ClientsPage() {
                         <Label className="text-xs">Telegram Group URL</Label>
                         <Input value={contextForm.telegram_url} onChange={(e) => setContextForm({ ...contextForm, telegram_url: e.target.value })} placeholder="https://t.me/..." className="focus-brand" />
                       </div>
-                      {/* [2026-06-11] Telegram chat ID — sits with the
-                          group URL because they're paired. The URL is
-                          what humans share; the chat ID is what the bot
-                          needs to actually post to the group (e.g.
-                          push call note summaries from /dashboard).
-                          Accepts a numeric chat_id (-1001234567...) or
-                          a @username. Bot must already be a member of
-                          the group before sends will land. */}
-                      <div className="grid gap-1">
-                        <Label className="text-xs">Telegram Chat ID (for bot sends)</Label>
-                        <Input
-                          value={contextForm.telegram_chat_id}
-                          onChange={(e) => setContextForm({ ...contextForm, telegram_chat_id: e.target.value })}
-                          placeholder="-1001234567890 or @publicgroup"
-                          className="focus-brand font-mono text-sm"
-                        />
-                        <p className="text-[11px] text-ink-warm-500 mt-0.5">
-                          Required for "Send to client TG" on dashboard call notes. Bot must be a member of the group.
-                        </p>
-                      </div>
+                      {/* [2026-07-08] Telegram Chat ID input removed from the
+                          Client Context UI per Andy. The telegram_chat_id value
+                          is still stored and used for bot sends (dashboard
+                          call-note "Send to client TG") — it's just no longer
+                          edited from this modal. Existing values are preserved
+                          on save via contextForm. */}
                       <div className="grid gap-1">
                         <Label className="text-xs">Brand Assets URL</Label>
                         <Input value={contextForm.shared_drive_url} onChange={(e) => setContextForm({ ...contextForm, shared_drive_url: e.target.value })} placeholder="https://drive.google.com/..." className="focus-brand" />

@@ -59,6 +59,8 @@ export interface MasterKOL {
   audience_summary?: string | null;
   /** AI-inferred brief-angle hint (Doc 2 Q7a). One-line activation hook the team can lift into a brief. */
   brief_angle_hint?: string | null;
+  /** Web2 vs Web3 classification (2026-07-08, per Jdot). Legacy KOLs default to 'Web3'. */
+  kol_category?: 'Web2' | 'Web3' | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -91,6 +93,8 @@ export interface CreateKOLData {
   description?: string;
   wallet?: string;
   projects_worked_together?: string[];
+  /** Web2 vs Web3 (2026-07-08). Omit to default to 'Web3' via the DB default. */
+  kol_category?: 'Web2' | 'Web3';
 }
 
 export interface UpdateKOLData {
@@ -122,6 +126,7 @@ export interface UpdateKOLData {
   description?: string | null;
   wallet?: string | null;
   projects_worked_together?: string[] | null;
+  kol_category?: 'Web2' | 'Web3' | null;
 }
 
 export class KOLService {
@@ -188,7 +193,8 @@ export class KOLService {
           creator_types: kolData.creator_types || null,
           content_type: kolData.content_type || null,
           in_house: kolData.in_house || null,
-          projects_worked_together: kolData.projects_worked_together || []
+          projects_worked_together: kolData.projects_worked_together || [],
+          kol_category: kolData.kol_category || 'Web3',
         }])
         .select()
         .single();

@@ -169,6 +169,7 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
         notes: kol.notes,
         wallet: kol.wallet,
         profile_picture_url: kol.profile_picture_url,
+        kol_category: kol.kol_category ?? 'Web3',
       });
     } else {
       setMasterKolForm({});
@@ -321,6 +322,22 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
                     {(fieldOptions?.regions || []).map((r: string) => (
                       <SelectItem key={r} value={r}>{r}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="mk-kol-category">Web2 / Web3</Label>
+                <Select
+                  value={(masterKolForm.kol_category as string) || 'Web3'}
+                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, kol_category: v as 'Web2' | 'Web3' }))}
+                >
+                  <SelectTrigger id="mk-kol-category" className="focus-brand">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Web3">Web3</SelectItem>
+                    <SelectItem value="Web2">Web2</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

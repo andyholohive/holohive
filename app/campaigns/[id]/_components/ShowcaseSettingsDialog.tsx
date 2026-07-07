@@ -37,6 +37,9 @@ type ShowcaseConfig = {
   hide_kol_handles?: boolean;
   hide_budget?: boolean;
   hide_notes?: boolean;
+  // [2026-07-08] Split out from hide_notes so notes and tags are
+  // independently hideable — hiding one no longer hides the other.
+  hide_tags?: boolean;
 };
 
 /** URL-safe random token. Uses crypto.getRandomValues — fails loud
@@ -78,6 +81,7 @@ export default function ShowcaseSettingsDialog({
     hide_kol_handles: false,
     hide_budget: true,
     hide_notes: false,
+    hide_tags: false,
   });
 
   // Working state
@@ -118,6 +122,7 @@ export default function ShowcaseSettingsDialog({
             hide_kol_handles:     data.showcase_config?.hide_kol_handles     ?? false,
             hide_budget:          data.showcase_config?.hide_budget          ?? true,
             hide_notes:           data.showcase_config?.hide_notes           ?? false,
+            hide_tags:            data.showcase_config?.hide_tags            ?? false,
           });
         }
         setLoading(false);
@@ -386,7 +391,8 @@ export default function ShowcaseSettingsDialog({
                     { key: 'hide_client_identity', label: 'Hide client identity', sub: 'Replaces logo + name with "Confidential campaign"' },
                     { key: 'hide_kol_handles',     label: 'Hide KOL handles',     sub: 'KOL names show as "KOL #1", "KOL #2"…' },
                     { key: 'hide_budget',          label: 'Hide budget',          sub: 'Removes the budget pill + value-anchor line' },
-                    { key: 'hide_notes',           label: 'Hide notes',           sub: 'Removes the content Notes column entirely' },
+                    { key: 'hide_notes',           label: 'Hide notes',           sub: 'Removes the content notes text (tags stay unless hidden below)' },
+                    { key: 'hide_tags',            label: 'Hide tags',            sub: 'Removes the client-facing content tag badges' },
                   ].map(item => {
                     const key = item.key as keyof ShowcaseConfig;
                     const justSaved = savedKey === key;

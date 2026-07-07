@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ExternalLink, Pencil, Save, X, Calendar as CalendarIcon, RefreshCw } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Pencil, Save, X, Calendar as CalendarIcon, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { MasterKOL, KOLService } from "@/lib/kolService";
@@ -1484,12 +1484,29 @@ function CallLogsTab({ kolId }: { kolId: string }) {
 }
 
 function CallLogRow({ c, onEdit, onDelete }: { c: KolCallLog; onEdit: () => void; onDelete: () => void }) {
+  // [2026-07-08] Collapsible per Andy — the header (date + type + project)
+  // stays visible; the prose body collapses so a long call history stays
+  // scannable. Default collapsed. Only rows with body content get a toggle.
+  const [expanded, setExpanded] = useState(false);
+  const hasBody = !!(c.notes || c.market_intel || c.recommended_angle || c.feedback_on_hh);
+  const preview = c.notes || c.market_intel || c.recommended_angle || c.feedback_on_hh || '';
   return (
     <Card className="p-3 border-l-2 border-l-brand transition-colors hover:bg-brand-light/20">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-ink-warm-900">{formatDate(c.call_date)}</span>
+          <button
+            type="button"
+            onClick={() => hasBody && setExpanded((v) => !v)}
+            className={`flex items-center gap-2 w-full text-left min-w-0 ${hasBody ? 'cursor-pointer' : 'cursor-default'}`}
+          >
+            {hasBody ? (
+              expanded
+                ? <ChevronDown className="h-3.5 w-3.5 text-ink-warm-400 flex-shrink-0" />
+                : <ChevronRight className="h-3.5 w-3.5 text-ink-warm-400 flex-shrink-0" />
+            ) : (
+              <span className="w-3.5 flex-shrink-0" />
+            )}
+            <span className="text-sm font-semibold text-ink-warm-900 flex-shrink-0">{formatDate(c.call_date)}</span>
             {c.call_type && (
               <StatusBadge tone="brand" size="sm" bordered>
                 {titleCase(c.call_type)}
@@ -1500,13 +1517,18 @@ function CallLogRow({ c, onEdit, onDelete }: { c: KolCallLog; onEdit: () => void
                 {c.project}
               </StatusBadge>
             )}
-          </div>
-          <div className="mt-2 space-y-1.5 text-xs">
-            {c.notes && <Section label="Notes" body={c.notes} />}
-            {c.market_intel && <Section label="Market Intel" body={c.market_intel} />}
-            {c.recommended_angle && <Section label="Recommended Angle" body={c.recommended_angle} />}
-            {c.feedback_on_hh && <Section label="Feedback on HH" body={c.feedback_on_hh} />}
-          </div>
+            {hasBody && !expanded && (
+              <span className="text-[11px] text-ink-warm-400 italic truncate min-w-0">— {preview}</span>
+            )}
+          </button>
+          {expanded && hasBody && (
+            <div className="mt-2 space-y-1.5 text-xs">
+              {c.notes && <Section label="Notes" body={c.notes} />}
+              {c.market_intel && <Section label="Market Intel" body={c.market_intel} />}
+              {c.recommended_angle && <Section label="Recommended Angle" body={c.recommended_angle} />}
+              {c.feedback_on_hh && <Section label="Feedback on HH" body={c.feedback_on_hh} />}
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">
           <Button size="sm" variant="ghost" onClick={onEdit} title="Edit" className="h-7 w-7 p-0">

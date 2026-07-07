@@ -6,10 +6,13 @@ import { TelegramService } from '@/lib/telegramService';
 export const dynamic = 'force-dynamic';
 
 /**
- * Weekday 09:00 KST (00:00 UTC Mon-Fri) cron: sends overdue task
+ * End-of-day 23:00 UTC (Mon-Fri) cron: sends overdue task
  * notifications to each assignee via TG DM, plus a summary to the ops
  * terminal chat. Also notifies assignees of stale tasks (no update in
  * 7+ days).
+ *
+ * [2026-07-08] Moved 00:00 → 23:00 UTC per Jdot: he wants the ping at the
+ * *end* of the working day, not the start of the next one.
  *
  * [2026-07-06] Wired for the first time (audit follow-up): the route
  * existed since the tasks build but had no vercel.json entry AND

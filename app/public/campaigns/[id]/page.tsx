@@ -77,6 +77,7 @@ type ShowcaseConfig = {
   hide_kol_handles?: boolean;
   hide_budget?: boolean;
   hide_notes?: boolean;
+  hide_tags?: boolean;
 };
 
 /**
@@ -403,6 +404,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     kolHandles:     !!cfg?.hide_kol_handles,
     budget:         !!cfg?.hide_budget,
     notes:          !!cfg?.hide_notes,
+    tags:           !!cfg?.hide_tags,
   };
   const maskedKolName = (originalName: string, idx: number): string =>
     mask.kolHandles ? `KOL #${idx + 1}` : originalName;
@@ -410,6 +412,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   // intent ("show notes to the client"), masked to false when
   // showcase mode hides notes (Section 9 default).
   const notesVisible = !!campaign?.share_content_notes && !mask.notes;
+  // [2026-07-08] Tags are independent of notes per Andy. Client-visibility
+  // tags are curated for the client, so they show unless explicitly hidden
+  // in showcase settings — hiding notes no longer hides the tags.
+  const tagsVisible = !mask.tags;
+  // The Notes/Tags column exists if EITHER is shown.
+  const notesColVisible = notesVisible || tagsVisible;
 
   const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'cards'>('table');
   const [contentViewMode, setContentViewMode] = useState<'table' | 'overview'>('table');
@@ -3167,15 +3175,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
                                 </button>
                               </TableHead>
-                              {notesVisible && (
-                                <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
+                              {notesColVisible && (
+                                <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">{notesVisible ? 'Notes' : 'Tags'}</TableHead>
                               )}
                             </TableRow>
                           </TableHeader>
                           <TableBody className="bg-white">
                             {sortedContents.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={12 + (notesVisible ? 1 : 0)} className="text-center py-12">
+                                <TableCell colSpan={12 + (notesColVisible ? 1 : 0)} className="text-center py-12">
                                   <div className="flex flex-col items-center justify-center text-ink-warm-500">
                                     <FileText className="h-12 w-12 mb-4 text-ink-warm-300" />
                                     <p className="text-lg font-medium mb-2">No content matches your filters</p>
@@ -3274,7 +3282,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 overflow-hidden`}>
                                       {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
                                     </TableCell>
-                                    {notesVisible && (
+                                    {notesColVisible && (
                                       <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-2 py-5 align-top`}>
                                         {/* HHP Onboarding Overhaul Spec § 9 #11 —
                                             "Complimen Post" truncation fix.
@@ -3292,8 +3300,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                               text. Internal tags filtered
                                               client-side. Multi-Post tag
                                               renders its sequence as
-                                              "Post N of M" automatically. */}
-                                          {(() => {
+                                              "Post N of M" automatically.
+                                              [2026-07-08] Gated by tagsVisible
+                                              — independent of notesVisible. */}
+                                          {tagsVisible && (() => {
                                             const assignments = (content.content_tag_assignments || [])
                                               .filter(a => a.tag && a.tag.visibility === 'client');
                                             if (assignments.length === 0) return null;
@@ -3320,11 +3330,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                               </div>
                                             );
                                           })()}
-                                          {content.notes || (
-                                            ((content.content_tag_assignments || []).some(a => a.tag?.visibility === 'client'))
+                                          {/* Notes text — gated by notesVisible; the
+                                              "-" placeholder is suppressed when tags
+                                              are showing (they fill the cell). */}
+                                          {notesVisible && (content.notes || (
+                                            (tagsVisible && (content.content_tag_assignments || []).some(a => a.tag?.visibility === 'client'))
                                               ? null
                                               : <span className="text-ink-warm-400 italic">-</span>
-                                          )}
+                                          ))}
                                         </div>
                                       </TableCell>
                                     )}
