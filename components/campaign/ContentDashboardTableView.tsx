@@ -1182,9 +1182,9 @@ export function ContentDashboardTableView() {
                     <p className="text-sm text-ink-warm-400">Content created for this campaign will appear here.</p>
                   </div>
                 ) : (
-                  {/* [&>div]:overflow-visible neutralizes the shadcn Table's own
-                      overflow-auto wrapper so THIS div is the sole scroller —
-                      required for the sticky header below to actually pin. */}
+                  // [&>div]:overflow-visible neutralizes the shadcn Table's own
+                  // overflow-auto wrapper so THIS div is the sole scroller —
+                  // required for the sticky header below to actually pin.
                   <div ref={contentTableRef} className="border rounded-lg [&>div]:overflow-visible" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh' }}>
                     <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                       {/* Frozen header row — stays visible while scrolling long content lists. */}
