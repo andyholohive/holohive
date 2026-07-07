@@ -2509,6 +2509,7 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
       kolName: caller.name,
       campaignId: activeCampaigns[0].id,
       campaignName: activeCampaigns[0].name,
+      displayName: activeCampaigns[0].client?.name || activeCampaigns[0].name,
       link,
       platform: detected.platform,
       contentType: detected.content_type,
@@ -2579,6 +2580,8 @@ async function finalizeSubmission(opts: {
   kolName: string;
   campaignId: string;
   campaignName: string;
+  /** KOL-facing label for the receipt — client name preferred, campaign name fallback. */
+  displayName: string;
   link: string;
   platform: string;
   contentType: string;
@@ -2657,10 +2660,16 @@ async function finalizeSubmission(opts: {
   const submittedAt = new Date();
   const submittedLabel = formatDateTime(submittedAt);
 
-  // [2026-07-03] No success-path receipt to the KOL group chat per Andy.
-  // The submission card lands in the team review chat immediately; if the
-  // KOL wants confirmation they can check with the team. Dedup + error
-  // paths above still reply because those ARE actionable feedback.
+  // [2026-07-08] Per Andy: acknowledge every successful /submit. The
+  // single-campaign auto-pick used to fire silently (only the multi-campaign
+  // picker edit gave feedback), so KOLs had no signal it worked. This is the
+  // one receipt for both paths — best-effort, never blocks the forward below.
+  await sendTelegramMessage(
+    opts.chatId,
+    `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`,
+    'HTML',
+    opts.threadId,
+  );
 
   // Forward to the team review channel.
   await forwardSubmissionToReviewChannel({
@@ -3052,6 +3061,7 @@ async function handleSubmPickerCallback(
     kolName,
     campaignId: campaign.id,
     campaignName: campaign.name,
+    displayName: campaign.client?.name || campaign.name,
     link: pending.link,
     platform: detected.platform,
     contentType: detected.content_type,
@@ -3059,11 +3069,14 @@ async function handleSubmPickerCallback(
 
   await (supabaseAdmin as any).from('pending_submissions').delete().eq('id', pendingId);
   if (messageChatId && messageId) {
+    // finalizeSubmission now sends the ✅ receipt (both paths), so this edit
+    // just closes out the picker — clears the buttons + records the choice
+    // without a second confirmation message.
     await editMessageText(
       messageChatId,
       messageId,
       submissionId
-        ? `✅ Submitted for <b>${escapeHtml(campaign.client?.name || campaign.name)}</b>.`
+        ? `<i>Campaign selected — <b>${escapeHtml(campaign.client?.name || campaign.name)}</b>.</i>`
         : '↩ Submission not saved — see message above.',
     );
   }
