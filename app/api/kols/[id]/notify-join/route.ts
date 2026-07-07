@@ -53,6 +53,16 @@ export async function POST(
       return NextResponse.json({ ok: false, skipped: 'no usable TG handle' });
     }
 
+    // Destination is configurable in the Telegram Comm admin tab
+    // (app_settings.kol_new_alert_chat_id / _thread_id). Falls back to
+    // the env terminal chat when unset.
+    const [chatSetting, threadSetting] = await Promise.all([
+      (admin as any).from('app_settings').select('value').eq('key', 'kol_new_alert_chat_id').maybeSingle(),
+      (admin as any).from('app_settings').select('value').eq('key', 'kol_new_alert_chat_thread_id').maybeSingle(),
+    ]);
+    const destChatId: string | undefined = (chatSetting.data as any)?.value || undefined;
+    const destThreadId: string | undefined = (threadSetting.data as any)?.value || undefined;
+
     const name = escapeHtml(kol.name || '(unnamed KOL)');
     const link = `https://t.me/${handle}`;
     const text =
@@ -62,11 +72,13 @@ export async function POST(
       `If you're not already in this channel, join it from the scanner account, ` +
       `then tap below to pull its niche + score.`;
 
-    const sent = await TelegramService.sendMessageWithButtons(text, [[
-      { text: '✅ Joined — Scan now', callback_data: `kolscan:${kol.id}` },
-    ]]);
+    const sent = await TelegramService.sendMessageWithButtons(
+      text,
+      [[{ text: '✅ Joined — Scan now', callback_data: `kolscan:${kol.id}` }]],
+      { chatId: destChatId, threadId: destThreadId },
+    );
 
-    return NextResponse.json({ ok: sent });
+    return NextResponse.json({ ok: sent, dest: destChatId ? 'configured' : 'fallback' });
   } catch (err: any) {
     console.error('[notify-join] crash:', err);
     return NextResponse.json({ error: 'Unexpected error', detail: err?.message ?? String(err) }, { status: 500 });

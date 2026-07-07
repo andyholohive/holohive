@@ -637,6 +637,9 @@ export default function LineupSettingsPage() {
 
       {/* ─── Lineup Deadline Reminders section [2026-07-06] ─── */}
       <LineupReminderChannelSection />
+
+      {/* ─── New KOL Join & Scan Prompt section [2026-07-06] ─── */}
+      <NewKolAlertChannelSection />
     </div>
   );
 }
@@ -881,6 +884,116 @@ function LineupConfirmedChannelSection() {
  * Writes to app_settings.spa_chat_id + spa_chat_thread_id; the webhook
  * falls back to per-campaign tg_ops_group_id only when this is unset.
  */
+/**
+ * NewKolAlertChannelSection — destination for the "new KOL added" DM.
+ * When a KOL first gets its Telegram channel link on /kols, the bot posts
+ * here with the channel link + a "✅ Joined — Scan now" button so someone
+ * can join the channel then trigger the niche/score scan. Writes to
+ * app_settings.kol_new_alert_chat_id + kol_new_alert_chat_thread_id; the
+ * /api/kols/[id]/notify-join route falls back to TELEGRAM_TERMINAL_CHAT_ID
+ * when this is unset. 2026-07-06.
+ */
+function NewKolAlertChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'kol_new_alert_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'kol_new_alert_chat_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'kol_new_alert_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'kol_new_alert_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'New-KOL alert destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'New-KOL join prompts will post in this topic.' : 'New-KOL join prompts will post in this chat.'
+          : 'New-KOL join prompts will fall back to the default terminal chat.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={UserCheck}
+      title="New KOL — Join & Scan Prompt"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm">Fallback</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Chat that receives the DM when a new KOL gets its Telegram channel — the channel link plus a <b>✅ Joined — Scan now</b> button. The scanner can only read channels it has joined, so join the channel then tap the button to pull the KOL&apos;s niche + score. Leave empty to fall back to the default <code className="bg-cream-100 px-1 rounded text-[10px]">TELEGRAM_TERMINAL_CHAT_ID</code>.</>
+      )}
+    >
+      <WhenItSends>
+        Instantly when a new KOL&apos;s Telegram link is first set on <code className="bg-cream-100 px-1 rounded text-[10px]">/kols</code>.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="New-KOL alert destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
+
 function SubmissionProgressChannelSection() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);

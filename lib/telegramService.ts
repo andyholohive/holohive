@@ -104,11 +104,17 @@ export class TelegramService {
   static async sendMessageWithButtons(
     text: string,
     buttons: Array<Array<{ text: string; callback_data: string }>>,
-    parseMode: 'HTML' | 'Markdown' = 'HTML',
+    opts?: { chatId?: string; threadId?: string; parseMode?: 'HTML' | 'Markdown' },
   ): Promise<boolean> {
     const botToken = this.botToken;
-    const chatId = this.chatId;
-    const threadId = this.threadId;
+    // An explicit chatId (e.g. the Telegram Comm admin destination) wins;
+    // otherwise fall back to the env terminal chat. A thread id is only
+    // meaningful within its own chat, so when overriding the chat, take
+    // the thread from the override too (not the env thread).
+    const usingOverride = !!opts?.chatId;
+    const chatId = opts?.chatId || this.chatId;
+    const threadId = usingOverride ? opts?.threadId : this.threadId;
+    const parseMode = opts?.parseMode || 'HTML';
     if (!botToken || !chatId) {
       console.error('[Telegram] sendMessageWithButtons: config missing', {
         hasToken: !!botToken, hasChatId: !!chatId,
@@ -123,7 +129,7 @@ export class TelegramService {
         disable_web_page_preview: false,
         reply_markup: { inline_keyboard: buttons },
       };
-      if (threadId) body.message_thread_id = parseInt(threadId);
+      if (threadId) body.message_thread_id = parseInt(String(threadId));
       const response = await fetch(
         `https://api.telegram.org/bot${botToken}/sendMessage`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
