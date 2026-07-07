@@ -1829,14 +1829,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       </div>
                     </div>
 
-                    <div className="border rounded-lg overflow-auto" style={{ position: 'relative' }}>
+                    <div className="border rounded-lg overflow-auto [&>div]:overflow-visible" style={{ position: 'relative', maxHeight: '70vh' }}>
                       <Table className="min-w-full" style={{
                         tableLayout: 'auto',
                         width: 'auto',
                         borderCollapse: 'collapse',
                         whiteSpace: 'nowrap'
                       }} suppressHydrationWarning>
-                        <TableHeader>
+                        {/* Frozen header row — stays visible as clients scroll the roster. */}
+                        <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-cream-50 [&_th]:border-b [&_th]:border-cream-200">
                           <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                             <TableHead className="relative py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
                             <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
@@ -2965,9 +2966,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </div>
 
-                      <div className="border rounded-lg overflow-auto">
+                      <div className="border rounded-lg overflow-auto [&>div]:overflow-visible" style={{ maxHeight: '70vh' }}>
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
-                          <TableHeader>
+                          {/* Frozen header row — stays visible as clients scroll the content list. */}
+                          <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-cream-50 [&_th]:border-b [&_th]:border-cream-200">
                             <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                               <TableHead className="relative py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap">#</TableHead>
                               <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-left">
