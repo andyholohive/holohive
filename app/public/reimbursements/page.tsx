@@ -1,14 +1,15 @@
 'use client';
 
 /**
- * Public reimbursement request form (no login). Styled to match the other
- * public forms (app/public/forms/[id]): white page, centered HoloHive logo,
- * large title, single-column fields, brand submit, full-page thank-you.
- * Posts to the allowlisted POST /api/public/reimbursements. Super-admins
- * review submissions on /expenses → Reimbursement Requests.
+ * Public reimbursement request form (no login). Styled to match the public
+ * link-submit form (app/public/links/submit): gray gradient background,
+ * centered white card, 48px logo, compact fields, inline error banner,
+ * full-width brand submit, "Powered by Holo Hive" footer. Posts to the
+ * allowlisted POST /api/public/reimbursements. Super-admins review on
+ * /expenses → Reimbursement Requests.
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,164 +18,215 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import { useToast } from '@/hooks/use-toast';
 import { formatDate as fmtDate } from '@/lib/dateFormat';
-import { Calendar as CalendarIcon, Upload, FileText, X, CheckCircle2, Loader, ChevronRight } from 'lucide-react';
+import { Check, Loader2, Calendar as CalendarIcon, Upload, FileText, X } from 'lucide-react';
 
 type ExpenseType = 'travel' | 'software' | 'meals_drinks' | 'others';
 
-const TYPE_LABEL: Record<ExpenseType, string> = {
-  travel: 'Travel',
-  software: 'Software',
-  meals_drinks: 'Meals / Drinks',
-  others: 'Others',
-};
+const CATEGORIES: { value: ExpenseType; label: string }[] = [
+  { value: 'travel', label: 'Travel' },
+  { value: 'software', label: 'Software' },
+  { value: 'meals_drinks', label: 'Meals / Drinks' },
+  { value: 'others', label: 'Others' },
+];
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
 const MAX_SIZE = 10 * 1024 * 1024;
 
-const Req = () => <span className="text-rose-500 ml-1">*</span>;
+export default function ReimbursementSubmitPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-export default function PublicReimbursementPage() {
-  const { toast } = useToast();
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [amount, setAmount] = useState('');
-  const [expenseType, setExpenseType] = useState<ExpenseType>('travel');
-  const [expenseDate, setExpenseDate] = useState('');
-  const [description, setDescription] = useState('');
-  const [notes, setNotes] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    amount: '',
+    expense_type: 'travel' as ExpenseType,
+    expense_date: '',
+    description: '',
+    notes: '',
+  });
   const [file, setFile] = useState<File | null>(null);
 
-  function pickFile(f: File | null) {
+  const resetForm = () => {
+    setFormData({ name: '', email: '', amount: '', expense_type: 'travel', expense_date: '', description: '', notes: '' });
+    setFile(null);
+  };
+
+  const pickFile = (f: File | null) => {
     if (!f) { setFile(null); return; }
-    if (f.size > MAX_SIZE) { toast({ title: 'File too large', description: 'Max 10 MB.', variant: 'destructive' }); return; }
-    if (!ALLOWED_MIME.includes(f.type)) { toast({ title: 'Unsupported file', description: 'JPG, PNG, GIF, WebP or PDF only.', variant: 'destructive' }); return; }
+    if (f.size > MAX_SIZE) { setError('Receipt exceeds the 10 MB limit'); return; }
+    if (!ALLOWED_MIME.includes(f.type)) { setError('Receipt must be a JPG, PNG, GIF, WebP or PDF'); return; }
+    setError(null);
     setFile(f);
-  }
+  };
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { toast({ title: 'Enter your name', variant: 'destructive' }); return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { toast({ title: 'Enter a valid email', variant: 'destructive' }); return; }
-    if (!amount || Number(amount) <= 0) { toast({ title: 'Enter an amount', variant: 'destructive' }); return; }
-    if (!expenseDate) { toast({ title: 'Pick the expense date', variant: 'destructive' }); return; }
-    if (!description.trim()) { toast({ title: 'Add a description', variant: 'destructive' }); return; }
+    setError(null);
 
-    setSubmitting(true);
+    if (!formData.name.trim()) { setError('Name is required'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email.trim())) { setError('A valid email is required'); return; }
+    if (!formData.amount || Number(formData.amount) <= 0) { setError('Amount must be greater than 0'); return; }
+    if (!formData.expense_date) { setError('Date of expense is required'); return; }
+    if (!formData.description.trim()) { setError('Description is required'); return; }
+
+    setIsSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append('requester_name', name.trim());
-      fd.append('requester_email', email.trim());
-      fd.append('amount_usd', String(Number(amount)));
-      fd.append('expense_type', expenseType);
-      fd.append('description', description.trim());
-      fd.append('notes', notes.trim());
-      fd.append('expense_date', expenseDate);
+      fd.append('requester_name', formData.name.trim());
+      fd.append('requester_email', formData.email.trim());
+      fd.append('amount_usd', String(Number(formData.amount)));
+      fd.append('expense_type', formData.expense_type);
+      fd.append('description', formData.description.trim());
+      fd.append('notes', formData.notes.trim());
+      fd.append('expense_date', formData.expense_date);
       if (file) fd.append('file', file);
 
-      const res = await fetch('/api/public/reimbursements', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Failed to submit');
-      if (json.receiptError) {
-        toast({ title: 'Submitted, but the receipt failed to upload', description: json.receiptError, variant: 'destructive' });
-      }
-      setSubmitted(true);
+      const response = await fetch('/api/public/reimbursements', { method: 'POST', body: fd });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to submit request');
+      setIsSubmitted(true);
     } catch (err: any) {
-      toast({ title: 'Submit failed', description: err.message, variant: 'destructive' });
+      setError(err.message || 'An error occurred while submitting');
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
-  }
+  };
 
-  // ─── Success state (full-page, matches public forms) ──────────────────
-  if (submitted) {
+  if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-6">
-        <div className="text-center max-w-md">
-          <div className="flex justify-center mb-6">
-            <Image src="/images/logo.png" alt="Logo" width={60} height={60} className="rounded-xl" />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          <div className="text-center">
+            <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+              <Check className="h-8 w-8 text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Submitted!</h2>
+            <p className="text-gray-500 mb-8">Your reimbursement request is now pending review. You&apos;ll be reimbursed once it&apos;s approved.</p>
+            <Button onClick={() => { setIsSubmitted(false); resetForm(); }} variant="outline" className="px-6">
+              Submit Another Request
+            </Button>
           </div>
-          <div className="rounded-full bg-emerald-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <CheckCircle2 className="h-10 w-10 text-emerald-600" />
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank you!</h2>
-          <p className="text-lg text-gray-600 leading-relaxed">Your reimbursement request has been submitted. You&apos;ll be reimbursed once it&apos;s approved.</p>
         </div>
       </div>
     );
   }
 
-  // ─── Form state ───────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-2xl mx-auto px-6 py-16">
-        {/* Logo and Title */}
-        <div className="text-center mb-12">
-          <div className="flex justify-center mb-6">
-            <Image src="/images/logo.png" alt="Logo" width={60} height={60} className="rounded-xl" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
+        {/* Header with logo */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center mb-4">
+            <Image src="/images/logo.png" alt="Logo" width={48} height={48} className="rounded-lg" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Reimbursement Request</h1>
-          <p className="text-lg text-gray-600 leading-relaxed max-w-xl mx-auto">
-            Submit an out-of-pocket expense for reimbursement. Attach your receipt and we&apos;ll route it for review.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Reimbursement Request</h1>
+          <p className="text-gray-500 mt-1">Submit an out-of-pocket expense for reimbursement</p>
         </div>
 
-        {/* Form Content */}
-        <div className="max-w-xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Section header — matches the titled section + divider used on the other public forms */}
-            <div className="text-2xl font-bold text-brand border-b-2 border-gray-300 pb-2">Reimbursement Details</div>
+        {/* Form Card */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="rb-name">Your name<Req /></Label>
-              <Input id="rb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="focus-brand" />
+              <Label htmlFor="name">Your name <span className="text-rose-500">*</span></Label>
+              <Input
+                id="name"
+                placeholder="Full name"
+                value={formData.name}
+                onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                disabled={isSubmitting}
+                className="focus-brand"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rb-email">Your email<Req /></Label>
-              <Input id="rb-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@holohive.io" className="focus-brand" />
+              <Label htmlFor="email">Your email <span className="text-rose-500">*</span></Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@holohive.io"
+                value={formData.email}
+                onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                disabled={isSubmitting}
+                className="focus-brand"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rb-amount">Amount (USD)<Req /></Label>
-              <Input id="rb-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="focus-brand" />
+              <Label htmlFor="amount">Amount (USD) <span className="text-rose-500">*</span></Label>
+              <Input
+                id="amount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={formData.amount}
+                onChange={e => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                disabled={isSubmitting}
+                className="focus-brand"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label>Category<Req /></Label>
-              <Select value={expenseType} onValueChange={(v) => setExpenseType(v as ExpenseType)}>
+              <Label>Category <span className="text-rose-500">*</span></Label>
+              <Select
+                value={formData.expense_type}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, expense_type: value as ExpenseType }))}
+                disabled={isSubmitting}
+              >
                 <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(TYPE_LABEL) as ExpenseType[]).map(t => (
-                    <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>
-                  ))}
+                  {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Date of expense<Req /></Label>
-              <DateField value={expenseDate} onChange={setExpenseDate} placeholder="Select date" />
+              <Label>Date of expense <span className="text-rose-500">*</span></Label>
+              <DateField
+                value={formData.expense_date}
+                onChange={(v) => setFormData(prev => ({ ...prev, expense_date: v }))}
+                disabled={isSubmitting}
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rb-desc">Description<Req /></Label>
-              <Input id="rb-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Client dinner — Seoul offsite" className="focus-brand" />
+              <Label htmlFor="description">Description <span className="text-rose-500">*</span></Label>
+              <Input
+                id="description"
+                placeholder="e.g. Client dinner — Seoul offsite"
+                value={formData.description}
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                disabled={isSubmitting}
+                className="focus-brand"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rb-notes">Notes</Label>
-              <Textarea id="rb-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional context for the reviewer" className="focus-brand" />
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Optional context for the reviewer"
+                value={formData.notes}
+                onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                disabled={isSubmitting}
+                className="focus-brand"
+                rows={2}
+              />
             </div>
 
             <div className="space-y-2">
-              <Label>Receipt</Label>
+              <Label>Receipt (Optional)</Label>
               {file ? (
-                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
                   <FileText className="h-4 w-4 text-gray-400 shrink-0" />
                   <span className="text-sm text-gray-700 truncate flex-1">{file.name}</span>
                   <button type="button" onClick={() => setFile(null)} className="text-gray-400 hover:text-rose-600" aria-label="Remove receipt">
@@ -182,44 +234,42 @@ export default function PublicReimbursementPage() {
                   </button>
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer flex flex-col items-center gap-2">
-                  <Upload className="h-6 w-6 text-gray-400" />
-                  <span className="text-sm text-gray-600">Click to attach a receipt</span>
-                  <span className="text-xs text-gray-400">JPG, PNG, GIF, WebP or PDF · max 10 MB</span>
-                  <input type="file" className="hidden" accept={ALLOWED_MIME.join(',')} onChange={(e) => pickFile(e.target.files?.[0] || null)} />
+                <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 px-3 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <Upload className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-500">Attach receipt (JPG, PNG, PDF · max 10 MB)</span>
+                  <input type="file" className="hidden" accept={ALLOWED_MIME.join(',')} disabled={isSubmitting} onChange={e => pickFile(e.target.files?.[0] || null)} />
                 </label>
               )}
             </div>
 
-            <div className="pt-8 flex justify-center">
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="px-6 h-12 text-base font-medium rounded-lg bg-brand hover:bg-[#2d6570] text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {submitting ? (
-                  <><Loader className="h-5 w-5 animate-spin" /> Submitting...</>
-                ) : (
-                  <>Submit <ChevronRight className="h-5 w-5" /></>
-                )}
-              </Button>
-            </div>
+            <Button variant="brand" type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+              ) : (
+                'Submit Request'
+              )}
+            </Button>
           </form>
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Powered by Holo Hive
+        </p>
       </div>
     </div>
   );
 }
 
 // ─── DateField (Popover + Calendar, brand-teal selection) ────────────────
-function DateField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+function DateField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   const selectedDate = value ? new Date(value + 'T00:00:00') : undefined;
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className="h-10 w-full justify-start font-normal focus-brand" style={{ color: value ? '#111827' : '#9ca3af' }}>
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {value ? fmtDate(selectedDate!) : (placeholder || 'Select date')}
+        <Button type="button" variant="outline" disabled={disabled} className="w-full justify-start font-normal focus-brand" style={{ color: value ? '#111827' : '#6b7280' }}>
+          <CalendarIcon className="mr-2 h-4 w-4 opacity-70" />
+          {value ? fmtDate(selectedDate!) : 'Select date'}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
