@@ -2324,6 +2324,25 @@ const CampaignDetailsPage = () => {
                   into a small inline toolbar at the bottom-right of
                   the content (or per-card for view mode). Cuts ~70px
                   of header weight from every tab. */}
+              {/* [2026-07-08] View-mode Edit affordance restored per Andy.
+                  When the Overview was made read-only (2026-06-29) the trigger
+                  for edit mode was dropped, leaving no way to rename a campaign
+                  or change its dates/status/etc. Gated to all signed-in users
+                  except guests. Clicking flips into the InformationEditMode
+                  form (Campaign Name + fields + Save/Cancel). */}
+              {!editMode && (userProfile as any)?.role && (userProfile as any).role !== 'guest' && (
+                <div className="mb-3 flex items-center justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-ink-warm-600 hover:text-brand"
+                    onClick={handleEdit}
+                  >
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                </div>
+              )}
               {editMode && (
                 <div className="mb-3 flex items-center justify-end gap-2">
                   <span className="text-[10px] mono uppercase tracking-[0.14em] text-amber-700">Editing</span>
