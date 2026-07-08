@@ -1193,59 +1193,10 @@ export function KolDashboardTableView({
                                     </a>
                                   )}
                                 </div>
-                                {/* [2026-07-01] Merged inline status strip — per
-                                    Andy: show hh_status + activation-recency
-                                    together beneath the name. Recency now sources
-                                    from approved contents (view rewritten), not
-                                    lineup membership — KOLs in a confirmed lineup
-                                    who never post no longer show as active.
-                                    "Last active Week X" recolored gray → light
-                                    green per the same request. */}
-                                {/* [2026-07-06] Single combined pill per Andy — the
-                                    hh_status chip and activation-recency chip merged
-                                    into ONE. Still click-to-edit (the pill IS the
-                                    hh_status Select trigger); recency renders as a
-                                    suffix. Active posting tints the whole pill
-                                    emerald (activity trumps the status palette);
-                                    no recency → plain status colors. */}
-                                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                  {(() => {
-                                    const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
-                                    const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
-                                    const recency = aw != null
-                                      ? `Active Wk ${aw}`
-                                      : lw != null
-                                        ? `Last active Wk ${lw}`
-                                        : null;
-                                    const pillColor = aw != null
-                                      ? 'bg-emerald-50 text-emerald-700'
-                                      : lw != null
-                                        ? 'bg-emerald-50/60 text-emerald-600'
-                                        : getStatusColor(campaignKOL.hh_status);
-                                    return (
-                                      <Select
-                                        value={campaignKOL.hh_status}
-                                        onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
-                                      >
-                                        <SelectTrigger
-                                          className={`border-none shadow-none bg-transparent w-auto h-auto px-1.5 py-0.5 rounded text-[10px] font-medium inline-flex items-center gap-0.5 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${pillColor}`}
-                                          style={{ outline: 'none', boxShadow: 'none' }}
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                                            {campaignKOL.hh_status}
-                                            {recency && <span className="opacity-75">· {recency}</span>}
-                                          </span>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {CampaignKOLService.getHHStatusOptions().map((status) => (
-                                            <SelectItem key={status} value={status || ''}>{status}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    );
-                                  })()}
-                                </div>
+                                {/* [2026-07-08] The status + activation-recency pill
+                                    moved to the dedicated Status column per Andy —
+                                    the under-name copy was removed to avoid showing
+                                    the same thing twice. */}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <MultiSelect
@@ -1423,22 +1374,46 @@ export function KolDashboardTableView({
                                 />
                               </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
-                                <Select
-                                  value={campaignKOL.hh_status} 
-                                  onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
-                                >
-                                  <SelectTrigger 
-                                    className={`border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${getStatusColor(campaignKOL.hh_status)}`}
-                                    style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
-                                  >
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {CampaignKOLService.getHHStatusOptions().map((status) => (
+                                {/* [2026-07-08] Status column now carries the combined
+                                    hh_status + activation-recency pill (previously only
+                                    shown under the name). Active posting tints the pill
+                                    emerald; recency renders as a suffix. The duplicate
+                                    under-name pill was removed. */}
+                                {(() => {
+                                  const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
+                                  const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
+                                  const recency = aw != null
+                                    ? `Active Wk ${aw}`
+                                    : lw != null
+                                      ? `Last active Wk ${lw}`
+                                      : null;
+                                  const pillColor = aw != null
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : lw != null
+                                      ? 'bg-emerald-50/60 text-emerald-600'
+                                      : getStatusColor(campaignKOL.hh_status);
+                                  return (
+                                    <Select
+                                      value={campaignKOL.hh_status}
+                                      onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
+                                    >
+                                      <SelectTrigger
+                                        className={`border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-0.5 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${pillColor}`}
+                                        style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
+                                      >
+                                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                          {campaignKOL.hh_status}
+                                          {recency && <span className="opacity-75">· {recency}</span>}
+                                        </span>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {CampaignKOLService.getHHStatusOptions().map((status) => (
                                           <SelectItem key={status} value={status || ''}>{status}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  );
+                                })()}
                               </TableCell>
                                   {/* Paid cell hidden
                                   <TableCell

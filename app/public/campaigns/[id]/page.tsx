@@ -2024,10 +2024,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 </button>
                               </TableHead>
                             )}
-                            {/* Status column hidden on the public view per Andy
-                                2026-07-06 — the KOL's status is already shown
-                                under the name in the KOL column. */}
-                            {false && (
+                            {/* [2026-07-08] Status column restored per Andy — the
+                                status + activation-recency pill now lives here
+                                (matching the internal KOL Dashboard) instead of
+                                under the KOL name. */}
+                            {true && (
                             <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                               <div className="flex items-center gap-1 group">
                                 <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-ink-warm-900" title="Sort by Status">
@@ -2095,7 +2096,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <TableBody className="bg-white">
                           {sortedKOLs.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={(campaign?.share_creator_type ? 10 : 9) + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
+                              <TableCell colSpan={(campaign?.share_creator_type ? 11 : 10) + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
                                 <div className="flex flex-col items-center justify-center text-ink-warm-500">
                                   <Users className="h-12 w-12 mb-4 text-ink-warm-300" />
                                   <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -2152,35 +2153,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                           </a>
                                         )}
                                       </div>
-                                      {/* [2026-07-06] Single combined pill — same
-                                          treatment as the internal KOL Dashboard
-                                          (per Andy: the two chips merged into one).
-                                          hh_status + activation recency in one span;
-                                          active posting tints it emerald. Read-only
-                                          on the public page — the client shouldn't
-                                          be editing KOL relationship status. */}
-                                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                        {(() => {
-                                          const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
-                                          const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
-                                          const recency = aw != null
-                                            ? `Active Wk ${aw}`
-                                            : lw != null
-                                              ? `Last active Wk ${lw}`
-                                              : null;
-                                          const pillColor = aw != null
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : lw != null
-                                              ? 'bg-emerald-50/60 text-emerald-600'
-                                              : getStatusColor(campaignKOL.hh_status || 'curated');
-                                          return (
-                                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${pillColor}`}>
-                                              {campaignKOL.hh_status || 'Curated'}
-                                              {recency && <span className="opacity-75">· {recency}</span>}
-                                            </span>
-                                          );
-                                        })()}
-                                      </div>
+                                      {/* [2026-07-08] The status + activation-recency
+                                          pill moved to the dedicated Status column per
+                                          Andy — the under-name copy was removed. */}
                                       {/* Section 5 — approved client-facing profile
                                           note. Renders as a subtitle under the KOL
                                           name. Hidden in showcase mode when handles
@@ -2226,14 +2201,32 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       ) : '-'}
                                     </TableCell>
                                   )}
-                                  {/* Status cell hidden on public — see header note. */}
-                                  {false && (
+                                  {/* [2026-07-08] Status cell — combined hh_status +
+                                      activation-recency pill (read-only), same as the
+                                      internal KOL Dashboard. The under-name copy was
+                                      removed. */}
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
-                                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
-                                      {campaignKOL.hh_status || 'Curated'}
-                                    </span>
+                                    {(() => {
+                                      const aw = (campaignKOL as any).activation_active_week as number | null | undefined;
+                                      const lw = (campaignKOL as any).activation_last_week as number | null | undefined;
+                                      const recency = aw != null
+                                        ? `Active Wk ${aw}`
+                                        : lw != null
+                                          ? `Last active Wk ${lw}`
+                                          : null;
+                                      const pillColor = aw != null
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : lw != null
+                                          ? 'bg-emerald-50/60 text-emerald-600'
+                                          : getStatusColor(campaignKOL.hh_status || 'curated');
+                                      return (
+                                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${pillColor}`}>
+                                          {campaignKOL.hh_status || 'Curated'}
+                                          {recency && <span className="opacity-75">· {recency}</span>}
+                                        </span>
+                                      );
+                                    })()}
                                   </TableCell>
-                                  )}
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center`}>
                                     <div className="font-medium text-ink-warm-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
