@@ -2893,25 +2893,41 @@ async function sendSubmissionProgressAlert(opts: {
     .neq('status', 'rejected');
   const todayCount = (todayRows ?? []).length;
 
-  // Planned count: lineup_slots for this campaign + current week.
-  // The lineup schema keys by lineup_id; we look up the active campaign_lineup.
-  const { data: lineup } = await (supabaseAdmin as any)
+  // Planned count = KOL slots in THIS week's confirmed lineup.
+  // Schema: campaign_lineups → lineup_angles (lineup_id) → lineup_slots
+  // (angle_id). Match the confirmed lineup by week_number when we have the
+  // campaign week (same getCampaignWeek anchor the LineupsTab uses); fall
+  // back to week_of (the Monday) when the campaign has no start_date.
+  // [2026-07-09] Was querying non-existent columns (campaign_lineups
+  // .week_start_date + lineup_slots.lineup_id), so plannedCount was always
+  // 0 and every alert read "No confirmed lineup yet."
+  let lineupQuery = (supabaseAdmin as any)
     .from('campaign_lineups')
-    .select('id, status')
+    .select('id')
     .eq('campaign_id', opts.campaignId)
-    .eq('status', 'confirmed')
-    .gte('week_start_date', weekStart.toISOString().slice(0, 10))
-    .order('week_start_date', { ascending: false })
+    .eq('status', 'confirmed');
+  lineupQuery = campaignWeek
+    ? lineupQuery.eq('week_number', campaignWeek.weekNumber)
+    : lineupQuery.eq('week_of', weekStart.toISOString().slice(0, 10));
+  const { data: lineup } = await lineupQuery
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   let plannedCount = 0;
   if (lineup?.id) {
-    const { data: slots } = await (supabaseAdmin as any)
-      .from('lineup_slots')
+    const { data: angles } = await (supabaseAdmin as any)
+      .from('lineup_angles')
       .select('id')
       .eq('lineup_id', lineup.id);
-    plannedCount = (slots ?? []).length;
+    const angleIds = ((angles ?? []) as Array<{ id: string }>).map(a => a.id);
+    if (angleIds.length) {
+      const { data: slots } = await (supabaseAdmin as any)
+        .from('lineup_slots')
+        .select('id')
+        .in('angle_id', angleIds);
+      plannedCount = (slots ?? []).length;
+    }
   }
 
   // Day-split rule
