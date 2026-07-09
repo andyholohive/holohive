@@ -267,6 +267,10 @@ export default function SOPsPage() {
   const [runAllPickerOpen, setRunAllPickerOpen] = useState(false);
   const [runAllPickerClientId, setRunAllPickerClientId] = useState<string>('');
   const [runAllBusy, setRunAllBusy] = useState(false);
+  // [2026-07-10] Run All chains the wizard through EVERY on_sop_start
+  // template, not just the first. Remaining templates queue here; each
+  // wizard's onCreated pops the next until the queue drains.
+  const [runAllQueue, setRunAllQueue] = useState<Array<{ templateId: string; title: string }>>([]);
   const [runNextPickerOpen, setRunNextPickerOpen] = useState(false);
   const [runNextOptions, setRunNextOptions] = useState<Array<{
     template_id: string;
@@ -495,17 +499,32 @@ export default function SOPsPage() {
         createdBy: user?.id ?? null,
       });
 
-      // 2. Open wizard for the first on_sop_start (or sequence[0]) template.
-      const first = seq.find(e => e.trigger_type === 'on_sop_start') ?? seq[0];
-      const tpl = deliverableTemplates.find(t => t.id === first.template_id);
+      // 2. Wizard EVERY template that "starts on run" — on_sop_start AND
+      //    recurring — in sequence order, not just the first. (recurring
+      //    templates also get a cron binding above for future weeks; the
+      //    immediate wizard here kicks off the current week so nothing is
+      //    silently skipped — a Weekly Campaign Cycle SOP with two recurring
+      //    deliverables now spawns both, one wizard each.) manual /
+      //    after_previous stay in Run Next. Legacy SOPs with none of these
+      //    fall back to sequence[0]. The first opens now; the rest queue and
+      //    the wizard's onCreated chains through them one at a time.
       const clientName = wizardClients.find(c => c.id === runAllPickerClientId)?.name || 'Client';
+      const immediate = seq
+        .filter(e => e.trigger_type === 'on_sop_start' || e.trigger_type === 'recurring')
+        .sort((a, b) => a.sort_order - b.sort_order);
+      const toSpawn = immediate.length > 0 ? immediate : [seq[0]];
+      const queue = toSpawn.map(e => {
+        const t = deliverableTemplates.find(x => x.id === e.template_id);
+        return { templateId: e.template_id, title: `${viewingSOP.name} — ${t?.name ?? 'Template'} — ${clientName}` };
+      });
 
       // Close picker, switch to wizard. The wizard mounts globally below
       // and reads its open state from `wizardOpen`.
       setRunAllPickerOpen(false);
       setIsViewOpen(false);
-      setWizardTemplateId(first.template_id);
-      setWizardInitialTitle(`${viewingSOP.name} — ${tpl?.name ?? 'Template'} — ${clientName}`);
+      setRunAllQueue(queue.slice(1));
+      setWizardTemplateId(queue[0].templateId);
+      setWizardInitialTitle(queue[0].title);
       setWizardOpen(true);
 
       // Toast describes what just happened — recurring counts are honest
@@ -515,9 +534,10 @@ export default function SOPsPage() {
         : recurringResult.skipped > 0
           ? ' Recurring bindings already in place.'
           : '';
+      const countMsg = queue.length > 1 ? `${queue.length} deliverables — one wizard each.` : 'Spawning template via wizard.';
       toast({
         title: `Run All — ${viewingSOP.name}`,
-        description: `Spawning first template via wizard.${recurringMsg}`,
+        description: `${countMsg}${recurringMsg}`,
       });
     } catch (err) {
       console.error('[Run All] failed:', err);
@@ -1763,8 +1783,16 @@ export default function SOPsPage() {
         </Dialog>
 
         <DeliverableWizard
+          // Remount per template so each Run All step starts the wizard
+          // fresh (clears the prior template's step assignments).
+          key={wizardTemplateId ?? 'none'}
           open={wizardOpen}
-          onOpenChange={setWizardOpen}
+          onOpenChange={(open) => {
+            setWizardOpen(open);
+            // Cancelling mid-chain abandons the rest of the Run All queue
+            // so it can't leak into the next wizard open.
+            if (!open) setRunAllQueue([]);
+          }}
           teamMembers={teamMembers.map(m => ({
             id: m.id,
             name: m.name,
@@ -1774,6 +1802,17 @@ export default function SOPsPage() {
           })) as any}
           clients={wizardClients}
           onCreated={() => {
+            // Run All: chain to the next queued on_sop_start template.
+            if (runAllQueue.length > 0) {
+              const [next, ...rest] = runAllQueue;
+              setRunAllQueue(rest);
+              setWizardTemplateId(next.templateId);
+              setWizardInitialTitle(next.title);
+              // wizardOpen stays true; the key change remounts the wizard
+              // for the next template.
+              toast({ title: 'Deliverable created', description: `Next up: ${next.title}` });
+              return;
+            }
             setWizardOpen(false);
             toast({
               title: 'Deliverable created',
