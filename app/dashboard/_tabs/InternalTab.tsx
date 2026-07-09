@@ -73,26 +73,6 @@ type AdHocTask = {
   client_id: string | null;
 };
 
-type MondayFormEntry = {
-  user_id: string;
-  name: string;
-  email: string | null;
-  role: string | null;
-  submitted: boolean;
-  submitted_at: string | null;
-  isLate: boolean;
-};
-
-type MondayFormStatus = {
-  formSlug: string;
-  weekOf: string;
-  deadlineHourUtc: number;
-  deadlinePassed: boolean;
-  totalTeamMembers: number;
-  submittedCount: number;
-  entries: MondayFormEntry[];
-};
-
 type Scorecard = {
   kind: 'renewal' | 'on_time' | 'composite';
   person: { id: string; name: string; photo: string | null };
@@ -127,7 +107,6 @@ type InternalPayload = {
   overdueTasks: OverdueTaskRow[];
   initiatives: Initiative[];
   adHocWork: { recentCount: number; recent: AdHocTask[] };
-  mondayForm: MondayFormStatus;
 };
 
 const initiativeTone: Record<Initiative['tone'], BadgeTone> = {
@@ -459,10 +438,11 @@ export default function InternalTab() {
         </Card>
       </div>
 
-      {/* [2026-07-06] Monday Check-In card removed per Andy ('remove
-          monday form entirely from dashboard and notifications for now').
-          Data plumbing (internal route mondayForm field, lib/dashboard/
-          monday-form.ts) left intact for easy restore. */}
+      {/* [2026-07-09 DP.11] Monday Form v2 fully retired (Daily Pulse Bot
+          spec § "What it replaces" — wins moved to the Friday DM). Card
+          was removed 2026-07-06; the data plumbing + lib/dashboard/
+          monday-form.ts + the dead chip/summary route are now gone too.
+          Historical form submissions remain in the DB (archived). */}
       </div>
 
       {/* ── 03 Strategy ─────────────────────────────────────────────── */}

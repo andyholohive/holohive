@@ -17,7 +17,6 @@
 import { NextResponse } from 'next/server';
 import { adminSupabase, getStandardClients, getRelevantClients, overdueToneFor } from '@/lib/dashboard/queries';
 import { getDashboardConfig } from '@/lib/dashboard/config';
-import { getMondayFormStatus, MONDAY_FORM_SLUG } from '@/lib/dashboard/monday-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,7 +52,6 @@ export async function GET() {
       initiativeLinkedTasksRes,
       initiativeMilestonesRes,
       usersRes,
-      mondayFormStatus,
       quarterTasksRes,
     ] = await Promise.all([
       getStandardClients(sb),
@@ -92,7 +90,6 @@ export async function GET() {
       (sb as any)
         .from('users')
         .select('id, name, role, profile_photo_url'),
-      getMondayFormStatus(sb, cfg.form_deadline_hour_utc),
       // [2026-07-02] Current-quarter task set for the quarterly overdue
       // rollup that feeds Jaymz + Quazo scorecards and the Overdue panel.
       // Fetches BOTH open and completed tasks with due_date in the quarter
@@ -666,10 +663,6 @@ export async function GET() {
           created_at: t.created_at,
           client_id: t.client_id,
         })),
-      },
-      mondayForm: {
-        ...mondayFormStatus,
-        formSlug: MONDAY_FORM_SLUG,
       },
     };
 

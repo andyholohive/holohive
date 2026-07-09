@@ -6,6 +6,7 @@ import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
 import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
 import { triggerKolScan } from '@/lib/githubActions';
 import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
+import { classifyReply, isFridayUTC, pulseDateFor, PULSE_CUTOFF_HOUR_UTC } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
 
@@ -3566,6 +3567,73 @@ async function uploadTelegramPhotoToBacklog(
 /**
  * Handle incoming message from Telegram
  */
+/**
+ * Daily Pulse reply capture (DP.5/DP.6/DP.9).
+ *
+ * Gated hard so ordinary bot traffic never becomes a phantom blocker:
+ * only a private DM, from a roster member, who was prompted today,
+ * before the 12:00 UTC cutoff, and NOT a slash command (those are
+ * handled by handleCommand and must never count). Classifies the reply
+ * (clear / blocked / Friday win) and updates today's daily_pulse row.
+ * Win and blocker are independent axes — a Friday reply can set both.
+ * Returns true if it consumed the message as a pulse reply.
+ */
+async function handleDailyPulseReply(message: any): Promise<boolean> {
+  try {
+    if (message.chat?.type !== 'private') return false;
+    const fromId = message.from?.id?.toString();
+    if (!fromId) return false;
+    const rawText = (message.text || '').trim();
+    if (!rawText || rawText.startsWith('/')) return false; // commands never count
+
+    const now = new Date();
+    if (now.getUTCHours() >= PULSE_CUTOFF_HOUR_UTC) return false; // past the digest cutoff
+
+    // Roster membership: resolve by immutable telegram_id.
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('telegram_id', fromId)
+      .maybeSingle();
+    if (!user) return false;
+
+    // Must have been prompted today (the DM cron seeds the row + prompted_at).
+    const pulseDate = pulseDateFor(now);
+    const { data: row } = await supabaseAdmin
+      .from('daily_pulse')
+      .select('id, prompted_at, win_text')
+      .eq('pulse_date', pulseDate)
+      .eq('user_id', (user as any).id)
+      .maybeSingle();
+    if (!row || !(row as any).prompted_at) return false;
+
+    const friday = isFridayUTC(now);
+    const cls = classifyReply(rawText, friday);
+    // Preserve an earlier win if this message didn't restate one.
+    const winText = cls.winText ?? (row as any).win_text ?? null;
+
+    await supabaseAdmin
+      .from('daily_pulse')
+      .update({
+        status: cls.status,
+        blocker_text: cls.status === 'blocked' ? cls.blockerText : null,
+        win_text: winText,
+        replied_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      })
+      .eq('id', (row as any).id);
+
+    // Ack so the member knows it registered (and doesn't re-send).
+    let ack = cls.status === 'clear' ? '✅ logged — clear' : '✅ logged';
+    if (winText) ack += ' · win noted 🎉';
+    await sendTelegramMessage(message.chat.id.toString(), ack, 'HTML');
+    return true;
+  } catch (err) {
+    console.error('[Daily Pulse] reply capture failed:', err);
+    return false;
+  }
+}
+
 async function handleMessage(message: any) {
   const chatId = message.chat?.id?.toString();
   const chatTitle = message.chat?.title;
@@ -3590,6 +3658,10 @@ async function handleMessage(message: any) {
     const args = parts.slice(1);
     await handleCommand(chatId, command, args, message);
   }
+
+  // Daily Pulse reply capture (self-gates on private DM + roster member +
+  // prompted-today + pre-cutoff + non-command). Cheap no-op otherwise.
+  await handleDailyPulseReply(message);
 
   // Track all chat types (groups, supergroups, and private DMs)
   // For DMs, use the user's name as the title

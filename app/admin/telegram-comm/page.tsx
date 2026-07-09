@@ -28,8 +28,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2, Activity, AlarmClock, Clock,
+  CheckCircle2, Activity, AlarmClock, Clock, Sunrise,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -562,6 +563,9 @@ export default function LineupSettingsPage() {
 
       {/* ─── New KOL Join & Scan Prompt section [2026-07-06] ─── */}
       <NewKolAlertChannelSection />
+
+      {/* ─── Daily Pulse section [2026-07-09] ─── */}
+      <DailyPulseChannelSection />
     </div>
   );
 }
@@ -1150,6 +1154,133 @@ function ContentReviewChannelSection() {
 }
 
 // ─── "When it sends" info line ────────────────────────────────────────
+
+/**
+ * DailyPulseChannelSection — configures the Daily Pulse Bot (DP.2).
+ * Two things: the digest destination (ChatThreadPicker → app_settings
+ * daily_pulse_digest_chat_id + daily_pulse_digest_thread_id) and the
+ * roster of team members DM'd each morning (checkbox list →
+ * daily_pulse_roster, a JSON array of user ids). Members with no linked
+ * Telegram can't be DM'd, so they're shown disabled.
+ */
+function DailyPulseChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [savedRoster, setSavedRoster] = useState<string[]>([]);
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+  const [roster, setRoster] = useState<string[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting, rosterSetting, usersRes] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'daily_pulse_digest_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'daily_pulse_digest_thread_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'daily_pulse_roster').maybeSingle(),
+          (supabase as any).from('users').select('id, email, name, telegram_id, telegram_username, role').order('name'),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        let r: string[] = [];
+        try { const parsed = JSON.parse((rosterSetting.data as any)?.value ?? '[]'); if (Array.isArray(parsed)) r = parsed.map(String); } catch { r = []; }
+        setSavedChatId(c); setSavedThreadId(t); setSavedRoster(r);
+        setChatId(c); setThreadId(t); setRoster(r);
+        setUsers(((usersRes.data as UserRow[]) ?? []));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const rosterDirty = roster.length !== savedRoster.length || roster.some(id => !savedRoster.includes(id));
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId || rosterDirty;
+  const toggleMember = (id: string) => setRoster(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any).from('app_settings').upsert({ key: 'daily_pulse_digest_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any).from('app_settings').upsert({ key: 'daily_pulse_digest_thread_id', value: threadId || null }, { onConflict: 'key' });
+      await (supabase as any).from('app_settings').upsert({ key: 'daily_pulse_roster', value: JSON.stringify(roster) }, { onConflict: 'key' });
+      setSavedChatId(chatId); setSavedThreadId(threadId); setSavedRoster(roster);
+      toast({ title: 'Daily Pulse saved', description: `${roster.length} member${roster.length === 1 ? '' : 's'} on the roster.` });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const ready = !!savedChatId && savedRoster.length > 0;
+
+  return (
+    <CollapsibleSection
+      icon={Sunrise}
+      title="Daily Pulse"
+      badge={!loading
+        ? (ready
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Live</span></StatusBadge>
+            : <StatusBadge tone="neutral" size="sm">Needs setup</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Morning blocker check-in. Each roster member is DM&#39;d at 06:00 UTC (Fridays also ask for one win); a shared digest posts to this channel at 12:00 UTC. Needs a digest channel and at least one roster member.</>
+      )}
+    >
+      <WhenItSends>
+        DMs fire daily at 06:00 UTC. The digest posts once at 12:00 UTC (Mon–Fri).
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => { setChatId(nextChat); setThreadId(nextThread); }}
+                label="Digest destination"
+                disabled={saving}
+              />
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Roster</Label>
+                <p className="text-xs text-gray-500 mt-1 mb-2">Team members DM&#39;d each morning. Members with no linked Telegram can&#39;t be added.</p>
+                <div className="space-y-1 max-h-64 overflow-y-auto rounded-lg border border-cream-200 p-2">
+                  {users.length === 0 ? (
+                    <p className="text-xs text-gray-400 px-1 py-2">No team members found.</p>
+                  ) : users.map(u => {
+                    const linked = !!u.telegram_id;
+                    const checked = roster.includes(u.id);
+                    return (
+                      <label key={u.id} className={`flex items-center gap-2 px-1.5 py-1 rounded ${linked ? 'cursor-pointer hover:bg-cream-50' : 'opacity-50 cursor-not-allowed'}`}>
+                        <Checkbox checked={checked} disabled={!linked || saving} onCheckedChange={() => { if (linked) toggleMember(u.id); }} />
+                        <span className="text-sm text-ink-warm-800">{u.name || u.email}</span>
+                        {u.telegram_username && <span className="text-xs text-gray-400">@{u.telegram_username}</span>}
+                        {!linked && <span className="ml-auto text-[10px] text-gray-400">no Telegram</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
 
 /**
  * Per Andy 2026-07-06: every Telegram Comm section states plainly WHEN
