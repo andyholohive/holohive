@@ -125,6 +125,30 @@ export default function CampaignsPage() {
     }
   }, [addParam, clientIdParam, userProfile]);
 
+  // Auto-prefill the new campaign's start date from the selected client's
+  // engagement. Prefer the active stint's start (the current engagement the
+  // campaign belongs to); fall back to the most recent stint. Editable after —
+  // the campaign's END is derived from stint coverage, so only start is stored.
+  useEffect(() => {
+    const cid = newCampaign.client_id;
+    if (!cid) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('client_stints')
+        .select('start_date, status')
+        .eq('client_id', cid)
+        .order('start_date', { ascending: false });
+      if (cancelled || !data || data.length === 0) return;
+      const active = (data as Array<{ start_date: string | null; status: string | null }>)
+        .find((s) => s.status === 'active');
+      const chosen = active?.start_date || data[0]?.start_date;
+      if (chosen) setNewCampaign((prev) => ({ ...prev, start_date: chosen }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newCampaign.client_id]);
+
   const fetchAvailableClients = async () => {
     try {
       const clients = await ClientService.getClientsForUser(userProfile!.role as 'admin' | 'member' | 'client', user!.id);
@@ -723,76 +747,42 @@ export default function CampaignsPage() {
                       </Select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="start-date">Start Date <span className="text-rose-500">*</span></Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                            style={{
-                              borderColor: "#e5e7eb",
-                              backgroundColor: "white",
-                              color: newCampaign.start_date ? "#111827" : "#9ca3af"
-                            }}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {newCampaign.start_date ? formatDate(newCampaign.start_date) : "Select start date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={parseDateFromInput(newCampaign.start_date)}
-                            onSelect={(date) => setNewCampaign({ ...newCampaign, start_date: formatDateForInput(date) })}
-                            initialFocus
-                            classNames={{
-                              day_selected: "text-white hover:text-white focus:text-white",
-                            }}
-                            modifiersStyles={{
-                              selected: { backgroundColor: "#3e8692" }
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="end-date">End Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                            style={{
-                              borderColor: "#e5e7eb",
-                              backgroundColor: "white",
-                              color: newCampaign.end_date ? "#111827" : "#9ca3af"
-                            }}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {newCampaign.end_date ? formatDate(newCampaign.end_date) : "Select end date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={parseDateFromInput(newCampaign.end_date)}
-                            onSelect={(date) => setNewCampaign({ ...newCampaign, end_date: formatDateForInput(date) })}
-                            disabled={(date) =>
-                              newCampaign.start_date ? date < parseDateFromInput(newCampaign.start_date)! : false
-                            }
-                            initialFocus
-                            classNames={{
-                              day_selected: "text-white hover:text-white focus:text-white",
-                            }}
-                            modifiersStyles={{
-                              selected: { backgroundColor: "#3e8692" }
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="start-date">Start Date <span className="text-rose-500">*</span></Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
+                          style={{
+                            borderColor: "#e5e7eb",
+                            backgroundColor: "white",
+                            color: newCampaign.start_date ? "#111827" : "#9ca3af"
+                          }}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newCampaign.start_date ? formatDate(newCampaign.start_date) : "Select start date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={parseDateFromInput(newCampaign.start_date)}
+                          onSelect={(date) => setNewCampaign({ ...newCampaign, start_date: formatDateForInput(date) })}
+                          initialFocus
+                          classNames={{
+                            day_selected: "text-white hover:text-white focus:text-white",
+                          }}
+                          modifiersStyles={{
+                            selected: { backgroundColor: "#3e8692" }
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-gray-500">
+                      Auto-filled from the client&apos;s engagement when available — editable. The
+                      end date is derived from the engagement (stint coverage), so it isn&apos;t set here.
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="description">Description (Optional) - Client Facing</Label>
