@@ -1087,6 +1087,10 @@ export function KolDashboardTableView({
                             </div>
                           </TableHead>
                           */}
+                          {/* Style — AI-inferred posting-style summary
+                              (master_kols.style_summary), read-only. Same
+                              "Style" field as the KOL Profile popup + Cards. */}
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Style</TableHead>
                           {/* Section 5 — Profile column. Client-facing
                               one-line bio per KOL per campaign. Double-
                               click to edit, same UX as Notes. Self-hides
@@ -1101,7 +1105,7 @@ export function KolDashboardTableView({
                       <TableBody className="bg-white">
                         {filteredKOLs.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={12} className="text-center py-12">
+                            <TableCell colSpan={13} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center text-ink-warm-500">
                                 <Users className="h-12 w-12 mb-4 text-ink-warm-300" />
                                 <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -1425,6 +1429,16 @@ export function KolDashboardTableView({
                                     </div>
                                   </TableCell>
                                   */}
+                                  {/* Style — read-only AI-inferred posting
+                                      style (master_kols.style_summary). */}
+                                  <TableCell
+                                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 align-middle overflow-hidden`}
+                                    style={{ width: '20%' }}
+                                  >
+                                    <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={(campaignKOL.master_kol as any)?.style_summary || ''}>
+                                      {(campaignKOL.master_kol as any)?.style_summary || <span className="text-ink-warm-400 italic">—</span>}
+                                    </div>
+                                  </TableCell>
                                   {/* Section 5 — Profile note cell.
                                       Mirrors Notes UX exactly so muscle
                                       memory carries over (double-click

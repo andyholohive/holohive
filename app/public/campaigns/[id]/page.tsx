@@ -2097,6 +2097,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 {sortIcon(kolSort.key === 'content_count', kolSort.dir)}
                               </button>
                             </TableHead>
+                            {/* Style — AI-inferred posting-style summary. */}
+                            <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Style</TableHead>
                             {campaign?.share_kol_notes && (
                               <TableHead className="relative select-none py-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
                             )}
@@ -2105,7 +2107,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <TableBody className="bg-white">
                           {sortedKOLs.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={(campaign?.share_creator_type ? 11 : 10) + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
+                              <TableCell colSpan={(campaign?.share_creator_type ? 11 : 10) + 1 + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
                                 <div className="flex flex-col items-center justify-center text-ink-warm-500">
                                   <Users className="h-12 w-12 mb-4 text-ink-warm-300" />
                                   <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -2239,6 +2241,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center`}>
                                     <div className="font-medium text-ink-warm-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
+                                    </div>
+                                  </TableCell>
+                                  {/* Style — AI-inferred posting-style summary. */}
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
+                                    <div className="text-sm text-ink-warm-700 max-w-xs whitespace-pre-wrap" title={campaignKOL.master_kol.style_summary || ''}>
+                                      {campaignKOL.master_kol.style_summary || <span className="text-ink-warm-400 italic">-</span>}
                                     </div>
                                   </TableCell>
                                   {campaign?.share_kol_notes && (
