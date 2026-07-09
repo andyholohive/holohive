@@ -162,7 +162,10 @@ export async function POST(
     receiptEdited = !!(res && (res as Response).ok);
   }
 
-  if (!receiptEdited) {
+  // Approve never sends a second message — it only edits the receipt (above).
+  // If there was no receipt to edit (legacy rows), stay silent. Reject still
+  // sends its own message so the KOL knows to fix + resubmit.
+  if (action === 'reject') {
     const { data: kolChat } = await (adminClient as any)
       .from('telegram_chats')
       .select('chat_id')
@@ -172,15 +175,12 @@ export async function POST(
       .maybeSingle();
     const kolChatId = (kolChat as any)?.chat_id ?? null;
     if (kolChatId && botToken) {
-      const text = action === 'approve'
-        ? '👍'
-        : `Submission issue: <i>${rejectionReason}</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`;
       await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: kolChatId,
-          text,
+          text: `Submission issue: <i>${rejectionReason}</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`,
           parse_mode: 'HTML',
         }),
       }).catch(() => {/* best effort */});
