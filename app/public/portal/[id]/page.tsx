@@ -50,10 +50,17 @@ import {
 import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
 import { formatDate as fmtDate, formatRelativeShort } from '@/lib/dateFormat';
+import { getCampaignWeek, getTotalCampaignWeeks } from '@/lib/campaignWeekHelpers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
+// [2026-07-09] Read-only anon client for the public portal — no auth
+// session. persistSession:false keeps it out of GoTrue storage so it
+// doesn't collide with the app's cookie browser client (lib/supabase),
+// which triggered the "Multiple GoTrueClient instances" console warning.
+const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 type Client = {
   id: string;
@@ -267,6 +274,29 @@ const getStatusBadge = (status: string) => {
 
 const stripHtml = (html: string) => {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+};
+
+// [2026-07-09] Client-facing file title. Storage keys look like
+// "1772646558355-7s3j6f.pdf" (timestamp-hash), which is ugly and
+// meaningless to a client. Strip the upload prefix; if what remains is
+// just a random hash, fall back to a friendly type name by extension.
+const friendlyFileTitle = (fileName: string): string => {
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+  const typeName =
+    ext === 'pdf' ? 'PDF Document'
+    : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext) ? 'Image'
+    : ['doc', 'docx'].includes(ext) ? 'Word Document'
+    : ['xls', 'xlsx', 'csv'].includes(ext) ? 'Spreadsheet'
+    : ['ppt', 'pptx'].includes(ext) ? 'Presentation'
+    : 'Attachment';
+  const base = fileName
+    .replace(/\.[^.]+$/, '')        // drop extension
+    .replace(/^\d{8,}[-_]/, '')     // drop leading upload timestamp prefix
+    .replace(/[-_]+/g, ' ')
+    .trim();
+  // A bare random hash (no spaces, short) isn't a real name → use type.
+  const looksLikeHash = base.length > 0 && base.length <= 12 && !base.includes(' ');
+  return base && !looksLikeHash ? base : typeName;
 };
 
 // [Campaign Live v1] Pull "@handle" out of a profile URL.
@@ -1452,9 +1482,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // stay in onboarding mode than render a stub.
   const isCampaignLiveMode = allMilestonesComplete && !!activeCampaign;
 
-  // Week math for the hero. Pure (today − start) / (end − start). Spec
-  // explicitly says continuous progress bar + "Week X of Y" label —
-  // not a countdown, not a percent ring.
+  // Week math for the hero. Week number + total both come from the
+  // canonical Monday-anchored helper in lib/campaignWeekHelpers.ts so
+  // the portal and the campaign page agree — Week 1 = first Monday
+  // on/after start_date. (Was raw ceil((today-start)/7d) here, which
+  // ran one week ahead of the campaign page.) The progress bar stays
+  // date-based for smoothness.
   const campaignWeekInfo = useMemo(() => {
     if (!activeCampaign?.start_date || !activeCampaign?.end_date) return null;
     const start = new Date(activeCampaign.start_date + 'T00:00:00').getTime();
@@ -1462,10 +1495,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     const now = Date.now();
     const totalMs = end - start;
     if (totalMs <= 0) return null;
-    const elapsedMs = Math.max(0, Math.min(totalMs, now - start));
-    const progressPct = (elapsedMs / totalMs) * 100;
-    const totalWeeks = Math.max(1, Math.ceil(totalMs / (7 * 24 * 60 * 60 * 1000)));
-    const currentWeek = Math.max(1, Math.min(totalWeeks, Math.ceil(elapsedMs / (7 * 24 * 60 * 60 * 1000)) || 1));
+    const progressPct = (Math.max(0, Math.min(totalMs, now - start)) / totalMs) * 100;
+    const wk = getCampaignWeek(activeCampaign.start_date);
+    const totalWeeks = Math.max(1, getTotalCampaignWeeks(activeCampaign.start_date, activeCampaign.end_date));
+    const currentWeek = wk ? Math.min(totalWeeks, wk.weekNumber) : 1;
     return { progressPct, currentWeek, totalWeeks };
   }, [activeCampaign?.start_date, activeCampaign?.end_date]);
 
@@ -2314,11 +2347,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   {renderTrend(statsTrends?.contentLiveDelta ?? null, 'raw')}
                 </CardContent>
               </Card>
-              {/* 3. Impressions — % delta ("↑ 18%") */}
+              {/* 3. Views — % delta ("↑ 18%"). [2026-07-09] Label
+                  standardized to "Views" to match the campaign page
+                  (same underlying number was "Impressions" here). */}
               <Card className="border border-gray-200 shadow-lg rounded-xl overflow-hidden">
                 <CardContent className="p-5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                    Impressions
+                    Views
                   </p>
                   <p className="text-3xl font-bold text-gray-900">{formatNumber(activeStats.impressions)}</p>
                   {renderTrend(statsTrends?.impressionsPctDelta ?? null, 'pct')}
@@ -2382,19 +2417,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             }`}
                           />
                           <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                            {/* [2026-06-11] Done items get strikethrough +
-                                muted color so the eye can scan past them
-                                to the still-pending work. Clients screen-
-                                shot this card; the visual contrast also
-                                makes the "progress this week" story read
-                                in a single glance. */}
-                            <p
-                              className={`text-sm leading-none ${
-                                it.status === 'done'
-                                  ? 'text-gray-400 line-through'
-                                  : 'text-gray-900'
-                              }`}
-                            >
+                            {/* [2026-07-09 per Andy] No strikethrough — it
+                                read as cancelled/done to clients. The dot
+                                color (emerald = done, orange = pending) is
+                                now the only status signal; the text stays
+                                fully legible for every item. */}
+                            <p className="text-sm leading-none text-gray-900">
                               {it.text}
                             </p>
                             {it.dateLabel && (
@@ -2887,8 +2915,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             from when mindshare was test-only); decoupled because the
             content here (scope, contacts, start date) is general
             client info and has nothing to do with the mindshare
-            tracker block below. */}
-        {(clientContext || linkedCRMAccount) && (
+            tracker block below.
+            [2026-07-09] Gate on real BODY content (scope or contacts),
+            not just clientContext/CRM existence — otherwise the card
+            rendered as a lone header + "Since" date with nothing under
+            it, which read as broken. */}
+        {(linkedCRMAccount?.scope || clientContext?.scope || clientContext?.holohive_contacts) && (
           <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -3315,8 +3347,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                 {isImage ? <ImageIcon className="h-4 w-4" /> : <File className="h-4 w-4" />}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-800 truncate">{att.fileName}</p>
-                                <p className="text-xs text-gray-400">{att.label}</p>
+                                {/* [2026-07-09] Clean title instead of the raw
+                                    storage key; subtitle is the file type, NOT
+                                    the internal onboarding-checklist field label
+                                    (which was leaking to the client). */}
+                                <p className="text-sm font-medium text-gray-800 truncate">{friendlyFileTitle(att.fileName)}</p>
+                                <p className="text-xs text-gray-400 uppercase tracking-wide">{ext || 'file'}</p>
                               </div>
                               <ExternalLink className="h-4 w-4 text-gray-400 flex-shrink-0" />
                             </a>

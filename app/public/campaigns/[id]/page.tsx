@@ -38,7 +38,14 @@ const KOL_STATUS_TONES: Record<string, BadgeTone> = {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
+// [2026-07-09] This is a read-only anon client for the public campaign
+// page — it never signs anyone in. Disabling session persistence gives it
+// its own GoTrue namespace so it doesn't collide with the app's cookie
+// browser client (lib/supabase), which was throwing the console warning
+// "Multiple GoTrueClient instances detected in the same browser context".
+const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 type Campaign = {
   id: string;
@@ -3376,35 +3383,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <KpiCard icon={Bookmark}      label="Saves"      value={formatFollowers(contentTotals.saves)}      accent="emerald" />
                       </div>
 
-                      {/* Value Anchor — Spec section 10. One factual
-                          line sitting below the stat cards, deliberately
-                          plain so it reads as evidence rather than a
-                          marketing claim. Shows total views + budget.
-                          Auto-hidden in showcase mode when the budget
-                          mask is on (Section 10: "Hidden automatically
-                          in showcase mode when budget is hidden"). */}
-                      {!mask.budget && campaign?.total_budget && campaign.total_budget > 0 && (() => {
-                        const totalViews = contentTotals.views;
-                        if (totalViews === 0) return null;
-                        // 57945 → "57.9K", 1245000 → "1.2M". Spec
-                        // example uses "57.9K" so we match that
-                        // shorthand format rather than full
-                        // toLocaleString.
-                        const formatShort = (n: number): string => {
-                          if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-                          if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
-                          return n.toLocaleString();
-                        };
-                        const budgetFmt = `$${campaign.total_budget.toLocaleString()}`;
-                        return (
-                          <p className="text-sm text-ink-warm-700 italic">
-                            <span className="font-semibold text-ink-warm-900 not-italic">{formatShort(totalViews)} views</span>
-                            {' '}delivered against a{' '}
-                            <span className="font-semibold text-ink-warm-900 not-italic">{budgetFmt}</span>
-                            {' '}engagement.
-                          </p>
-                        );
-                      })()}
+                      {/* [2026-07-09 per Andy] "Value Anchor" line removed —
+                          the "92.1K views delivered against a $15,000
+                          engagement" copy read as nonsense to clients. */}
 
                       {/* Average Engagement Rate — single-stat panel,
                           matching the internal ContentDashboardOverview. */}
