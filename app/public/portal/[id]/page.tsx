@@ -347,6 +347,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // Uploaded Files), with a Show-all toggle.
   const [showAllForms, setShowAllForms] = useState(false);
   const [showAllFiles, setShowAllFiles] = useState(false);
+  const [showAllLinks, setShowAllLinks] = useState(false);
   const [clientCoveredThrough, setClientCoveredThrough] = useState<string | null>(null);
   const [clientBudgetTotal, setClientBudgetTotal] = useState<number | null>(null);
   useEffect(() => {
@@ -3316,7 +3317,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   )}
                   {clientLinks.length > 0 && (
                     <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url) ? 'mt-4 space-y-3' : 'space-y-3'}>
-                      {clientLinks.map(link => (
+                      {(showAllLinks ? clientLinks : clientLinks.slice(0, 4)).map(link => (
                         <a
                           key={link.id}
                           href={link.url}
@@ -3334,6 +3335,15 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
                       ))}
+                      {clientLinks.length > 4 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllLinks(v => !v)}
+                          className="w-full text-center text-xs font-medium text-brand hover:text-brand-dark py-1.5"
+                        >
+                          {showAllLinks ? 'Show less' : `Show all ${clientLinks.length}`}
+                        </button>
+                      )}
                     </div>
                   )}
                   {formAttachments.length > 0 && (
