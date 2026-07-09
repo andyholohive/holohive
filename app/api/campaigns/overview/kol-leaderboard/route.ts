@@ -82,14 +82,20 @@ export async function GET(request: Request) {
   const reuseAmberMinClients = cfg.overview_reuse_amber_min_clients ?? 3;
   const top10AmberPct = cfg.overview_top10_concentration_amber_pct ?? 40;
 
-  // Test/sandbox campaigns are excluded from the overview entirely — their
-  // contents don't count toward KOL metrics and a KOL that only appears in
-  // test campaigns is dropped from the leaderboard.
-  const { data: testCampaignsRaw } = await (admin as any)
+  // Test/sandbox AND archived campaigns are excluded from the overview
+  // entirely — their contents don't count toward KOL metrics and a KOL that
+  // only appears in them is dropped from the leaderboard. Archived campaigns
+  // are hidden everywhere else in the app, so the all-time pool must match:
+  // otherwise dummy/legacy posts (e.g. an archived "Holo Hive Test Campaign"
+  // seeded with a single 100K-view row) crown a KOL at #1. Real completed
+  // campaigns stay archived_at NULL (status Completed), so nothing legit is
+  // lost. [2026-07-09] — supersedes the narrower 2026-07-05 rule that let
+  // archived posted content through as "historical activation".
+  const { data: excludedCampaignsRaw } = await (admin as any)
     .from('campaigns')
     .select('id')
-    .eq('is_test', true);
-  const testCampaignIds = new Set<string>(((testCampaignsRaw ?? []) as Array<{ id: string }>).map(c => c.id));
+    .or('is_test.eq.true,archived_at.not.is.null');
+  const excludedCampaignIds = new Set<string>(((excludedCampaignsRaw ?? []) as Array<{ id: string }>).map(c => c.id));
 
   // 2. All-time contents (posted only, deduped by multipost_group_id).
   // Content platform is the axis per Q5 default — a multi-platform KOL
@@ -108,7 +114,7 @@ export async function GET(request: Request) {
   const bestByGroup = new Map<string, any>();
   const nonGrouped: any[] = [];
   for (const c of (contentRows ?? []) as any[]) {
-    if (c.campaign_id && testCampaignIds.has(c.campaign_id)) continue; // drop test-campaign contents
+    if (c.campaign_id && excludedCampaignIds.has(c.campaign_id)) continue; // drop test/archived-campaign contents
     if (c.multipost_group_id) {
       const prev = bestByGroup.get(c.multipost_group_id);
       if (!prev || (c.impressions ?? 0) > (prev.impressions ?? 0)) {
@@ -129,7 +135,7 @@ export async function GET(request: Request) {
   const campaignsByKolId = new Map<string, Set<string>>();
   for (const ck of (campaignKols ?? []) as Array<{ id: string; master_kol_id: string | null; campaign_id: string; hidden: boolean | null; deleted_at: string | null }>) {
     if (!ck.master_kol_id || ck.hidden || ck.deleted_at) continue;
-    if (testCampaignIds.has(ck.campaign_id)) continue; // KOLs only in test campaigns drop out
+    if (excludedCampaignIds.has(ck.campaign_id)) continue; // KOLs only in test/archived campaigns drop out
     kolIdByCampaignKolsId.set(ck.id, ck.master_kol_id);
     if (!campaignsByKolId.has(ck.master_kol_id)) campaignsByKolId.set(ck.master_kol_id, new Set());
     campaignsByKolId.get(ck.master_kol_id)!.add(ck.campaign_id);
