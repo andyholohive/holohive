@@ -16,7 +16,6 @@ import {
   DollarSign,
   Users,
   BarChart3,
-  Search,
   ExternalLink,
   FileText,
   TrendingUp,
@@ -2169,15 +2168,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 <div className="bg-white px-6 sm:px-8 pt-6 pb-4 border-b border-gray-100">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle className="text-lg font-bold text-gray-900">Your Campaigns</CardTitle>
-                    <div className="relative w-full sm:w-72">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Search campaigns..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 focus-brand rounded-lg"
-                      />
-                    </div>
                   </div>
                 </div>
                 <CardContent className="p-6">
@@ -3597,15 +3587,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           <CardHeader className="bg-white border-b border-gray-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-lg font-bold text-gray-900">Your Campaigns</CardTitle>
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search campaigns..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 focus-brand rounded-lg"
-                />
-              </div>
             </div>
           </CardHeader>
           <CardContent className="p-6">
