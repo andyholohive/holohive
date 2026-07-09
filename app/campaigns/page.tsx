@@ -1409,8 +1409,13 @@ export default function CampaignsPage() {
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
                     <TableCell className="py-3.5 px-5 text-ink-warm-700 text-sm tabular-nums">
+                      {/* [2026-07-09] End = engagement TERM end (client
+                          covered_through), falling back to campaign end_date. */}
                       {formatDate(campaign.start_date)}
-                      {campaign.end_date ? ` – ${formatDate(campaign.end_date)}` : ''}
+                      {(() => {
+                        const termEnd = campaign.client_covered_through ?? campaign.end_date;
+                        return termEnd ? ` – ${formatDate(termEnd)}` : '';
+                      })()}
                     </TableCell>
                     {/* [Phase hidden everywhere] Inline Phase cell gated
                         off — must stay in lockstep with the header above

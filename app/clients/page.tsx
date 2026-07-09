@@ -41,6 +41,7 @@ import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
+import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import { EngagementTab } from '@/components/clients/EngagementTab';
 import dynamic from 'next/dynamic';
@@ -4665,16 +4666,10 @@ export default function ClientsPage() {
                       const active = milestones.find(m => m.status === 'active');
                       const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-                      // Week-N derivation. ISO week starts on Monday but for
-                      // an engagement timeline, "Week 1" is the calendar
-                      // week of the start date, regardless of weekday — so
-                      // ceil(days/7), min 1.
-                      const weekN = (() => {
-                        if (!ctx?.start_date) return null;
-                        const start = new Date(ctx.start_date + 'T00:00:00');
-                        const days = Math.floor((Date.now() - start.getTime()) / (24 * 60 * 60 * 1000));
-                        return Math.max(1, Math.ceil((days + 1) / 7));
-                      })();
+                      // [2026-07-09] Week-N via the canonical Monday-anchored
+                      // helper (getCampaignWeek) so the clients card, the
+                      // client portal, and the campaign tracker all agree.
+                      const weekN = getCampaignWeek(ctx?.start_date)?.weekNumber ?? null;
 
                       const pendingClientTaskItems = (clientActionItems[client.id] || []).filter(
                         i => i.court === 'yours' && !i.is_done && !i.is_hidden,
