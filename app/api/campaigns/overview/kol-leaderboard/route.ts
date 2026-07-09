@@ -82,6 +82,15 @@ export async function GET(request: Request) {
   const reuseAmberMinClients = cfg.overview_reuse_amber_min_clients ?? 3;
   const top10AmberPct = cfg.overview_top10_concentration_amber_pct ?? 40;
 
+  // Test/sandbox campaigns are excluded from the overview entirely — their
+  // contents don't count toward KOL metrics and a KOL that only appears in
+  // test campaigns is dropped from the leaderboard.
+  const { data: testCampaignsRaw } = await (admin as any)
+    .from('campaigns')
+    .select('id')
+    .eq('is_test', true);
+  const testCampaignIds = new Set<string>(((testCampaignsRaw ?? []) as Array<{ id: string }>).map(c => c.id));
+
   // 2. All-time contents (posted only, deduped by multipost_group_id).
   // Content platform is the axis per Q5 default — a multi-platform KOL
   // shows in both filters with different metrics.
@@ -99,6 +108,7 @@ export async function GET(request: Request) {
   const bestByGroup = new Map<string, any>();
   const nonGrouped: any[] = [];
   for (const c of (contentRows ?? []) as any[]) {
+    if (c.campaign_id && testCampaignIds.has(c.campaign_id)) continue; // drop test-campaign contents
     if (c.multipost_group_id) {
       const prev = bestByGroup.get(c.multipost_group_id);
       if (!prev || (c.impressions ?? 0) > (prev.impressions ?? 0)) {
@@ -119,6 +129,7 @@ export async function GET(request: Request) {
   const campaignsByKolId = new Map<string, Set<string>>();
   for (const ck of (campaignKols ?? []) as Array<{ id: string; master_kol_id: string | null; campaign_id: string; hidden: boolean | null; deleted_at: string | null }>) {
     if (!ck.master_kol_id || ck.hidden || ck.deleted_at) continue;
+    if (testCampaignIds.has(ck.campaign_id)) continue; // KOLs only in test campaigns drop out
     kolIdByCampaignKolsId.set(ck.id, ck.master_kol_id);
     if (!campaignsByKolId.has(ck.master_kol_id)) campaignsByKolId.set(ck.master_kol_id, new Set());
     campaignsByKolId.get(ck.master_kol_id)!.add(ck.campaign_id);

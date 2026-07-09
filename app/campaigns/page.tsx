@@ -93,6 +93,7 @@ export default function CampaignsPage() {
     intro_call_date: undefined as string | undefined,
     budgetAllocations: [] as { region: string; amount: string }[],
     manager: "",
+    is_test: false,
   });
 
   const router = useRouter();
@@ -237,6 +238,7 @@ export default function CampaignsPage() {
         intro_call: newCampaign.intro_call,
         intro_call_date: newCampaign.intro_call_date || null,
         manager: newCampaign.manager || null,
+        is_test: newCampaign.is_test,
         approved_emails: teamEmails.length > 0 ? teamEmails : undefined,
       });
       setNewCampaign({
@@ -254,6 +256,7 @@ export default function CampaignsPage() {
         intro_call_date: undefined,
         budgetAllocations: [],
         manager: user?.id || "",
+        is_test: false,
       });
       setIsNewCampaignOpen(false);
       await fetchCampaigns();
@@ -880,6 +883,14 @@ export default function CampaignsPage() {
                         )}
                       </div>
                     )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is_test"
+                      checked={newCampaign.is_test}
+                      onCheckedChange={(checked) => setNewCampaign({ ...newCampaign, is_test: checked as boolean })}
+                    />
+                    <Label htmlFor="is_test" className="text-sm">Test campaign <span className="text-ink-warm-400 font-normal">— hidden from Campaign Overview + KOL data</span></Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox

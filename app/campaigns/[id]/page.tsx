@@ -1079,19 +1079,26 @@ const CampaignDetailsPage = () => {
   // visible rename path. Non-guest only. [2026-07-09]
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+  const [renameIsTest, setRenameIsTest] = useState(false);
   const [renameSaving, setRenameSaving] = useState(false);
   const handleRenameSave = async () => {
     if (!campaign) return;
     const next = renameValue.trim();
-    if (!next || next === campaign.name) { setRenameOpen(false); return; }
+    const nextIsTest = renameIsTest;
+    const nameChanged = !!next && next !== campaign.name;
+    const testChanged = nextIsTest !== !!(campaign as any).is_test;
+    if (!nameChanged && !testChanged) { setRenameOpen(false); return; }
     setRenameSaving(true);
     try {
-      await CampaignService.updateCampaign(campaign.id, { name: next });
-      setCampaign({ ...campaign, name: next } as any);
-      toast({ title: 'Campaign renamed' });
+      const updates: { name?: string; is_test?: boolean } = {};
+      if (nameChanged) updates.name = next;
+      if (testChanged) updates.is_test = nextIsTest;
+      await CampaignService.updateCampaign(campaign.id, updates);
+      setCampaign({ ...campaign, ...(nameChanged ? { name: next } : {}), is_test: nextIsTest } as any);
+      toast({ title: 'Campaign updated' });
       setRenameOpen(false);
     } catch (err: any) {
-      toast({ title: 'Rename failed', description: err?.message, variant: 'destructive' });
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
     } finally {
       setRenameSaving(false);
     }
@@ -2143,8 +2150,8 @@ const CampaignDetailsPage = () => {
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 mt-1 text-ink-warm-400 hover:text-brand shrink-0"
-                      title="Rename campaign"
-                      onClick={() => { setRenameValue(campaign.name); setRenameOpen(true); }}
+                      title="Edit campaign"
+                      onClick={() => { setRenameValue(campaign.name); setRenameIsTest(!!(campaign as any).is_test); setRenameOpen(true); }}
                     >
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
@@ -2154,22 +2161,36 @@ const CampaignDetailsPage = () => {
                   <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
-                        <DialogTitle>Rename campaign</DialogTitle>
+                        <DialogTitle>Edit campaign</DialogTitle>
                         <DialogDescription>
-                          Updates the campaign name everywhere it&apos;s shown.
+                          Update the campaign name and flags.
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-1.5 py-1">
-                        <Label htmlFor="campaign-rename">Name <RequiredAsterisk /></Label>
-                        <Input
-                          id="campaign-rename"
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRenameSave(); } }}
-                          placeholder="Campaign name"
-                          className="h-9 focus-brand"
-                          autoFocus
-                        />
+                      <div className="space-y-3 py-1">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="campaign-rename">Name <RequiredAsterisk /></Label>
+                          <Input
+                            id="campaign-rename"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRenameSave(); } }}
+                            placeholder="Campaign name"
+                            className="h-9 focus-brand"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Checkbox
+                            id="campaign-is-test"
+                            checked={renameIsTest}
+                            onCheckedChange={(checked) => setRenameIsTest(checked as boolean)}
+                            className="mt-0.5"
+                          />
+                          <Label htmlFor="campaign-is-test" className="text-sm font-normal leading-snug">
+                            Test campaign
+                            <span className="block text-xs text-ink-warm-400">Hidden from Campaign Overview + its KOLs excluded from KOL data.</span>
+                          </Label>
+                        </div>
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancel</Button>

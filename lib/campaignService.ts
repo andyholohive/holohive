@@ -149,6 +149,7 @@ export class CampaignService {
       slug?: string;
       approved_emails?: string[];
       approved_domains?: string[];
+      is_test?: boolean;
     },
     supabaseClient?: any
   ): Promise<Campaign> {
@@ -236,7 +237,7 @@ export class CampaignService {
    */
   static async updateCampaign(
     id: string,
-    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline' | 'approved_emails' | 'approved_domains' | 'current_phase'>> & { slug?: string },
+    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline' | 'approved_emails' | 'approved_domains' | 'current_phase'>> & { slug?: string; is_test?: boolean },
     supabaseClient?: any
   ): Promise<Campaign> {
     try {
