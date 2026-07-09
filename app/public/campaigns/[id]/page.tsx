@@ -491,7 +491,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   // KOL_STATUS_ORDER below. Surfaces in-progress KOLs together rather
   // than scattering them through an alphabetical / insertion-order list.
   const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: 'hh_status', dir: 'asc' });
-  const [contentSort, setContentSort] = useState<{ key: ContentSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
+  // Default sort: Activation Date descending (newest at top), matching the
+  // internal Content Dashboard table. compareNullable pushes undated rows to
+  // the bottom regardless of direction. Client can still re-sort any column.
+  const [contentSort, setContentSort] = useState<{ key: ContentSortKey | null; dir: 'asc' | 'desc' }>({ key: 'activation_date', dir: 'desc' });
 
   const toggleKolSort = (key: KolSortKey) => {
     setKolSort(prev => {
