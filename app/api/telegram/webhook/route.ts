@@ -2376,6 +2376,113 @@ function detectFromLink(link: string): { platform: string; content_type: string 
 }
 
 /**
+ * The set of campaigns a KOL may `/submit` to right now.
+ *
+ * Base gates: assignment not deleted/hidden, hh_status 'Onboarded',
+ * campaign Active + not archived + started, client active.
+ *
+ * Liveness gate [2026-07-09, per Andy]: the campaign's stored `end_date`
+ * is NO LONGER used. A campaign counts as live if EITHER signal holds:
+ *   - engagement still covers today (client's active stint
+ *     covered_through >= today), OR
+ *   - a lineup for the current week (or later) is on the board.
+ * Either keeps it submittable — so a campaign whose engagement lapsed but
+ * still has an in-flight lineup (and vice-versa) stays open.
+ *
+ * Used by both the initial picker (handleSubmitCommand) and the
+ * stale-tap re-validation on the picker callback.
+ */
+async function getSubmittableCampaigns(kolId: string): Promise<Array<{
+  id: string;
+  name: string;
+  client: { id: string; name: string } | null;
+}>> {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  // Monday of the current week (UTC) — the anchor for lineup `week_of`.
+  const now = new Date();
+  const dow = now.getUTCDay() || 7; // 1 (Mon) … 7 (Sun)
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() - (dow - 1));
+  const mondayIso = monday.toISOString().slice(0, 10);
+
+  const { data: assignments } = await (supabaseAdmin as any)
+    .from('campaign_kols')
+    .select('campaign:campaigns!inner(id, name, status, start_date, archived_at, client:clients(id, name, is_active))')
+    .eq('master_kol_id', kolId)
+    .is('deleted_at', null)
+    // NULL-safe hidden filter: `.neq('hidden', true)` would also exclude
+    // rows where hidden IS NULL (SQL: NULL <> true is not true).
+    .or('hidden.is.null,hidden.eq.false')
+    .eq('hh_status', 'Onboarded');
+
+  const base = ((assignments ?? []) as Array<{ campaign: {
+    id: string; name: string; status: string; start_date: string | null;
+    archived_at: string | null;
+    client: { id: string; name: string; is_active: boolean | null } | null;
+  } | null }>)
+    .map(a => a.campaign)
+    .filter((c): c is NonNullable<typeof c> =>
+      !!c
+      && c.status === 'Active'
+      && !c.archived_at
+      && (!c.start_date || c.start_date <= todayIso)
+      && c.client?.is_active === true
+    );
+  if (base.length === 0) return [];
+
+  const campaignIds = base.map(c => c.id);
+  const clientIds = Array.from(new Set(base.map(c => c.client?.id).filter(Boolean))) as string[];
+
+  // Engagement coverage: a client is "covered" if its active stint's
+  // covered_through is today or later.
+  const coveredClientIds = new Set<string>();
+  if (clientIds.length) {
+    const { data: stints } = await (supabaseAdmin as any)
+      .from('client_stints')
+      .select('id, client_id')
+      .eq('status', 'active')
+      .in('client_id', clientIds);
+    const stintClientById = new Map<string, string>(
+      ((stints ?? []) as Array<{ id: string; client_id: string }>).map(s => [s.id, s.client_id]),
+    );
+    const stintIds = Array.from(stintClientById.keys());
+    if (stintIds.length) {
+      const { data: cov } = await (supabaseAdmin as any)
+        .from('client_coverage')
+        .select('stint_id, covered_through')
+        .in('stint_id', stintIds);
+      for (const row of (cov ?? []) as Array<{ stint_id: string; covered_through: string | null }>) {
+        if (row.covered_through && row.covered_through >= todayIso) {
+          const cid = stintClientById.get(row.stint_id);
+          if (cid) coveredClientIds.add(cid);
+        }
+      }
+    }
+  }
+
+  // Lineup presence: a lineup for the current week (or later) on the board.
+  const lineupCampaignIds = new Set<string>();
+  {
+    const { data: lus } = await (supabaseAdmin as any)
+      .from('campaign_lineups')
+      .select('campaign_id, week_of')
+      .in('campaign_id', campaignIds)
+      .gte('week_of', mondayIso);
+    for (const l of (lus ?? []) as Array<{ campaign_id: string }>) {
+      lineupCampaignIds.add(l.campaign_id);
+    }
+  }
+
+  return base
+    .filter(c => (c.client?.id && coveredClientIds.has(c.client.id)) || lineupCampaignIds.has(c.id))
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      client: c.client ? { id: c.client.id, name: c.client.name } : null,
+    }));
+}
+
+/**
  * `/submit <link>` — entry for KOL content submission. Single-shot when
  * KOL is on one active campaign; picker buttons when on 2+.
  *
@@ -2448,49 +2555,14 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   }
 
   // Pull the KOL's active-campaign list via campaign_kols + campaigns.
-  // Active = campaign.status = 'Active' AND not archived AND start_date <= today
-  // AND (end_date IS NULL OR end_date >= today). The end_date guard added
-  // 2026-06-16 per spec GAP — KOLs on a finished campaign should not be
-  // able to submit content to it.
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const { data: assignments } = await (supabaseAdmin as any)
-    .from('campaign_kols')
-    .select('id, hh_status, campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name, is_active))')
-    .eq('master_kol_id', caller.id)
-    .is('deleted_at', null)
-    // NULL-safe hidden filter: `.neq('hidden', true)` would also exclude
-    // rows where hidden IS NULL (SQL: NULL <> true is not true). The
-    // column is backfilled to false today, but don't depend on that.
-    .or('hidden.is.null,hidden.eq.false')
-    .eq('hh_status', 'Onboarded');
-
-  const activeCampaigns = ((assignments ?? []) as Array<{
-    id: string;
-    hh_status: string | null;
-    campaign: {
-      id: string;
-      name: string;
-      status: string;
-      start_date: string | null;
-      end_date: string | null;
-      archived_at: string | null;
-      client: { id: string; name: string; is_active: boolean | null } | null;
-    };
-  }>)
-    .map(a => a.campaign)
-    .filter(c =>
-      c
-      && c.status === 'Active'
-      && !c.archived_at
-      && (!c.start_date || c.start_date <= todayIso)
-      && (!c.end_date || c.end_date >= todayIso)
-      && c.client?.is_active === true
-    );
+  // Liveness gate: engagement-covers-today OR a current-week lineup exists.
+  // Campaign end_date is no longer used — see getSubmittableCampaigns.
+  const activeCampaigns = await getSubmittableCampaigns(caller.id);
 
   if (activeCampaigns.length === 0) {
     await sendTelegramMessage(
       chatId,
-      "🤷 You're not on any active campaigns right now. If you think this is wrong, ping your HoloHive contact.",
+      "You're not on any active campaigns right now. If you think this is wrong, ping your Holo Hive contact.",
       'HTML',
       threadId,
     );
@@ -2585,6 +2657,13 @@ async function finalizeSubmission(opts: {
   link: string;
   platform: string;
   contentType: string;
+  /**
+   * When provided, the success receipt EDITS this existing message (the
+   * campaign picker) instead of sending a fresh one — one message per
+   * submission in the multi-campaign flow. Omitted on the single-campaign
+   * auto-pick path, which has no prior bot message to edit.
+   */
+  editTarget?: { chatId: string; messageId: number };
 }): Promise<string | null> {
   // [2026-06-12] F3 dual-write: also create the canonical content_items
   // row so the rest of HHP (dashboards, leaderboards, lineup_slots.status)
@@ -2662,14 +2741,16 @@ async function finalizeSubmission(opts: {
 
   // [2026-07-08] Per Andy: acknowledge every successful /submit. The
   // single-campaign auto-pick used to fire silently (only the multi-campaign
-  // picker edit gave feedback), so KOLs had no signal it worked. This is the
-  // one receipt for both paths — best-effort, never blocks the forward below.
-  await sendTelegramMessage(
-    opts.chatId,
-    `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`,
-    'HTML',
-    opts.threadId,
-  );
+  // picker edit gave feedback), so KOLs had no signal it worked.
+  // [2026-07-09] Per Andy: in the multi-campaign flow, EDIT the picker
+  // message into the receipt rather than sending a second message. The
+  // single-campaign path (no editTarget) still sends a fresh receipt.
+  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, approved.`;
+  if (opts.editTarget) {
+    await editMessageText(opts.editTarget.chatId, opts.editTarget.messageId, receiptText);
+  } else {
+    await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
+  }
 
   // Forward to the team review channel.
   await forwardSubmissionToReviewChannel({
@@ -3019,25 +3100,8 @@ async function handleSubmPickerCallback(
     await answerCallbackQuery(callbackId, 'Missing campaign.');
     return;
   }
-  const pickTodayIso = new Date().toISOString().slice(0, 10);
-  const { data: assignments } = await (supabaseAdmin as any)
-    .from('campaign_kols')
-    .select('campaign:campaigns!inner(id, name, status, start_date, end_date, archived_at, client:clients(id, name, is_active))')
-    .eq('master_kol_id', pending.kol_id)
-    .is('deleted_at', null)
-    .or('hidden.is.null,hidden.eq.false')
-    .eq('hh_status', 'Onboarded');
-  const campaign = ((assignments ?? []) as Array<{ campaign: { id: string; name: string; status: string; start_date: string | null; end_date: string | null; archived_at: string | null; client: { id: string; name: string; is_active: boolean | null } | null } | null }>)
-    .map(a => a.campaign)
-    .filter(c =>
-      c
-      && c.status === 'Active'
-      && !c.archived_at
-      && (!c.start_date || c.start_date <= pickTodayIso)
-      && (!c.end_date || c.end_date >= pickTodayIso)
-      && c.client?.is_active === true
-    )
-    .find(c => c!.id.startsWith(campaignIdPrefix));
+  const campaign = (await getSubmittableCampaigns(pending.kol_id))
+    .find(c => c.id.startsWith(campaignIdPrefix));
   if (!campaign) {
     await answerCallbackQuery(callbackId, 'This campaign is no longer accepting submissions. Send /submit again.');
     return;
@@ -3054,6 +3118,9 @@ async function handleSubmPickerCallback(
   const detected = detectFromLink(pending.link);
 
   // Insert + confirm + forward. Same path as the single-campaign auto-pick.
+  // [2026-07-09] Pass the picker message as editTarget so the ✅ receipt
+  // EDITS the picker in place (one message, buttons cleared) instead of
+  // sending a second confirmation.
   const submissionId = await finalizeSubmission({
     chatId: messageChatId,
     threadId: undefined,
@@ -3065,20 +3132,14 @@ async function handleSubmPickerCallback(
     link: pending.link,
     platform: detected.platform,
     contentType: detected.content_type,
+    editTarget: messageChatId && messageId ? { chatId: messageChatId, messageId } : undefined,
   });
 
   await (supabaseAdmin as any).from('pending_submissions').delete().eq('id', pendingId);
-  if (messageChatId && messageId) {
-    // finalizeSubmission now sends the ✅ receipt (both paths), so this edit
-    // just closes out the picker — clears the buttons + records the choice
-    // without a second confirmation message.
-    await editMessageText(
-      messageChatId,
-      messageId,
-      submissionId
-        ? `<i>Campaign selected — <b>${escapeHtml(campaign.client?.name || campaign.name)}</b>.</i>`
-        : '↩ Submission not saved — see message above.',
-    );
+  if (!submissionId && messageChatId && messageId) {
+    // On failure (dup / insert error) finalizeSubmission sent its own ⚠️
+    // message and did NOT edit the picker — close the picker out here.
+    await editMessageText(messageChatId, messageId, '↩ Submission not saved — see message above.');
   }
   await answerCallbackQuery(callbackId);
 }
