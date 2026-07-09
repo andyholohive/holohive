@@ -77,6 +77,9 @@ type Campaign = {
   // [Stint-scoped Week N of M] Client's max covered_through — Week N of
   // M's "M" derives from this. Falls back to end_date when null.
   client_covered_through?: string | null;
+  // [2026-07-09] Sum of the client's engagement-term amounts. Shown as the
+  // budget instead of total_budget. Null → fall back to total_budget.
+  client_budget_total?: number | null;
 };
 
 type ShowcaseConfig = {
@@ -1063,6 +1066,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         showcase_token: (campaignData as any).showcase_token || null,
         showcase_config: (campaignData as any).showcase_config || null,
         client_covered_through: null,
+        client_budget_total: null,
       };
 
       // [Stint-scoped Week N of M] Best-effort fetch. If RLS blocks
@@ -1081,6 +1085,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         normalizedCampaign.client_covered_through = max;
       } catch {
         // silent — fallback to end_date
+      }
+
+      // [2026-07-09] Total budget = sum of the client's engagement TERMS
+      // (client_engagement_total view), so the public page shows the true
+      // engagement value, matching the internal Budget dashboard. Falls
+      // back to campaigns.total_budget if the view has no row for the client.
+      try {
+        const { data: budgetRow } = await supabasePublic
+          .from('client_engagement_total')
+          .select('total_amount')
+          .eq('client_id', campaignData.client_id)
+          .maybeSingle();
+        const terms = budgetRow ? Number((budgetRow as { total_amount: number | string | null }).total_amount ?? 0) : 0;
+        normalizedCampaign.client_budget_total = terms > 0 ? terms : null;
+      } catch {
+        // silent — fallback to total_budget
       }
 
       setCampaign(normalizedCampaign);
@@ -1485,15 +1505,21 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     isn't sensitive). When budget is hidden and we
                     still have dates, just show dates without a pipe. */}
                 <div className="text-sm text-ink-warm-700 font-medium shrink-0 whitespace-nowrap">
-                  {!mask.budget && formatCurrency(campaign.total_budget)}
-                  {campaign.start_date && campaign.end_date && (
-                    <>
-                      {!mask.budget && <span className="text-ink-warm-300 mx-2">|</span>}
-                      <span className="text-ink-warm-700">
-                        {formatDate(campaign.start_date)} – {formatDate(campaign.end_date)}
-                      </span>
-                    </>
-                  )}
+                  {/* [2026-07-09] Budget = engagement-term total; end date =
+                      the engagement term end (covered_through), not the
+                      stored campaign end_date. Both fall back when null. */}
+                  {!mask.budget && formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}
+                  {(() => {
+                    const termEnd = campaign.client_covered_through ?? campaign.end_date;
+                    return campaign.start_date && termEnd ? (
+                      <>
+                        {!mask.budget && <span className="text-ink-warm-300 mx-2">|</span>}
+                        <span className="text-ink-warm-700">
+                          {formatDate(campaign.start_date)} – {formatDate(termEnd)}
+                        </span>
+                      </>
+                    ) : null;
+                  })()}
                 </div>
               </div>
               {/* Week progress bar — only when we have a valid date

@@ -50,7 +50,7 @@ import {
 import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
 import { formatDate as fmtDate, formatRelativeShort } from '@/lib/dateFormat';
-import { getCampaignWeek, getTotalCampaignWeeks } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeek, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -340,6 +340,30 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
   // Data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  // [2026-07-09] Client-level engagement facts, so every campaign surface
+  // reads the SAME term end + total budget (the engagement term is a client
+  // attribute, not per-campaign). covered_through → Week N of M's "M" +
+  // displayed end date; budget total → sum of engagement terms.
+  const [clientCoveredThrough, setClientCoveredThrough] = useState<string | null>(null);
+  const [clientBudgetTotal, setClientBudgetTotal] = useState<number | null>(null);
+  useEffect(() => {
+    if (!clientId) { setClientCoveredThrough(null); setClientBudgetTotal(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: cov } = await supabasePublic.from('client_coverage').select('covered_through').eq('client_id', clientId);
+        const maxCov = ((cov as Array<{ covered_through: string | null }> | null) ?? [])
+          .map(r => r.covered_through).filter((d): d is string => !!d).sort().pop() ?? null;
+        if (!cancelled) setClientCoveredThrough(maxCov);
+      } catch { /* fall back to end_date */ }
+      try {
+        const { data: bud } = await supabasePublic.from('client_engagement_total').select('total_amount').eq('client_id', clientId).maybeSingle();
+        const terms = bud ? Number((bud as { total_amount: number | string | null }).total_amount ?? 0) : 0;
+        if (!cancelled) setClientBudgetTotal(terms > 0 ? terms : null);
+      } catch { /* fall back to total_budget */ }
+    })();
+    return () => { cancelled = true; };
+  }, [clientId]);
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1497,10 +1521,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     if (totalMs <= 0) return null;
     const progressPct = (Math.max(0, Math.min(totalMs, now - start)) / totalMs) * 100;
     const wk = getCampaignWeek(activeCampaign.start_date);
-    const totalWeeks = Math.max(1, getTotalCampaignWeeks(activeCampaign.start_date, activeCampaign.end_date));
+    // M derives from the client's engagement term (covered_through), falling
+    // back to the campaign end_date — same rule as the campaign tracker.
+    const totalWeeks = Math.max(1, getTotalCampaignWeeksFromCoverage(activeCampaign.start_date, clientCoveredThrough, activeCampaign.end_date));
     const currentWeek = wk ? Math.min(totalWeeks, wk.weekNumber) : 1;
     return { progressPct, currentWeek, totalWeeks };
-  }, [activeCampaign?.start_date, activeCampaign?.end_date]);
+  }, [activeCampaign?.start_date, activeCampaign?.end_date, clientCoveredThrough]);
 
   // Completion date for the collapsed-onboarding row tail. Most recent
   // `updated_at` among the complete milestones — best proxy for "when
@@ -2082,23 +2108,20 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {isCampaignLiveMode && activeCampaign && (
           <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Active Campaign
-              </p>
+              {/* [2026-07-09 per Andy] "Active Campaign" kicker + KOL count
+                  removed. End date shows the engagement TERM end
+                  (covered_through), falling back to campaign end_date. */}
               <h1 className="text-3xl font-bold text-gray-900 mb-1">
                 {activeCampaign.name}
               </h1>
-              <p className="text-gray-500 text-base mb-6">
-                {activeCampaign.start_date && activeCampaign.end_date ? (
-                  <>
-                    {formatDate(activeCampaign.start_date)} — {formatDate(activeCampaign.end_date)}
-                    {' · '}
-                    {activeCampaign.kol_count} KOL{activeCampaign.kol_count === 1 ? '' : 's'}
-                  </>
-                ) : (
-                  `${activeCampaign.kol_count} KOL${activeCampaign.kol_count === 1 ? '' : 's'}`
-                )}
-              </p>
+              {(() => {
+                const termEnd = clientCoveredThrough ?? activeCampaign.end_date;
+                return activeCampaign.start_date && termEnd ? (
+                  <p className="text-gray-500 text-base mb-6">
+                    {formatDate(activeCampaign.start_date)} — {formatDate(termEnd)}
+                  </p>
+                ) : <div className="mb-6" />;
+              })()}
 
               {/* Continuous progress bar + week label. No countdown, no ring. */}
               {campaignWeekInfo && (
@@ -2211,16 +2234,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                       <div className="p-1 bg-gray-100 rounded">
                                         <Calendar className="h-3.5 w-3.5 text-gray-500" />
                                       </div>
-                                      <span>{formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}</span>
+                                      {/* [2026-07-09] End date = engagement TERM
+                                          end (client covered_through); budget =
+                                          engagement-terms total. Both fall back. */}
+                                      <span>{formatDate(campaign.start_date)} - {formatDate(clientCoveredThrough ?? campaign.end_date)}</span>
                                     </div>
-                                    {campaign.total_budget && (
+                                    {(clientBudgetTotal ?? campaign.total_budget) ? (
                                       <div className="flex items-center gap-2">
                                         <div className="p-1 bg-gray-100 rounded">
                                           <DollarSign className="h-3.5 w-3.5 text-gray-500" />
                                         </div>
-                                        <span className="font-medium text-gray-700">{formatCurrency(campaign.total_budget)}</span>
+                                        <span className="font-medium text-gray-700">{formatCurrency(clientBudgetTotal ?? campaign.total_budget)}</span>
                                       </div>
-                                    )}
+                                    ) : null}
                                     <div className="flex items-center gap-2">
                                       <div className="p-1 bg-gray-100 rounded">
                                         <Users className="h-3.5 w-3.5 text-gray-500" />
