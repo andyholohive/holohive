@@ -31,6 +31,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CampaignService } from '@/lib/campaignService';
 import { BRAND_HEX } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
@@ -44,8 +45,12 @@ export function BudgetOverview() {
   // [2026-07-09] Total Budget = sum of the client's engagement-TERM amounts
   // (see BudgetDashboardV2) so both budget views agree.
   const clientId = (campaign as any)?.client_id as string | undefined;
-  const [engagementTermsTotal, setEngagementTermsTotal] = useState<number | null>(null);
+  // `undefined` = fetch in flight (skeleton the KPI strip so Total /
+  // Remaining never flash a fallback then jump); `null` = no terms.
+  const [engagementTermsTotal, setEngagementTermsTotal] = useState<number | null | undefined>(undefined);
+  const engagementLoaded = engagementTermsTotal !== undefined;
   useEffect(() => {
+    setEngagementTermsTotal(undefined);
     if (!clientId) { setEngagementTermsTotal(null); return; }
     let cancelled = false;
     (async () => {
@@ -71,7 +76,13 @@ export function BudgetOverview() {
                         Converted from inline gradient tiles to the shared
                         KpiCard primitive so this hero strip reads with
                         the same rhythm as /dashboard, /lists, /analytics. */}
-                    {(() => {
+                    {!engagementLoaded ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Skeleton key={i} className="h-24 rounded-xl" />
+                        ))}
+                      </div>
+                    ) : (() => {
                       const paid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
                       // [2026-07-09] Total budget = sum of region allocations
                       // (fallback to the stored total_budget scalar when none),

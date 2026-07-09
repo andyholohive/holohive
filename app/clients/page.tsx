@@ -5612,21 +5612,28 @@ export default function ClientsPage() {
                           {latestCampaign.name}
                         </p>
                       </div>
-                      <Select
-                        value={latestCampaign.current_phase ?? '__none__'}
-                        onValueChange={(v) => handleLatestCampaignPhaseChange(v === '__none__' ? null : v)}
-                        disabled={savingPhase}
-                      >
-                        <SelectTrigger className="w-[170px] h-8 focus-brand flex-shrink-0">
-                          <SelectValue placeholder="— Not set" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— Not set</SelectItem>
-                          {CURRENT_PHASE_OPTIONS.map(p => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* [Phase hidden everywhere] Campaign phase is no
+                          longer surfaced in any HQ or public view. The
+                          editable phase dropdown is gated off here (kept
+                          for easy restore); the banner still shows the
+                          active campaign name for context. */}
+                      {false && (
+                        <Select
+                          value={latestCampaign?.current_phase ?? '__none__'}
+                          onValueChange={(v) => handleLatestCampaignPhaseChange(v === '__none__' ? null : v)}
+                          disabled={savingPhase}
+                        >
+                          <SelectTrigger className="w-[170px] h-8 focus-brand flex-shrink-0">
+                            <SelectValue placeholder="— Not set" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— Not set</SelectItem>
+                            {CURRENT_PHASE_OPTIONS.map(p => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   )}
 

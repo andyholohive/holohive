@@ -1357,10 +1357,12 @@ export default function CampaignsPage() {
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Budget</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Dates</TableHead>
-                {/* [Campaign Live v1] Inline phase setter — same data
-                    the campaign detail form writes to
-                    (campaigns.current_phase). See portal page. */}
+                {/* [Phase hidden everywhere] Campaign phase is no longer
+                    surfaced in any HQ or public view. Column gated off
+                    (kept for easy restore). */}
+                {false && (
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Phase</TableHead>
+                )}
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Progress</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
               </TableRow>
@@ -1410,9 +1412,10 @@ export default function CampaignsPage() {
                       {formatDate(campaign.start_date)}
                       {campaign.end_date ? ` – ${formatDate(campaign.end_date)}` : ''}
                     </TableCell>
-                    {/* [Campaign Live v1] Inline Phase cell.
-                        stopPropagation prevents the row's onClick from
-                        firing when the user opens the dropdown. */}
+                    {/* [Phase hidden everywhere] Inline Phase cell gated
+                        off — must stay in lockstep with the header above
+                        so column counts match. */}
+                    {false && (
                     <TableCell className="py-3.5 px-5" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={campaign.current_phase ?? '__none__'}
@@ -1431,6 +1434,7 @@ export default function CampaignsPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    )}
                     <TableCell className="py-3.5 px-5">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-cream-100 rounded-full h-2 w-20 overflow-hidden">

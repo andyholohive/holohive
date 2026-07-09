@@ -23,6 +23,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, DollarSign, TrendingUp, Activity, Receipt, Wallet, Eye, Heart, FileText, Gauge, Trophy } from 'lucide-react';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -141,8 +142,14 @@ export function BudgetDashboardV2() {
   // so the true budget is their sum (e.g. Fogo = 2 terms × 15k = 30k) — not
   // the single total_budget scalar or one region allocation.
   const budgetClientId = (campaign as any)?.client_id as string | undefined;
-  const [engagementTermsTotal, setEngagementTermsTotal] = useState<number | null>(null);
+  // `undefined` = engagement fetch still in flight (render a skeleton so
+  // Total Budget / Remaining never flash a fallback value then jump);
+  // `null` = settled with no terms (fall back to allocations/total_budget);
+  // number = the summed engagement-term total.
+  const [engagementTermsTotal, setEngagementTermsTotal] = useState<number | null | undefined>(undefined);
+  const engagementLoaded = engagementTermsTotal !== undefined;
   useEffect(() => {
+    setEngagementTermsTotal(undefined);
     if (!budgetClientId) { setEngagementTermsTotal(null); return; }
     let cancelled = false;
     (async () => {
@@ -325,7 +332,16 @@ export function BudgetDashboardV2() {
 
   return (
     <div className="space-y-6">
-      {/* ── Top row: 5-cell spend breakdown ── */}
+      {/* ── Top row: 5-cell spend breakdown ──
+          Skeleton until the engagement-term fetch settles so Total Budget
+          + Remaining render once at their real value (no fallback flash). */}
+      {!engagementLoaded ? (
+        <div className={`grid grid-cols-2 md:grid-cols-${isAdminOrOwner ? '5' : '4'} gap-3`}>
+          {Array.from({ length: isAdminOrOwner ? 5 : 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+      ) : (
       <div className={`grid grid-cols-2 md:grid-cols-${isAdminOrOwner ? '5' : '4'} gap-3`}>
         <KpiCard
           icon={Wallet}
@@ -365,6 +381,7 @@ export function BudgetDashboardV2() {
           accent={remainingForRole < 0 ? 'rose' : 'emerald'}
         />
       </div>
+      )}
 
       {/* ── Efficiency metrics (collapsed by default) ────────────────
           CPM · CPE · Cost per content piece · Burn vs Pace. Grouped
