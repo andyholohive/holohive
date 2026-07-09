@@ -1418,10 +1418,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   };
 
   return (
-    <div className="min-h-screen bg-cream-50">
-      {/* Header */}
-      <div className="bg-white border-b border-cream-200">
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
+    // [2026-07-09] Page chrome aligned to the client portal so the two
+    // client-facing surfaces feel consistent: same gray gradient bg,
+    // sticky blurred header, and centered max-w-7xl container (was a
+    // cream bg + full-width header/main).
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
+      {/* Header — matches the portal's sticky white/blur bar */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-4">
             <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
             <div>
@@ -1429,9 +1433,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* ─── Slim Hero ─────────────────────────────────────────────
             HHP Campaign Dashboard Spec section 3. Replaces both the
             old title row (Megaphone + name + status) and the
