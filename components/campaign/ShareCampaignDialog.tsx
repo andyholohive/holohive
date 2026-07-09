@@ -46,8 +46,10 @@ export function ShareCampaignDialog({ open, onOpenChange }: ShareCampaignDialogP
     }
   };
 
+  // [2026-07-09] Match the campaigns-page card's share link exactly: prefer
+  // the friendly slug, fall back to the id (was id-only here → different URL).
   const shareUrl = typeof window !== 'undefined' && campaign?.id
-    ? `${window.location.origin}/public/campaigns/${campaign.id}`
+    ? `${window.location.origin}/public/campaigns/${(campaign as any).slug || campaign.id}`
     : '';
 
   return (
