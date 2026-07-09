@@ -344,6 +344,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // reads the SAME term end + total budget (the engagement term is a client
   // attribute, not per-campaign). covered_through → Week N of M's "M" +
   // displayed end date; budget total → sum of engagement terms.
+  // [2026-07-09] Collapse long lists to 4 by default (Form Submissions +
+  // Uploaded Files), with a Show-all toggle.
+  const [showAllForms, setShowAllForms] = useState(false);
+  const [showAllFiles, setShowAllFiles] = useState(false);
   const [clientCoveredThrough, setClientCoveredThrough] = useState<string | null>(null);
   const [clientBudgetTotal, setClientBudgetTotal] = useState<number | null>(null);
   useEffect(() => {
@@ -2274,8 +2278,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   <Button
                                     variant="outline"
-                                    size="sm"
-                                    className="rounded-lg border-gray-200 hover:border-brand transition-colors"
+                                    size="lg"
+                                    className="rounded-lg border-gray-200 hover:border-brand transition-colors h-11 px-6 text-base font-semibold"
                                     onClick={() => {
                                       const url = campaign.slug
                                         ? `/public/campaigns/${campaign.slug}`
@@ -2283,7 +2287,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                       window.open(url, '_blank');
                                     }}
                                   >
-                                    <ExternalLink className="h-4 w-4 mr-1.5" />
+                                    <ExternalLink className="h-5 w-5 mr-2" />
                                     View Campaign
                                   </Button>
                                   {campaign.share_report_publicly && (
@@ -3013,8 +3017,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Stats Cards — discovery & tracker only */}
-        {showAdvancedSections && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
+        {/* Stats Cards — discovery & tracker only.
+            [2026-07-09 per Andy] Removed the 4-card stat strip above Form
+            Submissions; gated off (not deleted) for easy restore. */}
+        {false && showAdvancedSections && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
           <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
@@ -3213,7 +3219,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 <CardContent className="p-6">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Submitted Forms</h4>
                   <div className="space-y-3">
-                    {formSubmissions.map((sub) => (
+                    {(showAllForms ? formSubmissions : formSubmissions.slice(0, 4)).map((sub) => (
                       <div
                         key={sub.id}
                         onClick={() => setViewingSubmission(sub)}
@@ -3235,6 +3241,15 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                         )}
                       </div>
                     ))}
+                    {formSubmissions.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllForms(v => !v)}
+                        className="w-full text-center text-xs font-medium text-brand hover:text-brand-dark py-1.5"
+                      >
+                        {showAllForms ? 'Show less' : `Show all ${formSubmissions.length}`}
+                      </button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -3355,7 +3370,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     <div className={(clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url)) || clientLinks.length > 0 ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Uploaded Files</h4>
                       <div className="space-y-3">
-                        {formAttachments.map((att, i) => {
+                        {(showAllFiles ? formAttachments : formAttachments.slice(0, 4)).map((att, i) => {
                           const ext = att.fileName.split('.').pop()?.toLowerCase() || '';
                           const isPdf = ext === 'pdf';
                           const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
@@ -3384,6 +3399,15 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             </a>
                           );
                         })}
+                        {formAttachments.length > 4 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllFiles(v => !v)}
+                            className="w-full text-center text-xs font-medium text-brand hover:text-brand-dark py-1.5"
+                          >
+                            {showAllFiles ? 'Show less' : `Show all ${formAttachments.length}`}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
