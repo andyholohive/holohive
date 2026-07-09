@@ -2241,29 +2241,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                         <span className="font-medium text-gray-700">{formatCurrency(clientBudgetTotal ?? campaign.total_budget)}</span>
                                       </div>
                                     ) : null}
-                                    <div className="flex items-center gap-2">
-                                      <div className="p-1 bg-gray-100 rounded">
-                                        <Users className="h-3.5 w-3.5 text-gray-500" />
-                                      </div>
-                                      <span>{campaign.kol_count} KOLs</span>
-                                    </div>
+                                    {/* [2026-07-09] KOLs / impressions / engagement removed
+                                        from the portal campaign card per Andy — date + budget only. */}
                                   </div>
-                                  {campaign.content_count > 0 && (
-                                    <div className="flex items-center gap-6 text-sm">
-                                      <div className="flex items-center gap-2">
-                                        <Eye className="h-4 w-4 text-brand" />
-                                        <span className="text-gray-600">
-                                          <span className="font-semibold text-gray-900">{formatNumber(campaign.total_impressions)}</span> impressions
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <TrendingUp className="h-4 w-4 text-emerald-500" />
-                                        <span className="text-gray-600">
-                                          <span className="font-semibold text-gray-900">{formatNumber(campaign.total_engagement)}</span> engagement
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   <Button
