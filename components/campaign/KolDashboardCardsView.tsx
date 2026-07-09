@@ -385,6 +385,16 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                   )}
                 </div>
 
+                {/* Style — the AI-inferred posting-style summary from the
+                    Telegram scan (master_kols.style_summary), same field
+                    shown in the KOL Profile popup's Profile Insights. */}
+                {(campaignKOL.master_kol as any)?.style_summary && (
+                  <div className="mt-3 pt-3 border-t border-cream-100">
+                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Style</span>
+                    <p className="text-sm text-ink-warm-900 mt-1 line-clamp-3">{(campaignKOL.master_kol as any).style_summary}</p>
+                  </div>
+                )}
+
                 {campaignKOL.notes && (
                   <div className="mt-3 pt-3 border-t border-cream-100">
                     <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Notes</span>

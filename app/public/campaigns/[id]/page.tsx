@@ -178,6 +178,9 @@ type CampaignKOL = {
      *  null when the KOL has no public avatar or the cron hasn't run
      *  for that row yet. */
     profile_picture_url: string | null;
+    /** AI-inferred posting-style summary (Telegram scan). Surfaced on
+     *  the Cards view — same "Style" field as the KOL Profile popup. */
+    style_summary: string | null;
   };
 };
 
@@ -1092,7 +1095,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           // one-line bio per KOL per campaign. Different from notes
           // (internal/team) and from master_kol.notes (per-KOL global).
           // Renders as a new "Profile" column on the KOL Dashboard.
-          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, profile_note, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type, profile_picture_url)`)
+          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, profile_note, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type, profile_picture_url, style_summary)`)
           .eq('campaign_id', actualCampaignId)
           .or('hidden.is.null,hidden.eq.false')
           .order('created_at', { ascending: false });
@@ -2327,6 +2330,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 <span className="font-medium text-ink-warm-900 tabular-nums">{contentCount}</span>
                               </div>
                             </div>
+
+                            {/* Style — AI-inferred posting-style summary
+                                (master_kols.style_summary), the same "Style"
+                                field shown in the KOL Profile popup. */}
+                            {item.master_kol.style_summary && (
+                              <div className="mt-3 pt-3 border-t border-cream-100">
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Style</span>
+                                <p className="text-sm text-ink-warm-900 mt-1 line-clamp-3">{item.master_kol.style_summary}</p>
+                              </div>
+                            )}
 
                             {campaign?.share_kol_notes && item.notes && (
                               <div className="mt-3 pt-3 border-t border-cream-100">
