@@ -18,6 +18,12 @@ export interface CampaignWithDetails extends Omit<Campaign, 'share_creator_type'
   // (via client_coverage view). Drives the auto-derived Paused bucket on the
   // /campaigns tab strip: client engagement lapsed while is_active still true.
   client_covered_through?: string | null;
+  // [2026-07-09] Sum of the client's engagement-term amounts (via the
+  // client_engagement_total view). The /campaigns card + table show this so
+  // the budget number matches the client portal + public campaign tracker,
+  // which both display the engagement-terms total rather than the campaign's
+  // own total_budget. Falls back to total_budget when the client has no terms.
+  client_budget_total?: number | null;
   budget_allocations?: CampaignBudgetAllocation[];
   total_allocated?: number;
   share_creator_type?: boolean | null;
@@ -70,6 +76,20 @@ export class CampaignService {
         }
       }
 
+      // [2026-07-09] Join in the engagement-terms total per client so the card
+      // + table budget matches the client portal + public campaign tracker
+      // (both show this, not the campaign's own total_budget).
+      const budgetTotalByClient: Record<string, number | null> = {};
+      if (clientIds.length > 0) {
+        const { data: engagementRows } = await client
+          .from('client_engagement_total')
+          .select('client_id, total_amount')
+          .in('client_id', clientIds);
+        for (const row of (engagementRows || []) as Array<{ client_id: string; total_amount: number | null }>) {
+          budgetTotalByClient[row.client_id] = row.total_amount ?? null;
+        }
+      }
+
       return campaigns?.map((campaign: any) => ({
         ...campaign,
         client_name: (campaign.clients as any)?.name,
@@ -78,6 +98,7 @@ export class CampaignService {
         client_is_active: (campaign.clients as any)?.is_active ?? null,
         client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
         client_covered_through: coveredThroughByClient[campaign.client_id] ?? null,
+        client_budget_total: budgetTotalByClient[campaign.client_id] ?? null,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
       })) || [];
@@ -106,6 +127,18 @@ export class CampaignService {
       if (error) throw error;
       if (!campaign) return null;
 
+      // [2026-07-09] Same engagement-terms total the /campaigns list carries,
+      // so the campaign-detail Share dialog budget matches the portal/tracker.
+      let clientBudgetTotal: number | null = null;
+      if (campaign.client_id) {
+        const { data: engagementRow } = await client
+          .from('client_engagement_total')
+          .select('total_amount')
+          .eq('client_id', campaign.client_id)
+          .maybeSingle();
+        clientBudgetTotal = (engagementRow as { total_amount: number | null } | null)?.total_amount ?? null;
+      }
+
       return {
         ...campaign,
         client_name: (campaign.clients as any)?.name,
@@ -113,6 +146,7 @@ export class CampaignService {
         client_logo_url: (campaign.clients as any)?.logo_url,
         client_is_active: (campaign.clients as any)?.is_active ?? null,
         client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
+        client_budget_total: clientBudgetTotal,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
 

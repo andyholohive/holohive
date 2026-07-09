@@ -71,7 +71,7 @@ export function ShareCampaignDialog({ open, onOpenChange }: ShareCampaignDialogP
               </div>
               <div className="flex justify-between mb-2">
                 <span className="font-medium">Budget:</span>
-                <span>{CampaignService.formatCurrency(campaign?.total_budget || 0)}</span>
+                <span>{CampaignService.formatCurrency((campaign as any)?.client_budget_total ?? campaign?.total_budget ?? 0)}</span>
               </div>
               <div className="flex justify-between mb-2">
                 <span className="font-medium">Dates:</span>

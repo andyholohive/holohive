@@ -1274,7 +1274,7 @@ export default function CampaignsPage() {
                     </div>
                     <div className="flex items-center text-sm text-ink-warm-700">
                       <DollarSign className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
-                      <span className="tabular-nums">{CampaignService.formatCurrency(campaign.total_budget)}</span>
+                      <span className="tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</span>
                     </div>
                     <div className="flex items-center text-sm text-ink-warm-700">
                       <CalendarIcon className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
@@ -1407,7 +1407,7 @@ export default function CampaignsPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
+                    <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</TableCell>
                     <TableCell className="py-3.5 px-5 text-ink-warm-700 text-sm tabular-nums">
                       {/* [2026-07-09] End = engagement TERM end (client
                           covered_through), falling back to campaign end_date. */}
@@ -1533,7 +1533,7 @@ export default function CampaignsPage() {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Budget:</span>
-                  <span>{CampaignService.formatCurrency(sharingCampaign?.total_budget || 0)}</span>
+                  <span>{CampaignService.formatCurrency(sharingCampaign?.client_budget_total ?? sharingCampaign?.total_budget ?? 0)}</span>
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
