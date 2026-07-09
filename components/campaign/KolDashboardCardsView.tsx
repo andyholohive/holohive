@@ -391,7 +391,7 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                 {(campaignKOL.master_kol as any)?.style_summary && (
                   <div className="mt-3 pt-3 border-t border-cream-100">
                     <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Style</span>
-                    <p className="text-sm text-ink-warm-900 mt-1 line-clamp-3">{(campaignKOL.master_kol as any).style_summary}</p>
+                    <p className="text-sm text-ink-warm-900 mt-1">{(campaignKOL.master_kol as any).style_summary}</p>
                   </div>
                 )}
 

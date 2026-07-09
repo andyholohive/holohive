@@ -2337,7 +2337,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             {item.master_kol.style_summary && (
                               <div className="mt-3 pt-3 border-t border-cream-100">
                                 <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Style</span>
-                                <p className="text-sm text-ink-warm-900 mt-1 line-clamp-3">{item.master_kol.style_summary}</p>
+                                <p className="text-sm text-ink-warm-900 mt-1">{item.master_kol.style_summary}</p>
                               </div>
                             )}
 
