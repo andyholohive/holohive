@@ -151,7 +151,11 @@ async function sendTelegramMessage(
     }
 
     console.log('[Telegram Webhook] Sent reply to chat:', chatId, threadId ? `(thread ${threadId})` : '');
-    return true;
+    // Return the sent message_id (a positive int, so still truthy for the
+    // many callers that only check truthiness) so callers that need to edit
+    // the message later can capture it. Falls back to `true` if absent.
+    const data = await response.json().catch(() => null);
+    return (data?.result?.message_id as number | undefined) ?? true;
   } catch (error) {
     console.error('[Telegram Webhook] Error sending message:', error);
     return false;
@@ -2745,11 +2749,27 @@ async function finalizeSubmission(opts: {
   // [2026-07-09] Per Andy: in the multi-campaign flow, EDIT the picker
   // message into the receipt rather than sending a second message. The
   // single-campaign path (no editTarget) still sends a fresh receipt.
-  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, approved.`;
+  // The receipt reads "…, pending review." on submit; on team Approve the
+  // review handler edits THIS message to drop the tail ("…, submitted for X.").
+  // We record the receipt's (chat_id, message_id) on the submission so the
+  // approve handler can find it.
+  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`;
+  let receiptChatId: string | null = null;
+  let receiptMessageId: number | null = null;
   if (opts.editTarget) {
     await editMessageText(opts.editTarget.chatId, opts.editTarget.messageId, receiptText);
+    receiptChatId = opts.editTarget.chatId;
+    receiptMessageId = opts.editTarget.messageId;
   } else {
-    await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
+    const sent = await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
+    receiptChatId = opts.chatId;
+    receiptMessageId = typeof sent === 'number' ? sent : null;
+  }
+  if (receiptChatId && receiptMessageId) {
+    await (supabaseAdmin as any)
+      .from('content_submissions')
+      .update({ kol_receipt_chat_id: receiptChatId, kol_receipt_message_id: receiptMessageId })
+      .eq('id', submissionId);
   }
 
   // Forward to the team review channel.
@@ -3164,8 +3184,9 @@ async function handleSubmReviewCallback(
     .from('content_submissions')
     .select(`
       id, kol_id, campaign_id, link, platform, content_type, status,
+      kol_receipt_chat_id, kol_receipt_message_id,
       kol:master_kols!inner(id, name),
-      campaign:campaigns!inner(id, name)
+      campaign:campaigns!inner(id, name, client:clients(name))
     `)
     .eq('id', submissionId)
     .maybeSingle();
@@ -3252,6 +3273,20 @@ async function handleSubmReviewCallback(
     if (result.error) {
       console.error('[/submit] contents insert on approve failed:', result.error);
       approveSideEffectError = result.error;
+    }
+
+    // [2026-07-09] Per Andy: on approve, edit the KOL's original /submit
+    // receipt to drop the "pending review" tail — "…, submitted for X." —
+    // so the KOL sees it went through. Best-effort; only if we recorded the
+    // receipt's coordinates at submit time, and only when the row actually
+    // landed (no side-effect error).
+    if (!approveSideEffectError && (sub as any).kol_receipt_chat_id && (sub as any).kol_receipt_message_id) {
+      const displayName = (sub as any).campaign?.client?.name || campaignName;
+      await editMessageText(
+        (sub as any).kol_receipt_chat_id,
+        Number((sub as any).kol_receipt_message_id),
+        `✅ Got it — submitted for <b>${escapeHtml(displayName)}</b>.`,
+      );
     }
   }
 

@@ -77,8 +77,9 @@ export async function POST(
     .from('content_submissions')
     .select(`
       id, kol_id, campaign_id, link, platform, content_type, status,
+      kol_receipt_chat_id, kol_receipt_message_id,
       kol:master_kols!inner(id, name),
-      campaign:campaigns!inner(id, name)
+      campaign:campaigns!inner(id, name, client:clients(name))
     `)
     .eq('id', params.id)
     .maybeSingle();
@@ -136,28 +137,54 @@ export async function POST(
     }
   }
 
-  // Notify the KOL via their per-KOL group chat (matches TG callback path)
-  const { data: kolChat } = await (adminClient as any)
-    .from('telegram_chats')
-    .select('chat_id')
-    .eq('master_kol_id', sub.kol_id)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-  const kolChatId = (kolChat as any)?.chat_id ?? null;
-  if (kolChatId && process.env.TELEGRAM_BOT_TOKEN) {
-    const text = action === 'approve'
-      ? '👍'
-      : `Submission issue: <i>${rejectionReason}</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`;
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  // Notify the KOL. On approve, prefer EDITING their original /submit
+  // receipt to drop the "pending review" tail — "…, submitted for X." —
+  // matching the TG callback path. Fall back to a fresh per-KOL-chat
+  // message for rejects and for legacy submissions with no recorded receipt.
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const receiptChatId = (sub as any).kol_receipt_chat_id;
+  const receiptMessageId = (sub as any).kol_receipt_message_id;
+  const displayName = (sub as any).campaign?.client?.name || (sub as any).campaign?.name || 'your campaign';
+  const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  let receiptEdited = false;
+  if (action === 'approve' && !createContentError && receiptChatId && receiptMessageId && botToken) {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: kolChatId,
-        text,
+        chat_id: receiptChatId,
+        message_id: Number(receiptMessageId),
+        text: `✅ Got it — submitted for <b>${escHtml(displayName)}</b>.`,
         parse_mode: 'HTML',
       }),
-    }).catch(() => {/* best effort */});
+    }).catch(() => null);
+    receiptEdited = !!(res && (res as Response).ok);
+  }
+
+  if (!receiptEdited) {
+    const { data: kolChat } = await (adminClient as any)
+      .from('telegram_chats')
+      .select('chat_id')
+      .eq('master_kol_id', sub.kol_id)
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    const kolChatId = (kolChat as any)?.chat_id ?? null;
+    if (kolChatId && botToken) {
+      const text = action === 'approve'
+        ? '👍'
+        : `Submission issue: <i>${rejectionReason}</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`;
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: kolChatId,
+          text,
+          parse_mode: 'HTML',
+        }),
+      }).catch(() => {/* best effort */});
+    }
   }
 
   return NextResponse.json({
