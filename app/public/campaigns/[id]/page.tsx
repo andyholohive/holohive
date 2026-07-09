@@ -1492,7 +1492,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                 <div className="border-t border-cream-100 px-5 py-2.5 bg-cream-50/60">
                   <div className="flex items-center justify-between text-[11px] text-ink-warm-500 mb-1">
                     <span>Week {weekN} of {weekOf}</span>
-                    <span className="tabular-nums">{Math.round(progressPct * 100)}%</span>
                   </div>
                   <div className="h-1 rounded-full bg-cream-200 overflow-hidden">
                     <div
