@@ -2086,10 +2086,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     {/* Phase badge — only renders when mig 078 is applied AND
                         the CM has set a phase. Until then the slot is empty
                         and the layout still looks correct. */}
-                    {activeCampaign.current_phase && (
+                    {/* [2026-07-09] Campaign phase hidden per Andy (internal + public). */}
+                    {false && activeCampaign?.current_phase && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-sm font-semibold">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        {activeCampaign.current_phase}
+                        {activeCampaign?.current_phase}
                       </span>
                     )}
                   </div>

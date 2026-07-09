@@ -2215,10 +2215,12 @@ const CampaignDetailsPage = () => {
                     >
                       {campaign.status}
                     </StatusBadge>
-                    {campaign.current_phase && (
+                    {/* [2026-07-09] Campaign phase hidden per Andy — everywhere
+                        internal + public. Gated off (not deleted) for restore. */}
+                    {false && campaign?.current_phase && (
                       <>
                         <span className="text-ink-warm-300">·</span>
-                        <span className="text-ink-warm-700">{campaign.current_phase}</span>
+                        <span className="text-ink-warm-700">{campaign?.current_phase}</span>
                       </>
                     )}
                     {campaign.start_date && (campaign.end_date || clientCoveredThrough) && (() => {

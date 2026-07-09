@@ -112,6 +112,8 @@ export default function CampaignOverviewPage() {
       <div className="space-y-6">
         <PageHeader
           icon={BarChart3}
+          kicker="Clients · Campaign Overview"
+          kickerDot="sky"
           title="Campaign Overview"
           subtitle="Company-wide, all-time. Who performs and where we over-rely."
           actions={heroActions}
@@ -133,6 +135,8 @@ export default function CampaignOverviewPage() {
     <div className="space-y-6">
       <PageHeader
         icon={BarChart3}
+        kicker="Clients · Campaign Overview"
+        kickerDot="sky"
         title="Campaign Overview"
         subtitle="Company-wide, all-time. Who performs and where we over-rely."
         actions={heroActions}

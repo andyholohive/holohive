@@ -135,14 +135,35 @@ export function BudgetDashboardV2() {
     return { content, activation, internal };
   }, [payments]);
 
-  // [2026-07-09] Total Budget = sum of the campaign's budget allocations
-  // (what was actually allocated across regions), falling back to the stored
-  // total_budget scalar only when no allocations exist. Previously read
-  // total_budget directly, which drifted from the allocations once more than
-  // one region was added.
+  // [2026-07-09] Total Budget = sum of the client's engagement-TERM amounts
+  // (client_engagement_periods across the client's stints). A campaign maps
+  // to a client engagement and each term carries its own contracted amount,
+  // so the true budget is their sum (e.g. Fogo = 2 terms × 15k = 30k) — not
+  // the single total_budget scalar or one region allocation.
+  const budgetClientId = (campaign as any)?.client_id as string | undefined;
+  const [engagementTermsTotal, setEngagementTermsTotal] = useState<number | null>(null);
+  useEffect(() => {
+    if (!budgetClientId) { setEngagementTermsTotal(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data: stints } = await (supabase as any)
+        .from('client_stints').select('id').eq('client_id', budgetClientId);
+      const stintIds = ((stints ?? []) as Array<{ id: string }>).map(s => s.id);
+      if (!stintIds.length) { if (!cancelled) setEngagementTermsTotal(null); return; }
+      const { data: periods } = await (supabase as any)
+        .from('client_engagement_periods').select('amount').in('stint_id', stintIds);
+      const sum = ((periods ?? []) as Array<{ amount: number | string | null }>)
+        .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      if (!cancelled) setEngagementTermsTotal(sum);
+    })();
+    return () => { cancelled = true; };
+  }, [budgetClientId]);
+
   const allocationsSum = (((campaign as any)?.budget_allocations ?? []) as Array<{ allocated_budget?: number | string | null }>)
     .reduce((s, a) => s + Number(a.allocated_budget ?? 0), 0);
-  const totalBudget = allocationsSum > 0 ? allocationsSum : Number((campaign as any)?.total_budget ?? 0);
+  const totalBudget = (engagementTermsTotal && engagementTermsTotal > 0)
+    ? engagementTermsTotal
+    : (allocationsSum > 0 ? allocationsSum : Number((campaign as any)?.total_budget ?? 0));
   const remaining = totalBudget - totals.content - totals.activation - totals.internal;
   // Team/client view: fold Expenses into Remaining (hidden tile).
   const remainingForRole = isAdminOrOwner ? remaining : remaining + totals.internal;
@@ -173,6 +194,7 @@ export function BudgetDashboardV2() {
     })();
     return () => { cancelled = true; };
   }, [campaign?.id]);
+
 
   /** Aggregate metrics from the campaign's content rows for CPM + CPE.
    *  Billable-deliverable counting: rows sharing a multipost_group_id

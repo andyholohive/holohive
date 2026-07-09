@@ -35,9 +35,32 @@ import { CampaignService } from '@/lib/campaignService';
 import { BRAND_HEX } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { formatDate } from '@/lib/dateFormat';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export function BudgetOverview() {
   const { campaign, campaignKOLs, payments } = useCampaignDetail();
+
+  // [2026-07-09] Total Budget = sum of the client's engagement-TERM amounts
+  // (see BudgetDashboardV2) so both budget views agree.
+  const clientId = (campaign as any)?.client_id as string | undefined;
+  const [engagementTermsTotal, setEngagementTermsTotal] = useState<number | null>(null);
+  useEffect(() => {
+    if (!clientId) { setEngagementTermsTotal(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data: stints } = await (supabase as any)
+        .from('client_stints').select('id').eq('client_id', clientId);
+      const stintIds = ((stints ?? []) as Array<{ id: string }>).map(s => s.id);
+      if (!stintIds.length) { if (!cancelled) setEngagementTermsTotal(null); return; }
+      const { data: periods } = await (supabase as any)
+        .from('client_engagement_periods').select('amount').in('stint_id', stintIds);
+      const sum = ((periods ?? []) as Array<{ amount: number | string | null }>)
+        .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+      if (!cancelled) setEngagementTermsTotal(sum);
+    })();
+    return () => { cancelled = true; };
+  }, [clientId]);
 
   if (!campaign) return null;
 
@@ -54,7 +77,9 @@ export function BudgetOverview() {
                       // (fallback to the stored total_budget scalar when none),
                       // so the KPI reflects everything actually allocated.
                       const allocationsSum = (campaign.budget_allocations ?? []).reduce((s: number, a: any) => s + Number(a.allocated_budget ?? 0), 0);
-                      const effectiveTotal = allocationsSum > 0 ? allocationsSum : (campaign.total_budget || 0);
+                      const effectiveTotal = (engagementTermsTotal && engagementTermsTotal > 0)
+                        ? engagementTermsTotal
+                        : (allocationsSum > 0 ? allocationsSum : (campaign.total_budget || 0));
                       const remaining = effectiveTotal - paid;
                       const paidPct = effectiveTotal > 0 ? (paid / effectiveTotal) * 100 : 0;
                       const remainPct = effectiveTotal > 0 ? (remaining / effectiveTotal) * 100 : 0;

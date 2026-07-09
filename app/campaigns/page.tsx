@@ -1311,31 +1311,35 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                   {/* Section shortcuts — jump straight into a tab of the
-                      campaign detail page (?tab=…). Pinned at bottom. */}
-                  <div className="mt-auto grid grid-cols-2 gap-2">
-                    {([
-                      { label: 'KOL Dashboard', tab: 'kols', icon: Users },
-                      { label: 'Content Dashboard', tab: 'contents', icon: FileText },
-                      { label: 'Lineups', tab: 'lineups', icon: List },
-                      { label: 'Budget', tab: 'payments', icon: DollarSign },
-                    ] as const).map(({ label, tab, icon: Icon }) => (
-                      <Button
-                        key={tab}
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center text-xs px-1.5"
-                        onClick={() => {
-                          if (!campaign.id) {
-                            console.error('Campaign ID is missing!', campaign);
-                            return;
-                          }
-                          router.push(`/campaigns/${campaign.slug || campaign.id}?tab=${tab}`);
-                        }}
-                      >
-                        <Icon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                        {label}
-                      </Button>
-                    ))}
+                      campaign detail page (?tab=…). Same format as the
+                      /clients card footer buttons: flat divider + a
+                      flex-wrap row of flex-1 outline buttons. */}
+                  <div className="mt-auto pt-3 border-t border-cream-100">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {([
+                        { label: 'KOL Dashboard', tab: 'kols', icon: Users },
+                        { label: 'Content Dashboard', tab: 'contents', icon: FileText },
+                        { label: 'Lineups', tab: 'lineups', icon: List },
+                        { label: 'Budget', tab: 'payments', icon: DollarSign },
+                      ] as const).map(({ label, tab, icon: Icon }) => (
+                        <Button
+                          key={tab}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 min-w-[110px] px-2"
+                          onClick={() => {
+                            if (!campaign.id) {
+                              console.error('Campaign ID is missing!', campaign);
+                              return;
+                            }
+                            router.push(`/campaigns/${campaign.slug || campaign.id}?tab=${tab}`);
+                          }}
+                        >
+                          <Icon className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                          <span className="truncate">{label}</span>
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
