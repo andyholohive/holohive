@@ -1073,6 +1073,30 @@ const CampaignDetailsPage = () => {
   }, [campaign]);
 
   const handleEdit = () => setEditMode(true);
+
+  // Inline campaign rename — the Overview/Information tab (which holds the
+  // full edit form) is hidden, so this pencil next to the title is the
+  // visible rename path. Non-guest only. [2026-07-09]
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+  const handleRenameSave = async () => {
+    if (!campaign) return;
+    const next = renameValue.trim();
+    if (!next || next === campaign.name) { setRenameOpen(false); return; }
+    setRenameSaving(true);
+    try {
+      await CampaignService.updateCampaign(campaign.id, { name: next });
+      setCampaign({ ...campaign, name: next } as any);
+      toast({ title: 'Campaign renamed' });
+      setRenameOpen(false);
+    } catch (err: any) {
+      toast({ title: 'Rename failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setRenameSaving(false);
+    }
+  };
+
   const handleCancel = () => {
     setEditMode(false);
     setForm(campaign);
@@ -2093,24 +2117,69 @@ const CampaignDetailsPage = () => {
                     declarative sentence ("Venice Korea Expansion.").
                     Falls back to plain serif when there's only one
                     word in the name. */}
-                {campaign && (() => {
-                  const words = campaign.name.trim().split(/\s+/);
-                  if (words.length <= 1) {
+                <div className="flex items-start gap-1.5">
+                  {campaign && (() => {
+                    const words = campaign.name.trim().split(/\s+/);
+                    if (words.length <= 1) {
+                      return (
+                        <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
+                          {campaign.name}.
+                        </h1>
+                      );
+                    }
+                    const first = words[0];
+                    const rest = words.slice(1).join(' ');
                     return (
                       <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
-                        {campaign.name}.
+                        {first}{' '}
+                        <span className="display-serif-italic text-brand">{rest}.</span>
                       </h1>
                     );
-                  }
-                  const first = words[0];
-                  const rest = words.slice(1).join(' ');
-                  return (
-                    <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
-                      {first}{' '}
-                      <span className="display-serif-italic text-brand">{rest}.</span>
-                    </h1>
-                  );
-                })()}
+                  })()}
+                  {/* Inline rename — visible entry point since the Overview
+                      tab (with the full edit form) is hidden. Non-guest only. */}
+                  {campaign && (userProfile as any)?.role && (userProfile as any).role !== 'guest' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 mt-1 text-ink-warm-400 hover:text-brand shrink-0"
+                      title="Rename campaign"
+                      onClick={() => { setRenameValue(campaign.name); setRenameOpen(true); }}
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+                {campaign && (
+                  <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Rename campaign</DialogTitle>
+                        <DialogDescription>
+                          Updates the campaign name everywhere it&apos;s shown.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-1.5 py-1">
+                        <Label htmlFor="campaign-rename">Name <RequiredAsterisk /></Label>
+                        <Input
+                          id="campaign-rename"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRenameSave(); } }}
+                          placeholder="Campaign name"
+                          className="h-9 focus-brand"
+                          autoFocus
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancel</Button>
+                        <Button variant="brand" onClick={handleRenameSave} disabled={renameSaving || !renameValue.trim()}>
+                          {renameSaving ? 'Saving…' : 'Save'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
                 {/* Inline status pill + metrics row.
                     Uses centralized `<StatusBadge>` with a tone map
                     (CAMPAIGN_STATUS_TONES near the top of this file)
