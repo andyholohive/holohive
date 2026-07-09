@@ -50,15 +50,20 @@ export function BudgetOverview() {
                         the same rhythm as /dashboard, /lists, /analytics. */}
                     {(() => {
                       const paid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-                      const remaining = campaign.total_budget - paid;
-                      const paidPct = campaign.total_budget > 0 ? (paid / campaign.total_budget) * 100 : 0;
-                      const remainPct = campaign.total_budget > 0 ? (remaining / campaign.total_budget) * 100 : 0;
+                      // [2026-07-09] Total budget = sum of region allocations
+                      // (fallback to the stored total_budget scalar when none),
+                      // so the KPI reflects everything actually allocated.
+                      const allocationsSum = (campaign.budget_allocations ?? []).reduce((s: number, a: any) => s + Number(a.allocated_budget ?? 0), 0);
+                      const effectiveTotal = allocationsSum > 0 ? allocationsSum : (campaign.total_budget || 0);
+                      const remaining = effectiveTotal - paid;
+                      const paidPct = effectiveTotal > 0 ? (paid / effectiveTotal) * 100 : 0;
+                      const remainPct = effectiveTotal > 0 ? (remaining / effectiveTotal) * 100 : 0;
                       return (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <KpiCard
                             icon={DollarSign}
                             label="Total Budget"
-                            value={CampaignService.formatCurrency(campaign.total_budget)}
+                            value={CampaignService.formatCurrency(effectiveTotal)}
                             sub={campaign.budget_allocations && campaign.budget_allocations.length > 0
                               ? `${campaign.budget_allocations.length} regions allocated`
                               : 'Campaign allocation'}

@@ -135,7 +135,14 @@ export function BudgetDashboardV2() {
     return { content, activation, internal };
   }, [payments]);
 
-  const totalBudget = Number((campaign as any)?.total_budget ?? 0);
+  // [2026-07-09] Total Budget = sum of the campaign's budget allocations
+  // (what was actually allocated across regions), falling back to the stored
+  // total_budget scalar only when no allocations exist. Previously read
+  // total_budget directly, which drifted from the allocations once more than
+  // one region was added.
+  const allocationsSum = (((campaign as any)?.budget_allocations ?? []) as Array<{ allocated_budget?: number | string | null }>)
+    .reduce((s, a) => s + Number(a.allocated_budget ?? 0), 0);
+  const totalBudget = allocationsSum > 0 ? allocationsSum : Number((campaign as any)?.total_budget ?? 0);
   const remaining = totalBudget - totals.content - totals.activation - totals.internal;
   // Team/client view: fold Expenses into Remaining (hidden tile).
   const remainingForRole = isAdminOrOwner ? remaining : remaining + totals.internal;

@@ -1987,7 +1987,7 @@ const CampaignDetailsPage = () => {
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand shrink-0" aria-hidden />
-              <span>Talent · Campaign</span>
+              <span>Clients · Campaign</span>
             </div>
             <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
               Campaign{' '}
@@ -2102,7 +2102,7 @@ const CampaignDetailsPage = () => {
                 {/* Kicker — sky dot + chapter labels + mono identifier */}
                 <div className="flex items-center gap-2 mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500 flex-wrap">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" aria-hidden />
-                  <span>Talent · Campaign</span>
+                  <span>Clients · Campaign</span>
                   {campaign?.client_name && (
                     <span className="text-ink-warm-300 normal-case mono tracking-normal text-[11px] truncate">
                       {campaign.client_name}

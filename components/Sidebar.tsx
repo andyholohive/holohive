@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
-import { SidebarCustomizeDialog, NAV_BY_HREF, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
+import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
@@ -327,6 +327,22 @@ export default function Sidebar({ children }: SidebarProps) {
    *  original location is hidden. (User intent: bookmark = "I want this
    *  visible at the top," hide = "I don't want this in its original
    *  spot." Bookmarks win.) */
+  // Longest-prefix active match. A nav item is active when its href prefixes
+  // the current path AND no other registered nav href is a *longer* prefix —
+  // so /campaigns/overview highlights "Campaign Overview" only (not the
+  // parent "Campaigns"), and /admin/changelog highlights "Changelog" only
+  // (not "Admin Tools"). Deeper unregistered routes (e.g. /campaigns/[id],
+  // /admin/field-options) still light up their nearest registered parent.
+  const isHrefActive = (href: string) => {
+    if (pathname === href) return true;
+    if (!pathname.startsWith(href + '/')) return false;
+    return !NAV_REGISTRY.some(n =>
+      n.href !== href &&
+      n.href.length > href.length &&
+      (pathname === n.href || pathname.startsWith(n.href + '/')),
+    );
+  };
+
   const NavItem = ({
     href,
     icon: Icon,
@@ -339,7 +355,7 @@ export default function Sidebar({ children }: SidebarProps) {
     force?: boolean;
   }) => {
     if (!force && hiddenSet.has(href)) return null;
-    const isActive = pathname.startsWith(href);
+    const isActive = isHrefActive(href);
     // [v11 design system, 2026-06-01]
     // - Active:  brand-soft bg + brand-deep text + 3px brand left rail
     //   (`.accent-l-brand`). Replaces the flat `bg-brand text-white` fill

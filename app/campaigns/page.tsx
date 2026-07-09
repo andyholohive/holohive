@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import Link from "next/link";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight, Users, FileText } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -1299,23 +1299,32 @@ export default function CampaignsPage() {
                       )}
                     </div>
                   </div>
-                  {/* View Campaign — primary action, pinned at bottom */}
-                  <div className="mt-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        if (!campaign.id) {
-                          console.error('Campaign ID is missing!', campaign);
-                          return;
-                        }
-                        router.push(`/campaigns/${campaign.slug || campaign.id}`);
-                      }}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                      View Campaign
-                    </Button>
+                  {/* Section shortcuts — jump straight into a tab of the
+                      campaign detail page (?tab=…). Pinned at bottom. */}
+                  <div className="mt-auto grid grid-cols-2 gap-2">
+                    {([
+                      { label: 'KOL Dashboard', tab: 'kols', icon: Users },
+                      { label: 'Content Dashboard', tab: 'contents', icon: FileText },
+                      { label: 'Lineups', tab: 'lineups', icon: List },
+                      { label: 'Budget', tab: 'payments', icon: DollarSign },
+                    ] as const).map(({ label, tab, icon: Icon }) => (
+                      <Button
+                        key={tab}
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center text-xs px-1.5"
+                        onClick={() => {
+                          if (!campaign.id) {
+                            console.error('Campaign ID is missing!', campaign);
+                            return;
+                          }
+                          router.push(`/campaigns/${campaign.slug || campaign.id}?tab=${tab}`);
+                        }}
+                      >
+                        <Icon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                        {label}
+                      </Button>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
