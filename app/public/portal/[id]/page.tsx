@@ -3238,114 +3238,49 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url) && (
-                    <div className="space-y-3">
-                      {clientContext.telegram_url && (
-                        <a
-                          href={clientContext.telegram_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
-                        >
-                          <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                            <Send className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Telegram Group</p>
-                            <p className="text-xs text-gray-500">Open chat</p>
-                          </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
-                        </a>
-                      )}
-                      {clientContext.shared_drive_url && (
-                        <a
-                          href={clientContext.shared_drive_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
-                        >
-                          <div className="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
-                            <FolderOpen className="h-5 w-5 text-emerald-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Brand Assets</p>
-                            <p className="text-xs text-gray-500">View files</p>
-                          </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
-                        </a>
-                      )}
-                      {clientContext.gtm_sync_url && (
-                        <a
-                          href={clientContext.gtm_sync_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
-                        >
-                          <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                            <Globe className="h-5 w-5 text-purple-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">GTM Overview</p>
-                            <p className="text-xs text-gray-500">View plan</p>
-                          </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
-                        </a>
-                      )}
-                      {/* [2026-06-08] KOL Content Brief — 4th Resources
-                          card per Post-Onboarding Campaign View spec
-                          v2 (Phase 1). Amber icon tile to differentiate
-                          from the three existing cards (blue / emerald
-                          / purple). Same chrome / hover pattern. */}
-                      {clientContext.kol_content_brief_url && (
-                        <a
-                          href={clientContext.kol_content_brief_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
-                        >
-                          <div className="p-2 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
-                            <FileText className="h-5 w-5 text-amber-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">KOL Content Brief</p>
-                            <p className="text-xs text-gray-500">Open brief</p>
-                          </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  {clientLinks.length > 0 && (
-                    <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url) ? 'mt-4 space-y-3' : 'space-y-3'}>
-                      {(showAllLinks ? clientLinks : clientLinks.slice(0, 4)).map(link => (
-                        <a
-                          key={link.id}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
-                        >
-                          <div className="p-2 bg-brand-light rounded-lg group-hover:bg-[#d4edef] transition-colors">
-                            <LinkIcon className="h-5 w-5 text-brand" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">{link.name}</p>
-                            {link.description && <p className="text-xs text-gray-500">{link.description}</p>}
-                          </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
-                        </a>
-                      ))}
-                      {clientLinks.length > 4 && (
-                        <button
-                          type="button"
-                          onClick={() => setShowAllLinks(v => !v)}
-                          className="w-full text-center text-xs font-medium text-brand hover:text-brand-dark py-1.5"
-                        >
-                          {showAllLinks ? 'Show less' : `Show all ${clientLinks.length}`}
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* [2026-07-10] The fixed context links (Telegram / Brand
+                      Assets / GTM / KOL Content Brief) and the client resource
+                      links share ONE cap of 4 — the context links count toward
+                      it. Show all/less reveals the rest. */}
+                  {(() => {
+                    const items: Array<{ key: string; href: string; icon: JSX.Element; wrap: string; title: string; subtitle?: string }> = [];
+                    if (clientContext?.telegram_url) items.push({ key: 'ctx-tg', href: clientContext.telegram_url, icon: <Send className="h-5 w-5 text-blue-600" />, wrap: 'bg-blue-100 group-hover:bg-blue-200', title: 'Telegram Group', subtitle: 'Open chat' });
+                    if (clientContext?.shared_drive_url) items.push({ key: 'ctx-drive', href: clientContext.shared_drive_url, icon: <FolderOpen className="h-5 w-5 text-emerald-600" />, wrap: 'bg-emerald-100 group-hover:bg-emerald-200', title: 'Brand Assets', subtitle: 'View files' });
+                    if (clientContext?.gtm_sync_url) items.push({ key: 'ctx-gtm', href: clientContext.gtm_sync_url, icon: <Globe className="h-5 w-5 text-purple-600" />, wrap: 'bg-purple-100 group-hover:bg-purple-200', title: 'GTM Overview', subtitle: 'View plan' });
+                    if (clientContext?.kol_content_brief_url) items.push({ key: 'ctx-brief', href: clientContext.kol_content_brief_url, icon: <FileText className="h-5 w-5 text-amber-600" />, wrap: 'bg-amber-100 group-hover:bg-amber-200', title: 'KOL Content Brief', subtitle: 'Open brief' });
+                    for (const link of clientLinks) items.push({ key: link.id, href: link.url, icon: <LinkIcon className="h-5 w-5 text-brand" />, wrap: 'bg-brand-light group-hover:bg-[#d4edef]', title: link.name, subtitle: link.description || undefined });
+                    if (items.length === 0) return null;
+                    const shown = showAllLinks ? items : items.slice(0, 4);
+                    return (
+                      <div className="space-y-3">
+                        {shown.map(it => (
+                          <a
+                            key={it.key}
+                            href={it.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
+                          >
+                            <div className={`p-2 rounded-lg transition-colors ${it.wrap}`}>{it.icon}</div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 group-hover:text-brand truncate">{it.title}</p>
+                              {it.subtitle && <p className="text-xs text-gray-500 truncate">{it.subtitle}</p>}
+                            </div>
+                            <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand flex-shrink-0" />
+                          </a>
+                        ))}
+                        {items.length > 4 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllLinks(v => !v)}
+                            className="w-full text-center text-xs font-medium text-brand hover:text-brand-dark py-1.5"
+                          >
+                            {showAllLinks ? 'Show less' : `Show all ${items.length}`}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {formAttachments.length > 0 && (
                     <div className={(clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url)) || clientLinks.length > 0 ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Uploaded Files</h4>
