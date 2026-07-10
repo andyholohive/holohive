@@ -66,6 +66,9 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   LINEUP_DEADLINES: 1,         // Fri/Mon/Thu 12:00 UTC — lineup propose/approve/posted reminders
   DAILY_PULSE_DM: 1,           // weekdays 06:00 UTC — Daily Pulse morning blocker DM
   DAILY_PULSE_DIGEST: 1,       // weekdays 12:00 UTC — Daily Pulse digest to HH Ops terminal
+  KR_SIGNAL_WEEKLY: 1,         // weekly (Sunday 12:00 UTC) — KR Signal Weekly Market Report to client GCs
+  KR_SIGNAL_BASELINES: 1,      // weekly (Sunday 12:30 UTC) — KR Signal §5 regime baseline refresh
+  KR_SIGNAL_LISTINGS: 24,      // hourly — KR Signal listings alert + digest sweep (Feature B)
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

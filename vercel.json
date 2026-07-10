@@ -5,6 +5,18 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/kr-signal-weekly",
+      "schedule": "0 12 * * 0"
+    },
+    {
+      "path": "/api/cron/kr-signal-baselines",
+      "schedule": "30 12 * * 0"
+    },
+    {
+      "path": "/api/cron/kr-signal-listings",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/korean-exchange-listings",
       "schedule": "0 * * * *"
     },
