@@ -36,47 +36,61 @@ function bar(pct: number, cells = 8): string {
 }
 function pad(s: string, n: number): string { return s.length >= n ? s : s + " ".repeat(n - s.length); }
 
+/**
+ * HoloHive brand mark. Wraps a fallback emoji in a Telegram custom-emoji entity
+ * so the logo shows in front of the title + Holo Hive Signal line. Overridable
+ * via KR_SIGNAL_LOGO_EMOJI_ID. Custom emoji don't render inside <pre> blocks, so
+ * these lines are emitted OUTSIDE the monospace body. sendMessage strips the tag
+ * and falls back to the plain emoji if the bot isn't allowed to send it.
+ */
+const LOGO_EMOJI_ID = process.env.KR_SIGNAL_LOGO_EMOJI_ID || "4988010039290627193";
+function logo(fallback: string): string {
+  return LOGO_EMOJI_ID ? `<tg-emoji emoji-id="${LOGO_EMOJI_ID}">${fallback}</tg-emoji>` : fallback;
+}
+
 export function buildWeeklyReport(d: WeeklyReportData): string {
   const HR = "━━━━━━━━━━━━━";
-  const L: string[] = [];
-  L.push(`📊 $${d.ticker} Weekly Report · ${d.weekLabel}`);
-  L.push(HR);
-  L.push(`🇰🇷 Korea Demand`);
-  L.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
-  L.push(`KR Vol 7d      ${d.krVol7dArrow} ${sign(d.krVol7dPct)}`);
-  L.push(d.koreaReadLabel);
-  L.push(HR);
-  L.push(`🏦 By Venue (7d volume)`);
+  // Monospace body (bars need alignment) — everything except the branded
+  // title + Holo Hive Signal header, which sit OUTSIDE <pre> so the custom
+  // logo emoji renders (it can't inside a code block).
+  const B: string[] = [];
+  B.push(`🇰🇷 Korea Demand`);
+  B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
+  B.push(`KR Vol 7d      ${d.krVol7dArrow} ${sign(d.krVol7dPct)}`);
+  B.push(d.koreaReadLabel);
+  B.push(HR);
+  B.push(`🏦 By Venue (7d volume)`);
   for (const v of d.byVenue) {
     const flag = v.isKR ? "🇰🇷 " : "   ";
-    L.push(`${flag}${pad(v.name, 9)}${pad(usdM(v.usd), 6)} ${bar(v.pct)} ${v.pct}%`);
+    B.push(`${flag}${pad(v.name, 9)}${pad(usdM(v.usd), 6)} ${bar(v.pct)} ${v.pct}%`);
   }
-  L.push(HR);
-  L.push(`🌐 Market Backdrop`);
-  L.push(`Futures total  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
-  L.push(`KR CEX vol     ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
-  L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
-  L.push(`               ${sign(d.kospiYtdPct)} YTD${d.kospiAtAth ? " (at ATH)" : ""}`);
-  L.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
-  L.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
-  L.push(HR);
-  L.push(`🐝 Holo Hive Signal`);
-  L.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
-  L.push(`vs AI-token peers    $${d.ticker} #${d.peerRank} in KR vol share`);
+  B.push(HR);
+  B.push(`🌐 Market Backdrop`);
+  B.push(`Futures total  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
+  B.push(`KR CEX vol     ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
+  B.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
+  B.push(`               ${sign(d.kospiYtdPct)} YTD${d.kospiAtAth ? " (at ATH)" : ""}`);
+  B.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
+  B.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
 
-  return `<pre>${esc(L.join("\n"))}</pre>`;
+  const title = `${logo("📊")} <b>$${esc(d.ticker)} Weekly Report · ${esc(d.weekLabel)}</b>`;
+  const signal = [
+    `${logo("🐝")} <b>Holo Hive Signal</b>`,
+    esc(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`),
+    esc(`vs AI-token peers    $${d.ticker} #${d.peerRank} in KR vol share`),
+  ].join("\n");
+
+  return `${title}\n<pre>${esc(B.join("\n"))}</pre>\n${signal}`;
 }
 
 /** Market-backdrop-only block — for the /vl command (mirrors @cexdexspikebot). */
 export function buildBackdrop(d: WeeklyReportData): string {
-  const HR = "━━━━━━━━━━━━━";
   const L: string[] = [];
-  L.push(`📊 $${d.ticker} Market Backdrop · ${d.weekLabel}`);
-  L.push(HR);
   L.push(`Futures total  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
   L.push(`KR CEX vol     ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
   L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
   L.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   L.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
-  return `<pre>${esc(L.join("\n"))}</pre>`;
+  const title = `${logo("📊")} <b>$${esc(d.ticker)} Market Backdrop · ${esc(d.weekLabel)}</b>`;
+  return `${title}\n<pre>${esc(L.join("\n"))}</pre>`;
 }

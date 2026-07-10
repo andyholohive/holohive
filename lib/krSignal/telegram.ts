@@ -40,7 +40,17 @@ export async function sendMessage(
   if (threadId !== undefined && threadId !== null && String(threadId) !== "") {
     body.message_thread_id = Number(threadId);
   }
-  return call<{ message_id: number }>("sendMessage", body);
+  try {
+    return await call<{ message_id: number }>("sendMessage", body);
+  } catch (e) {
+    // Bots can't always send custom emoji (<tg-emoji>). On failure, strip the
+    // tags — keeping the inner fallback glyph — and resend so the report lands.
+    if (/<tg-emoji/i.test(html)) {
+      const plain = html.replace(/<tg-emoji[^>]*>(.*?)<\/tg-emoji>/gi, "$1");
+      return await call<{ message_id: number }>("sendMessage", { ...body, text: plain });
+    }
+    throw e;
+  }
 }
 
 /** Edit a previously sent message in place — used for the Day-1 recap (Stage 2, §7.D/§8). */
