@@ -28,6 +28,7 @@
 
 import { NextResponse } from 'next/server';
 import { adminSupabase, getStandardClients, getAdHocClients, renewalToneFor, overdueToneFor } from '@/lib/dashboard/queries';
+import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { getDashboardConfig } from '@/lib/dashboard/config';
 import { getThisWeekKolDelivery } from '@/lib/clientDeliveryService';
 
@@ -368,16 +369,15 @@ export async function GET(request: Request) {
       });
     }
 
-    // [2026-06-11] Compute week-number per spec § 4.2:
-    // FLOOR((NOW - started_date) / 7) + 1 — week 1 is the week the
-    // engagement started. Returns null for clients with no start date.
-    const weekNumberFor = (startedDate: string | null | undefined): number | null => {
-      if (!startedDate) return null;
-      const start = new Date(startedDate + (startedDate.includes('T') ? '' : 'T00:00:00Z'));
-      const ms = Date.now() - start.getTime();
-      if (ms < 0) return null;
-      return Math.floor(ms / (7 * 86_400_000)) + 1;
-    };
+    // [2026-07-10] Week number now uses the canonical Monday-anchored
+    // helper (lib/campaignWeekHelpers). The old raw FLOOR((NOW-start)/7)+1
+    // counted the partial pre-Monday week, so a Thursday-start client
+    // read one week AHEAD of the campaign page (Jdot: "Campaign page
+    // says Week 9, Team Dashboard says Wk 10"). Supersedes the literal
+    // spec § 4.2 formula — one week rule app-wide per the 2026-06-23
+    // consolidation.
+    const weekNumberFor = (startedDate: string | null | undefined): number | null =>
+      getCampaignWeek(startedDate)?.weekNumber ?? null;
 
     // [2026-06-11] Health tone per spec § 4.2:
     // 0 overdue = green/healthy, 1-2 = amber/needs attention, 3+ = red/at risk.

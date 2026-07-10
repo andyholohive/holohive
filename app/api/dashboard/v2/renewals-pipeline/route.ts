@@ -20,6 +20,7 @@
 
 import { NextResponse } from 'next/server';
 import { adminSupabase, getStandardClients, getRelevantClients, renewalToneFor } from '@/lib/dashboard/queries';
+import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { getDashboardConfig } from '@/lib/dashboard/config';
 import { getPipelineSnapshot, ACTIVE_PIPELINE_STAGES } from '@/lib/dashboard/pipeline-source';
 
@@ -91,13 +92,11 @@ export async function GET() {
         // [F1 cleanup 2026-07-02] Week number counts from active stint
         // start_date, not the retired clients.engagement_start_date.
         // Continuous per TD §5.2 — doesn't reset on renewal.
+        // [2026-07-10] Switched to the canonical Monday-anchored helper —
+        // the raw floor math counted the partial pre-Monday week and ran
+        // one week ahead of the campaign page (Jdot punch list).
         const stintStart = stintStartById.get(c.id) ?? null;
-        let weekNumber: number | null = null;
-        if (stintStart) {
-          const start = new Date(stintStart + (stintStart.includes('T') ? '' : 'T00:00:00Z'));
-          const weeks = Math.floor((Date.now() - start.getTime()) / (7 * 86_400_000));
-          weekNumber = weeks >= 0 ? weeks + 1 : null;
-        }
+        const weekNumber = getCampaignWeek(stintStart)?.weekNumber ?? null;
         return {
           id: c.id,
           name: c.name,

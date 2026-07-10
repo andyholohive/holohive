@@ -88,7 +88,7 @@ type TermRollover = {
   rolloverPct: number | null;
 };
 
-export function BudgetDashboardV2() {
+export function BudgetDashboardV2({ clientCoveredThrough }: { clientCoveredThrough?: string | null } = {}) {
   const { campaign, payments } = useCampaignDetail();
   const { userProfile } = useAuth();
   const isAdminOrOwner = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
@@ -232,11 +232,18 @@ export function BudgetDashboardV2() {
     return { totalViews, engagementSum, contentCount, cpm, cpe, costPerPiece };
   }, [contentRows, totals.content]);
 
-  /** Burn vs pace. Per spec, burn calc can include all categories. */
+  /** Burn vs pace. Per spec, burn calc can include all categories.
+   *
+   *  [2026-07-10] Term end is coverage-first (client covered_through ??
+   *  campaign end_date) — same rule as the hero's "Week N of M" and the
+   *  campaign card. Anchoring to end_date alone clamped elapsed to 100%
+   *  once the campaign's own end date passed mid-engagement (Jdot:
+   *  Venice showed "43% / 100%" at Week 9 of 13; should be ~70%). */
   const burn = useMemo(() => {
     if (!campaign?.start_date || !totalBudget) return null;
     const start = new Date(campaign.start_date as any);
-    const end = (campaign as any).end_date ? new Date((campaign as any).end_date) : null;
+    const termEndIso = clientCoveredThrough ?? (campaign as any).end_date ?? null;
+    const end = termEndIso ? new Date(termEndIso) : null;
     if (!end) return null;
     const today = new Date();
     const totalDays = Math.max(1, (end.getTime() - start.getTime()) / 86400000);
@@ -245,7 +252,7 @@ export function BudgetDashboardV2() {
     const allSpent = totals.content + totals.activation + totals.internal;
     const pctSpent = (allSpent / totalBudget) * 100;
     return { pctSpent, pctElapsed, gap: pctSpent - pctElapsed };
-  }, [campaign, totalBudget, totals]);
+  }, [campaign, clientCoveredThrough, totalBudget, totals]);
 
   // ── Rollover Summary, by term ─────────────────────────────────────
   // [2026-06-30] Per Andy: rows are TERMS (client_engagement_periods),

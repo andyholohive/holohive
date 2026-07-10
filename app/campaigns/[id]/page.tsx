@@ -2360,8 +2360,11 @@ const CampaignDetailsPage = () => {
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t flex items-center gap-1.5"
               >
                 KOL Dashboard
-                {campaignKOLs.length > 0 && (
-                  <span className="text-[10px] mono tabular-nums text-ink-warm-500">{campaignKOLs.length}</span>
+                {/* [2026-07-10] Badge counts ACTIVE (non-hidden) KOLs only —
+                    it read 31 while the Overview showed 20 because 11 hidden
+                    KOLs were included (Jdot punch list). */}
+                {campaignKOLs.filter((k) => !k.hidden).length > 0 && (
+                  <span className="text-[10px] mono tabular-nums text-ink-warm-500">{campaignKOLs.filter((k) => !k.hidden).length}</span>
                 )}
               </TabsTrigger>
               <TabsTrigger
@@ -2752,7 +2755,7 @@ const CampaignDetailsPage = () => {
                     breakdown row, CPM/CPE/Cost-per-piece/Burn tiles,
                     portfolio benchmark, Phase 2 funnel placeholder,
                     rollover summary. */}
-                <BudgetDashboardV2 />
+                <BudgetDashboardV2 clientCoveredThrough={clientCoveredThrough} />
 
                 {/* Existing payment table — preserved as-is per spec
                     "PRESERVE · x/x content paid tracker" feature. */}
