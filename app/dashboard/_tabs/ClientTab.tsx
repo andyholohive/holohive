@@ -228,18 +228,18 @@ function FragmentRow({
         <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
           {client.extVisitsLast7d}
         </TableCell>
+        <TableCell className="py-3.5 px-5">
+          <StatusBadge tone={HEALTH_TO_BADGE[client.healthTone]} size="sm" bordered withDot>
+            {HEALTH_LABEL[client.healthTone]}
+          </StatusBadge>
+        </TableCell>
         {/* [2026-07-10] KOL delivery roll-up promoted from the expanded
-            sub-row header to its own column next to Health, so the
+            sub-row header to its own column right of Health, so the
             approved/total ratio is scannable without expanding rows. */}
         <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
           {client.kolDelivery.total > 0
             ? `${client.kolDelivery.approved}/${client.kolDelivery.total}`
             : <span className="text-ink-warm-300">—</span>}
-        </TableCell>
-        <TableCell className="py-3.5 px-5">
-          <StatusBadge tone={HEALTH_TO_BADGE[client.healthTone]} size="sm" bordered withDot>
-            {HEALTH_LABEL[client.healthTone]}
-          </StatusBadge>
         </TableCell>
       </TableRow>
 
@@ -406,7 +406,7 @@ export default function ClientTab() {
         <SectionHeader label="Client Health" dot="brand" counter="02 — Delivery only · This week" />
 
       {/* Client Health table — post-2026-06-25 redesign:
-          Client | Week | HQ Tasks | Content | Visits | Approved | Health.
+          Client | Week | HQ Tasks | Content | Visits | Health | Approved.
           Renewal column moved to the dedicated Renewals & Pipeline tab
           (single source of renewal math). Rows expand to show this week's
           KOL roster from confirmed lineups + /submit status; the
@@ -446,8 +446,8 @@ export default function ClientTab() {
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">HQ Tasks</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Content</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Visits</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Approved</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Health</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Approved</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
