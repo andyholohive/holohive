@@ -31,13 +31,32 @@ type UnscoredRow = {
   content_id: string;
   tg_comment_id: number;
   text: string;
+  parent_comment_id: number | null;
+  reactions_json: Array<{ emoticon?: string; count?: number }> | null;
 };
+
+/** v3 six-bucket taxonomy (spec Layer 3). Sentiment is computed over
+ *  positive/negative/fud only — noise + hype are volume, questions are
+ *  their own signal ("a wall of questions means the narrative is not
+ *  landing"), never folded into the score. */
+type BucketLabel = 'noise' | 'hype' | 'positive' | 'negative' | 'question' | 'fud';
+const BUCKETS: BucketLabel[] = ['noise', 'hype', 'positive', 'negative', 'question', 'fud'];
 
 type Verdict = {
   tg_comment_id: number;
-  sentiment_label: 'positive' | 'neutral' | 'negative';
+  sentiment_label: BucketLabel;
   sentiment_theme: string;
+  en_gloss: string | null;
 };
+
+const hasHangul = (s: string) => /[ㄱ-ㆎ가-힣]/.test(s || '');
+const hasLatin = (s: string) => /[a-zA-Z]{2,}/.test(s || '');
+const detectLang = (s: string) =>
+  hasHangul(s) ? (hasLatin(s) ? 'mixed' : 'ko') : 'en';
+const reactionTotal = (r: UnscoredRow['reactions_json']) =>
+  Array.isArray(r) ? r.reduce((s, x) => s + (Number(x?.count) || 0), 0) : 0;
+/** Copy-paste farming collapses into a dedup_group (normalized text). */
+const dedupKey = (s: string) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET) {
@@ -103,7 +122,7 @@ export async function GET(request: Request) {
     // per-post naturally without a second query.
     const { data: rows, error: fetchErr } = await (supabase as any)
       .from('post_comments')
-      .select('id, content_id, tg_comment_id, text')
+      .select('id, content_id, tg_comment_id, text, parent_comment_id, reactions_json')
       .is('sentiment_scored_at', null)
       .order('content_id')
       .order('sent_at')
@@ -141,15 +160,28 @@ export async function GET(request: Request) {
         // multi-row UPDATE with different values per row without an RPC.
         // For 100-comment batches this is fine; if it becomes a bottleneck,
         // move to a bulk RPC that takes JSON.
+        // Dedup pre-pass (spec Layer 2): identical normalized text across
+        // 2+ comments on the post gets a shared dedup_group tag.
+        const textCounts = new Map<string, number>();
+        for (const c of comments) {
+          const k = dedupKey(c.text);
+          if (k) textCounts.set(k, (textCounts.get(k) || 0) + 1);
+        }
+
         const scoredAt = new Date().toISOString();
         for (const c of comments) {
           const v = byId.get(c.tg_comment_id);
           if (!v) continue;
+          const k = dedupKey(c.text);
           const { error: uErr } = await (supabase as any)
             .from('post_comments')
             .update({
               sentiment_label: v.sentiment_label,
               sentiment_theme: v.sentiment_theme.slice(0, 40),
+              en_gloss: v.en_gloss ? v.en_gloss.slice(0, 300) : null,
+              lang: detectLang(c.text),
+              reaction_total: reactionTotal(c.reactions_json),
+              dedup_group: k && (textCounts.get(k) || 0) > 1 ? k.slice(0, 120) : null,
               sentiment_scored_at: scoredAt,
             })
             .eq('id', c.id);
@@ -193,21 +225,37 @@ async function scorePost(
   contentId: string,
   comments: UnscoredRow[],
 ): Promise<Verdict[]> {
+  // v3 taxonomy (spec Layer 3): GATE BEFORE YOU SCORE. Noise/hype are
+  // classified but never touch the sentiment rollup. Score in the
+  // ORIGINAL language — translate-then-score flattens KR sarcasm/slang;
+  // the EN gloss is display-only for the quote bank.
   const system = [
     'You classify Telegram discussion-group comments on a crypto KOL post.',
-    'For each comment, output ONE JSON row with sentiment_label and a short theme keyword.',
-    'sentiment_label: "positive" (endorsement, hype, agreement, thanks),',
-    '                 "negative" (criticism, doubt, FUD, complaint), or',
-    '                 "neutral"  (question, price ask, off-topic, ambiguous).',
-    'sentiment_theme: one short (1-3 word) English keyword describing the comment\'s angle,',
-    '                 e.g. "hype", "price ask", "confusion", "shilling", "gratitude",',
-    '                 "questioning fundamentals", "off-topic". Lowercase.',
-    'Respond ONLY with a JSON array. No preamble. Every input comment must appear in the output.',
+    'Classify each comment into EXACTLY ONE bucket:',
+    '  "noise"    — farming: gm, emoji-only, "done", tag-a-friend, one-word hype with no content.',
+    '  "hype"     — generic hype: bullish, LFG, rockets. Engagement signal, no real feedback.',
+    '  "positive" — substantive positive: a real reason or specific praise.',
+    '  "negative" — substantive criticism: complaints, doubts, bug reports, specific pushback.',
+    '  "question" — genuine question or confusion about the product/mechanics.',
+    '  "fud"      — trust/security/rug/team concerns (separate from ordinary criticism).',
+    'Read Korean natively — do NOT translate before judging tone.',
+    'When parent_text is present, the comment is a REPLY: judge it in that context',
+    '(a bare "no, that is not it" inverts meaning depending on what it answers).',
+    'sentiment_theme: one short lowercase English keyword (1-3 words) for the angle.',
+    'en_gloss: for non-English comments in buckets positive/negative/question/fud, a short',
+    '          faithful English gloss of the comment. null for English comments and for noise/hype.',
+    'Respond ONLY with a JSON array. Every input comment must appear in the output.',
   ].join('\n');
+
+  const parentText = new Map<number, string>();
+  for (const c of comments) parentText.set(c.tg_comment_id, c.text || '');
 
   const commentsPayload = comments.map(c => ({
     id: c.tg_comment_id,
     text: (c.text || '').slice(0, 2000),
+    parent_text: c.parent_comment_id
+      ? (parentText.get(c.parent_comment_id) || null)?.slice(0, 500) ?? null
+      : null,
   }));
 
   const user = [
@@ -215,12 +263,12 @@ async function scorePost(
     `Comments (${commentsPayload.length}):`,
     JSON.stringify(commentsPayload, null, 2),
     '',
-    'Return: [{"tg_comment_id": <id>, "sentiment_label": "...", "sentiment_theme": "..."}, ...]',
+    'Return: [{"tg_comment_id": <id>, "sentiment_label": "...", "sentiment_theme": "...", "en_gloss": "..."|null}, ...]',
   ].join('\n');
 
   const msg = await anthropic.messages.create({
     model,
-    max_tokens: Math.max(1024, comments.length * 60),
+    max_tokens: Math.max(1024, comments.length * 140),
     system,
     messages: [{ role: 'user', content: user }],
     thinking: { type: 'adaptive' },
@@ -241,9 +289,10 @@ async function scorePost(
     const label = row?.sentiment_label;
     const theme = String(row?.sentiment_theme || '').toLowerCase().trim();
     if (!Number.isFinite(id)) continue;
-    if (label !== 'positive' && label !== 'neutral' && label !== 'negative') continue;
+    if (!BUCKETS.includes(label)) continue;
     if (!theme) continue;
-    verdicts.push({ tg_comment_id: id, sentiment_label: label, sentiment_theme: theme });
+    const gloss = typeof row?.en_gloss === 'string' && row.en_gloss.trim() ? row.en_gloss.trim() : null;
+    verdicts.push({ tg_comment_id: id, sentiment_label: label, sentiment_theme: theme, en_gloss: gloss });
   }
   return verdicts;
 }
