@@ -394,6 +394,36 @@ export async function GET(request: Request) {
     // Approved / In QA / Not submitted. See lib/clientDeliveryService.
     const deliveryByClient = await getThisWeekKolDelivery(sb as any, standardClientIds);
 
+    // [2026-07-10] TG Comment Sentiment v3 — FUD-spike client alert
+    // (threshold confirmed by Jdot: fud >= 15% of scored comments in the
+    // last 14 days, or 5+ FUD comments on a single post).
+    const fudAlertByClient = new Map<string, boolean>();
+    try {
+      const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString();
+      const { data: scoredRows } = await (sb as any)
+        .from('post_comments')
+        .select('content_id, sentiment_label, contents!inner(campaigns!inner(client_id))')
+        .in('sentiment_label', ['positive', 'negative', 'fud'])
+        .gte('sent_at', since14)
+        .limit(10000);
+      const agg = new Map<string, { scored: number; fud: number; fudByPost: Map<string, number> }>();
+      for (const r of ((scoredRows ?? []) as any[])) {
+        const clientId = r?.contents?.campaigns?.client_id;
+        if (!clientId) continue;
+        const a = agg.get(clientId) ?? { scored: 0, fud: 0, fudByPost: new Map() };
+        a.scored++;
+        if (r.sentiment_label === 'fud') {
+          a.fud++;
+          a.fudByPost.set(r.content_id, (a.fudByPost.get(r.content_id) || 0) + 1);
+        }
+        agg.set(clientId, a);
+      }
+      for (const [clientId, a] of agg) {
+        const maxOnPost = Math.max(0, ...a.fudByPost.values());
+        fudAlertByClient.set(clientId, (a.scored > 0 && a.fud / a.scored >= 0.15) || maxOnPost >= 5);
+      }
+    } catch { /* sentiment tables optional — alert stays off */ }
+
     // Build client health rows — ACTIVE-bucket clients only. Per Andy
     // 2026-07-06, Paused clients (coverage lapsed) are excluded from the
     // health table entirely, matching the Clients page's Active tab.
@@ -431,6 +461,7 @@ export async function GET(request: Request) {
         // instrumentation lands.
         extVisitsLast7d: extVisitsByClient.get(c.id) ?? 0,
         healthTone: healthToneFor(t.overdue),
+        fudAlert: fudAlertByClient.get(c.id) ?? false,
         is_whitelisted: c.is_whitelisted ?? false,
         kolDelivery: delivery
           ? {

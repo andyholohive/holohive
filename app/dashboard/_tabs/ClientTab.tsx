@@ -85,6 +85,9 @@ type ClientHealthRow = {
   totalContentPosted: number;
   extVisitsLast7d: number;
   healthTone: HealthTone;
+  // [2026-07-10] TG Comment Sentiment v3 — FUD spike in the last 14 days
+  // (>=15% of scored comments or 5+ on one post; thresholds per Jdot).
+  fudAlert?: boolean;
   // [2026-07-06] Coverage-aware engagement status matching the Clients
   // page (active = covered today, paused = coverage lapsed).
   status: 'active' | 'paused';
@@ -218,6 +221,13 @@ function FragmentRow({
               has lapsed (renewal pending), so it isn't counted as Active. */}
           {client.status === 'paused' && (
             <StatusBadge tone="warning" size="sm" className="mt-1">Paused</StatusBadge>
+          )}
+          {/* [2026-07-10] Sentiment v3 client-layer alert — trust/security
+              concerns spiking in the client's TG comment sections; needs a
+              faster response than ordinary criticism. Details live in the
+              campaign Overview sentiment module. */}
+          {client.fudAlert && (
+            <StatusBadge tone="danger" size="sm" className="mt-1">FUD spike</StatusBadge>
           )}
         </TableCell>
         <TableCell className="py-3.5 px-5 text-ink-warm-700 tabular-nums">
