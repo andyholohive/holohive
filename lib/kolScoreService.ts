@@ -2,15 +2,21 @@
  * KOL Score service — implements Jdot's TG Addendum (18 June 2026)
  * two-score model + blend rule.
  *
- *   Channel Score (5 dims, 100%):
- *     Engagement Quality       30%  = avg organic views / followers
+ *   Channel Score (5 dims, 100%) — amended per Jdot 2026-07-10:
+ *     Average Views            30%  = avg organic views per post (RAW, not
+ *                                     ÷followers — the one dimension where a
+ *                                     big channel earns its reach; ranked
+ *                                     against the WHOLE roster)
  *     Reach Efficiency         25%  = avg organic forwards / avg organic views
  *     Discussion Engagement    15%  = avg organic replies / avg organic views
  *                                     (drop + renormalize for broadcast-only)
- *     Channel Health           15%  = avg(min-max(engagement_rate),
- *                                          min-max(posting_frequency))
+ *     Channel Health           15%  = avg(rank(engagement_rate),
+ *                                          rank(posting_frequency))
  *     Growth Trajectory        15%  = follower_growth_pct, floor neg at 0
  *                                     (drop + renormalize on month-1 / null)
+ *     The four RATE dims rank within follower bands (<5K / 5–20K / 20K+)
+ *     so small channels compete against small — big wins on reach, small
+ *     wins on quality, neither gets shut out.
  *
  *   Campaign Performance Score (3 dims, gates at 3+ deliverables):
  *     Activation Impact        50%  = participants / single-campaign avg
@@ -24,9 +30,13 @@
  *   Tier (absolute, applied to the displayed score):
  *     S 85+ · A 70-84 · B 50-69 · C 30-49 · D <30
  *
- * All raw dimension outputs get min-max normalized to 0-100 across the
- * pool that produced them: roster for Channel dims, aggregated campaign
- * data for Campaign dims (per Jdot Q3 + Q12).
+ * All raw dimension outputs are RANK-normalized to 0-100 (percentile
+ * position in the comparison pool) per Jdot's 2026-07-10 amendment —
+ * min-max let one freak channel peg 100 and crush everyone into the
+ * teens; rank puts the middle of the pack at ~50. Comparison pools:
+ * whole roster for Average Views, follower band for the rate dims,
+ * activated pool for Campaign dims. X-only/test accounts (no TG
+ * snapshot) carry null raws and drop out of every pool automatically.
  *
  * Pure compute — no DB calls. Pass in arrays of SnapshotInput +
  * DeliverableInput + master KOL list; get a Map<kol_id, ScoreResult>
@@ -123,19 +133,36 @@ const ACTIVATION_THRESHOLD = 3;
 // ─── Math helpers ──────────────────────────────────────────────────────
 
 /**
- * Min-max normalize a value into 0–100 against a population.
- * Population values of `null`/`undefined` are dropped. If min==max the
- * normalized value collapses to 50 (neutral) — preserves rank order
- * without dividing by zero.
+ * Rank-normalize a value into 0–100 against a population (Jdot 2026-07-10
+ * amendment). Score = midrank percentile: where the KOL sits in the pool,
+ * ties averaged. Replaces min-max, where one freak channel pegged 100 and
+ * dropped everyone else into the teens — rank pulls the median to ~50.
+ * Population values of `null`/`undefined` are dropped; a pool of one
+ * collapses to 50 (neutral).
  */
-function minMaxNormalize(value: number, population: ReadonlyArray<number | null | undefined>): number {
+function rankNormalize(value: number, population: ReadonlyArray<number | null | undefined>): number {
   const nums = population.filter((n): n is number => n != null && isFinite(n));
-  if (nums.length === 0) return 0;
-  const min = Math.min(...nums);
-  const max = Math.max(...nums);
-  if (max === min) return 50;
-  const scaled = ((value - min) / (max - min)) * 100;
-  return clamp(scaled, 0, 100);
+  if (nums.length <= 1) return 50;
+  let below = 0;
+  let equal = 0;
+  for (const n of nums) {
+    if (n < value) below++;
+    else if (n === value) equal++;
+  }
+  // Midrank percentile over n values → median lands at 50, best near 100.
+  const pct = ((below + (equal + 1) / 2 - 0.5) / nums.length) * 100;
+  return clamp(pct, 0, 100);
+}
+
+/** Follower band for the rate dimensions (Jdot 2026-07-10): small channels
+ *  rank against small so strong engagement on 3K isn't buried under 60K.
+ *  Coarse on purpose — each band needs enough KOLs to rank against.
+ *  Unknown follower counts fall into the small band. */
+type FollowerBand = 'small' | 'mid' | 'big';
+function bandFor(followers: number | null | undefined): FollowerBand {
+  if (followers == null || followers < 5_000) return 'small';
+  if (followers < 20_000) return 'mid';
+  return 'big';
 }
 
 function clamp(n: number, lo: number, hi: number): number { return Math.max(lo, Math.min(hi, n)); }
@@ -165,7 +192,10 @@ function extractChannelRaw(snap: SnapshotInput | undefined): ChannelRawDims {
     };
   }
   return {
-    engagementQualityRaw: safeDiv(snap.avg_views_per_post, snap.follower_count),
+    // [2026-07-10 Jdot] "Average Views" — raw avg views per post, NOT
+    // ÷followers. The old ratio quietly favored tiny channels; this is
+    // now the one dimension where a big channel earns its reach.
+    engagementQualityRaw: snap.avg_views_per_post ?? null,
     reachEfficiencyRaw: safeDiv(snap.avg_forwards_per_post, snap.avg_views_per_post),
     discussionEngagementRaw: safeDiv(snap.avg_replies_per_post, snap.avg_views_per_post),
     channelHealthRaw_ER: snap.engagement_rate,
@@ -353,18 +383,33 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
     ));
   }
 
-  // Pass 2: collect roster populations for min-max normalization.
-  // Channel dims normalize across the 86-KOL roster (Jdot Q3 + Q12).
-  // Campaign dims normalize across "aggregated campaign data" — i.e. the
-  // pool of activated KOLs' raw ratios (Q12).
-  const channelPop = {
-    eq: kolIds.map(id => channelRawByKol.get(id)?.engagementQualityRaw),
-    re: kolIds.map(id => channelRawByKol.get(id)?.reachEfficiencyRaw),
-    de: kolIds.map(id => channelRawByKol.get(id)?.discussionEngagementRaw),
-    ch_er: kolIds.map(id => channelRawByKol.get(id)?.channelHealthRaw_ER),
-    ch_freq: kolIds.map(id => channelRawByKol.get(id)?.channelHealthRaw_Freq),
-    gt: kolIds.map(id => channelRawByKol.get(id)?.growthTrajectoryRaw),
+  // Pass 2: collect comparison pools for RANK normalization (Jdot
+  // 2026-07-10 amendment). Average Views ranks against the WHOLE roster
+  // (size counts there); the four rate dims rank within follower bands
+  // (<5K / 5–20K / 20K+) so small competes with small. X-only/test
+  // accounts have no TG snapshot → null raws → excluded from every pool
+  // by rankNormalize's null filter.
+  const bandByKol = new Map<string, FollowerBand>();
+  for (const kolId of kolIds) {
+    bandByKol.set(kolId, bandFor(latestSnapshotByKol.get(kolId)?.follower_count));
+  }
+  const idsInBand = (b: FollowerBand) => kolIds.filter(id => bandByKol.get(id) === b);
+  const bandPop = (b: FollowerBand) => {
+    const ids = idsInBand(b);
+    return {
+      re: ids.map(id => channelRawByKol.get(id)?.reachEfficiencyRaw),
+      de: ids.map(id => channelRawByKol.get(id)?.discussionEngagementRaw),
+      ch_er: ids.map(id => channelRawByKol.get(id)?.channelHealthRaw_ER),
+      ch_freq: ids.map(id => channelRawByKol.get(id)?.channelHealthRaw_Freq),
+      gt: ids.map(id => channelRawByKol.get(id)?.growthTrajectoryRaw),
+    };
   };
+  const ratePops: Record<FollowerBand, ReturnType<typeof bandPop>> = {
+    small: bandPop('small'),
+    mid: bandPop('mid'),
+    big: bandPop('big'),
+  };
+  const avgViewsPop = kolIds.map(id => channelRawByKol.get(id)?.engagementQualityRaw);
   const campaignPop = {
     ai: kolIds.map(id => campaignRawByKol.get(id)?.activationImpactRaw),
     sel: kolIds.map(id => campaignRawByKol.get(id)?.sponsoredEngagementLiftRaw),
@@ -378,17 +423,18 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
     const camp = campaignRawByKol.get(kolId)!;
     const snap = latestSnapshotByKol.get(kolId);
 
-    // Channel dims.
-    const eq = raw.engagementQualityRaw == null ? 0 : minMaxNormalize(raw.engagementQualityRaw, channelPop.eq);
-    const re = raw.reachEfficiencyRaw == null ? 0 : minMaxNormalize(raw.reachEfficiencyRaw, channelPop.re);
+    // Channel dims — Average Views vs whole roster; rate dims vs band.
+    const pop = ratePops[bandByKol.get(kolId)!];
+    const eq = raw.engagementQualityRaw == null ? 0 : rankNormalize(raw.engagementQualityRaw, avgViewsPop);
+    const re = raw.reachEfficiencyRaw == null ? 0 : rankNormalize(raw.reachEfficiencyRaw, pop.re);
     const de = raw.discussionEngagementRaw == null
       ? null
-      : minMaxNormalize(raw.discussionEngagementRaw, channelPop.de);
-    // Channel Health: average of two min-max'd sub-metrics per Jdot Q3 option A.
-    const chER = raw.channelHealthRaw_ER == null ? 0 : minMaxNormalize(raw.channelHealthRaw_ER, channelPop.ch_er);
-    const chFreq = raw.channelHealthRaw_Freq == null ? 0 : minMaxNormalize(raw.channelHealthRaw_Freq, channelPop.ch_freq);
+      : rankNormalize(raw.discussionEngagementRaw, pop.de);
+    // Channel Health: average of two ranked sub-metrics per Jdot Q3 option A.
+    const chER = raw.channelHealthRaw_ER == null ? 0 : rankNormalize(raw.channelHealthRaw_ER, pop.ch_er);
+    const chFreq = raw.channelHealthRaw_Freq == null ? 0 : rankNormalize(raw.channelHealthRaw_Freq, pop.ch_freq);
     const ch = (chER + chFreq) / 2;
-    const gt = raw.growthTrajectoryRaw == null ? null : minMaxNormalize(raw.growthTrajectoryRaw, channelPop.gt);
+    const gt = raw.growthTrajectoryRaw == null ? null : rankNormalize(raw.growthTrajectoryRaw, pop.gt);
 
     const channelBreakdown: ChannelScoreBreakdown = {
       engagementQuality: eq,
@@ -402,9 +448,12 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
     // Campaign dims (only if activated).
     let campaignBreakdown: CampaignScoreBreakdown | null = null;
     if (camp.deliverableCount >= ACTIVATION_THRESHOLD) {
-      const ai = camp.activationImpactRaw == null ? 0 : minMaxNormalize(camp.activationImpactRaw, campaignPop.ai);
-      const sel = camp.sponsoredEngagementLiftRaw == null ? 0 : minMaxNormalize(camp.sponsoredEngagementLiftRaw, campaignPop.sel);
-      const sr = camp.sponsoredReachRaw == null ? 0 : minMaxNormalize(camp.sponsoredReachRaw, campaignPop.sr);
+      // Campaign formulas/weights unchanged (size can't distort them) —
+      // only the 0-100 conversion switches to rank so a 70 means the
+      // same on both scores (Jdot 2026-07-10).
+      const ai = camp.activationImpactRaw == null ? 0 : rankNormalize(camp.activationImpactRaw, campaignPop.ai);
+      const sel = camp.sponsoredEngagementLiftRaw == null ? 0 : rankNormalize(camp.sponsoredEngagementLiftRaw, campaignPop.sel);
+      const sr = camp.sponsoredReachRaw == null ? 0 : rankNormalize(camp.sponsoredReachRaw, campaignPop.sr);
       campaignBreakdown = {
         activationImpact: ai,
         sponsoredEngagementLift: sel,

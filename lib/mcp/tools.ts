@@ -1777,8 +1777,8 @@ export async function getKolScore(
   }
   if (blended.lowConfidence) out.push(`*⚠ Low-confidence: latest snapshot flagged low organic volume.*`);
   out.push('');
-  out.push('**Channel Score breakdown (0-100, normalized vs roster):**');
-  out.push(`  · Engagement Quality   (30%): ${Math.round(channel.engagementQuality)}`);
+  out.push('**Channel Score breakdown (0-100, rank vs roster/band):**');
+  out.push(`  · Average Views        (30%): ${Math.round(channel.engagementQuality)}`);
   out.push(`  · Reach Efficiency     (25%): ${Math.round(channel.reachEfficiency)}`);
   out.push(`  · Discussion Engagement (15%): ${channel.discussionEngagement == null ? '— (no linked discussion group)' : Math.round(channel.discussionEngagement)}`);
   out.push(`  · Channel Health       (15%): ${Math.round(channel.channelHealth)}`);

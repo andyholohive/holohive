@@ -339,7 +339,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'get_kol_score',
-      'Composite Score (0-100) + tier badge (S/A/B/C/D) for one KOL, with the per-dimension breakdown (Engagement Quality, Reach Efficiency, Channel Health, Growth Trajectory, Activation Impact). Each dimension is min-max normalized against the whole roster, so scores are always relative. Returns "Insufficient data" if the KOL has fewer than 3 logged deliverables.',
+      'Composite Score (0-100) + tier badge (S/A/B/C/D) for one KOL, with the per-dimension breakdown (Average Views, Reach Efficiency, Channel Health, Growth Trajectory, Activation Impact). Each dimension is rank-normalized (percentile position in its comparison pool: whole roster for Average Views, follower band for rate dims), so scores are relative and the median sits near 50. Returns "Insufficient data" if the KOL has fewer than 3 logged deliverables.',
       getKolScoreSchema,
       async (args) => {
         const supabase = getServiceClient();

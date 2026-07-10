@@ -157,7 +157,7 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Channel Score</h3>
           <span className="text-sm font-semibold text-ink-warm-900 tabular-nums">{Math.round(channel.composite)}</span>
         </div>
-        <DimBar label="Engagement Quality"    weight="30%" value={channel.engagementQuality} />
+        <DimBar label="Average Views"         weight="30%" value={channel.engagementQuality} />
         <DimBar label="Reach Efficiency"      weight="25%" value={channel.reachEfficiency} />
         <DimBar label="Discussion Engagement" weight="15%" value={channel.discussionEngagement}
                 emptyHint="Channel has no linked discussion group" />
