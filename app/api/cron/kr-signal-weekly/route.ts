@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     for (const c of targets) {
       try {
         const res = await assembleWeekly(supabase, c);
-        const m = await sendMessage(c.telegram_chat_id!, res.html);
+        const m = await sendMessage(c.telegram_chat_id!, res.html, c.telegram_thread_id);
         // Persist AFTER a successful send so history reflects delivered reports.
         await saveGlobalWeekly(supabase, res.weekEnding, res.global);
         await saveClientWeekly(supabase, c.id, res.weekEnding, res.client);

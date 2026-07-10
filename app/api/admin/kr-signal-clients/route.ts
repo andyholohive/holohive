@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const COLUMNS =
-  'id, key, name, ticker, kr_listed, telegram_chat_id, features, is_active';
+  'id, key, name, ticker, kr_listed, telegram_chat_id, telegram_thread_id, features, is_active';
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -50,6 +50,10 @@ export async function PATCH(request: Request) {
   if ('telegram_chat_id' in body) {
     const raw = (body.telegram_chat_id ?? '').toString().trim();
     update.telegram_chat_id = raw === '' ? null : raw;
+  }
+  if ('telegram_thread_id' in body) {
+    const raw = (body.telegram_thread_id ?? '').toString().trim();
+    update.telegram_thread_id = raw === '' ? null : raw;
   }
   if ('features' in body && body.features && typeof body.features === 'object') {
     update.features = body.features;

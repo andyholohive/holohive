@@ -31,13 +31,14 @@ export interface KrSignalClient {
   peer_basket: string[];
   content_log_source: string | null;
   telegram_chat_id: string | null;
+  telegram_thread_id: string | null;
   features: KrSignalFeatures;
   thresholds: KrSignalThresholds;
   is_active: boolean;
 }
 
 const COLUMNS =
-  "id, key, name, ticker, contract, chain, coingecko_id, kr_listed, kr_venues, global_venues, peer_basket, content_log_source, telegram_chat_id, features, thresholds, is_active";
+  "id, key, name, ticker, contract, chain, coingecko_id, kr_listed, kr_venues, global_venues, peer_basket, content_log_source, telegram_chat_id, telegram_thread_id, features, thresholds, is_active";
 
 /** All active clients (config source for the crons). */
 export async function loadActiveClients(supabase: SupabaseClient): Promise<KrSignalClient[]> {

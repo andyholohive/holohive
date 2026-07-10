@@ -24,14 +24,23 @@ async function call<T = any>(method: string, body?: Record<string, unknown>): Pr
 
 export const getMe = () => call("getMe");
 
-/** Send an HTML message; returns the sent message (incl. message_id). */
-export async function sendMessage(chatId: string | number, html: string): Promise<{ message_id: number }> {
-  return call<{ message_id: number }>("sendMessage", {
+/** Send an HTML message; returns the sent message (incl. message_id).
+ *  Pass threadId to post into a specific forum topic (message_thread_id). */
+export async function sendMessage(
+  chatId: string | number,
+  html: string,
+  threadId?: string | number | null
+): Promise<{ message_id: number }> {
+  const body: Record<string, unknown> = {
     chat_id: chatId,
     text: html,
     parse_mode: "HTML",
     disable_web_page_preview: true,
-  });
+  };
+  if (threadId !== undefined && threadId !== null && String(threadId) !== "") {
+    body.message_thread_id = Number(threadId);
+  }
+  return call<{ message_id: number }>("sendMessage", body);
 }
 
 /** Edit a previously sent message in place — used for the Day-1 recap (Stage 2, §7.D/§8). */

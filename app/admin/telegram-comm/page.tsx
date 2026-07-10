@@ -1296,11 +1296,12 @@ interface KrClient {
   ticker: string;
   kr_listed: boolean;
   telegram_chat_id: string | null;
+  telegram_thread_id: string | null;
   features: { weekly_market_report?: boolean; korea_listings_digest?: boolean; client_listing_alert?: boolean };
   is_active: boolean;
 }
 
-type KrEdit = { telegram_chat_id: string; features: KrClient['features']; is_active: boolean };
+type KrEdit = { telegram_chat_id: string; telegram_thread_id: string; features: KrClient['features']; is_active: boolean };
 
 function KrSignalClientsSection() {
   const { toast } = useToast();
@@ -1318,7 +1319,7 @@ function KrSignalClientsSection() {
         const list: KrClient[] = json.clients ?? [];
         setClients(list);
         const e: Record<string, KrEdit> = {};
-        for (const c of list) e[c.id] = { telegram_chat_id: c.telegram_chat_id ?? '', features: { ...c.features }, is_active: c.is_active };
+        for (const c of list) e[c.id] = { telegram_chat_id: c.telegram_chat_id ?? '', telegram_thread_id: c.telegram_thread_id ?? '', features: { ...c.features }, is_active: c.is_active };
         setEdits(e);
       } catch {
         /* leave empty */
@@ -1332,6 +1333,7 @@ function KrSignalClientsSection() {
     const e = edits[c.id];
     if (!e) return false;
     return (e.telegram_chat_id ?? '') !== (c.telegram_chat_id ?? '')
+      || (e.telegram_thread_id ?? '') !== (c.telegram_thread_id ?? '')
       || e.is_active !== c.is_active
       || JSON.stringify(e.features) !== JSON.stringify(c.features);
   };
@@ -1348,13 +1350,13 @@ function KrSignalClientsSection() {
       const res = await fetch('/api/admin/kr-signal-clients', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: c.id, telegram_chat_id: e.telegram_chat_id, features: e.features, is_active: e.is_active }),
+        body: JSON.stringify({ id: c.id, telegram_chat_id: e.telegram_chat_id, telegram_thread_id: e.telegram_thread_id, features: e.features, is_active: e.is_active }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Save failed');
       const updated: KrClient = json.client;
       setClients(prev => prev.map(x => (x.id === c.id ? updated : x)));
-      setEdits(prev => ({ ...prev, [c.id]: { telegram_chat_id: updated.telegram_chat_id ?? '', features: { ...updated.features }, is_active: updated.is_active } }));
+      setEdits(prev => ({ ...prev, [c.id]: { telegram_chat_id: updated.telegram_chat_id ?? '', telegram_thread_id: updated.telegram_thread_id ?? '', features: { ...updated.features }, is_active: updated.is_active } }));
       toast({ title: `${updated.name} saved`, description: updated.telegram_chat_id ? 'Chat linked — reports will post here.' : 'No chat set — skipped until you add one.' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -1393,16 +1395,13 @@ function KrSignalClientsSection() {
                     ? <StatusBadge tone="success" size="sm">Linked</StatusBadge>
                     : <StatusBadge tone="warning" size="sm">No chat</StatusBadge>}
                 </div>
-                <div>
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Group chat ID</Label>
-                  <Input
-                    value={e.telegram_chat_id}
-                    onChange={ev => setEdit(c.id, { telegram_chat_id: ev.target.value })}
-                    placeholder="-1001234567890"
-                    className="h-9 focus-brand mt-1 font-mono"
-                    disabled={savingId === c.id}
-                  />
-                </div>
+                <ChatThreadPicker
+                  chatId={e.telegram_chat_id}
+                  threadId={e.telegram_thread_id}
+                  onChange={({ chatId: nextChat, threadId: nextThread }) => setEdit(c.id, { telegram_chat_id: nextChat, telegram_thread_id: nextThread })}
+                  label="Group chat"
+                  disabled={savingId === c.id}
+                />
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                   {(([
                     ['weekly_market_report', 'Weekly report'],
