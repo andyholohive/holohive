@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const COLUMNS =
-  'id, key, name, ticker, kr_listed, telegram_chat_id, telegram_thread_id, features, is_active';
+  'id, key, name, ticker, kr_listed, telegram_chat_id, telegram_thread_id, features, is_active, peer_basket, content_log_source';
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -59,6 +59,16 @@ export async function PATCH(request: Request) {
     update.features = body.features;
   }
   if ('is_active' in body) update.is_active = !!body.is_active;
+  // §6.4 peer rank input — CoinGecko ids. Accepts an array; blanks dropped.
+  if ('peer_basket' in body) {
+    const arr = Array.isArray(body.peer_basket) ? body.peer_basket : [];
+    update.peer_basket = arr.map((s: unknown) => String(s).trim().toLowerCase()).filter(Boolean);
+  }
+  // §6.5 SoV source ref — 'hhp:<clients.id>' convention; empty clears it.
+  if ('content_log_source' in body) {
+    const raw = (body.content_log_source ?? '').toString().trim();
+    update.content_log_source = raw === '' ? null : raw;
+  }
 
   const { data, error } = await supabase
     .from('kr_signal_clients')

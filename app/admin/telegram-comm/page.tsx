@@ -25,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
@@ -1299,9 +1300,21 @@ interface KrClient {
   telegram_thread_id: string | null;
   features: { weekly_market_report?: boolean; korea_listings_digest?: boolean; client_listing_alert?: boolean };
   is_active: boolean;
+  /** §6.4 — CoinGecko ids ranked against for "#N in KR vol share". */
+  peer_basket: string[] | null;
+  /** §6.5 — SoV source ref; 'hhp:<clients.id>' counts posted HHP content. */
+  content_log_source: string | null;
 }
 
-type KrEdit = { telegram_chat_id: string; telegram_thread_id: string; features: KrClient['features']; is_active: boolean };
+type KrEdit = {
+  telegram_chat_id: string;
+  telegram_thread_id: string;
+  features: KrClient['features'];
+  is_active: boolean;
+  /** Comma-separated in the input; split/trimmed on save. */
+  peer_basket: string;
+  content_log_source: string;
+};
 
 function KrSignalClientsSection() {
   const { toast } = useToast();
@@ -1309,6 +1322,18 @@ function KrSignalClientsSection() {
   const [clients, setClients] = useState<KrClient[]>([]);
   const [edits, setEdits] = useState<Record<string, KrEdit>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  // HHP clients for the content-source picker (§6.5 — SoV counts posted
+  // content across the linked client's campaigns).
+  const [hhpClients, setHhpClients] = useState<{ id: string; name: string }[]>([]);
+
+  const toEdit = (c: KrClient): KrEdit => ({
+    telegram_chat_id: c.telegram_chat_id ?? '',
+    telegram_thread_id: c.telegram_thread_id ?? '',
+    features: { ...c.features },
+    is_active: c.is_active,
+    peer_basket: (c.peer_basket ?? []).join(', '),
+    content_log_source: c.content_log_source ?? '',
+  });
 
   useEffect(() => {
     (async () => {
@@ -1319,7 +1344,7 @@ function KrSignalClientsSection() {
         const list: KrClient[] = json.clients ?? [];
         setClients(list);
         const e: Record<string, KrEdit> = {};
-        for (const c of list) e[c.id] = { telegram_chat_id: c.telegram_chat_id ?? '', telegram_thread_id: c.telegram_thread_id ?? '', features: { ...c.features }, is_active: c.is_active };
+        for (const c of list) e[c.id] = toEdit(c);
         setEdits(e);
       } catch {
         /* leave empty */
@@ -1327,15 +1352,22 @@ function KrSignalClientsSection() {
         setLoading(false);
       }
     })();
+    (async () => {
+      const { data } = await supabase.from('clients').select('id, name').eq('is_active', true).order('name');
+      setHhpClients(((data as any[]) ?? []).map(r => ({ id: r.id, name: r.name })));
+    })();
   }, []);
 
+  const parseBasket = (s: string) => s.split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
   const dirty = (c: KrClient) => {
     const e = edits[c.id];
     if (!e) return false;
     return (e.telegram_chat_id ?? '') !== (c.telegram_chat_id ?? '')
       || (e.telegram_thread_id ?? '') !== (c.telegram_thread_id ?? '')
       || e.is_active !== c.is_active
-      || JSON.stringify(e.features) !== JSON.stringify(c.features);
+      || JSON.stringify(e.features) !== JSON.stringify(c.features)
+      || JSON.stringify(parseBasket(e.peer_basket)) !== JSON.stringify(c.peer_basket ?? [])
+      || (e.content_log_source ?? '') !== (c.content_log_source ?? '');
   };
   const setEdit = (id: string, patch: Partial<KrEdit>) =>
     setEdits(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -1350,13 +1382,21 @@ function KrSignalClientsSection() {
       const res = await fetch('/api/admin/kr-signal-clients', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: c.id, telegram_chat_id: e.telegram_chat_id, telegram_thread_id: e.telegram_thread_id, features: e.features, is_active: e.is_active }),
+        body: JSON.stringify({
+          id: c.id,
+          telegram_chat_id: e.telegram_chat_id,
+          telegram_thread_id: e.telegram_thread_id,
+          features: e.features,
+          is_active: e.is_active,
+          peer_basket: parseBasket(e.peer_basket),
+          content_log_source: e.content_log_source,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Save failed');
       const updated: KrClient = json.client;
       setClients(prev => prev.map(x => (x.id === c.id ? updated : x)));
-      setEdits(prev => ({ ...prev, [c.id]: { telegram_chat_id: updated.telegram_chat_id ?? '', telegram_thread_id: updated.telegram_thread_id ?? '', features: { ...updated.features }, is_active: updated.is_active } }));
+      setEdits(prev => ({ ...prev, [c.id]: toEdit(updated) }));
       toast({ title: `${updated.name} saved`, description: updated.telegram_chat_id ? 'Chat linked — reports will post here.' : 'No chat set — skipped until you add one.' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -1413,6 +1453,43 @@ function KrSignalClientsSection() {
                       <span className="text-xs text-ink-warm-800">{flabel}</span>
                     </label>
                   ))}
+                </div>
+                {/* §6.4 peer basket + §6.5 SoV source — the weekly report's
+                    "Holo Hive Signal" lines render flat/#1 until these are set. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-ink-warm-600">Peer basket · CoinGecko ids, comma-separated</Label>
+                    <Input
+                      value={e.peer_basket}
+                      onChange={(ev) => setEdit(c.id, { peer_basket: ev.target.value })}
+                      placeholder="virtuals-protocol, ai16z, freysa-ai"
+                      className="h-9 focus-brand"
+                      disabled={savingId === c.id}
+                    />
+                    <p className="text-[11px] text-ink-warm-500">Ranks ${c.ticker} vs these tokens on KR vol share (&quot;#N in KR vol share&quot; line).</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-ink-warm-600">Content source · for KR share-of-voice</Label>
+                    <Select
+                      value={/^hhp:/.test(e.content_log_source) ? e.content_log_source : e.content_log_source ? '__custom__' : '__none__'}
+                      onValueChange={(v) => setEdit(c.id, { content_log_source: v === '__none__' ? '' : v === '__custom__' ? e.content_log_source : v })}
+                      disabled={savingId === c.id}
+                    >
+                      <SelectTrigger className="h-9 focus-brand">
+                        <SelectValue placeholder="Not set" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Not set</SelectItem>
+                        {e.content_log_source && !/^hhp:/.test(e.content_log_source) && (
+                          <SelectItem value="__custom__">Custom: {e.content_log_source}</SelectItem>
+                        )}
+                        {hhpClients.map(hc => (
+                          <SelectItem key={hc.id} value={`hhp:${hc.id}`}>HHP client · {hc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-ink-warm-500">Counts posted HHP content for this client → WoW growth on the SoV line.</p>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-1.5 cursor-pointer">
