@@ -2725,6 +2725,7 @@ const CampaignDetailsPage = () => {
                 campaignId={campaign.id}
                 campaignStartDate={campaign.start_date as any}
                 campaignEndDate={campaign.end_date as any}
+                campaignCoveredThrough={clientCoveredThrough}
                 campaignName={campaign.name}
                 currentUserId={(userProfile as any)?.id ?? null}
                 currentUserName={(userProfile as any)?.name ?? (userProfile as any)?.email ?? 'User'}

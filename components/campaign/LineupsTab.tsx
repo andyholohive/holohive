@@ -73,6 +73,7 @@ import {
   mondayOfCampaignWeek,
   currentWeekNumber,
 } from '@/lib/lineupManagerService';
+import { getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 
 // ─── Types specific to this UI ─────────────────────────────────────
 
@@ -141,6 +142,7 @@ export default function LineupsTab({
   campaignId,
   campaignStartDate,
   campaignEndDate,
+  campaignCoveredThrough,
   currentUserId,
   currentUserName,
   campaignName,
@@ -148,6 +150,7 @@ export default function LineupsTab({
   campaignId: string;
   campaignStartDate: string;
   campaignEndDate: string;
+  campaignCoveredThrough?: string | null;
   currentUserId: string | null;
   currentUserName: string;
   campaignName: string;
@@ -195,14 +198,14 @@ export default function LineupsTab({
 
   // ─── Derived ──────────────────────────────────────────────────────
 
-  const totalWeeks = useMemo(() => {
-    if (!campaignStartDate || !campaignEndDate) return 1;
-    const start = new Date(campaignStartDate + 'T00:00:00Z');
-    const end = new Date(campaignEndDate + 'T00:00:00Z');
-    if (end <= start) return 1;
-    const days = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    return Math.max(1, Math.ceil(days / 7));
-  }, [campaignStartDate, campaignEndDate]);
+  // [2026-07-10] Week count spans the client's ENGAGEMENT (stint covered_through),
+  // not the campaign's own end_date — matches the campaign hero's "Week N of M".
+  // Falls back to end_date when coverage is null. Was capping at end_date (e.g.
+  // Venice showed 9 weeks to Jul 6 instead of 13 to the Aug 7 engagement end).
+  const totalWeeks = useMemo(
+    () => Math.max(1, getTotalCampaignWeeksFromCoverage(campaignStartDate, campaignCoveredThrough ?? null, campaignEndDate)),
+    [campaignStartDate, campaignCoveredThrough, campaignEndDate],
+  );
 
   const lineupByWeek = useMemo(() => {
     const m = new Map<number, CampaignLineup>();
