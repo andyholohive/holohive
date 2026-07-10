@@ -77,6 +77,34 @@ export async function getTrailing7dAvgVolumeUsd(id: string): Promise<number> {
   return prior.reduce((a, b) => a + b, 0) / prior.length;
 }
 
+/** §7.C — current USD price + market cap for the client listing alert. Best-effort → nulls. */
+export async function getCoinPriceAndMcapUsd(id: string): Promise<{ priceUsd: number | null; mcapUsd: number | null }> {
+  try {
+    const j = await cgJson(`${CG}/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd&include_market_cap=true`);
+    const row = j?.[id];
+    return {
+      priceUsd: typeof row?.usd === "number" ? row.usd : null,
+      mcapUsd: typeof row?.usd_market_cap === "number" ? row.usd_market_cap : null,
+    };
+  } catch {
+    return { priceUsd: null, mcapUsd: null };
+  }
+}
+
+/** §6.7 / §7.B — resolve a bare ticker to a CoinGecko id (exact symbol match).
+ *  Used to freeze the vol-spike baseline for non-client listings, where we
+ *  only have the exchange ticker. Best-effort → null on ambiguity/miss. */
+export async function searchCoingeckoIdBySymbol(symbol: string): Promise<string | null> {
+  try {
+    const j = await cgJson(`${CG}/search?query=${encodeURIComponent(symbol)}`);
+    const sym = symbol.toUpperCase();
+    const hit = (j?.coins || []).find((c: any) => String(c?.symbol || "").toUpperCase() === sym);
+    return hit?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Map CoinGecko market names → our venue keys; aggregate 24h converted USD volume. */
 export async function getPerVenueVolume(id: string): Promise<Record<string, number>> {
   const c = await cgJson(`${CG}/coins/${id}/tickers?depth=false`);

@@ -92,12 +92,62 @@ export async function assembleWeekly(
     flat: cfg.thresholds?.kimchi_flat ?? 0.01,
   };
 
-  // SOV + peer rank — starved until external inputs are set (§6.5, §10)
-  const sovArrow: calc.Arrow = "⟷";
-  const sovPct = 0;
-  if (!cfg.content_log_source) pending.push("KR share-of-voice line — content_log_source not set");
-  const peerRank = 1;
-  if (!cfg.peer_basket?.length) pending.push("peer rank (#N in KR vol share) — peer_basket empty");
+  // SOV placeholder (§6.5) — cumulative content-piece growth WoW, NOT real
+  // mindshare. Supported source ref: 'hhp:<clients.id uuid>' → count posted
+  // contents across that HHP client's campaigns. Prior cumulative comes from
+  // kr_signal_client_weekly.sov_pieces_cum (persisted after each send).
+  let sovArrow: calc.Arrow = "⟷";
+  let sovPct = 0;
+  let sovPiecesCum: number | null = null;
+  const hhpRef = /^hhp:([0-9a-f-]{36})$/i.exec(cfg.content_log_source ?? "");
+  if (!cfg.content_log_source) {
+    pending.push("KR share-of-voice line — content_log_source not set");
+  } else if (!hhpRef) {
+    pending.push(`KR share-of-voice line — unsupported content_log_source (use hhp:<client uuid>)`);
+  } else {
+    try {
+      const { count } = await (supabase as any)
+        .from("contents")
+        .select("id, campaigns!inner(client_id)", { count: "exact", head: true })
+        .eq("status", "posted")
+        .eq("campaigns.client_id", hhpRef[1]);
+      const cum = count ?? 0;
+      sovPiecesCum = cum;
+      const prevCum = await getClientPrior(supabase, cfg.id, "sov_pieces_cum", weekEnding);
+      if (prevCum != null && prevCum > 0) {
+        const g = calc.sovPlaceholder(cum, prevCum);
+        sovPct = Math.round(g * 100);
+        sovArrow = calc.trendArrow(cum, prevCum, db);
+      } else {
+        pending.push("KR share-of-voice trend — first run, no prior cumulative yet");
+      }
+    } catch {
+      pending.push("KR share-of-voice line — content count query failed");
+    }
+  }
+
+  // Peer rank (§6.4 / §7.A) — client KR-vol-share ranked against the
+  // peer_basket (CoinGecko ids). Failed peer fetches drop out of the basket.
+  let peerRank = 1;
+  if (!cfg.peer_basket?.length) {
+    pending.push("peer rank (#N in KR vol share) — peer_basket empty");
+  } else {
+    const peerResults = await Promise.allSettled(
+      cfg.peer_basket.map((id) => adapters.getPerVenueVolume(id))
+    );
+    const peerShares: number[] = [];
+    let failed = 0;
+    for (const r of peerResults) {
+      if (r.status !== "fulfilled") { failed++; continue; }
+      const pv = r.value;
+      const totals = tracked.map((v) => pv[v] || 0);
+      const kr = (pv["upbit"] || 0) + (pv["bithumb"] || 0);
+      const sum = totals.reduce((a, b) => a + b, 0);
+      peerShares.push(sum > 0 ? kr / sum : 0);
+    }
+    peerRank = calc.krVolShareRank(krVolShare, peerShares);
+    if (failed > 0) pending.push(`peer rank — ${failed} peer fetch(es) failed, ranked against the rest`);
+  }
 
   const data: WeeklyReportData = {
     ticker: cfg.ticker,
@@ -136,6 +186,8 @@ export async function assembleWeekly(
     kr_token_vol_usd: krTok,
     kr_vol_share: krVolShare,
     by_venue: byVenue,
+    // §6.5 — persist this week's cumulative so next week's SOV growth has a prior.
+    sov_pieces_cum: sovPiecesCum,
   };
 
   return {

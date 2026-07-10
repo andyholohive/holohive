@@ -67,6 +67,7 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   // numbers as weekly — the "volume seems inaccurate" report from Jdot's
   // side. The WoW arrow compares this 24h reading to last week's.
   const B: string[] = [];
+  B.push(HR); // §7.A — divider between the title block and Korea Demand
   B.push(`🇰🇷 Korea Demand`);
   B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
   B.push(`KR Vol (24h)   ${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
@@ -79,8 +80,10 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   }
   B.push(HR);
   B.push(`🌐 Market Backdrop`);
-  B.push(`Futures total  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
-  B.push(`KR CEX vol     ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
+  // (24h) per Andy 2026-07-10 — both are 24-hour readings (top-5 perp
+  // notional; Upbit+Bithumb KRW spot), same honesty rule as By Venue.
+  B.push(`Futures (24h)  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
+  B.push(`KR CEX (24h)   ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
   B.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
   B.push(`               ${sign(d.kospiYtdPct)} YTD${d.kospiAtAth ? " (at ATH)" : ""}`);
   B.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
@@ -97,8 +100,8 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
 /** Market-backdrop-only block — for the /vl command (mirrors @cexdexspikebot). */
 export function buildBackdrop(d: WeeklyReportData): string {
   const L: string[] = [];
-  L.push(`Futures total  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
-  L.push(`KR CEX vol     ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
+  L.push(`Futures (24h)  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
+  L.push(`KR CEX (24h)   ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
   L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
   L.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   L.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
