@@ -1453,7 +1453,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           // Week math — single source of truth in lib/campaignWeekHelpers.ts.
           // Week 1 anchored to the first Monday on/after start_date.
           const startMs = campaign.start_date ? new Date(`${campaign.start_date}T00:00:00`).getTime() : null;
-          const endMs = campaign.end_date ? new Date(`${campaign.end_date}T00:00:00`).getTime() : null;
+          // [2026-07-10] Progress-bar denominator uses the same coverage-first
+          // term end as the "Week N of M" label below — previously the label
+          // counted to covered_through while the bar filled to the campaign's
+          // own end_date, so the bar could sit at 100% mid-engagement.
+          const termEndIso = campaign.client_covered_through ?? campaign.end_date;
+          const endMs = termEndIso ? new Date(`${termEndIso}T00:00:00`).getTime() : null;
           const todayMs = Date.now();
           let weekN = 0, weekOf = 0, progressPct = 0;
           if (startMs && endMs && endMs > startMs) {

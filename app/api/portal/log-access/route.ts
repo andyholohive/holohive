@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,6 +116,31 @@ export async function POST(request: Request) {
     // Don't leak the DB error to the caller. The portal page doesn't
     // care about the response — fire-and-forget — so a 500 is fine.
     return NextResponse.json({ ok: false }, { status: 500 });
+  }
+
+  // [2026-07-10] Dual-write into portal_visits — the analytics table the
+  // Team Dashboard's "Ext. Visits" column reads (is_external + last 7d).
+  // Sat empty since its 2026-06-15 skeleton migration because no portal
+  // instrumentation ever landed. log-access already fires on every portal
+  // and campaign-tracker visit, so it IS the instrumentation point — one
+  // write path, no extra client fetch. Best-effort: a failure here never
+  // fails the request (the access-log row above already landed).
+  try {
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const isExternal = !normalizedEmail.endsWith('@holohive.io');
+    const visitorHash = createHash('sha256').update(normalizedEmail).digest('hex');
+    const pagePath = source === 'campaign' && campaignId
+      ? `/public/campaigns/${campaignId}`
+      : `/public/portal/${clientId}`;
+    const { error: visitErr } = await supabase.from('portal_visits').insert({
+      client_id: clientId,
+      is_external: isExternal,
+      page_path: pagePath,
+      visitor_hash: visitorHash,
+    });
+    if (visitErr) console.error('[portal/log-access] portal_visits insert error:', visitErr);
+  } catch (e) {
+    console.error('[portal/log-access] portal_visits write failed:', e);
   }
 
   return NextResponse.json({ ok: true });

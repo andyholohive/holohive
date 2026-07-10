@@ -1543,7 +1543,11 @@ export default function CampaignsPage() {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
-                  <span>{sharingCampaign ? fmtDate(sharingCampaign.start_date) : ''}{sharingCampaign?.end_date ? ` - ${fmtDate(sharingCampaign.end_date)}` : ' - TBD'}</span>
+                  {/* [2026-07-10] Same coverage-first term end as the card + table. */}
+                  <span>{sharingCampaign ? fmtDate(sharingCampaign.start_date) : ''}{(() => {
+                    const termEnd = sharingCampaign?.client_covered_through ?? sharingCampaign?.end_date;
+                    return termEnd ? ` - ${fmtDate(termEnd)}` : ' - TBD';
+                  })()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>

@@ -31,6 +31,14 @@ const PUBLIC_API_PREFIXES = [
   '/api/telegram/webhook',       // Telegram-gated (their API call)
   '/api/webhooks/',              // External integration webhooks
   '/api/forms/submit',           // Public form intake
+  // [2026-07-10] Public portal telemetry. The portal is unauthenticated
+  // (client-side email gate), so this endpoint can't rely on a Supabase
+  // session — external client visitors were silently 401ing here, meaning
+  // only team members with an HHP session got logged (exactly backwards
+  // for an EXTERNAL-visits metric). The handler validates client_id
+  // existence + enum fields itself; RLS has no INSERT policy, so this
+  // route stays the only write path.
+  '/api/portal/log-access',
   '/api/version',                // Trivial liveness/version probe
   '/api/public/',                // Token-gated client-facing endpoints (mindshare share reports, etc.)
   // ── MCP (Claude.ai connector) ──

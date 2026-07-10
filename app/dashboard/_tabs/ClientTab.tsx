@@ -225,8 +225,16 @@ function FragmentRow({
         </TableCell>
         <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{client.openTasks}</TableCell>
         <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">{client.totalContentPosted}</TableCell>
-        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-500" title="Portal analytics not yet wired — see API header comment.">
+        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
           {client.extVisitsLast7d}
+        </TableCell>
+        {/* [2026-07-10] KOL delivery roll-up promoted from the expanded
+            sub-row header to its own column next to Health, so the
+            approved/total ratio is scannable without expanding rows. */}
+        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
+          {client.kolDelivery.total > 0
+            ? `${client.kolDelivery.approved}/${client.kolDelivery.total}`
+            : <span className="text-ink-warm-300">—</span>}
         </TableCell>
         <TableCell className="py-3.5 px-5">
           <StatusBadge tone={HEALTH_TO_BADGE[client.healthTone]} size="sm" bordered withDot>
@@ -238,15 +246,14 @@ function FragmentRow({
       {/* ── Expanded KOL roll-up sub-row ────────────────────────────── */}
       {isExpanded && hasDelivery && (
         <TableRow className="bg-cream-50/40 hover:bg-cream-50/40 border-cream-100">
-          <TableCell colSpan={7} className="py-0 px-5">
+          <TableCell colSpan={8} className="py-0 px-5">
             <div className="py-3">
+              {/* [2026-07-10] approved/total counter moved up into the main
+                  row's Approved column (next to Health) — no dup here. */}
               <div className="flex items-center justify-between mb-2.5">
                 <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.18em]">
                   KOL Delivery · This week
                   <span className="ml-2 text-ink-warm-400 normal-case font-normal tracking-normal">from /submit</span>
-                </div>
-                <div className="text-[11px] text-ink-warm-500 tabular-nums">
-                  {client.kolDelivery.approved}/{client.kolDelivery.total} approved
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-1.5">
@@ -399,10 +406,11 @@ export default function ClientTab() {
         <SectionHeader label="Client Health" dot="brand" counter="02 — Delivery only · This week" />
 
       {/* Client Health table — post-2026-06-25 redesign:
-          Client | Week | HQ Tasks | Content | Visits | Health.
+          Client | Week | HQ Tasks | Content | Visits | Approved | Health.
           Renewal column moved to the dedicated Renewals & Pipeline tab
           (single source of renewal math). Rows expand to show this week's
-          KOL roster from confirmed lineups + /submit status. */}
+          KOL roster from confirmed lineups + /submit status; the
+          approved/total roll-up sits in the Approved column (2026-07-10). */}
       <Card className="border-cream-200 overflow-hidden">
         <CardHeaderEditorial
           icon={Users}
@@ -438,6 +446,7 @@ export default function ClientTab() {
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">HQ Tasks</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Content</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Visits</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Approved</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Health</TableHead>
               </TableRow>
             </TableHeader>
