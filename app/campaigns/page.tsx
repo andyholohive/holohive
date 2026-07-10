@@ -1278,7 +1278,13 @@ export default function CampaignsPage() {
                     </div>
                     <div className="flex items-center text-sm text-ink-warm-700">
                       <CalendarIcon className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
-                      <span className="tabular-nums">{formatDate(campaign.start_date)}{campaign.end_date ? ` – ${formatDate(campaign.end_date)}` : ' – TBD'}</span>
+                      {/* [2026-07-10] End = client's engagement TERM end (stint
+                          covered_through), falling back to campaign end_date —
+                          matches the table view. Start is already stint-filled. */}
+                      <span className="tabular-nums">{formatDate(campaign.start_date)}{(() => {
+                        const termEnd = campaign.client_covered_through ?? campaign.end_date;
+                        return termEnd ? ` – ${formatDate(termEnd)}` : ' – TBD';
+                      })()}</span>
                     </div>
                   </div>
                 </CardHeader>
