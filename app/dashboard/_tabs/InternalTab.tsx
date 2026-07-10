@@ -217,11 +217,15 @@ export default function InternalTab() {
               for Overdue the polarity flips so up = red. Flat is
               always neutral. Computed in the API by comparing this 7d
               window to the prior 7d. */}
+          {/* [2026-07-10] Per Andy (Jdot's dashboard pass): value = FULL
+              open backlog so it always matches the Team Workload to-do
+              sum below; trend = true WoW delta vs open-as-of-week-start.
+              Replaces the 2026-07-06 created-this-week definition. */}
           <KpiCard
             icon={ListTodo}
             label="Active Tasks"
             value={data.kpis.openTasks}
-            sub="created this week"
+            sub="open · all clients"
             accent="sky"
             topAccent
             trend={{ delta: data.kpis.openTasksDelta, upIsGood: false }}

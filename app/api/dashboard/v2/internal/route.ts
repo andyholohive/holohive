@@ -297,17 +297,13 @@ export async function GET() {
     const overduePrev = ((overduePrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
     const openCount = openTasks.length;
 
-    // [2026-07-06] Per Andy: the "Active Tasks" KPI counts tasks CREATED
-    // this week (still open), not the whole open backlog — it answers
-    // "how much new work landed this week". The prior-week comparable is
-    // tasks created in the previous week that are still open. Both derive
-    // from the open-task set we already have (created_at added to select),
-    // so no extra query. openCount stays the full backlog for the
-    // completion-rate denominator below.
-    const activeTasksThisWeek = openTasks.filter(t => t.created_at && t.created_at >= weekStart).length;
-    const activeTasksPrevWeek = openTasks.filter(
-      t => t.created_at && t.created_at >= prevWeekStart && t.created_at < weekStart,
-    ).length;
+    // [2026-07-10] Per Andy (superseding his 2026-07-06 created-this-week
+    // definition, after Jdot's dashboard pass): "Active Tasks" = the FULL
+    // open backlog, so the KPI always equals the Team Workload table's
+    // per-person open sum (both iterate the same openTasks set, workload
+    // includes an Unassigned bucket). Trend = true week-over-week delta
+    // vs open-as-of-week-start (openPrev, already fetched for the
+    // completion-rate comparable).
 
     // KPI rollups
     const overdue = openTasks.filter(
@@ -631,9 +627,9 @@ export async function GET() {
       thresholds: cfg,
       kpis: {
         activeStandardClients: standardClients.length,
-        // [2026-07-06] "Active Tasks" = open tasks created this week (new
-        // work that landed this week), not the whole open backlog.
-        openTasks: activeTasksThisWeek,
+        // [2026-07-10] "Active Tasks" = full open backlog (matches the
+        // Team Workload sum). See definition comment above.
+        openTasks: openCount,
         overdueTasks: overdue.length,
         overdueRed: overdueRed.length,
         completedThisWeek,
@@ -641,7 +637,7 @@ export async function GET() {
         // Week-over-week deltas for the trend arrows on Layer 1.
         // `null` indicates we couldn't form a comparable prior — UI
         // suppresses the arrow rather than rendering 0.
-        openTasksDelta: activeTasksThisWeek - activeTasksPrevWeek,
+        openTasksDelta: openCount - openPrev,
         overdueDelta: overdue.length - overduePrev,
         completedThisWeekDelta: completedThisWeek - completedPrev,
         completionRateDelta: completionRate - completionRatePrev,
