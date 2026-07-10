@@ -84,13 +84,25 @@ export function buildStage1Alert(ticker: string, l: DetectedListing): string {
   return L.join("\n");
 }
 
-/** §7.D Stage-2 recap — edited into the Stage-1 message ~24h later. */
-export function buildStage2Recap(ticker: string, l: DetectedListing, day1VolKrw: number, fxUsdKrw: number): string {
+/** §7.D Stage-2 recap — edited into the Stage-1 message ~24h later.
+ *  spikeMultiple (§6.7) = day-1 volume ÷ the token's frozen trailing-7d avg. */
+export function buildStage2Recap(
+  ticker: string,
+  l: DetectedListing,
+  day1VolKrw: number,
+  fxUsdKrw: number,
+  spikeMultiple?: number | null
+): string {
   const day1Usd = fxUsdKrw > 0 ? day1VolKrw / fxUsdKrw : 0;
+  const spikeLine =
+    spikeMultiple != null && isFinite(spikeMultiple) && spikeMultiple > 0
+      ? `Vol-spike     ${spikeMultiple.toFixed(1)}× the token's prior 7-day avg`
+      : ``;
   const L = [
     `📊 <b>$${esc(ticker)} · Day-1 on ${esc(venueList(l.venues))}</b>`,
     ``,
-    `First-24h KRW volume  ${krwT(day1VolKrw)}${day1Usd ? ` ≈ ${usdM(day1Usd)}` : ``}`,
+    `First-24h KRW vol  ${krwT(day1VolKrw)}${day1Usd ? ` ≈ ${usdM(day1Usd)}` : ``}`,
+    spikeLine,
     l.warning ? `⚠️ Investment-warning designation in effect.` : ``,
     ``,
     `Listed ${esc(l.listedOn)}. Trading now live for KR retail.`,

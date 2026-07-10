@@ -66,6 +66,17 @@ const VENUE_MATCH: [string, string][] = [
   ["upbit", "upbit"], ["bithumb", "bithumb"], ["coinbase", "coinbase"],
   ["bybit", "bybit"], ["kraken", "kraken"], ["bitget", "bitget"], ["gate", "gate"],
 ];
+/** §6.7 — token's frozen trailing-7d average DAILY volume (USD), for the listing
+ *  vol-spike multiple. Excludes the most recent (partial) day. Best-effort → 0. */
+export async function getTrailing7dAvgVolumeUsd(id: string): Promise<number> {
+  const c = await cgJson(`${CG}/coins/${id}/market_chart?vs_currency=usd&days=8&interval=daily`);
+  const vols: [number, number][] = c.total_volumes || [];
+  if (vols.length < 2) return 0;
+  const prior = vols.slice(0, -1).slice(-7).map((v) => v[1]).filter((x) => typeof x === "number" && x > 0);
+  if (!prior.length) return 0;
+  return prior.reduce((a, b) => a + b, 0) / prior.length;
+}
+
 /** Map CoinGecko market names → our venue keys; aggregate 24h converted USD volume. */
 export async function getPerVenueVolume(id: string): Promise<Record<string, number>> {
   const c = await cgJson(`${CG}/coins/${id}/tickers?depth=false`);

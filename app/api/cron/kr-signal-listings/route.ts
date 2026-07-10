@@ -9,7 +9,7 @@ import {
   buildListingsDigest,
   type DetectedListing,
 } from '@/lib/krSignal/listings';
-import { getUsdKrw } from '@/lib/krSignal/adapters';
+import { getUsdKrw, getTrailing7dAvgVolumeUsd } from '@/lib/krSignal/adapters';
 import { sendMessage, editMessageText } from '@/lib/krSignal/telegram';
 
 export const dynamic = 'force-dynamic';
@@ -92,6 +92,13 @@ export async function GET(request: Request) {
             client_id: c.id, ticker: c.ticker, chat_id: String(c.telegram_chat_id), message_id: m.message_id,
             stage: 1, listed_on_key: l.listedOn, edit_due_at: new Date(now.getTime() + 24 * 3600 * 1000).toISOString(),
           });
+          // §6.7 — freeze the token's trailing-7d avg volume now, for the +24h spike multiple.
+          if (c.coingecko_id) {
+            const base = await getTrailing7dAvgVolumeUsd(c.coingecko_id).catch(() => 0);
+            if (base > 0) {
+              await supabase.from('kr_signal_listings').update({ baseline_7d: base }).eq('ticker', l.symbol).eq('listed_on', l.listedOn);
+            }
+          }
           summary.alerts++;
         } catch (e) { /* keep sweeping */ }
       }
@@ -107,7 +114,7 @@ export async function GET(request: Request) {
       for (const a of dueAlerts as any[]) {
         try {
           const { data: lst } = await supabase
-            .from('kr_signal_listings').select('venues')
+            .from('kr_signal_listings').select('venues, baseline_7d')
             .eq('ticker', a.ticker).eq('listed_on', a.listed_on_key).maybeSingle();
           const listing: DetectedListing = {
             symbol: a.ticker.toUpperCase(),
@@ -116,7 +123,13 @@ export async function GET(request: Request) {
             warning: false,
           };
           const day1 = await getTokenKrVolumeKrw(a.ticker);
-          await editMessageText(a.chat_id, a.message_id, buildStage2Recap(a.ticker, listing, day1, fx));
+          // §6.7 vol-spike = day-1 KR volume (USD) ÷ frozen trailing-7d avg (USD).
+          const day1Usd = fx > 0 ? day1 / fx : 0;
+          const base = Number((lst as any)?.baseline_7d ?? 0);
+          const spike = base > 0 && day1Usd > 0 ? day1Usd / base : null;
+          await editMessageText(a.chat_id, a.message_id, buildStage2Recap(a.ticker, listing, day1, fx, spike));
+          await supabase.from('kr_signal_listings')
+            .update({ day1_kr_vol: day1 }).eq('ticker', a.ticker).eq('listed_on', a.listed_on_key);
           await supabase.from('kr_signal_alert_messages')
             .update({ stage: 2, edited_at: now.toISOString() }).eq('id', a.id);
           summary.edits++;
