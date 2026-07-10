@@ -312,7 +312,9 @@ export default function ListsPage() {
     const matchesRegion = regionFilter.length === 0 || (kol.region && regionFilter.includes(kol.region));
 
     const matchesCreatorType =
-      creatorTypeFilter.length === 0 || (Array.isArray(kol.creator_type) && creatorTypeFilter.some(ct => kol.creator_type.includes(ct)));
+      // [2026-07-10] AND semantics per Andy: selecting AI + Trading means
+      // KOLs with BOTH types, matching /kols (which already uses .every).
+      creatorTypeFilter.length === 0 || (Array.isArray(kol.creator_type) && creatorTypeFilter.every(ct => kol.creator_type.includes(ct)));
 
     const matchesFollowers = (() => {
       if (!followersOperator || !followersValue) return true;

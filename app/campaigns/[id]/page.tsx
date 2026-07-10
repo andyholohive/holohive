@@ -998,8 +998,10 @@ const CampaignDetailsPage = () => {
       (kol.master_kol.region && kolFilters.region.includes(kol.master_kol.region));
 
     // Creator Type filter
+    // [2026-07-10] AND semantics per Andy: selecting AI + Trading means
+    // KOLs with BOTH types, matching /kols (which already uses .every).
     const matchesCreatorType = kolFilters.creator_type.length === 0 ||
-      (kol.master_kol.creator_type && kolFilters.creator_type.some(ct => kol.master_kol.creator_type.includes(ct)));
+      (kol.master_kol.creator_type && kolFilters.creator_type.every(ct => kol.master_kol.creator_type.includes(ct)));
 
     // Content Type filter
     const matchesContentType = kolFilters.content_type.length === 0 ||

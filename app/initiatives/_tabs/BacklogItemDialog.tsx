@@ -484,10 +484,14 @@ export default function BacklogItemDialog({
                         // /clients action-item delete pattern.
                         <div className="flex items-center gap-2 w-full">
                           <span className="text-xs text-ink-warm-700 flex-1">Delete this attachment?</span>
-                          <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => deleteAttachment(att)}>
+                          {/* [2026-07-10] type="button" required — inside the
+                              dialog <form> the default is "submit", so the
+                              click was saving the form (refresh) instead of
+                              deleting the attachment. */}
+                          <Button type="button" size="sm" variant="destructive" className="h-7 text-xs" onClick={() => deleteAttachment(att)}>
                             Delete
                           </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setDeletingAttachmentId(null)}>
+                          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setDeletingAttachmentId(null)}>
                             Cancel
                           </Button>
                         </div>
