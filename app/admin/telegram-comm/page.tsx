@@ -28,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2, Activity, AlarmClock, Clock, Sunrise,
+  CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
@@ -566,6 +566,9 @@ export default function LineupSettingsPage() {
 
       {/* ─── Daily Pulse section [2026-07-09] ─── */}
       <DailyPulseChannelSection />
+
+      {/* ─── KR Signal Bot section [2026-07-10] ─── */}
+      <KrSignalClientsSection />
     </div>
   );
 }
@@ -1276,6 +1279,155 @@ function DailyPulseChannelSection() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
+
+// ─── KR Signal Bot — per-client chat + feature config ───────────────
+// kr_signal_clients is RLS-locked, so this section reads/writes through
+// the super-admin /api/admin/kr-signal-clients route (not browser Supabase).
+
+interface KrClient {
+  id: string;
+  key: string;
+  name: string;
+  ticker: string;
+  kr_listed: boolean;
+  telegram_chat_id: string | null;
+  features: { weekly_market_report?: boolean; korea_listings_digest?: boolean; client_listing_alert?: boolean };
+  is_active: boolean;
+}
+
+type KrEdit = { telegram_chat_id: string; features: KrClient['features']; is_active: boolean };
+
+function KrSignalClientsSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [clients, setClients] = useState<KrClient[]>([]);
+  const [edits, setEdits] = useState<Record<string, KrEdit>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/kr-signal-clients');
+        const json = await res.json();
+        const list: KrClient[] = json.clients ?? [];
+        setClients(list);
+        const e: Record<string, KrEdit> = {};
+        for (const c of list) e[c.id] = { telegram_chat_id: c.telegram_chat_id ?? '', features: { ...c.features }, is_active: c.is_active };
+        setEdits(e);
+      } catch {
+        /* leave empty */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const dirty = (c: KrClient) => {
+    const e = edits[c.id];
+    if (!e) return false;
+    return (e.telegram_chat_id ?? '') !== (c.telegram_chat_id ?? '')
+      || e.is_active !== c.is_active
+      || JSON.stringify(e.features) !== JSON.stringify(c.features);
+  };
+  const setEdit = (id: string, patch: Partial<KrEdit>) =>
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  const toggleFeature = (id: string, key: keyof KrClient['features']) =>
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], features: { ...prev[id].features, [key]: !prev[id].features[key] } } }));
+
+  async function handleSave(c: KrClient) {
+    const e = edits[c.id];
+    if (!e) return;
+    setSavingId(c.id);
+    try {
+      const res = await fetch('/api/admin/kr-signal-clients', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id, telegram_chat_id: e.telegram_chat_id, features: e.features, is_active: e.is_active }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Save failed');
+      const updated: KrClient = json.client;
+      setClients(prev => prev.map(x => (x.id === c.id ? updated : x)));
+      setEdits(prev => ({ ...prev, [c.id]: { telegram_chat_id: updated.telegram_chat_id ?? '', features: { ...updated.features }, is_active: updated.is_active } }));
+      toast({ title: `${updated.name} saved`, description: updated.telegram_chat_id ? 'Chat linked — reports will post here.' : 'No chat set — skipped until you add one.' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  const configured = clients.filter(c => !!c.telegram_chat_id && c.is_active).length;
+
+  return (
+    <CollapsibleSection
+      icon={Radio}
+      title="KR Signal Bot"
+      badge={!loading ? <CountChip n={configured} total={clients.length} /> : null}
+      subtitle={<>Client-facing Korea market-intel bot (separate token). Set each client&#39;s group chat ID and toggle features. Clients with no chat are skipped.</>}
+    >
+      <WhenItSends>
+        Weekly report posts Sundays 12:00 UTC. Listing alerts + Saturday digest run off the hourly Korea-listings sweep.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : clients.length === 0 ? (
+            <p className="text-xs text-gray-400">No KR Signal clients configured.</p>
+          ) : clients.map(c => {
+            const e = edits[c.id];
+            if (!e) return null;
+            return (
+              <div key={c.id} className="rounded-lg border border-cream-200 p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-ink-warm-900">{c.name}</span>
+                  <StatusBadge tone="neutral" size="sm">${c.ticker}</StatusBadge>
+                  {c.telegram_chat_id
+                    ? <StatusBadge tone="success" size="sm">Linked</StatusBadge>
+                    : <StatusBadge tone="warning" size="sm">No chat</StatusBadge>}
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Group chat ID</Label>
+                  <Input
+                    value={e.telegram_chat_id}
+                    onChange={ev => setEdit(c.id, { telegram_chat_id: ev.target.value })}
+                    placeholder="-1001234567890"
+                    className="h-9 focus-brand mt-1 font-mono"
+                    disabled={savingId === c.id}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  {(([
+                    ['weekly_market_report', 'Weekly report'],
+                    ['korea_listings_digest', 'Listings digest'],
+                    ['client_listing_alert', 'Listing alert'],
+                  ]) as [keyof KrClient['features'], string][]).map(([fk, flabel]) => (
+                    <label key={fk} className="flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox checked={!!e.features[fk]} disabled={savingId === c.id} onCheckedChange={() => toggleFeature(c.id, fk)} />
+                      <span className="text-xs text-ink-warm-800">{flabel}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox checked={e.is_active} disabled={savingId === c.id} onCheckedChange={() => setEdit(c.id, { is_active: !e.is_active })} />
+                    <span className="text-xs text-ink-warm-600">Active</span>
+                  </label>
+                  <Button variant="brand" size="sm" onClick={() => handleSave(c)} disabled={savingId === c.id || !dirty(c)}>
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    {savingId === c.id ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
     </CollapsibleSection>
