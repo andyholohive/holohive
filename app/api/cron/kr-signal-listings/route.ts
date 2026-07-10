@@ -12,7 +12,7 @@ import {
   type DetectedListing,
   type DigestEntry,
 } from '@/lib/krSignal/listings';
-import { getUsdKrw, getTrailing7dAvgVolumeUsd, getCoinPriceAndMcapUsd, searchCoingeckoIdBySymbol } from '@/lib/krSignal/adapters';
+import { getUsdKrw, getTrailing7dAvgVolumeUsd, getCoinPriceAndMcapUsd, searchCoingeckoIdBySymbol, getPerVenueVolume } from '@/lib/krSignal/adapters';
 import { sendMessage, editMessageText } from '@/lib/krSignal/telegram';
 
 export const dynamic = 'force-dynamic';
@@ -95,6 +95,29 @@ export async function GET(request: Request) {
     }
 
     const clients = await loadActiveClients(supabase);
+
+    // 1.5 Daily per-venue volume snapshot (00:xx UTC run = 09:00 KST, the
+    // spec §3 snapshot time). CoinGecko only exposes 24h per-exchange
+    // volume, so the weekly report's TRUE 7d venue numbers come from
+    // summing these daily rows (per Andy 2026-07-10). Piggybacks on this
+    // hourly cron instead of adding another vercel cron entry.
+    if (now.getUTCHours() === 0) {
+      for (const c of clients) {
+        if (!c.coingecko_id) continue;
+        try {
+          const pv = await getPerVenueVolume(c.coingecko_id);
+          const day = now.toISOString().slice(0, 10);
+          const rows = Object.entries(pv)
+            .filter(([, usd]) => usd > 0)
+            .map(([venue, usd]) => ({ client_id: c.id, day, venue, usd }));
+          if (rows.length > 0) {
+            await supabase.from('kr_signal_venue_vols_daily')
+              .upsert(rows, { onConflict: 'client_id,day,venue' });
+            summary.dailyVols = (summary.dailyVols ?? 0) + rows.length;
+          }
+        } catch (e) { /* keep sweeping */ }
+      }
+    }
 
     // 2. Client alert (§7.C) — a client's own token just listed.
     const alertClients = clients.filter((c) => c.features?.client_listing_alert && c.telegram_chat_id);

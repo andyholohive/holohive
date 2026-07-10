@@ -120,8 +120,22 @@ export async function getPerVenueVolume(id: string): Promise<Record<string, numb
 }
 
 // ─── FX ───────────────────────────────────────────────────────────────────
-/** USD/KRW FX (§4). Free, no key. */
+/** USD/KRW FX (§4). Real-time source first — er-api only refreshes once a
+ *  day (00:02 UTC), and that staleness was skewing the kimchi premium by
+ *  ~0.5pp intraday (verified 2026-07-10: er-api 1508.29 vs live 1500.4).
+ *  Yahoo Finance quote is near-real-time and keyless; er-api is fallback. */
 export async function getUsdKrw(): Promise<number> {
+  try {
+    const r = await fetch(
+      "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d",
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    if (r.ok) {
+      const j: any = await r.json();
+      const px = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (typeof px === "number" && px > 500 && px < 3000) return px;
+    }
+  } catch { /* fall through to er-api */ }
   const r = await fetch("https://open.er-api.com/v6/latest/USD");
   if (!r.ok) throw new Error(`FX ${r.status}`);
   const j: any = await r.json();

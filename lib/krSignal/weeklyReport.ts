@@ -11,6 +11,10 @@ export interface VenueVol { name: string; usd: number; pct: number; isKR?: boole
 export interface WeeklyReportData {
   ticker: string;
   weekLabel: string;
+  /** Actual window of the venue-volume figures: "7d" once a week of daily
+   *  snapshots has accrued, "Nd" mid-accrual, "24h" fallback. Labels always
+   *  state what the numbers really are. */
+  volWindow?: string;
   krVolSharePct: number;
   krVol7dArrow: Arrow; krVol7dPct: number;
   koreaReadLabel: string;
@@ -66,14 +70,15 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   // available in one call). The old "(7d volume)" header presented daily
   // numbers as weekly — the "volume seems inaccurate" report from Jdot's
   // side. The WoW arrow compares this 24h reading to last week's.
+  const W = d.volWindow || "24h";
   const B: string[] = [];
   B.push(HR); // §7.A — divider between the title block and Korea Demand
   B.push(`🇰🇷 Korea Demand`);
   B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
-  B.push(`KR Vol (24h)   ${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
+  B.push(`${pad(`KR Vol (${W})`, 15)}${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
   B.push(d.koreaReadLabel);
   B.push(HR);
-  B.push(`🏦 By Venue (24h volume)`);
+  B.push(`🏦 By Venue (${W} volume)`);
   for (const v of d.byVenue) {
     const flag = v.isKR ? "🇰🇷 " : "   ";
     B.push(`${flag}${pad(v.name, 9)}${pad(usdCompact(v.usd), 7)} ${bar(v.pct)} ${v.pct}%`);

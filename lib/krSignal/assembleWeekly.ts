@@ -51,11 +51,37 @@ export async function assembleWeekly(
 
   const kimchi = calc.kimchiPremium(usdtKrw, fx);
 
-  // By Venue + KR vol share (token volume, uniform CoinGecko source)
+  // By Venue + KR vol share — TRUE trailing-7d sums from the daily
+  // snapshots (kr_signal_venue_vols_daily, captured 09:00 KST by the
+  // hourly listings cron) per Andy 2026-07-10. Falls back to the live
+  // 24h pull until at least 2 daily snapshots have accrued; the report
+  // label reflects the actual window either way.
   const tracked = [...cfg.kr_venues, ...cfg.global_venues];
-  const vols = tracked.map((v) => ({ v, usd: perVenue[v] || 0 })).filter((x) => x.usd > 0);
+  let volWindow = "24h";
+  let venueUsd: Record<string, number> = perVenue;
+  try {
+    const sevenAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const { data: dailyRows } = await (supabase as any)
+      .from("kr_signal_venue_vols_daily")
+      .select("day, venue, usd")
+      .eq("client_id", cfg.id)
+      .gte("day", sevenAgo);
+    const rows = (dailyRows ?? []) as Array<{ day: string; venue: string; usd: number }>;
+    const days = new Set(rows.map((r) => r.day)).size;
+    if (days >= 2) {
+      const summed: Record<string, number> = {};
+      for (const r of rows) summed[r.venue] = (summed[r.venue] || 0) + Number(r.usd || 0);
+      venueUsd = summed;
+      volWindow = days >= 7 ? "7d" : `${days}d`;
+    } else {
+      pending.push(`7d venue volume — accruing daily snapshots (${days}/7), showing 24h`);
+    }
+  } catch {
+    pending.push("7d venue volume — daily-snapshot read failed, showing 24h");
+  }
+  const vols = tracked.map((v) => ({ v, usd: venueUsd[v] || 0 })).filter((x) => x.usd > 0);
   const totalTok = vols.reduce((s, x) => s + x.usd, 0);
-  const krTok = (perVenue["upbit"] || 0) + (perVenue["bithumb"] || 0);
+  const krTok = (venueUsd["upbit"] || 0) + (venueUsd["bithumb"] || 0);
   const krVolShare = totalTok ? krTok / totalTok : 0;
   const byVenue: VenueVol[] = vols
     .sort((a, b) => b.usd - a.usd)
@@ -152,6 +178,7 @@ export async function assembleWeekly(
   const data: WeeklyReportData = {
     ticker: cfg.ticker,
     weekLabel: weekLabel(),
+    volWindow,
     krVolSharePct: Math.round(krVolShare * 100),
     krVol7dArrow: krVolArrow,
     krVol7dPct: Math.round(krVolPct),
