@@ -45,6 +45,7 @@ import { KolDashboardCardsView } from "@/components/campaign/KolDashboardCardsVi
 import { KolDashboardTableView } from "@/components/campaign/KolDashboardTableView";
 import { BudgetOverview } from "@/components/campaign/BudgetOverview";
 import { BudgetDashboardV2 } from "@/components/campaign/BudgetDashboardV2";
+import { SentimentModule } from "@/components/campaign/SentimentModule";
 import { BudgetTableView } from "@/components/campaign/BudgetTableView";
 import { ContentDashboardOverview } from "@/components/campaign/ContentDashboardOverview";
 import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
@@ -2403,6 +2404,15 @@ const CampaignDetailsPage = () => {
             </TabsList>
             
             <TabsContent value="information" className="mt-4">
+              {/* [2026-07-10] TG Comment Sentiment v3 — perception-row
+                  module per Jdot's spec (module-first placement; the
+                  full Output/Reach/Perception funnel stack is a later
+                  build). Renders nothing until the pipeline has scored
+                  comments for this campaign. Mindshare slots beside it
+                  when that ships. */}
+              <div className="mb-4">
+                <SentimentModule campaignId={campaign.id} />
+              </div>
               {/* Outer Card wrapper dropped — with underline tabs the
                   content sits directly under the tab strip (mockup
                   pattern). Inner sections (Campaign Overview /
