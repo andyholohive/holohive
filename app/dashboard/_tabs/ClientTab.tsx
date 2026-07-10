@@ -390,11 +390,14 @@ export default function ClientTab() {
             accent="purple"
             topAccent
           />
+          {/* [2026-07-10] Live: portal_visits now populated by
+              /api/portal/log-access on every client portal visit —
+              subtitle dropped the old "TBD · portal analytics". */}
           <KpiCard
             icon={ExternalLink}
             label="Ext. Visits"
             value={data.outputSignals.totalExtVisitsLast7d}
-            sub="TBD · portal analytics"
+            sub="This week · external portal visits"
             accent="amber"
             topAccent
           />

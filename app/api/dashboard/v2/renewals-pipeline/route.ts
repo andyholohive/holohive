@@ -104,6 +104,11 @@ export async function GET() {
           slug: c.slug,
           renewal_anchor: anchor,
           weekNumber,
+          // [2026-07-10] The "Started" column read c.engagement_start_date,
+          // but that clients column was retired in the F1 stint cleanup and
+          // this API never sent a replacement — the column rendered blank.
+          // Send the active stint start (same source the Week number uses).
+          engagement_start_date: stintStart,
           tone: t.tone,
           daysLeft: t.daysLeft,
         };
