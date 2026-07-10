@@ -26,7 +26,14 @@ export interface WeeklyReportData {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const sign = (n: number) => (n >= 0 ? "+" : "") + n.toFixed(n % 1 === 0 ? 0 : 1) + "%";
-const usdM = (n: number) => "$" + (n / 1e6).toFixed(0) + "M";
+/** Compact USD with unit-appropriate precision. The old fixed "$XM" render
+ *  showed "$0M" for thousands-range token volumes (Andy 2026-07-10). */
+const usdCompact = (n: number) =>
+  n >= 1e9 ? "$" + (n / 1e9).toFixed(2) + "B"
+  : n >= 1e7 ? "$" + (n / 1e6).toFixed(0) + "M"
+  : n >= 1e6 ? "$" + (n / 1e6).toFixed(1) + "M"
+  : n >= 1e3 ? "$" + (n / 1e3).toFixed(0) + "K"
+  : "$" + n.toFixed(0);
 const usdB = (n: number) => "$" + (n / 1e9).toFixed(2) + "B";
 
 /** 8-cell bar: filled █ vs empty ░ from a 0–100 pct. */
@@ -37,32 +44,38 @@ function bar(pct: number, cells = 8): string {
 function pad(s: string, n: number): string { return s.length >= n ? s : s + " ".repeat(n - s.length); }
 
 /**
- * HoloHive brand mark. Wraps a fallback emoji in a Telegram custom-emoji entity
- * so the logo shows in front of the title + Holo Hive Signal line. Overridable
- * via KR_SIGNAL_LOGO_EMOJI_ID. Custom emoji don't render inside <pre> blocks, so
- * these lines are emitted OUTSIDE the monospace body. sendMessage strips the tag
- * and falls back to the plain emoji if the bot isn't allowed to send it.
+ * HoloHive brand mark — ☆ per Andy 2026-07-10 (replaces the bee; the custom
+ * logo emoji can't ship until we own a bot-created emoji pack — Telegram only
+ * lets bots send custom emoji from packs the bot itself created). If/when that
+ * pack exists, set KR_SIGNAL_LOGO_EMOJI_ID and this wraps ☆ in a tg-emoji
+ * entity; sendMessage strips the tag and falls back to ☆ on failure.
  */
-const LOGO_EMOJI_ID = process.env.KR_SIGNAL_LOGO_EMOJI_ID || "4988010039290627193";
-function logo(fallback: string): string {
+const LOGO_EMOJI_ID = process.env.KR_SIGNAL_LOGO_EMOJI_ID || "";
+function logo(fallback = "☆"): string {
   return LOGO_EMOJI_ID ? `<tg-emoji emoji-id="${LOGO_EMOJI_ID}">${fallback}</tg-emoji>` : fallback;
 }
 
 export function buildWeeklyReport(d: WeeklyReportData): string {
   const HR = "━━━━━━━━━━━━━";
-  // Monospace body (bars need alignment) — everything except the branded
-  // title + Holo Hive Signal header, which sit OUTSIDE <pre> so the custom
-  // logo emoji renders (it can't inside a code block).
+  // Monospace body (bars need alignment). Brand header + title sit at the
+  // TOP of the same message, outside <pre> (Andy 2026-07-10 — moved back
+  // from the bottom); the share-of-voice lines fold into the body's tail.
+  //
+  // Volume labels say 24h, not 7d: getPerVenueVolume aggregates CoinGecko's
+  // 24-hour converted USD volume per exchange (a per-venue 7d figure isn't
+  // available in one call). The old "(7d volume)" header presented daily
+  // numbers as weekly — the "volume seems inaccurate" report from Jdot's
+  // side. The WoW arrow compares this 24h reading to last week's.
   const B: string[] = [];
   B.push(`🇰🇷 Korea Demand`);
   B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
-  B.push(`KR Vol 7d      ${d.krVol7dArrow} ${sign(d.krVol7dPct)}`);
+  B.push(`KR Vol (24h)   ${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
   B.push(d.koreaReadLabel);
   B.push(HR);
-  B.push(`🏦 By Venue (7d volume)`);
+  B.push(`🏦 By Venue (24h volume)`);
   for (const v of d.byVenue) {
     const flag = v.isKR ? "🇰🇷 " : "   ";
-    B.push(`${flag}${pad(v.name, 9)}${pad(usdM(v.usd), 6)} ${bar(v.pct)} ${v.pct}%`);
+    B.push(`${flag}${pad(v.name, 9)}${pad(usdCompact(v.usd), 7)} ${bar(v.pct)} ${v.pct}%`);
   }
   B.push(HR);
   B.push(`🌐 Market Backdrop`);
@@ -72,15 +85,13 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   B.push(`               ${sign(d.kospiYtdPct)} YTD${d.kospiAtAth ? " (at ATH)" : ""}`);
   B.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   B.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
+  B.push(HR);
+  B.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
+  B.push(`vs AI-token peers   $${d.ticker} #${d.peerRank} in KR vol share`);
 
-  const title = `${logo("📊")} <b>$${esc(d.ticker)} Weekly Report · ${esc(d.weekLabel)}</b>`;
-  const signal = [
-    `${logo("🐝")} <b>Holo Hive Signal</b>`,
-    esc(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`),
-    esc(`vs AI-token peers    $${d.ticker} #${d.peerRank} in KR vol share`),
-  ].join("\n");
-
-  return `${title}\n<pre>${esc(B.join("\n"))}</pre>\n${signal}`;
+  const brand = `${logo()} <b>Holo Hive Signal</b>`;
+  const title = `<b>$${esc(d.ticker)} Weekly Report · ${esc(d.weekLabel)}</b>`;
+  return `${brand}\n${title}\n<pre>${esc(B.join("\n"))}</pre>`;
 }
 
 /** Market-backdrop-only block — for the /vl command (mirrors @cexdexspikebot). */
@@ -91,6 +102,6 @@ export function buildBackdrop(d: WeeklyReportData): string {
   L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
   L.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   L.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
-  const title = `${logo("📊")} <b>$${esc(d.ticker)} Market Backdrop · ${esc(d.weekLabel)}</b>`;
+  const title = `${logo()} <b>$${esc(d.ticker)} Market Backdrop · ${esc(d.weekLabel)}</b>`;
   return `${title}\n<pre>${esc(L.join("\n"))}</pre>`;
 }

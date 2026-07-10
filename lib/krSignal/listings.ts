@@ -71,7 +71,14 @@ const VENUE_LABEL: Record<string, string> = { upbit: "Upbit", bithumb: "Bithumb"
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const venueList = (v: string[]) => v.map((x) => VENUE_LABEL[x] || x).join(" + ");
 const krwT = (n: number) => "₩" + (n / 1e12).toFixed(2) + "T";
-const usdM = (n: number) => "$" + (n / 1e6).toFixed(1) + "M";
+/** Compact USD — thousands-range day-1 volumes rendered "$0.0M" with the old
+ *  fixed-M formatter (Andy 2026-07-10). Mirrors weeklyReport's usdCompact. */
+const usdCompact = (n: number) =>
+  n >= 1e9 ? "$" + (n / 1e9).toFixed(2) + "B"
+  : n >= 1e7 ? "$" + (n / 1e6).toFixed(0) + "M"
+  : n >= 1e6 ? "$" + (n / 1e6).toFixed(1) + "M"
+  : n >= 1e3 ? "$" + (n / 1e3).toFixed(0) + "K"
+  : "$" + n.toFixed(0);
 
 /** §7.C Stage-1 client listing alert — the client's own token just listed on a KR exchange. */
 export function buildStage1Alert(ticker: string, l: DetectedListing): string {
@@ -99,9 +106,9 @@ export function buildStage2Recap(
       ? `Vol-spike     ${spikeMultiple.toFixed(1)}× the token's prior 7-day avg`
       : ``;
   const L = [
-    `📊 <b>$${esc(ticker)} · Day-1 on ${esc(venueList(l.venues))}</b>`,
+    `☆ <b>$${esc(ticker)} · Day-1 on ${esc(venueList(l.venues))}</b>`,
     ``,
-    `First-24h KRW vol  ${krwT(day1VolKrw)}${day1Usd ? ` ≈ ${usdM(day1Usd)}` : ``}`,
+    `First-24h KRW vol  ${krwT(day1VolKrw)}${day1Usd ? ` ≈ ${usdCompact(day1Usd)}` : ``}`,
     spikeLine,
     l.warning ? `⚠️ Investment-warning designation in effect.` : ``,
     ``,
