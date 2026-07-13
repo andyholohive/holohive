@@ -809,12 +809,14 @@ function LineupConfirmedChannelSection() {
 }
 
 /**
- * WeeklyContentRecapChannelSection — destination for the Monday 12:00 UTC
- * "«Campaign» Korea Weekly Content Recap" post (per Andy 2026-07-13). One
- * message per campaign whose just-ended week had posted content: angles
- * in order, only KOLs who posted, each name linked to their content.
- * Empty campaigns are skipped (no content = no post). Writes to
- * app_settings.weekly_recap_chat_id + weekly_recap_chat_thread_id.
+ * WeeklyContentRecapChannelSection — OVERRIDE destination for the Monday
+ * 12:00 UTC "«Campaign» Weekly Content Recap" post (per Andy 2026-07-13).
+ *
+ * By default each campaign's recap goes to that client's chat (the chat
+ * linked to the client in /crm/telegram). This selector is an override:
+ * when set, EVERY recap posts here instead — handy for a consolidated
+ * feed or a test chat. Leave empty to use per-client routing.
+ * Writes to app_settings.weekly_recap_chat_id + weekly_recap_chat_thread_id.
  */
 function WeeklyContentRecapChannelSection() {
   const { toast } = useToast();
@@ -859,10 +861,10 @@ function WeeklyContentRecapChannelSection() {
       setSavedChatId(chatId);
       setSavedThreadId(threadId);
       toast({
-        title: chatId ? 'Weekly recap destination saved' : 'Channel cleared',
+        title: chatId ? 'Recap override saved' : 'Override cleared',
         description: chatId
-          ? threadId ? 'Weekly recaps will post in this topic.' : 'Weekly recaps will post in this chat.'
-          : 'Weekly recaps are paused until a chat is set.',
+          ? threadId ? 'All recaps will post in this topic.' : 'All recaps will post in this chat, overriding per-client routing.'
+          : 'Recaps will route to each client’s chat (set in /crm/telegram).',
       });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -877,11 +879,11 @@ function WeeklyContentRecapChannelSection() {
       title="Weekly Content Recap"
       badge={!loading
         ? (savedChatId
-            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
-            : <StatusBadge tone="warning" size="sm">Paused</StatusBadge>)
+            ? <StatusBadge tone="brand" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Override</span></StatusBadge>
+            : <StatusBadge tone="neutral" size="sm">Per-client</StatusBadge>)
         : null}
       subtitle={(
-        <>Chat that receives the <b>&ldquo;Korea Weekly Content Recap&rdquo;</b> post — one per campaign whose just-ended week had posted content, grouped by angle, each KOL linked to their content. Unposted KOLs are dropped; a campaign with no posted content is skipped entirely. Leave empty to pause recaps.</>
+        <>The <b>&ldquo;Weekly Content Recap&rdquo;</b> post — per campaign whose just-ended week had posted content, grouped by angle, each KOL linked to their content. By default it routes to each <b>client&rsquo;s chat</b> (linked in <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>). Set a chat here to <b>override</b> that and send every recap to one place instead.</>
       )}
     >
       <WhenItSends>
@@ -900,7 +902,7 @@ function WeeklyContentRecapChannelSection() {
                   setChatId(nextChat);
                   setThreadId(nextThread);
                 }}
-                label="Weekly recap destination"
+                label="Override destination (optional)"
                 disabled={saving}
               />
               <div className="flex items-center justify-end gap-2">
