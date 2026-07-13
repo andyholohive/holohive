@@ -64,6 +64,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   CRON_HEALTH_CHECK: 1,        // daily 08:00 UTC — this sweep's own self-log
   TASK_ALERTS: 1,              // weekdays 00:00 UTC (09:00 KST) — overdue/stale task DMs
   LINEUP_DEADLINES: 1,         // Fri/Mon/Thu 12:00 UTC — lineup propose/approve/posted reminders
+  WEEKLY_CONTENT_RECAP: 1,     // Mon 12:00 UTC — per-campaign weekly content recap post
   DAILY_PULSE_DM: 1,           // weekdays 06:00 UTC — Daily Pulse morning blocker DM
   DAILY_PULSE_DIGEST: 1,       // weekdays 12:00 UTC — Daily Pulse digest to HH Ops terminal
   KR_SIGNAL_WEEKLY: 1,         // weekly (Sunday 12:00 UTC) — KR Signal Weekly Market Report to client GCs

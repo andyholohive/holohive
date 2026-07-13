@@ -29,7 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio,
+  CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio, Newspaper,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
@@ -562,6 +562,9 @@ export default function LineupSettingsPage() {
       {/* ─── Lineup Deadline Reminders section [2026-07-06] ─── */}
       <LineupReminderChannelSection />
 
+      {/* ─── Weekly Content Recap section [2026-07-13] ─── */}
+      <WeeklyContentRecapChannelSection />
+
       {/* ─── New KOL Join & Scan Prompt section [2026-07-06] ─── */}
       <NewKolAlertChannelSection />
 
@@ -799,6 +802,120 @@ function LineupConfirmedChannelSection() {
       <Card className="border-cream-200">
         <CardContent className="p-4">
           <MessageTemplateEditor settingKey="tmpl_lineup_confirmed_header" label="Post header line" />
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
+
+/**
+ * WeeklyContentRecapChannelSection — destination for the Monday 12:00 UTC
+ * "«Campaign» Korea Weekly Content Recap" post (per Andy 2026-07-13). One
+ * message per campaign whose just-ended week had posted content: angles
+ * in order, only KOLs who posted, each name linked to their content.
+ * Empty campaigns are skipped (no content = no post). Writes to
+ * app_settings.weekly_recap_chat_id + weekly_recap_chat_thread_id.
+ */
+function WeeklyContentRecapChannelSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_chat_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'weekly_recap_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'weekly_recap_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Weekly recap destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'Weekly recaps will post in this topic.' : 'Weekly recaps will post in this chat.'
+          : 'Weekly recaps are paused until a chat is set.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={Newspaper}
+      title="Weekly Content Recap"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm">Paused</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Chat that receives the <b>&ldquo;Korea Weekly Content Recap&rdquo;</b> post — one per campaign whose just-ended week had posted content, grouped by angle, each KOL linked to their content. Unposted KOLs are dropped; a campaign with no posted content is skipped entirely. Leave empty to pause recaps.</>
+      )}
+    >
+      <WhenItSends>
+        Every Monday 12:00 UTC — recaps the week that just ended.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Weekly recap destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+      <Card className="border-cream-200">
+        <CardContent className="p-4">
+          <MessageTemplateEditor settingKey="tmpl_weekly_content_recap_header" label="Recap header line" />
         </CardContent>
       </Card>
     </CollapsibleSection>

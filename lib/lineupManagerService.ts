@@ -16,6 +16,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { renderTemplate } from './messageTemplates';
+import { escapeHtml } from './telegramHtml';
 import {
   getCampaignWeek,
   mondayOfCampaignWeek as mondayOfCampaignWeekHelper,
@@ -792,6 +793,99 @@ export class LineupManagerService {
     }
     lines.push(`Confirmed by ${confirmedByName} | ${new Date(full.confirmed_at || Date.now()).toLocaleString()}`);
     return lines.join('\n');
+  }
+
+  // ── Weekly Content Recap (§ Andy 2026-07-13) ─────────────────────
+
+  /**
+   * Format the just-ended week's lineup as a client-facing "Weekly
+   * Content Recap" (per Andy): angles in order, each with only the KOLs
+   * who actually posted, each name hyperlinked to their content. KOLs
+   * with no posted content that week are dropped ("remove unposted
+   * kols"). Returns null when nothing posted ("no content = no post").
+   *
+   * Posted = a `contents` row for that campaign+KOL with status 'posted'
+   * and activation_date inside the lineup week (week_of .. week_of+6).
+   * The slot's own 'posted' status isn't trusted here — the content row
+   * is the source of truth, and it's what carries the link + preview.
+   *
+   * HTML output; web preview left ON by the sender so the first content
+   * link renders its image.
+   */
+  async formatWeeklyContentRecap(
+    campaignId: string,
+    campaignName: string,
+    weekOf: string,
+    headerTemplate?: string,
+  ): Promise<string | null> {
+    // Find the week's lineup (confirmed or completed — the close-out
+    // cron flips confirmed→completed Monday 06:00, before this runs).
+    const { data: lineups } = await (this.supabase as any)
+      .from('campaign_lineups')
+      .select('id, week_number, week_of, status')
+      .eq('campaign_id', campaignId)
+      .eq('week_of', weekOf)
+      .in('status', ['confirmed', 'completed'])
+      .order('week_number', { ascending: false })
+      .limit(1);
+    const lineup = (lineups as any[])?.[0];
+    if (!lineup) return null;
+
+    const full = await this.getLineupFull(lineup.id);
+    if (!full || full.angles.length === 0) return null;
+
+    // Week window end (Sunday).
+    const weekEnd = new Date(weekOf + 'T00:00:00Z');
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+    // Posted content for the campaign in this week, keyed by master_kol_id
+    // (latest wins). contents → campaign_kols(master_kol_id).
+    const { data: contentRows } = await (this.supabase as any)
+      .from('contents')
+      .select('content_link, activation_date, campaign_kols:campaign_kols_id(master_kol_id)')
+      .eq('campaign_id', campaignId)
+      .eq('status', 'posted')
+      .gte('activation_date', weekOf)
+      .lte('activation_date', weekEndStr)
+      .order('activation_date', { ascending: true });
+    const linkByKol = new Map<string, string>();
+    for (const r of ((contentRows as any[]) ?? [])) {
+      const kolId = r.campaign_kols?.master_kol_id;
+      const link = (r.content_link || '').trim();
+      if (kolId && link) linkByKol.set(kolId, link); // ascending order → last (latest) wins
+    }
+    if (linkByKol.size === 0) return null; // no content = no post
+
+    // KOL display names for the slots.
+    const allKolIds = full.angles.flatMap(a => a.slots.map(s => s.kol_id));
+    const { data: kols } = await (this.supabase as any)
+      .from('master_kols')
+      .select('id, name')
+      .in('id', allKolIds.length > 0 ? allKolIds : ['00000000-0000-0000-0000-000000000000']);
+    const nameByKol = new Map<string, string>();
+    for (const k of ((kols as any[]) ?? [])) nameByKol.set(k.id, k.name);
+
+    const header = headerTemplate
+      ? renderTemplate(headerTemplate, { campaign: escapeHtml(campaignName), week: String(lineup.week_number) })
+      : `<b>${escapeHtml(campaignName)} Weekly Content Recap</b>`;
+
+    const blocks: string[] = [];
+    for (const angle of full.angles) {
+      // Only KOLs in this angle who actually posted (have a content link).
+      const posted = angle.slots.filter(s => linkByKol.has(s.kol_id));
+      if (posted.length === 0) continue; // drop empty angles
+      const lines = [`<b>${escapeHtml(angle.angle_name)}</b> (${posted.length} KOL${posted.length === 1 ? '' : 's'})`];
+      for (const slot of posted) {
+        const name = nameByKol.get(slot.kol_id) || 'KOL';
+        const link = linkByKol.get(slot.kol_id)!;
+        lines.push(`  • <a href="${escapeHtml(link)}">${escapeHtml(name)}</a>`);
+      }
+      blocks.push(lines.join('\n'));
+    }
+    if (blocks.length === 0) return null;
+
+    return [header, '', blocks.join('\n\n')].join('\n');
   }
 
   // ── Internal helpers ─────────────────────────────────────────────

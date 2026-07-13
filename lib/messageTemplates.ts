@@ -24,7 +24,8 @@ export type TemplateKey =
   | 'tmpl_content_review_card'
   | 'tmpl_lineup_reminder_friday'
   | 'tmpl_lineup_reminder_monday'
-  | 'tmpl_lineup_reminder_thursday';
+  | 'tmpl_lineup_reminder_thursday'
+  | 'tmpl_weekly_content_recap_header';
 
 export interface TemplateMeta {
   /** Built-in message used when the app_settings row is unset/empty. */
@@ -91,6 +92,12 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
     vars: ['week'],
     format: 'HTML',
     appended: 'The list of campaigns with unposted KOLs is appended automatically.',
+  },
+  tmpl_weekly_content_recap_header: {
+    default: '<b>{campaign} Weekly Content Recap</b>',
+    vars: ['campaign', 'week'],
+    format: 'HTML',
+    appended: 'The per-angle KOL list (posted only, each name linked to their content) is appended automatically.',
   },
 };
 
