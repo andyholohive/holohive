@@ -89,7 +89,7 @@ export async function GET() {
       // bulk and reduced per-initiative below.
       (sb as any)
         .from('initiative_milestones')
-        .select('initiative_id, spec_id, name, sort_order, completed')
+        .select('spec_id, name, sort_order, completed')
         .order('sort_order', { ascending: true }),
       (sb as any)
         .from('users')
@@ -635,7 +635,7 @@ export async function GET() {
     const currentGateByInitiative = new Map<string, string>();
     for (const m of ((initiativeMilestonesRes.data ?? []) as any[])) {
       if (m.completed) continue;
-      const key = m.spec_id ?? m.initiative_id;
+      const key = m.spec_id;
       if (key && !currentGateByInitiative.has(key)) {
         currentGateByInitiative.set(key, m.name);
       }

@@ -4397,9 +4397,9 @@ export type Database = {
           created_at: string
           definition: string | null
           id: string
-          initiative_id: string
           name: string
           sort_order: number
+          spec_id: string | null
           target_date: string | null
           updated_at: string
         }
@@ -4409,9 +4409,9 @@ export type Database = {
           created_at?: string
           definition?: string | null
           id?: string
-          initiative_id: string
           name: string
           sort_order: number
+          spec_id?: string | null
           target_date?: string | null
           updated_at?: string
         }
@@ -4421,69 +4421,18 @@ export type Database = {
           created_at?: string
           definition?: string | null
           id?: string
-          initiative_id?: string
           name?: string
           sort_order?: number
+          spec_id?: string | null
           target_date?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "initiative_milestones_initiative_id_fkey"
-            columns: ["initiative_id"]
+            foreignKeyName: "initiative_milestones_spec_id_fkey"
+            columns: ["spec_id"]
             isOneToOne: false
-            referencedRelation: "initiatives"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      initiatives: {
-        Row: {
-          category_tags: string[] | null
-          created_at: string | null
-          deleted_at: string | null
-          id: string
-          name: string
-          owner_id: string | null
-          owner_user_id: string | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          category_tags?: string[] | null
-          created_at?: string | null
-          deleted_at?: string | null
-          id?: string
-          name: string
-          owner_id?: string | null
-          owner_user_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          category_tags?: string[] | null
-          created_at?: string | null
-          deleted_at?: string | null
-          id?: string
-          name?: string
-          owner_id?: string | null
-          owner_user_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "initiatives_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "initiatives_owner_user_id_fkey"
-            columns: ["owner_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "specs"
             referencedColumns: ["id"]
           },
         ]
@@ -7524,7 +7473,7 @@ export type Database = {
             foreignKeyName: "tasks_linked_initiative_fkey"
             columns: ["linked_initiative"]
             isOneToOne: false
-            referencedRelation: "initiatives"
+            referencedRelation: "specs"
             referencedColumns: ["id"]
           },
           {

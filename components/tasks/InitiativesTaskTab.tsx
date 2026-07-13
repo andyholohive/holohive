@@ -28,7 +28,6 @@ import { formatDate } from '@/lib/dateFormat';
 
 type Milestone = {
   id: string;
-  initiative_id: string;
   name: string;
   sort_order: number;
   completed: boolean;
@@ -126,12 +125,13 @@ export function InitiativesTaskTab() {
       }
       const { data: milestonesRaw } = await (supabase as any)
         .from('initiative_milestones')
-        .select('id, initiative_id, spec_id, name, sort_order, completed, completed_date, target_date')
+        .select('id, spec_id, name, sort_order, completed, completed_date, target_date')
         .in('spec_id', inits.map(i => i.id))
         .order('sort_order');
       const byInit = new Map<string, Milestone[]>();
       for (const m of (milestonesRaw ?? []) as Array<Milestone & { spec_id: string | null }>) {
-        const key = m.spec_id ?? m.initiative_id;
+        const key = m.spec_id;
+        if (!key) continue;
         const arr = byInit.get(key) || [];
         arr.push(m);
         byInit.set(key, arr);
