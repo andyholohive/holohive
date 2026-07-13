@@ -1764,31 +1764,30 @@ export async function getKolScore(
   const result = await getKolScoreFromService(supabase, args.kol_id);
   if (!result) return `Score not computed for ${target.name} (${args.kol_id}).`;
 
-  const { blended, channel, campaign } = result;
+  // Round 2 (Jdot 2026-07-10): no blend — two scores side by side.
+  const { scores, channel, activation } = result;
   const out: string[] = [];
   out.push(`## Score for ${target.name}`);
   out.push('');
-  out.push(`**Displayed:** ${Math.round(blended.displayed)}/100 · Tier ${blended.tier}`);
-  out.push(`**Channel Score:** ${Math.round(blended.channel)} (60% weight when activated, else 100%)`);
-  if (blended.activated && blended.campaign != null) {
-    out.push(`**Campaign Performance:** ${Math.round(blended.campaign)} (40% weight, activated at ${campaign?.deliverableCount ?? '?'}+ deliverables)`);
+  out.push(`**Channel / Activation:** ${Math.round(scores.channel)} / ${scores.activation != null ? Math.round(scores.activation) : '—'} · Tier ${scores.tier}`);
+  out.push(`**Channel Score:** ${Math.round(scores.channel)} — organic channel strength (potential)`);
+  if (scores.activation != null) {
+    out.push(`**Activation Score:** ${Math.round(scores.activation)} — participants driven (proven, ${activation?.campaignsCounted ?? '?'} campaign(s))`);
   } else {
-    out.push(`**Campaign Performance:** Not activated — needs 3+ logged deliverables.`);
+    out.push(`**Activation Score:** — (no logged activation participants yet — strong channel, never tested)`);
   }
-  if (blended.lowConfidence) out.push(`*⚠ Low-confidence: latest snapshot flagged low organic volume.*`);
+  if (scores.lowConfidence) out.push(`*⚠ Low-confidence: latest snapshot flagged low organic volume.*`);
   out.push('');
-  out.push('**Channel Score breakdown (0-100, rank vs roster/band):**');
-  out.push(`  · Average Views        (30%): ${Math.round(channel.engagementQuality)}`);
-  out.push(`  · Reach Efficiency     (25%): ${Math.round(channel.reachEfficiency)}`);
-  out.push(`  · Discussion Engagement (15%): ${channel.discussionEngagement == null ? '— (no linked discussion group)' : Math.round(channel.discussionEngagement)}`);
-  out.push(`  · Channel Health       (15%): ${Math.round(channel.channelHealth)}`);
-  out.push(`  · Growth Trajectory    (15%): ${channel.growthTrajectory == null ? '— (needs 2nd monthly snapshot)' : Math.round(channel.growthTrajectory)}`);
-  if (campaign) {
+  out.push('**Channel Score breakdown (0-100, rank vs roster/band, final blend re-ranked):**');
+  out.push(`  · Average Views     (35%): ${Math.round(channel.averageViews)}`);
+  out.push(`  · Engagement Rate   (35%): ${channel.engagementRate == null ? '— (no views data)' : Math.round(channel.engagementRate)}`);
+  out.push(`  · Channel Health    (15%): ${Math.round(channel.channelHealth)}`);
+  out.push(`  · Growth Trajectory (15%): ${channel.growthTrajectory == null ? '— (needs 2nd monthly snapshot)' : Math.round(channel.growthTrajectory)}`);
+  if (activation) {
     out.push('');
-    out.push('**Campaign Performance breakdown:**');
-    out.push(`  · Activation Impact         (50%): ${Math.round(campaign.activationImpact)}`);
-    out.push(`  · Sponsored Engagement Lift (30%): ${Math.round(campaign.sponsoredEngagementLift)}`);
-    out.push(`  · Sponsored Reach           (20%): ${Math.round(campaign.sponsoredReach)}`);
+    out.push('**Activation breakdown:**');
+    out.push(`  · Activation Impact (100%): ${Math.round(activation.activationImpact)} — participants percentiled within each campaign, averaged`);
+    out.push(`  · Over ${activation.campaignsCounted} campaign(s), ${activation.deliverableCount} deliverable(s)`);
   }
   return out.join('\n');
 }

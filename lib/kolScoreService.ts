@@ -2,32 +2,30 @@
  * KOL Score service — implements Jdot's TG Addendum (18 June 2026)
  * two-score model + blend rule.
  *
- *   Channel Score (5 dims, 100%) — amended per Jdot 2026-07-10:
- *     Average Views            30%  = avg organic views per post (RAW, not
- *                                     ÷followers — the one dimension where a
- *                                     big channel earns its reach; ranked
- *                                     against the WHOLE roster)
- *     Reach Efficiency         25%  = avg organic forwards / avg organic views
- *     Discussion Engagement    15%  = avg organic replies / avg organic views
- *                                     (drop + renormalize for broadcast-only)
- *     Channel Health           15%  = avg(rank(engagement_rate),
- *                                          rank(posting_frequency))
- *     Growth Trajectory        15%  = follower_growth_pct, floor neg at 0
- *                                     (drop + renormalize on month-1 / null)
- *     The four RATE dims rank within follower bands (<5K / 5–20K / 20K+)
- *     so small channels compete against small — big wins on reach, small
- *     wins on quality, neither gets shut out.
+ *   Channel Score (4 dims, Round 2 per Jdot 2026-07-10) = POTENTIAL:
+ *     Average Views    35%  = avg organic views per post (RAW — the one
+ *                             dimension where a big channel earns its
+ *                             reach; ranked vs the WHOLE roster)
+ *     Engagement Rate  35%  = (reactions + replies + forwards) / views
+ *                             (absorbs old Reach Efficiency + Discussion;
+ *                             ranked within follower bands)
+ *     Channel Health   15%  = avg(rank(engagement_rate), rank(posting_freq))
+ *     Growth Trajectory 15% = follower_growth_pct, floor neg at 0
+ *     Rate dims rank within follower bands (<5K / 5–20K / 20K+); then the
+ *     weighted blend is RE-RANKED across the roster so the top KOL sits
+ *     near 100 (averaging ranks alone caps everyone ~70).
  *
- *   Campaign Performance Score (3 dims, gates at 3+ deliverables):
- *     Activation Impact        50%  = participants / single-campaign avg
- *     Sponsored Engagement Lift 30% = views_48h / KOL baseline (closest-prior snapshot)
- *     Sponsored Reach          20%  = forwards / views_48h on sponsored posts
+ *   Activation Score (Round 2) = PROVEN. One dimension: participants
+ *   driven, percentiled WITHIN each campaign (not vs the mean, which big
+ *   drivers drag up), averaged across campaigns, then re-ranked across
+ *   the activated pool. No logged participants → null, renders "—".
  *
- *   Display blend:
- *     not activated   → Channel Score (100%)
- *     activated (3+)  → 0.4 * Campaign + 0.6 * Channel
+ *   Display: NO BLEND. Two scores side by side ("72 / 88"). Channel =
+ *   how good they are; Activation = how well they delivered.
  *
- *   Tier (absolute, applied to the displayed score):
+ *   Rule across the model: rank everything, log nothing.
+ *
+ *   Tier (from the Channel Score — the score everyone has):
  *     S 85+ · A 70-84 · B 50-69 · C 30-49 · D <30
  *
  * All raw dimension outputs are RANK-normalized to 0-100 (percentile
@@ -51,30 +49,38 @@ import type { Database } from './database.types';
 
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D';
 
+/** Round 2 (Jdot 2026-07-10): 4 dimensions, and `composite` is the FINAL
+ *  Channel Score — the weighted pre-blend re-ranked across the roster so
+ *  the top KOL sits near 100 (averaging ranks alone caps everyone ~70). */
 export interface ChannelScoreBreakdown {
-  /** All normalized 0–100. null = dimension dropped (broadcast-only / month-1). */
-  engagementQuality: number;
-  reachEfficiency: number;
-  discussionEngagement: number | null;
+  averageViews: number;
+  /** (reactions + replies + forwards) / views — absorbs the old Reach
+   *  Efficiency + Discussion Engagement. null = no views data. */
+  engagementRate: number | null;
   channelHealth: number;
   growthTrajectory: number | null;
-  /** Weighted composite, renormalized over present dimensions. 0–100. */
+  /** FINAL Channel Score: rank of the weighted blend across the roster. */
   composite: number;
 }
 
-export interface CampaignScoreBreakdown {
+/** Round 2: Campaign Performance → Activation Score. One thing only —
+ *  participants driven, percentiled WITHIN each campaign then averaged,
+ *  then the final number re-ranked across the activated pool. */
+export interface ActivationScoreBreakdown {
+  /** Avg of per-campaign participant percentiles (pre final rank). */
   activationImpact: number;
-  sponsoredEngagementLift: number;
-  sponsoredReach: number;
+  /** FINAL Activation Score: rank across the activated pool. */
   composite: number;
   deliverableCount: number;
+  campaignsCounted: number;
 }
 
-export interface BlendedScore {
+/** Round 2: NO BLEND. Two scores side by side — Channel = potential
+ *  (everyone has one), Activation = proven (null renders as "—"). */
+export interface DisplayScores {
   channel: number;
-  campaign: number | null;
-  /** The single Score that renders on /kols. */
-  displayed: number;
+  activation: number | null;
+  /** Tier from the Channel Score — the score everyone has. */
   tier: Tier;
   activated: boolean;
   /** From the latest snapshot's low_organic_volume_flag — low-confidence marker. */
@@ -83,8 +89,8 @@ export interface BlendedScore {
 
 export interface ScoreResult {
   channel: ChannelScoreBreakdown;
-  campaign: CampaignScoreBreakdown | null;
-  blended: BlendedScore;
+  activation: ActivationScoreBreakdown | null;
+  scores: DisplayScores;
 }
 
 export interface SnapshotInput {
@@ -112,23 +118,13 @@ export interface DeliverableInput {
 
 // ─── Dimension weights ────────────────────────────────────────────────
 
+// Round 2 weights: Average Views + combined Engagement Rate carry 70%.
 const CHANNEL_WEIGHTS = {
-  engagementQuality: 0.30,
-  reachEfficiency: 0.25,
-  discussionEngagement: 0.15,
+  averageViews: 0.35,
+  engagementRate: 0.35,
   channelHealth: 0.15,
   growthTrajectory: 0.15,
 } as const;
-
-const CAMPAIGN_WEIGHTS = {
-  activationImpact: 0.50,
-  sponsoredEngagementLift: 0.30,
-  sponsoredReach: 0.20,
-} as const;
-
-const CHANNEL_BLEND_WEIGHT = 0.60;
-const CAMPAIGN_BLEND_WEIGHT = 0.40;
-const ACTIVATION_THRESHOLD = 3;
 
 // ─── Math helpers ──────────────────────────────────────────────────────
 
@@ -176,9 +172,8 @@ function safeDiv(num: number | null | undefined, den: number | null | undefined)
 // ─── Raw dimension extractors (per-KOL, pre-normalization) ─────────────
 
 interface ChannelRawDims {
-  engagementQualityRaw: number | null;
-  reachEfficiencyRaw: number | null;
-  discussionEngagementRaw: number | null;
+  averageViewsRaw: number | null;
+  engagementRateRaw: number | null;
   channelHealthRaw_ER: number | null;
   channelHealthRaw_Freq: number | null;
   growthTrajectoryRaw: number | null;
@@ -187,17 +182,20 @@ interface ChannelRawDims {
 function extractChannelRaw(snap: SnapshotInput | undefined): ChannelRawDims {
   if (!snap) {
     return {
-      engagementQualityRaw: null, reachEfficiencyRaw: null, discussionEngagementRaw: null,
+      averageViewsRaw: null, engagementRateRaw: null,
       channelHealthRaw_ER: null, channelHealthRaw_Freq: null, growthTrajectoryRaw: null,
     };
   }
+  // Round 2: combined Engagement Rate absorbs the old Reach Efficiency
+  // (forwards÷views double-counted views, tiny + noisy, fought Average
+  // Views) and Discussion Engagement.
+  const interactions =
+    (snap.avg_reactions_per_post ?? 0) + (snap.avg_replies_per_post ?? 0) + (snap.avg_forwards_per_post ?? 0);
   return {
-    // [2026-07-10 Jdot] "Average Views" — raw avg views per post, NOT
-    // ÷followers. The old ratio quietly favored tiny channels; this is
-    // now the one dimension where a big channel earns its reach.
-    engagementQualityRaw: snap.avg_views_per_post ?? null,
-    reachEfficiencyRaw: safeDiv(snap.avg_forwards_per_post, snap.avg_views_per_post),
-    discussionEngagementRaw: safeDiv(snap.avg_replies_per_post, snap.avg_views_per_post),
+    // "Average Views" — raw avg views per post, NOT ÷followers. The one
+    // dimension where a big channel earns its reach.
+    averageViewsRaw: snap.avg_views_per_post ?? null,
+    engagementRateRaw: safeDiv(interactions, snap.avg_views_per_post),
     channelHealthRaw_ER: snap.engagement_rate,
     channelHealthRaw_Freq: snap.posting_frequency,
     growthTrajectoryRaw: snap.follower_growth_pct == null
@@ -208,33 +206,26 @@ function extractChannelRaw(snap: SnapshotInput | undefined): ChannelRawDims {
 
 // ─── Channel Score composite (with renormalize) ────────────────────────
 
-function computeChannelComposite(
+/** Weighted 4-dim blend BEFORE the final re-rank. Missing dims (no views
+ *  → no engagement rate; month-1 → no growth) drop out and the remaining
+ *  weights rescale to 1 (Jdot Q2 + Q4 renormalization rule). */
+function computeChannelPreBlend(
   normalized: {
-    engagementQuality: number;
-    reachEfficiency: number;
-    discussionEngagement: number | null;
+    averageViews: number;
+    engagementRate: number | null;
     channelHealth: number;
     growthTrajectory: number | null;
   }
 ): number {
-  /**
-   * Renormalization rule per Jdot Q2 + Q4: when Discussion or Growth is
-   * missing, drop that dimension entirely and rescale the remaining
-   * weights so they sum to 1. Done by dividing the weighted sum by the
-   * total weight of present dimensions.
-   */
   let weighted = 0;
   let totalWeight = 0;
 
-  weighted += normalized.engagementQuality * CHANNEL_WEIGHTS.engagementQuality;
-  totalWeight += CHANNEL_WEIGHTS.engagementQuality;
+  weighted += normalized.averageViews * CHANNEL_WEIGHTS.averageViews;
+  totalWeight += CHANNEL_WEIGHTS.averageViews;
 
-  weighted += normalized.reachEfficiency * CHANNEL_WEIGHTS.reachEfficiency;
-  totalWeight += CHANNEL_WEIGHTS.reachEfficiency;
-
-  if (normalized.discussionEngagement != null) {
-    weighted += normalized.discussionEngagement * CHANNEL_WEIGHTS.discussionEngagement;
-    totalWeight += CHANNEL_WEIGHTS.discussionEngagement;
+  if (normalized.engagementRate != null) {
+    weighted += normalized.engagementRate * CHANNEL_WEIGHTS.engagementRate;
+    totalWeight += CHANNEL_WEIGHTS.engagementRate;
   }
 
   weighted += normalized.channelHealth * CHANNEL_WEIGHTS.channelHealth;
@@ -249,93 +240,29 @@ function computeChannelComposite(
   return weighted / totalWeight;
 }
 
-// ─── Campaign Performance ──────────────────────────────────────────────
+// ─── Activation Score (Round 2: participants only) ────────────────────
+// Sponsored Engagement Lift + Sponsored Reach dropped entirely — driving
+// real people is the only thing sponsored data tells us that the channel
+// score can't already see. Participants are percentiled WITHIN each
+// campaign (not vs the campaign mean, which the big drivers drag up so
+// everyone else lands below it), then averaged across the KOL's campaigns.
 
-interface CampaignRawDims {
-  activationImpactRaw: number | null;
-  sponsoredEngagementLiftRaw: number | null;
-  sponsoredReachRaw: number | null;
-  deliverableCount: number;
-}
-
-/**
- * Find the snapshot from `kolSnapshots` that was the most recent one
- * on/before `postedDate`. Used for Engagement Lift baseline per Doc 2 §6
- * (closest-prior snapshot, per Jdot Q1).
- */
-function findBaselineSnapshot(
-  kolSnapshots: SnapshotInput[],
-  postedDate: string | null
-): SnapshotInput | null {
-  if (!postedDate || kolSnapshots.length === 0) return null;
-  const target = new Date(postedDate).getTime();
-  const eligible = kolSnapshots
-    .filter(s => new Date(s.snapshot_date).getTime() <= target)
-    .sort((a, b) => new Date(b.snapshot_date).getTime() - new Date(a.snapshot_date).getTime());
-  return eligible[0] ?? null;
-}
-
-function extractCampaignRaw(
-  deliverables: DeliverableInput[],          // this KOL's deliverables only
-  allSnapshotsByKol: Map<string, SnapshotInput[]>,
-  campaignAvgParticipants: Map<string, number>,
-  kolId: string
-): CampaignRawDims {
-  const count = deliverables.length;
-  if (count < ACTIVATION_THRESHOLD) {
-    return {
-      activationImpactRaw: null, sponsoredEngagementLiftRaw: null,
-      sponsoredReachRaw: null, deliverableCount: count,
-    };
+/** This KOL's participants summed per campaign. Only deliverables with
+ *  activation_participants logged count — no logging, no score. */
+function participantsPerCampaign(deliverables: DeliverableInput[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const d of deliverables) {
+    if (d.activation_participants == null) continue;
+    m.set(d.campaign_id, (m.get(d.campaign_id) ?? 0) + d.activation_participants);
   }
-
-  // Activation Impact: avg(participants / that-campaign's-average)
-  const impactRatios = deliverables
-    .map(d => {
-      const campAvg = campaignAvgParticipants.get(d.campaign_id);
-      return safeDiv(d.activation_participants, campAvg);
-    })
-    .filter((n): n is number => n != null);
-
-  // Engagement Lift: avg(views_48h / baseline-at-time-of-post)
-  const kolSnapshots = allSnapshotsByKol.get(kolId) ?? [];
-  const liftRatios = deliverables
-    .map(d => {
-      const baseline = findBaselineSnapshot(kolSnapshots, d.date_posted);
-      return safeDiv(d.views_48h, baseline?.avg_views_per_post);
-    })
-    .filter((n): n is number => n != null);
-
-  // Sponsored Reach: avg(forwards / views_48h)
-  const reachRatios = deliverables
-    .map(d => safeDiv(d.forwards, d.views_48h))
-    .filter((n): n is number => n != null);
-
-  return {
-    activationImpactRaw: impactRatios.length ? avg(impactRatios) : null,
-    sponsoredEngagementLiftRaw: liftRatios.length ? avg(liftRatios) : null,
-    sponsoredReachRaw: reachRatios.length ? avg(reachRatios) : null,
-    deliverableCount: count,
-  };
+  return m;
 }
 
 function avg(xs: number[]): number {
   return xs.reduce((s, x) => s + x, 0) / xs.length;
 }
 
-function computeCampaignComposite(normalized: {
-  activationImpact: number;
-  sponsoredEngagementLift: number;
-  sponsoredReach: number;
-}): number {
-  return (
-    normalized.activationImpact * CAMPAIGN_WEIGHTS.activationImpact +
-    normalized.sponsoredEngagementLift * CAMPAIGN_WEIGHTS.sponsoredEngagementLift +
-    normalized.sponsoredReach * CAMPAIGN_WEIGHTS.sponsoredReach
-  );
-}
-
-// ─── Blend + tier ──────────────────────────────────────────────────────
+// ─── Tier ──────────────────────────────────────────────────────────────
 
 function tierFor(displayedScore: number): Tier {
   if (displayedScore >= 85) return 'S';
@@ -343,11 +270,6 @@ function tierFor(displayedScore: number): Tier {
   if (displayedScore >= 50) return 'B';
   if (displayedScore >= 30) return 'C';
   return 'D';
-}
-
-function blend(channel: number, campaign: number | null): number {
-  if (campaign == null) return channel;
-  return campaign * CAMPAIGN_BLEND_WEIGHT + channel * CHANNEL_BLEND_WEIGHT;
 }
 
 // ─── Orchestrator ──────────────────────────────────────────────────────
@@ -370,25 +292,18 @@ export interface ComputeInputs {
 export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult> {
   const { latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol, campaignAvgParticipants, kolIds } = inputs;
 
-  // Pass 1: extract raw dims per KOL.
+  // Pass 1: raw channel dims per KOL + per-campaign participant sums.
   const channelRawByKol = new Map<string, ChannelRawDims>();
-  const campaignRawByKol = new Map<string, CampaignRawDims>();
+  const participantsByKol = new Map<string, Map<string, number>>();
   for (const kolId of kolIds) {
     channelRawByKol.set(kolId, extractChannelRaw(latestSnapshotByKol.get(kolId)));
-    campaignRawByKol.set(kolId, extractCampaignRaw(
-      deliverablesByKol.get(kolId) ?? [],
-      allSnapshotsByKol,
-      campaignAvgParticipants,
-      kolId,
-    ));
+    participantsByKol.set(kolId, participantsPerCampaign(deliverablesByKol.get(kolId) ?? []));
   }
 
-  // Pass 2: collect comparison pools for RANK normalization (Jdot
-  // 2026-07-10 amendment). Average Views ranks against the WHOLE roster
-  // (size counts there); the four rate dims rank within follower bands
-  // (<5K / 5–20K / 20K+) so small competes with small. X-only/test
-  // accounts have no TG snapshot → null raws → excluded from every pool
-  // by rankNormalize's null filter.
+  // Pass 2: comparison pools (rank normalization, Jdot Round 2).
+  // Average Views ranks vs the WHOLE roster; the rate dims rank within
+  // follower bands (<5K / 5–20K / 20K+). X-only/test accounts have no TG
+  // snapshot → null raws → excluded from every pool automatically.
   const bandByKol = new Map<string, FollowerBand>();
   for (const kolId of kolIds) {
     bandByKol.set(kolId, bandFor(latestSnapshotByKol.get(kolId)?.follower_count));
@@ -397,8 +312,7 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
   const bandPop = (b: FollowerBand) => {
     const ids = idsInBand(b);
     return {
-      re: ids.map(id => channelRawByKol.get(id)?.reachEfficiencyRaw),
-      de: ids.map(id => channelRawByKol.get(id)?.discussionEngagementRaw),
+      er: ids.map(id => channelRawByKol.get(id)?.engagementRateRaw),
       ch_er: ids.map(id => channelRawByKol.get(id)?.channelHealthRaw_ER),
       ch_freq: ids.map(id => channelRawByKol.get(id)?.channelHealthRaw_Freq),
       gt: ids.map(id => channelRawByKol.get(id)?.growthTrajectoryRaw),
@@ -409,75 +323,92 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
     mid: bandPop('mid'),
     big: bandPop('big'),
   };
-  const avgViewsPop = kolIds.map(id => channelRawByKol.get(id)?.engagementQualityRaw);
-  const campaignPop = {
-    ai: kolIds.map(id => campaignRawByKol.get(id)?.activationImpactRaw),
-    sel: kolIds.map(id => campaignRawByKol.get(id)?.sponsoredEngagementLiftRaw),
-    sr: kolIds.map(id => campaignRawByKol.get(id)?.sponsoredReachRaw),
-  };
+  const avgViewsPop = kolIds.map(id => channelRawByKol.get(id)?.averageViewsRaw);
 
-  // Pass 3: normalize + compose per KOL.
-  const results = new Map<string, ScoreResult>();
+  // Activation pools: every KOL's participant total WITHIN each campaign.
+  const campaignPools = new Map<string, number[]>();
+  for (const perCamp of participantsByKol.values()) {
+    for (const [campaignId, total] of perCamp) {
+      const arr = campaignPools.get(campaignId) ?? [];
+      arr.push(total);
+      campaignPools.set(campaignId, arr);
+    }
+  }
+
+  // Pass 3: per-dimension ranks + weighted pre-blends.
+  const preChannel = new Map<string, {
+    dims: { averageViews: number; engagementRate: number | null; channelHealth: number; growthTrajectory: number | null };
+    preBlend: number;
+    hasSnapshot: boolean;
+  }>();
+  const preActivation = new Map<string, { impact: number; campaignsCounted: number; deliverableCount: number }>();
+
   for (const kolId of kolIds) {
     const raw = channelRawByKol.get(kolId)!;
-    const camp = campaignRawByKol.get(kolId)!;
-    const snap = latestSnapshotByKol.get(kolId);
-
-    // Channel dims — Average Views vs whole roster; rate dims vs band.
     const pop = ratePops[bandByKol.get(kolId)!];
-    const eq = raw.engagementQualityRaw == null ? 0 : rankNormalize(raw.engagementQualityRaw, avgViewsPop);
-    const re = raw.reachEfficiencyRaw == null ? 0 : rankNormalize(raw.reachEfficiencyRaw, pop.re);
-    const de = raw.discussionEngagementRaw == null
-      ? null
-      : rankNormalize(raw.discussionEngagementRaw, pop.de);
-    // Channel Health: average of two ranked sub-metrics per Jdot Q3 option A.
+    const av = raw.averageViewsRaw == null ? 0 : rankNormalize(raw.averageViewsRaw, avgViewsPop);
+    const er = raw.engagementRateRaw == null ? null : rankNormalize(raw.engagementRateRaw, pop.er);
     const chER = raw.channelHealthRaw_ER == null ? 0 : rankNormalize(raw.channelHealthRaw_ER, pop.ch_er);
     const chFreq = raw.channelHealthRaw_Freq == null ? 0 : rankNormalize(raw.channelHealthRaw_Freq, pop.ch_freq);
     const ch = (chER + chFreq) / 2;
     const gt = raw.growthTrajectoryRaw == null ? null : rankNormalize(raw.growthTrajectoryRaw, pop.gt);
+    const dims = { averageViews: av, engagementRate: er, channelHealth: ch, growthTrajectory: gt };
+    preChannel.set(kolId, {
+      dims,
+      preBlend: computeChannelPreBlend(dims),
+      hasSnapshot: latestSnapshotByKol.get(kolId) != null,
+    });
 
-    const channelBreakdown: ChannelScoreBreakdown = {
-      engagementQuality: eq,
-      reachEfficiency: re,
-      discussionEngagement: de,
-      channelHealth: ch,
-      growthTrajectory: gt,
-      composite: computeChannelComposite({ engagementQuality: eq, reachEfficiency: re, discussionEngagement: de, channelHealth: ch, growthTrajectory: gt }),
-    };
-
-    // Campaign dims (only if activated).
-    let campaignBreakdown: CampaignScoreBreakdown | null = null;
-    if (camp.deliverableCount >= ACTIVATION_THRESHOLD) {
-      // Campaign formulas/weights unchanged (size can't distort them) —
-      // only the 0-100 conversion switches to rank so a 70 means the
-      // same on both scores (Jdot 2026-07-10).
-      const ai = camp.activationImpactRaw == null ? 0 : rankNormalize(camp.activationImpactRaw, campaignPop.ai);
-      const sel = camp.sponsoredEngagementLiftRaw == null ? 0 : rankNormalize(camp.sponsoredEngagementLiftRaw, campaignPop.sel);
-      const sr = camp.sponsoredReachRaw == null ? 0 : rankNormalize(camp.sponsoredReachRaw, campaignPop.sr);
-      campaignBreakdown = {
-        activationImpact: ai,
-        sponsoredEngagementLift: sel,
-        sponsoredReach: sr,
-        composite: computeCampaignComposite({ activationImpact: ai, sponsoredEngagementLift: sel, sponsoredReach: sr }),
-        deliverableCount: camp.deliverableCount,
-      };
+    // Activation Impact: percentile within each campaign, averaged.
+    const perCamp = participantsByKol.get(kolId)!;
+    if (perCamp.size > 0) {
+      const pcts = [...perCamp.entries()].map(([campaignId, total]) =>
+        rankNormalize(total, campaignPools.get(campaignId) ?? []));
+      preActivation.set(kolId, {
+        impact: avg(pcts),
+        campaignsCounted: perCamp.size,
+        deliverableCount: (deliverablesByKol.get(kolId) ?? []).length,
+      });
     }
+  }
 
-    const channelScore = channelBreakdown.composite;
-    const campaignScore = campaignBreakdown?.composite ?? null;
-    const displayed = blend(channelScore, campaignScore);
-    const blended: BlendedScore = {
-      channel: channelScore,
-      campaign: campaignScore,
-      displayed,
-      tier: tierFor(displayed),
-      activated: campaignBreakdown != null,
+  // Pass 4 (Round 2 core fix): re-rank the FINAL score across the roster.
+  // Averaging ranked dims pulls everyone to the middle (~70 max); ranking
+  // the blend puts the top KOL near 100 so tiers actually spread. Same
+  // for Activation across the activated pool.
+  const channelBlendPop = kolIds
+    .filter(id => preChannel.get(id)!.hasSnapshot)
+    .map(id => preChannel.get(id)!.preBlend);
+  const activationBlendPop = [...preActivation.values()].map(a => a.impact);
+
+  const results = new Map<string, ScoreResult>();
+  for (const kolId of kolIds) {
+    const pre = preChannel.get(kolId)!;
+    const snap = latestSnapshotByKol.get(kolId);
+    const channelFinal = pre.hasSnapshot ? rankNormalize(pre.preBlend, channelBlendPop) : 0;
+
+    const channelBreakdown: ChannelScoreBreakdown = { ...pre.dims, composite: channelFinal };
+
+    const act = preActivation.get(kolId);
+    const activationBreakdown: ActivationScoreBreakdown | null = act
+      ? {
+          activationImpact: act.impact,
+          composite: rankNormalize(act.impact, activationBlendPop),
+          deliverableCount: act.deliverableCount,
+          campaignsCounted: act.campaignsCounted,
+        }
+      : null;
+
+    const scores: DisplayScores = {
+      channel: channelFinal,
+      activation: activationBreakdown?.composite ?? null,
+      tier: tierFor(channelFinal),
+      activated: activationBreakdown != null,
       lowConfidence: snap?.low_organic_volume_flag ?? false,
     };
 
-    results.set(kolId, { channel: channelBreakdown, campaign: campaignBreakdown, blended });
+    results.set(kolId, { channel: channelBreakdown, activation: activationBreakdown, scores });
   }
-
   return results;
 }
 

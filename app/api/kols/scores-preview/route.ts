@@ -96,7 +96,7 @@ export async function GET() {
     const score = scores.get(row.kol_id);
     if (!score) continue;
     out[row.kol_id] = { name: row.name, ...score };
-    tierDist[score.blended.tier]++;
+    tierDist[score.scores.tier]++;
   }
 
   return NextResponse.json({

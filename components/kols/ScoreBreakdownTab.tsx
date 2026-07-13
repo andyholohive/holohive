@@ -98,22 +98,26 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
   if (error) return <div className="text-sm text-rose-600">{error}</div>;
   if (!data) return <div className="text-sm text-ink-warm-500">No score data.</div>;
 
-  const { blended, channel, campaign } = data;
+  const { scores, channel, activation } = data;
 
   return (
     <div className="space-y-4 text-sm">
-      {/* Hero — blended displayed score + tier + Channel/Campaign split.
-          The Refresh button (right side) dispatches scan-one.yml in the
-          MCP repo. Doc 2 §4 Mode 3: on-demand single-KOL refresh. */}
+      {/* Hero — Round 2: two scores side by side, no blend. Channel =
+          potential, Activation = proven ("—" until participants logged).
+          The Refresh button dispatches scan-one.yml in the MCP repo. */}
       <Card className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl font-bold text-ink-warm-900 tabular-nums leading-none">
-                {Math.round(blended.displayed)}
+                {Math.round(scores.channel)}
+                <span className="text-ink-warm-300 font-normal"> / </span>
+                <span className={scores.activation != null ? 'text-brand-dark' : 'text-ink-warm-300 font-normal'}>
+                  {scores.activation != null ? Math.round(scores.activation) : '—'}
+                </span>
               </span>
-              <TierBadge tier={blended.tier} />
-              {blended.lowConfidence && (
+              <TierBadge tier={scores.tier} />
+              {scores.lowConfidence && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
                   <Info className="h-3 w-3" /> Low-confidence
                 </span>
@@ -121,15 +125,12 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
             </div>
             <div className="mt-2 flex items-center gap-3 text-xs text-ink-warm-500 flex-wrap">
               <span>
-                <span className="text-ink-warm-700 font-medium">Channel {Math.round(blended.channel)}</span>
-                {blended.activated && blended.campaign != null && (
-                  <> <span className="mx-1.5">·</span>
-                    <span className="text-ink-warm-700 font-medium">Campaign {Math.round(blended.campaign)}</span></>
-                )}
+                <span className="text-ink-warm-700 font-medium">Channel = potential</span>
+                <span className="mx-1.5">·</span>
+                <span className="text-ink-warm-700 font-medium">
+                  Activation = proven{scores.activation == null ? ' (never tested)' : ''}
+                </span>
               </span>
-              {!blended.activated && (
-                <span className="text-ink-warm-400">Not activated — needs 3+ deliverables for Campaign Performance.</span>
-              )}
               {queuedAt && (
                 <span className="text-ink-warm-400 italic">
                   · Scan queued {formatRelativeShort(queuedAt.toISOString())} — score updates in ~1 min
@@ -157,36 +158,36 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500">Channel Score</h3>
           <span className="text-sm font-semibold text-ink-warm-900 tabular-nums">{Math.round(channel.composite)}</span>
         </div>
-        <DimBar label="Average Views"         weight="30%" value={channel.engagementQuality} />
-        <DimBar label="Reach Efficiency"      weight="25%" value={channel.reachEfficiency} />
-        <DimBar label="Discussion Engagement" weight="15%" value={channel.discussionEngagement}
-                emptyHint="Channel has no linked discussion group" />
-        <DimBar label="Channel Health"        weight="15%" value={channel.channelHealth} />
-        <DimBar label="Growth Trajectory"     weight="15%" value={channel.growthTrajectory}
+        <DimBar label="Average Views"     weight="35%" value={channel.averageViews} />
+        <DimBar label="Engagement Rate"   weight="35%" value={channel.engagementRate}
+                emptyHint="No views data on the latest snapshot" />
+        <DimBar label="Channel Health"    weight="15%" value={channel.channelHealth} />
+        <DimBar label="Growth Trajectory" weight="15%" value={channel.growthTrajectory}
                 emptyHint="Needs a 2nd monthly snapshot" />
       </Card>
 
-      {/* Campaign Performance — only when activated. */}
-      {campaign ? (
+      {/* Activation Score — participants driven, "—" until logged. */}
+      {activation ? (
         <Card className="p-4 space-y-3">
           <div className="flex items-baseline justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500">
-              Campaign Performance
+              Activation Score
               <span className="ml-2 text-ink-warm-400 normal-case font-normal">
-                · {campaign.deliverableCount} deliverable{campaign.deliverableCount === 1 ? '' : 's'}
+                · {activation.campaignsCounted} campaign{activation.campaignsCounted === 1 ? '' : 's'} · {activation.deliverableCount} deliverable{activation.deliverableCount === 1 ? '' : 's'}
               </span>
             </h3>
-            <span className="text-sm font-semibold text-ink-warm-900 tabular-nums">{Math.round(campaign.composite)}</span>
+            <span className="text-sm font-semibold text-ink-warm-900 tabular-nums">{Math.round(activation.composite)}</span>
           </div>
-          <DimBar label="Activation Impact"          weight="50%" value={campaign.activationImpact} />
-          <DimBar label="Sponsored Engagement Lift"  weight="30%" value={campaign.sponsoredEngagementLift} />
-          <DimBar label="Sponsored Reach"            weight="20%" value={campaign.sponsoredReach} />
+          <DimBar label="Activation Impact" weight="100%" value={activation.activationImpact} />
+          <p className="text-[11px] text-ink-warm-400">
+            Participants percentiled within each campaign (top driver ≈ 100), averaged across campaigns, then ranked across the activated pool.
+          </p>
         </Card>
       ) : (
         <Card className="p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500 mb-1">Campaign Performance</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500 mb-1">Activation Score</h3>
           <p className="text-xs text-ink-warm-500">
-            Activates at 3+ logged deliverables. Until then, the displayed Score is the Channel Score (100%).
+            — · Strong channel, never tested. Appears once activation participants are logged on this KOL&apos;s deliverables.
           </p>
         </Card>
       )}

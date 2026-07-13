@@ -3396,12 +3396,10 @@ export default function KOLsPage() {
                   {/* [2026-07-02] Latest Cost column merged into Pricing per
                       Andy — the paid amount now shows as the primary value in
                       the Pricing cell with the ask visible on hover. */}
-                  {/* Score: Doc 2 two-score blended display. Hover →
-                      Channel/Campaign split per Jdot Q6c. Tier from
-                      result.blended.tier (absolute bands S 85+ / A 70 /
-                      B 50 / C 30 / D below). Distinct color treatment
-                      when Campaign data is present (blended ≠ Channel
-                      composite) per Doc 2 §5. */}
+                  {/* Score: Round 2 (Jdot 2026-07-10) — NO blend. Two scores
+                      side by side: Channel = potential (everyone has one),
+                      Activation = proven ("—" until participants are logged).
+                      Tier from the Channel Score. */}
                   {visibleColumns.score && (() => {
                     const result = scoreMap.get(kol.id);
                     return (
@@ -3411,22 +3409,25 @@ export default function KOLsPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="inline-flex items-center gap-1.5 cursor-default">
-                                  <span className={`text-sm font-semibold tabular-nums ${result.blended.activated ? 'text-brand-dark' : 'text-ink-warm-900'}`}>
-                                    {Math.round(result.blended.displayed)}
+                                  <span className="text-sm font-semibold tabular-nums text-ink-warm-900">
+                                    {Math.round(result.scores.channel)}
+                                    <span className="text-ink-warm-400 font-normal"> / </span>
+                                    <span className={result.scores.activation != null ? 'text-brand-dark' : 'text-ink-warm-400 font-normal'}>
+                                      {result.scores.activation != null ? Math.round(result.scores.activation) : '—'}
+                                    </span>
                                   </span>
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${TIER_CLASSES[result.blended.tier]}`}>
-                                    {result.blended.tier}
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${TIER_CLASSES[result.scores.tier]}`}>
+                                    {result.scores.tier}
                                   </span>
-                                  {result.blended.lowConfidence && <span className="text-[9px] text-amber-700" title="Low organic volume">⚠</span>}
+                                  {result.scores.lowConfidence && <span className="text-[9px] text-amber-700" title="Low organic volume">⚠</span>}
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent side="left" className="text-xs">
-                                <div>Channel {Math.round(result.blended.channel)}</div>
-                                {result.blended.activated && result.blended.campaign != null && (
-                                  <div>Campaign {Math.round(result.blended.campaign)}</div>
-                                )}
-                                {!result.blended.activated && (
-                                  <div className="text-ink-warm-400 mt-0.5">Channel-only (needs 3+ deliverables for Campaign Performance)</div>
+                                <div>Channel {Math.round(result.scores.channel)} · potential</div>
+                                {result.scores.activation != null ? (
+                                  <div>Activation {Math.round(result.scores.activation)} · proven participants driven</div>
+                                ) : (
+                                  <div className="text-ink-warm-400 mt-0.5">Activation — · no logged participants yet</div>
                                 )}
                               </TooltipContent>
                             </Tooltip>
