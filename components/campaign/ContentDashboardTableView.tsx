@@ -673,6 +673,23 @@ export function ContentDashboardTableView() {
       );
     }
 
+    // content_link renders as a clickable link (single-click opens in a
+    // new tab); double-click still enters edit mode, matching the /kols
+    // Link column. Other text/number cells render plain.
+    const displayContent = field === 'content_link' && value
+      ? (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline truncate"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {value}
+        </a>
+      )
+      : (numberFields.includes(field) && value != null ? Number(value).toLocaleString() : (value || '-'));
+
     return (
       <div
         className="cursor-pointer w-full h-full flex items-center px-1 py-1"
@@ -684,7 +701,7 @@ export function ContentDashboardTableView() {
         }}
         title={textFields.includes(field) || numberFields.includes(field) ? 'Double-click to edit' : undefined}
       >
-        {numberFields.includes(field) && value != null ? Number(value).toLocaleString() : (value || '-')}
+        {displayContent}
       </div>
     );
   };
