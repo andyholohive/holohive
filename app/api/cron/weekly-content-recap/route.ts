@@ -29,10 +29,11 @@ export const maxDuration = 60;
  *     skipped; if none posted anywhere, nothing is sent.
  *   • preview image left in — sender doesn't disable web preview, so the
  *     first content link renders its image.
- *   • routing — each campaign's recap goes to that client's chat by
- *     default (telegram_chats.client_id, set in /crm/telegram). The
- *     /admin/telegram-comm selector (weekly_recap_chat_id) is a global
- *     OVERRIDE: when set, every recap goes there instead.
+ *   • routing — each campaign's recap goes to that client's chat
+ *     (telegram_chats.client_id, set in /crm/telegram). Per-client
+ *     overrides in /admin/telegram-comm win when present
+ *     (app_settings.weekly_recap_client_overrides — a JSON
+ *     { <client_id>: { chat_id, thread_id } } map).
  *
  * Auth: Bearer ${CRON_SECRET}. Logs to agent_runs as
  * WEEKLY_CONTENT_RECAP for the cron-health-check sweep.
@@ -80,18 +81,17 @@ export async function GET(request: Request) {
     const prevMonday = new Date(new Date(mondayOf(now) + 'T00:00:00Z').getTime() - 7 * 86_400_000)
       .toISOString().slice(0, 10);
 
-    // Routing (per Andy 2026-07-13): default is each campaign's CLIENT
-    // chat — the chat linked to that client in /crm/telegram
-    // (telegram_chats.client_id). The /admin/telegram-comm selector is a
-    // global OVERRIDE: when set, every recap goes there instead (handy
-    // for a consolidated feed or a test chat).
-    const [overrideChatSetting, overrideThreadSetting] = await Promise.all([
-      (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_chat_id').maybeSingle(),
-      (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_chat_thread_id').maybeSingle(),
-    ]);
-    const overrideChatId = ((overrideChatSetting.data as any)?.value as string | undefined) || undefined;
-    const overrideThreadRaw = (overrideThreadSetting.data as any)?.value as string | undefined;
-    const overrideThreadId = overrideChatId && overrideThreadRaw ? parseInt(overrideThreadRaw, 10) : undefined;
+    // Routing (per Andy 2026-07-13): each campaign's recap goes to its
+    // CLIENT chat — the chat linked to that client in /crm/telegram
+    // (telegram_chats.client_id). Per-client OVERRIDES set in
+    // /admin/telegram-comm win when present: a JSON map
+    // { <client_id>: { chat_id, thread_id } } stored under
+    // app_settings.weekly_recap_client_overrides.
+    const { data: overrideSetting } = await (supabase as any)
+      .from('app_settings').select('value').eq('key', 'weekly_recap_client_overrides').maybeSingle();
+    let overrides: Record<string, { chat_id?: string; thread_id?: string }> = {};
+    try { overrides = JSON.parse(((overrideSetting as any)?.value as string) || '{}') || {}; }
+    catch { overrides = {}; }
 
     // Campaigns with a confirmed/completed lineup for the ended week.
     const { data: lineups } = await (supabase as any)
@@ -117,29 +117,27 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: true, weekOf: prevMonday, posted: 0 });
     }
 
-    // Resolve each client's chat once (skipped when an override is set).
-    // Pick the client-facing GC: not hidden, external before internal,
-    // most recently active.
+    // Default per-client chat: the chat linked to that client in
+    // /crm/telegram. Pick the client-facing GC: not hidden, external
+    // before internal, most recently active.
     const clientChatByClient = new Map<string, string>();
-    if (!overrideChatId) {
-      const clientIds = [...new Set(campaigns.map(c => c.clientId).filter(Boolean))] as string[];
-      if (clientIds.length > 0) {
-        const { data: chats } = await (supabase as any)
-          .from('telegram_chats')
-          .select('chat_id, client_id, is_internal, is_hidden, last_message_at')
-          .in('client_id', clientIds)
-          .or('is_hidden.is.null,is_hidden.eq.false');
-        for (const clientId of clientIds) {
-          const cands = ((chats as any[]) ?? []).filter(x => x.client_id === clientId && x.chat_id);
-          cands.sort((a, b) => {
-            const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0;
-            if (ai !== bi) return ai - bi; // external (client-facing) first
-            const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
-            const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
-            return bt - at; // most recently active first
-          });
-          if (cands[0]) clientChatByClient.set(clientId, cands[0].chat_id);
-        }
+    const clientIds = [...new Set(campaigns.map(c => c.clientId).filter(Boolean))] as string[];
+    if (clientIds.length > 0) {
+      const { data: chats } = await (supabase as any)
+        .from('telegram_chats')
+        .select('chat_id, client_id, is_internal, is_hidden, last_message_at')
+        .in('client_id', clientIds)
+        .or('is_hidden.is.null,is_hidden.eq.false');
+      for (const clientId of clientIds) {
+        const cands = ((chats as any[]) ?? []).filter(x => x.client_id === clientId && x.chat_id);
+        cands.sort((a, b) => {
+          const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0;
+          if (ai !== bi) return ai - bi; // external (client-facing) first
+          const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
+          const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
+          return bt - at; // most recently active first
+        });
+        if (cands[0]) clientChatByClient.set(clientId, cands[0].chat_id);
       }
     }
 
@@ -152,16 +150,17 @@ export async function GET(request: Request) {
     for (const c of campaigns) {
       const message = await svc.formatWeeklyContentRecap(c.id, c.name, prevMonday, headerTemplate);
       if (!message) { noContent++; continue; } // no content = no post
-      const destChat = overrideChatId || (c.clientId ? clientChatByClient.get(c.clientId) : undefined);
-      if (!destChat) { noChat++; continue; } // client has no linked chat + no override
-      const destThread = overrideChatId ? overrideThreadId : undefined;
+      // Per-client override wins; otherwise the client's /crm/telegram chat.
+      const ov = c.clientId ? overrides[c.clientId] : undefined;
+      const destChat = (ov?.chat_id || (c.clientId ? clientChatByClient.get(c.clientId) : undefined)) || undefined;
+      if (!destChat) { noChat++; continue; } // no override + no linked chat
+      const destThread = ov?.chat_id && ov.thread_id ? parseInt(ov.thread_id, 10) : undefined;
       const sent = await TelegramService.sendToChat(destChat, message, 'HTML', destThread);
       if (sent) posted++;
     }
 
-    const routing = overrideChatId ? 'override' : 'per-client';
-    await logRun('completed', `Week ${prevMonday} (${routing}): ${posted} posted, ${noContent} no-content, ${noChat} no-chat.`);
-    return NextResponse.json({ ok: true, weekOf: prevMonday, routing, posted, noContent, noChat, candidates: campaigns.length });
+    await logRun('completed', `Week ${prevMonday}: ${posted} posted, ${noContent} no-content, ${noChat} no-chat.`);
+    return NextResponse.json({ ok: true, weekOf: prevMonday, posted, noContent, noChat, candidates: campaigns.length });
   } catch (err: any) {
     console.error('[cron/weekly-content-recap] error:', err);
     await logRun('failed', err?.message ?? 'unknown');

@@ -809,62 +809,103 @@ function LineupConfirmedChannelSection() {
 }
 
 /**
- * WeeklyContentRecapChannelSection — OVERRIDE destination for the Monday
+ * WeeklyContentRecapChannelSection — per-CLIENT routing for the Monday
  * 12:00 UTC "«Campaign» Weekly Content Recap" post (per Andy 2026-07-13).
  *
- * By default each campaign's recap goes to that client's chat (the chat
- * linked to the client in /crm/telegram). This selector is an override:
- * when set, EVERY recap posts here instead — handy for a consolidated
- * feed or a test chat. Leave empty to use per-client routing.
- * Writes to app_settings.weekly_recap_chat_id + weekly_recap_chat_thread_id.
+ * Each campaign's recap goes to its client's chat (the chat linked to the
+ * client in /crm/telegram). This section lets you set a per-client
+ * OVERRIDE chat — when set, that client's recaps post there instead of
+ * the /crm/telegram default. Overrides are stored as a JSON map
+ * { <client_id>: { chat_id, thread_id } } under
+ * app_settings.weekly_recap_client_overrides.
  */
+type RecapOverride = { chat_id: string; thread_id: string };
 function WeeklyContentRecapChannelSection() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savedChatId, setSavedChatId] = useState<string>('');
-  const [savedThreadId, setSavedThreadId] = useState<string>('');
-  const [chatId, setChatId] = useState<string>('');
-  const [threadId, setThreadId] = useState<string>('');
+  const [clients, setClients] = useState<Array<{ id: string; name: string; defaultChat: string | null }>>([]);
+  const [saved, setSaved] = useState<Record<string, RecapOverride>>({});
+  const [draft, setDraft] = useState<Record<string, RecapOverride>>({});
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [chatSetting, threadSetting] = await Promise.all([
-          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_chat_id').maybeSingle(),
-          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_chat_thread_id').maybeSingle(),
+        const [clientsRes, overrideRes] = await Promise.all([
+          (supabase as any).from('clients').select('id, name, is_active').eq('is_active', true).order('name'),
+          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_client_overrides').maybeSingle(),
         ]);
-        const c = (chatSetting.data as any)?.value ?? '';
-        const t = (threadSetting.data as any)?.value ?? '';
-        setSavedChatId(c);
-        setSavedThreadId(t);
-        setChatId(c);
-        setThreadId(t);
+        const clientRows = ((clientsRes.data as any[]) ?? []);
+        const clientIds = clientRows.map(c => c.id);
+
+        // Default per-client chat title (client-facing GC from /crm/telegram)
+        // so the user can see what happens without an override.
+        const chatByClient = new Map<string, string>();
+        if (clientIds.length > 0) {
+          const { data: chats } = await (supabase as any)
+            .from('telegram_chats')
+            .select('title, client_id, is_internal, is_hidden, last_message_at')
+            .in('client_id', clientIds)
+            .or('is_hidden.is.null,is_hidden.eq.false');
+          for (const id of clientIds) {
+            const cands = ((chats as any[]) ?? []).filter(x => x.client_id === id);
+            cands.sort((a, b) => {
+              const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0;
+              if (ai !== bi) return ai - bi;
+              const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
+              const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
+              return bt - at;
+            });
+            if (cands[0]?.title) chatByClient.set(id, cands[0].title);
+          }
+        }
+
+        setClients(clientRows.map(c => ({ id: c.id, name: c.name, defaultChat: chatByClient.get(c.id) ?? null })));
+
+        let parsed: Record<string, RecapOverride> = {};
+        try { parsed = JSON.parse(((overrideRes.data as any)?.value as string) || '{}') || {}; } catch { parsed = {}; }
+        // Normalize to {chat_id, thread_id} strings.
+        const norm: Record<string, RecapOverride> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v && (v as any).chat_id) norm[k] = { chat_id: String((v as any).chat_id), thread_id: (v as any).thread_id ? String((v as any).thread_id) : '' };
+        }
+        setSaved(norm);
+        setDraft(norm);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const overrideCount = Object.keys(saved).length;
+
+  function setOverride(clientId: string, chatId: string, threadId: string) {
+    setDraft(prev => {
+      const next = { ...prev };
+      if (chatId) next[clientId] = { chat_id: chatId, thread_id: threadId || '' };
+      else delete next[clientId]; // clearing the chat removes the override
+      return next;
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
+      // Drop empties before persisting.
+      const clean: Record<string, RecapOverride> = {};
+      for (const [k, v] of Object.entries(draft)) if (v.chat_id) clean[k] = v;
       await (supabase as any)
         .from('app_settings')
-        .upsert({ key: 'weekly_recap_chat_id', value: chatId || null }, { onConflict: 'key' });
-      await (supabase as any)
-        .from('app_settings')
-        .upsert({ key: 'weekly_recap_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
-      setSavedChatId(chatId);
-      setSavedThreadId(threadId);
+        .upsert({ key: 'weekly_recap_client_overrides', value: JSON.stringify(clean) }, { onConflict: 'key' });
+      setSaved(clean);
+      setDraft(clean);
       toast({
-        title: chatId ? 'Recap override saved' : 'Override cleared',
-        description: chatId
-          ? threadId ? 'All recaps will post in this topic.' : 'All recaps will post in this chat, overriding per-client routing.'
-          : 'Recaps will route to each client’s chat (set in /crm/telegram).',
+        title: 'Recap routing saved',
+        description: Object.keys(clean).length > 0
+          ? `${Object.keys(clean).length} client override(s) active; the rest use their /crm/telegram chat.`
+          : 'All recaps route to each client’s /crm/telegram chat.',
       });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -878,12 +919,12 @@ function WeeklyContentRecapChannelSection() {
       icon={Newspaper}
       title="Weekly Content Recap"
       badge={!loading
-        ? (savedChatId
-            ? <StatusBadge tone="brand" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Override</span></StatusBadge>
+        ? (overrideCount > 0
+            ? <StatusBadge tone="brand" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />{overrideCount} override{overrideCount === 1 ? '' : 's'}</span></StatusBadge>
             : <StatusBadge tone="neutral" size="sm">Per-client</StatusBadge>)
         : null}
       subtitle={(
-        <>The <b>&ldquo;Weekly Content Recap&rdquo;</b> post — per campaign whose just-ended week had posted content, grouped by angle, each KOL linked to their content. By default it routes to each <b>client&rsquo;s chat</b> (linked in <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>). Set a chat here to <b>override</b> that and send every recap to one place instead.</>
+        <>The <b>&ldquo;Weekly Content Recap&rdquo;</b> post — per campaign whose just-ended week had posted content, grouped by angle, each KOL linked to their content. It routes to each <b>client&rsquo;s chat</b> (linked in <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>). Set a per-client <b>override</b> below to send that client&rsquo;s recaps somewhere else.</>
       )}
     >
       <WhenItSends>
@@ -892,20 +933,35 @@ function WeeklyContentRecapChannelSection() {
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
-            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-24 w-full" />
+          ) : clients.length === 0 ? (
+            <p className="text-sm text-ink-warm-500">No active clients.</p>
           ) : (
             <>
-              <ChatThreadPicker
-                chatId={chatId}
-                threadId={threadId}
-                onChange={({ chatId: nextChat, threadId: nextThread }) => {
-                  setChatId(nextChat);
-                  setThreadId(nextThread);
-                }}
-                label="Override destination (optional)"
-                disabled={saving}
-              />
-              <div className="flex items-center justify-end gap-2">
+              <div className="space-y-4">
+                {clients.map(c => (
+                  <div key={c.id} className="space-y-1.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-ink-warm-900">{c.name}</span>
+                      <span className="text-[11px] text-ink-warm-400">
+                        {draft[c.id]?.chat_id
+                          ? 'Override set'
+                          : c.defaultChat
+                            ? <>Default: {c.defaultChat}</>
+                            : 'No /crm/telegram chat linked'}
+                      </span>
+                    </div>
+                    <ChatThreadPicker
+                      chatId={draft[c.id]?.chat_id || ''}
+                      threadId={draft[c.id]?.thread_id || ''}
+                      onChange={({ chatId: nextChat, threadId: nextThread }) => setOverride(c.id, nextChat, nextThread)}
+                      label={`Override for ${c.name} (optional)`}
+                      disabled={saving}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
                 <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
                   <Save className="h-3.5 w-3.5 mr-1.5" />
                   {saving ? 'Saving…' : 'Save'}
