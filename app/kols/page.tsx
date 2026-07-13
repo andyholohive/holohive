@@ -1154,6 +1154,11 @@ export default function KOLsPage() {
         in_house: null,
         description: '',
         projects_worked_together: [],
+        // [2026-07-13] Land the new KOL in whichever table is showing.
+        // On the Web2 tab, create it as Web2 so it stays visible instead
+        // of silently dropping into Web3 (the default). 'need_update' and
+        // Web3 tabs both fall back to Web3.
+        kol_category: (kolTab === 'web2' ? 'Web2' : 'Web3') as 'Web2' | 'Web3',
       };
       const createdKOL = await KOLService.createKOL(emptyKOL);
       setKols(prevKols => [createdKOL, ...prevKols]); // add to top
