@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { LineupManagerService } from '@/lib/lineupManagerService';
+import { TelegramService } from '@/lib/telegramService';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -11,6 +13,14 @@ export const maxDuration = 60;
  * HHP Lineup Manager Spec § 4.1 — Completed status auto-transition.
  * Daily job that flips Confirmed lineups → Completed once their
  * week has ended (week_of + 6 days < today, UTC).
+ *
+ * [2026-07-13] End-of-week close-out (per Andy): as each lineup ages
+ * out, any slot still 'pending' flips to 'missed' (the service does
+ * this) and the bot posts ONE line to the ops terminal:
+ *   «Venice» Wk 9 closed. 5/6 posted, missed: 임팔
+ * Destination mirrors the confirm post: the global internal chat
+ * (app_settings.lineup_confirmed_chat_id + _thread_id), falling back
+ * to the campaign's own tg_ops_group_id when the global is unset.
  *
  * Schedule: 06:00 UTC daily. Cheap; usually 0 updates on most days
  * with maybe 1-2 on Mondays as previous-week lineups age out.
@@ -39,6 +49,36 @@ export async function GET(request: Request) {
     const svc = new LineupManagerService(supabase as any);
     const result = await svc.markCompletedIfWeekEnded();
 
+    // ── Close-out posts to the ops terminal ────────────────────────
+    // Same destination resolution as the confirm post: global internal
+    // chat first, per-campaign tg_ops_group_id as fallback.
+    let closeOutsSent = 0;
+    if (result.closeOuts.length > 0) {
+      const [globalChatSetting, globalThreadSetting] = await Promise.all([
+        (supabase as any).from('app_settings').select('value').eq('key', 'lineup_confirmed_chat_id').maybeSingle(),
+        (supabase as any).from('app_settings').select('value').eq('key', 'lineup_confirmed_chat_thread_id').maybeSingle(),
+      ]);
+      const globalChatId = (globalChatSetting.data as any)?.value as string | undefined;
+      const globalThreadRaw = (globalThreadSetting.data as any)?.value as string | undefined;
+
+      for (const co of result.closeOuts) {
+        const targetChatId = globalChatId || co.opsChatId;
+        if (!targetChatId) continue; // No destination — skip silently.
+        const targetThreadId = globalChatId && globalThreadRaw ? parseInt(globalThreadRaw, 10) : undefined;
+
+        const missedFragment = co.missedNames.length > 0
+          ? `, missed: ${escapeHtml(co.missedNames.join(', '))}`
+          : '';
+        const line = `<b>${escapeHtml(co.campaignName)}</b> Wk ${co.weekNumber} closed. ${co.posted}/${co.total} posted${missedFragment}`;
+        try {
+          const sent = await TelegramService.sendToChat(targetChatId, line, 'HTML', targetThreadId);
+          if (sent) closeOutsSent++;
+        } catch (err) {
+          console.warn('[cron/lineup-completion] close-out post failed:', err);
+        }
+      }
+    }
+
     // agent_runs log for cron-health-check coverage.
     try {
       await (supabase as any).from('agent_runs').insert({
@@ -47,7 +87,7 @@ export async function GET(request: Request) {
         started_at: new Date(start).toISOString(),
         completed_at: new Date().toISOString(),
         status: 'success',
-        output_summary: `Marked ${result.updated} lineup(s) as Completed.`,
+        output_summary: `Marked ${result.updated} lineup(s) as Completed; ${closeOutsSent} close-out post(s) sent.`,
       });
     } catch { /* swallow */ }
 
@@ -55,6 +95,7 @@ export async function GET(request: Request) {
       ok: true,
       lineupsMarkedCompleted: result.updated,
       lineupIds: result.ids,
+      closeOutsSent,
       durationMs: Date.now() - start,
     });
   } catch (err: any) {

@@ -83,6 +83,26 @@ export type LineupFull = CampaignLineup & {
   confirmed_by_name?: string | null;
 };
 
+/**
+ * End-of-week close-out summary for one lineup (per Andy 2026-07-13).
+ * Produced by `markCompletedIfWeekEnded` so the cron can post a single
+ * ops-terminal line — "«campaign» Wk N closed. X/Y posted, missed: …".
+ */
+export type LineupCloseOut = {
+  lineupId: string;
+  campaignId: string | null;
+  campaignName: string;
+  weekNumber: number;
+  /** Slots that reached 'posted' (content landed). */
+  posted: number;
+  /** Total slots in the lineup. */
+  total: number;
+  /** KOL names whose slots were still pending → flipped to missed. */
+  missedNames: string[];
+  /** Per-campaign ops chat fallback (campaigns.tg_ops_group_id). */
+  opsChatId: string | null;
+};
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /**
@@ -574,52 +594,120 @@ export class LineupManagerService {
    * lineup whose week has ended (week_of + 7 days <= today UTC).
    * Returns count of updated rows for cron telemetry.
    *
+   * [2026-07-13] End-of-week close-out (per Andy): at rollover, any
+   * lineup_slot still 'pending' flips to 'missed' — so a KOL who
+   * flaked leaves a record instead of silently falling off the
+   * dashboard. Returns per-lineup close-out data (posted/total +
+   * missed KOL names + the campaign's ops chat) so the cron can post
+   * one summary line per lineup to the ops terminal. Slots reach
+   * 'posted' via lib/lineupSlotSync when content lands; everything
+   * left over is a no-show.
+   *
    * Note: this is the auto-transition per spec § 4.1 Completed
    * (blue) status. Manual "Mark as Completed" can be added later
    * if Jdot prefers explicit control — for now, time-based is the
    * lowest-friction default (open question #4 in the Jdot message).
    */
-  async markCompletedIfWeekEnded(): Promise<{ updated: number; ids: string[] }> {
+  async markCompletedIfWeekEnded(): Promise<{
+    updated: number;
+    ids: string[];
+    closeOuts: LineupCloseOut[];
+  }> {
     const today = new Date().toISOString().slice(0, 10);
     const { data: candidates, error: cErr } = await (this.supabase as any)
       .from('campaign_lineups')
-      .select('id, week_of')
+      .select('id, week_of, week_number, campaign:campaigns(id, name, tg_ops_group_id)')
       .eq('status', 'confirmed');
     if (cErr) throw cErr;
 
-    const toUpdate = ((candidates || []) as Array<{ id: string; week_of: string }>)
-      .filter(c => {
-        // week_of is the Monday; the week ends 7 days later (next Sunday inclusive).
-        const weekEnd = new Date(c.week_of + 'T00:00:00Z');
-        weekEnd.setUTCDate(weekEnd.getUTCDate() + 6); // Sunday
-        const todayMs = new Date(today + 'T00:00:00Z').getTime();
-        return todayMs > weekEnd.getTime();
-      })
-      .map(c => c.id);
+    const ended = ((candidates || []) as Array<{
+      id: string;
+      week_of: string;
+      week_number: number;
+      campaign: { id: string; name: string; tg_ops_group_id: string | null } | null;
+    }>).filter(c => {
+      // week_of is the Monday; the week ends 6 days later (Sunday inclusive).
+      const weekEnd = new Date(c.week_of + 'T00:00:00Z');
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6); // Sunday
+      const todayMs = new Date(today + 'T00:00:00Z').getTime();
+      return todayMs > weekEnd.getTime();
+    });
 
-    if (toUpdate.length === 0) return { updated: 0, ids: [] };
+    if (ended.length === 0) return { updated: 0, ids: [], closeOuts: [] };
+
+    const ids = ended.map(c => c.id);
+    const closeOuts: LineupCloseOut[] = [];
+
+    for (const lineup of ended) {
+      // Slots hang off angles, not the lineup directly.
+      const { data: angles } = await (this.supabase as any)
+        .from('lineup_angles')
+        .select('id')
+        .eq('lineup_id', lineup.id);
+      const angleIds = ((angles as any[]) ?? []).map(a => a.id);
+
+      let posted = 0;
+      let total = 0;
+      const missedNames: string[] = [];
+
+      if (angleIds.length > 0) {
+        // Pull every slot with the KOL name so we can (a) flip the
+        // pending ones to missed and (b) name the no-shows in the post.
+        const { data: slots } = await (this.supabase as any)
+          .from('lineup_slots')
+          .select('id, status, kol:master_kols(name)')
+          .in('angle_id', angleIds);
+        const slotRows = ((slots as any[]) ?? []);
+        total = slotRows.length;
+        posted = slotRows.filter(s => s.status === 'posted').length;
+        const pendingIds = slotRows.filter(s => s.status === 'pending').map(s => s.id);
+        for (const s of slotRows) {
+          if (s.status === 'pending') missedNames.push(s.kol?.name || 'Unknown');
+        }
+        if (pendingIds.length > 0) {
+          await (this.supabase as any)
+            .from('lineup_slots')
+            .update({ status: 'missed' })
+            .in('id', pendingIds);
+        }
+      }
+
+      closeOuts.push({
+        lineupId: lineup.id,
+        campaignId: lineup.campaign?.id ?? null,
+        campaignName: lineup.campaign?.name ?? 'Campaign',
+        weekNumber: lineup.week_number,
+        posted,
+        total,
+        missedNames,
+        opsChatId: lineup.campaign?.tg_ops_group_id ?? null,
+      });
+    }
 
     const { error: uErr } = await (this.supabase as any)
       .from('campaign_lineups')
       .update({ status: 'completed' })
-      .in('id', toUpdate);
+      .in('id', ids);
     if (uErr) throw uErr;
 
     // Best-effort activity log writes — one per lineup.
-    for (const id of toUpdate) {
+    for (const co of closeOuts) {
       try {
+        const missedNote = co.missedNames.length > 0
+          ? ` ${co.missedNames.length} slot(s) flipped to missed: ${co.missedNames.join(', ')}.`
+          : '';
         await (this.supabase as any)
           .from('lineup_activity_log')
           .insert({
-            lineup_id: id,
+            lineup_id: co.lineupId,
             action: 'completed',
             actor: null,
-            details: 'Auto-transitioned to Completed (week ended).',
+            details: `Auto-transitioned to Completed (week ended). ${co.posted}/${co.total} posted.${missedNote}`,
           });
       } catch { /* swallow */ }
     }
 
-    return { updated: toUpdate.length, ids: toUpdate };
+    return { updated: ids.length, ids, closeOuts };
   }
 
   // ── Activity log ─────────────────────────────────────────────────

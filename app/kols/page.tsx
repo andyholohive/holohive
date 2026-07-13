@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2, Activity, RefreshCw, Send } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown, MessageSquare, Maximize2, Activity, RefreshCw, Send } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
 import { SendAnnouncementDialog } from "@/components/kols/SendAnnouncementDialog";
 // [2026-06-22] Migrated off lib/kolScoringEngine (legacy May 2026 5-dim
@@ -213,6 +213,28 @@ export default function KOLsPage() {
   // Bumped by the modal when a deliverable/snapshot edit invalidates
   // the score — triggers a refetch.
   const [scoreRefreshNonce, setScoreRefreshNonce] = useState(0);
+
+  // [2026-07-13] Column sort (per Andy) — followers, each score
+  // separately (channel / activation), and pricing. Click a header to
+  // cycle desc → asc → off. Missing values (no score, null activation,
+  // no post_price) always sort to the bottom regardless of direction.
+  type SortKey = 'followers' | 'channel' | 'activation' | 'pricing';
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null);
+  const toggleSort = useCallback((key: SortKey) => {
+    setCurrentPage(1); // jump back to the first page so the new top is visible
+    setSortConfig(prev => {
+      if (!prev || prev.key !== key) return { key, dir: 'desc' }; // first click → highest first
+      if (prev.dir === 'desc') return { key, dir: 'asc' };
+      return null; // third click clears
+    });
+  }, []);
+  const sortIcon = (key: SortKey) => {
+    const active = sortConfig?.key === key;
+    if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-40 group-hover:opacity-70" />;
+    return sortConfig!.dir === 'desc'
+      ? <ChevronDown className="h-3 w-3 text-brand" />
+      : <ChevronUp className="h-3 w-3 text-brand" />;
+  };
 
   // Sticky scrollbar state
   const [stickyScrollbar, setStickyScrollbar] = useState<{
@@ -776,6 +798,39 @@ export default function KOLsPage() {
     return filteredKOLs;
   }, [filteredKOLs, kolTab]);
 
+  // [2026-07-13] Column sort applied on top of the tab filter. When no
+  // sort is active, preserve the incoming order. Missing values always
+  // sink to the bottom (a KOL with no score / no price shouldn't crowd
+  // the top just because null compares low).
+  const sortedKOLs = useMemo(() => {
+    if (!sortConfig) return tabbedKOLs;
+    const { key, dir } = sortConfig;
+    const valueOf = (kol: MasterKOL): number | null => {
+      if (key === 'followers') {
+        const f = parseInt(String(kol.followers ?? '').replace(/[^0-9]/g, ''), 10);
+        return Number.isFinite(f) ? f : null;
+      }
+      if (key === 'pricing') {
+        return kol.post_price != null ? Number(kol.post_price) : null;
+      }
+      const result = scoreMap.get(kol.id);
+      if (!result) return null;
+      return key === 'channel'
+        ? result.scores.channel
+        : result.scores.activation; // may be null when no participants logged
+    };
+    const factor = dir === 'asc' ? 1 : -1;
+    return [...tabbedKOLs].sort((a, b) => {
+      const va = valueOf(a);
+      const vb = valueOf(b);
+      // Nulls always last, regardless of direction.
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return (va - vb) * factor;
+    });
+  }, [tabbedKOLs, sortConfig, scoreMap]);
+
   // Count for need update tab badge
   const needUpdateCount = useMemo(() => {
     return filteredKOLs.filter(kol => {
@@ -896,11 +951,11 @@ export default function KOLsPage() {
 
   // Pagination calculations (memoized for performance)
   const paginationData = useMemo(() => {
-    const totalItems = tabbedKOLs.length;
+    const totalItems = sortedKOLs.length;
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedKOLs = tabbedKOLs.slice(startIndex, endIndex);
+    const paginatedKOLs = sortedKOLs.slice(startIndex, endIndex);
 
     return {
       totalItems,
@@ -910,7 +965,7 @@ export default function KOLsPage() {
       paginatedKOLs,
       currentPage,
     };
-  }, [tabbedKOLs, currentPage, ITEMS_PER_PAGE]);
+  }, [sortedKOLs, currentPage, ITEMS_PER_PAGE]);
 
   const handleCellDoubleClick = (kolId: string, field: keyof MasterKOL, currentValue: any) => {
     setEditingCell({ kolId, field });
@@ -2765,8 +2820,11 @@ export default function KOLsPage() {
               )}
               {visibleColumns.followers && (
                 <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
-                  <div className="flex items-center gap-1 cursor-pointer group">
-                    <span>Followers</span>
+                  <div className="flex items-center gap-1 group">
+                    <button type="button" onClick={() => toggleSort('followers')} className="inline-flex items-center gap-0.5 hover:text-brand transition-colors" title="Sort by followers">
+                      <span>Followers</span>
+                      {sortIcon('followers')}
+                    </button>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -3055,15 +3113,28 @@ export default function KOLsPage() {
               )}
               {visibleColumns.pricing && (
                 <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
-                  Pricing
+                  <button type="button" onClick={() => toggleSort('pricing')} className="inline-flex items-center gap-0.5 hover:text-brand transition-colors group" title="Sort by post price">
+                    <span>Pricing</span>
+                    {sortIcon('pricing')}
+                  </button>
                 </TableHead>
               )}
               {/* [2026-07-02] Latest Cost header dropped — merged into Pricing. */}
-              {/* Score: placeholder until Phase 3 (kol_channel_snapshots
-                  + scoring formula) ships. Show a static "Score" header;
-                  no filter yet (will get a numeric range filter in Phase 3). */}
+              {/* Score header — Round 2 two-score model. Each score sorts
+                  independently: "Ch" (Channel = potential) and "Act"
+                  (Activation = proven). Click cycles desc → asc → off. */}
               {visibleColumns.score && (
-                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Score</TableHead>
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>Score</span>
+                    <button type="button" onClick={() => toggleSort('channel')} className="inline-flex items-center gap-0.5 normal-case tracking-normal text-[10px] hover:text-brand transition-colors" title="Sort by Channel Score">
+                      Ch{sortIcon('channel')}
+                    </button>
+                    <button type="button" onClick={() => toggleSort('activation')} className="inline-flex items-center gap-0.5 normal-case tracking-normal text-[10px] hover:text-brand transition-colors" title="Sort by Activation Score">
+                      Act{sortIcon('activation')}
+                    </button>
+                  </span>
+                </TableHead>
               )}
               {/* Projects Worked Together: free-text tags per spec v1.
                   Substring-match filter on the chip list. */}
