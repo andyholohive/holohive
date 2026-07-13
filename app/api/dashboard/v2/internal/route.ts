@@ -297,6 +297,40 @@ export async function GET() {
     const overduePrev = ((overduePrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
     const openCount = openTasks.length;
 
+    // [2026-07-13] Week-before-last (prev-prev) window, so the "Last Week"
+    // KPI toggle can show its own trend arrows (last week vs the week
+    // before). Same query shapes as the prev window, shifted back another
+    // 7 days. Only 3 head queries — cheap, and gated behind the toggle in
+    // the UI so it's always available without a second fetch.
+    const prevPrevWeekStart = new Date(weekStartDate.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const prevWeekStartDateStr = prevWeekStart.slice(0, 10);
+    const [completedPrevPrevRes, openPrevPrevRes, overduePrevPrevRes] = await Promise.all([
+      (sb as any)
+        .from('tasks')
+        .select('id, client_id')
+        .eq('status', 'complete')
+        .gte('completed_at', prevPrevWeekStart)
+        .lt('completed_at', prevWeekStart),
+      (sb as any)
+        .from('tasks')
+        .select('id, client_id')
+        .lte('created_at', prevWeekStart)
+        .or(`completed_at.is.null,completed_at.gte.${prevWeekStart}`),
+      (sb as any)
+        .from('tasks')
+        .select('id, client_id')
+        .lte('created_at', prevWeekStart)
+        .or(`completed_at.is.null,completed_at.gte.${prevWeekStart}`)
+        .lt('due_date', prevWeekStartDateStr),
+    ]);
+    const completedPrevPrev = ((completedPrevPrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
+    const openPrevPrev = ((openPrevPrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
+    const overduePrevPrev = ((overduePrevPrevRes.data ?? []) as any[]).filter(isRelevantTask).length;
+    const totalPrevPrev = completedPrevPrev + openPrevPrev;
+    const completionRatePrevPrev = totalPrevPrev > 0
+      ? Math.round((completedPrevPrev / totalPrevPrev) * 100)
+      : 0;
+
     // [2026-07-10] Per Andy (superseding his 2026-07-06 created-this-week
     // definition, after Jdot's dashboard pass): "Active Tasks" = the FULL
     // open backlog, so the KPI always equals the Team Workload table's
@@ -641,6 +675,22 @@ export async function GET() {
         overdueDelta: overdue.length - overduePrev,
         completedThisWeekDelta: completedThisWeek - completedPrev,
         completionRateDelta: completionRate - completionRatePrev,
+        // [2026-07-13] Last-week snapshot for the This Week / Last Week
+        // toggle. Absolutes are the prior 7-day window; deltas compare
+        // last week to the week before (prev vs prev-prev) so the toggle's
+        // trend arrows stay meaningful. Same field names as above so the
+        // UI can render either object through one code path.
+        lastWeek: {
+          openTasks: openPrev,
+          overdueTasks: overduePrev,
+          overdueRed: 0, // not computed historically; red-count tone is a live-only detail
+          completedThisWeek: completedPrev,
+          completionRate: completionRatePrev,
+          openTasksDelta: openPrev - openPrevPrev,
+          overdueDelta: overduePrev - overduePrevPrev,
+          completedThisWeekDelta: completedPrev - completedPrevPrev,
+          completionRateDelta: completionRatePrev - completionRatePrevPrev,
+        },
       },
       workload,
       escalations,

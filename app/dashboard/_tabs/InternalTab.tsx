@@ -99,6 +99,19 @@ type InternalPayload = {
     overdueDelta: number;
     completedThisWeekDelta: number;
     completionRateDelta: number;
+    // [2026-07-13] Prior 7-day window for the This Week / Last Week toggle.
+    // Deltas here compare last week to the week before.
+    lastWeek: {
+      openTasks: number;
+      overdueTasks: number;
+      overdueRed: number;
+      completedThisWeek: number;
+      completionRate: number;
+      openTasksDelta: number;
+      overdueDelta: number;
+      completedThisWeekDelta: number;
+      completionRateDelta: number;
+    };
   };
   workload: WorkloadRow[];
   escalations: WorkloadRow[];
@@ -169,6 +182,10 @@ export default function InternalTab() {
   const [data, setData] = useState<InternalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // [2026-07-13] Overview KPI window — This Week (live) vs Last Week
+  // (prior 7-day snapshot). Both windows ship in one payload; the toggle
+  // just picks which object the cards read.
+  const [kpiWindow, setKpiWindow] = useState<'this' | 'last'>('this');
 
   useEffect(() => {
     let cancelled = false;
@@ -199,11 +216,38 @@ export default function InternalTab() {
   }
   if (!data) return null;
 
+  // Active KPI snapshot per the This Week / Last Week toggle. Both windows
+  // arrive in one payload; the toggle only picks which one the cards read.
+  const kpi = kpiWindow === 'this' ? data.kpis : data.kpis.lastWeek;
+  const isLast = kpiWindow === 'last';
+
   return (
     <div className="space-y-8">
       {/* ── 01 Overview ─────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <SectionHeader label="Overview" dot="brand" counter="01 — KPIs · Live" first />
+        <SectionHeader label="Overview" dot="brand" counter={`01 — KPIs · ${isLast ? 'Last week' : 'Live'}`} first />
+
+        {/* [2026-07-13] This Week / Last Week toggle. This Week = live
+            (open backlog now + this 7d window); Last Week = the prior 7d
+            snapshot with its own vs-week-before trend arrows. */}
+        <div className="flex justify-end">
+          <div className="inline-flex rounded-md border border-cream-200 bg-cream-50 p-0.5 text-xs">
+            {([['this', 'This Week'], ['last', 'Last Week']] as const).map(([val, lbl]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setKpiWindow(val)}
+                className={`px-3 py-1 rounded font-medium transition-colors ${
+                  kpiWindow === val
+                    ? 'bg-white text-ink-warm-900 shadow-sm'
+                    : 'text-ink-warm-500 hover:text-ink-warm-700'
+                }`}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* [2026-06-11] KPI row realigned to spec § 3.1 exactly:
             Active Tasks (to-do) | Overdue | Completed (7d) | Completion Rate (7d).
@@ -224,11 +268,11 @@ export default function InternalTab() {
           <KpiCard
             icon={ListTodo}
             label="Active Tasks"
-            value={data.kpis.openTasks}
-            sub="open · all clients"
+            value={kpi.openTasks}
+            sub={isLast ? 'open · at week start' : 'open · all clients'}
             accent="sky"
             topAccent
-            trend={{ delta: data.kpis.openTasksDelta, upIsGood: false }}
+            trend={{ delta: kpi.openTasksDelta, upIsGood: false }}
           />
           {/* Per Andy 2026-06-19: drop the "N red · M yellow" sub-line
               and the rose-vs-amber accent flip. Overdue is overdue —
@@ -239,32 +283,32 @@ export default function InternalTab() {
           <KpiCard
             icon={AlertCircle}
             label="Overdue"
-            value={data.kpis.overdueTasks}
+            value={kpi.overdueTasks}
             sub="past due"
             accent="rose"
             topAccent
-            trend={{ delta: data.kpis.overdueDelta, upIsGood: false }}
+            trend={{ delta: kpi.overdueDelta, upIsGood: false }}
           />
           <KpiCard
             icon={CheckCircle2}
             label="Completed (7d)"
-            value={data.kpis.completedThisWeek}
-            sub="this week"
+            value={kpi.completedThisWeek}
+            sub={isLast ? 'last week' : 'this week'}
             accent="emerald"
             topAccent
-            trend={{ delta: data.kpis.completedThisWeekDelta, upIsGood: true }}
+            trend={{ delta: kpi.completedThisWeekDelta, upIsGood: true }}
           />
           <KpiCard
             icon={Compass}
             label="Completion Rate (7d)"
-            value={`${data.kpis.completionRate}%`}
+            value={`${kpi.completionRate}%`}
             sub="completed / total"
             accent="brand"
             topAccent
             trend={{
-              delta: data.kpis.completionRateDelta,
+              delta: kpi.completionRateDelta,
               upIsGood: true,
-              label: `${data.kpis.completionRateDelta > 0 ? '+' : ''}${data.kpis.completionRateDelta}pp`,
+              label: `${kpi.completionRateDelta > 0 ? '+' : ''}${kpi.completionRateDelta}pp`,
             }}
           />
         </div>
