@@ -44,8 +44,12 @@ import SpecsTab from './_tabs/SpecsTab';
 // Two tabs in the Initiatives space — Initiatives keeps its existing
 // behavior (this file's contents below); Backlog is its own component
 // inside _tabs/. URL state syncs via ?tab= so links + back-button work.
-type SpaceTab = 'initiatives' | 'backlog' | 'specs';
-const VALID_TABS: readonly SpaceTab[] = ['initiatives', 'backlog', 'specs'] as const;
+// [2026-07-14] Initiatives + Specs merged into one tab (Plan A). The
+// "Initiatives" tab now renders the (initiative-aware) SpecsTab; the old
+// standalone "specs" tab is gone. A legacy ?tab=specs deep link falls
+// back to 'initiatives' via isValidTab.
+type SpaceTab = 'initiatives' | 'backlog';
+const VALID_TABS: readonly SpaceTab[] = ['initiatives', 'backlog'] as const;
 const isValidTab = (s: string | null): s is SpaceTab =>
   !!s && (VALID_TABS as readonly string[]).includes(s);
 
@@ -282,16 +286,19 @@ function InitiativesPageInner() {
             <Bug className="h-4 w-4" />
             Backlog
           </TabsTrigger>
-          <TabsTrigger
-            value="specs"
-            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm font-medium px-4 py-2 text-ink-warm-500 flex items-center gap-1.5"
-          >
-            <FileCheck2 className="h-4 w-4" />
-            Specs
-          </TabsTrigger>
         </TabsList>
 
+        {/* Merged Initiatives tab — the initiative-aware SpecsTab. Each
+            spec can be a promoted initiative (star); the "Initiatives"
+            scope filter defaults on so this opens on the strategic list. */}
         <TabsContent value="initiatives" className="mt-4">
+          <SpecsTab />
+        </TabsContent>
+
+        {/* Legacy initiative table — superseded by the merged tab above
+            (Plan A, 2026-07-14). Parked behind an unreachable tab value;
+            safe to delete once the fold is verified on deploy. */}
+        <TabsContent value="__legacy_initiatives" className="mt-4 hidden">
           {loading ? (
             <Skeleton className="h-64 rounded-lg" />
           ) : (
@@ -397,9 +404,6 @@ function InitiativesPageInner() {
 
         <TabsContent value="backlog" className="mt-4">
           <BacklogTab />
-        </TabsContent>
-        <TabsContent value="specs" className="mt-4">
-          <SpecsTab />
         </TabsContent>
       </Tabs>
 

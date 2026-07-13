@@ -39,7 +39,7 @@ import {
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Upload, CheckCircle2,
   AlertTriangle, XCircle, Circle, FileText, ExternalLink, History, MapPin, Database, Loader2,
-  Sparkles, Search, Edit2, Trash2, ArrowLeft, FileCheck2,
+  Sparkles, Search, Edit2, Trash2, ArrowLeft, FileCheck2, Star, Flag,
 } from 'lucide-react';
 import { SectionHeader } from '@/components/ui/section-header';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
@@ -102,6 +102,17 @@ export default function SpecsTab() {
   const [specs, setSpecs] = useState<SpecCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  // [2026-07-14] Initiatives merged into specs (Plan A). A spec flagged
+  // is_initiative is a promoted "initiative"; the dashboard Initiatives
+  // card shows only these. `initiativeMeta` carries status + owner +
+  // current gate for the promoted ones so the card can show them without
+  // a second component. `scope` toggles Initiatives-only (default, what
+  // Jdot expects) vs. All specs.
+  type InitMeta = { status: string | null; ownerName: string | null; gate: string | null };
+  const [initiativeMeta, setInitiativeMeta] = useState<Record<string, InitMeta>>({});
+  const [scope, setScope] = useState<'initiatives' | 'all'>('initiatives');
+  const [promoting, setPromoting] = useState<string | null>(null);
 
   /**
    * Status filter for the grid. Per Andy 2026-06-14 — mini-tabs above
@@ -187,10 +198,63 @@ export default function SpecsTab() {
     try {
       const rows = await service.listAllWithRollup();
       setSpecs(rows);
+      await loadInitiativeMeta();
     } catch (err: any) {
       toast({ title: 'Failed to load specs', description: err?.message, variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  /** Load initiative fields (status/owner/current gate) for promoted specs
+   *  so the merged cards can show them. Current gate = lowest-sort_order
+   *  incomplete milestone per spec. */
+  async function loadInitiativeMeta() {
+    try {
+      const [promotedRes, milestonesRes] = await Promise.all([
+        (supabase as any)
+          .from('specs')
+          .select('id, initiative_status, users:owner_id(name)')
+          .eq('is_initiative', true),
+        (supabase as any)
+          .from('initiative_milestones')
+          .select('spec_id, name, sort_order, completed')
+          .order('sort_order', { ascending: true }),
+      ]);
+      const gateBySpec = new Map<string, string>();
+      for (const m of ((milestonesRes.data as any[]) ?? [])) {
+        if (m.completed || !m.spec_id) continue;
+        if (!gateBySpec.has(m.spec_id)) gateBySpec.set(m.spec_id, m.name);
+      }
+      const meta: Record<string, InitMeta> = {};
+      for (const p of ((promotedRes.data as any[]) ?? [])) {
+        meta[p.id] = {
+          status: p.initiative_status ?? null,
+          ownerName: p.users?.name ?? null,
+          gate: gateBySpec.get(p.id) ?? null,
+        };
+      }
+      setInitiativeMeta(meta);
+    } catch (err) {
+      console.error('[SpecsTab] loadInitiativeMeta failed:', err);
+    }
+  }
+
+  /** Flip a spec's is_initiative (promote / demote). Optimistic via
+   *  refresh; the dashboard Initiatives card follows is_initiative. */
+  async function togglePromote(specId: string, next: boolean) {
+    setPromoting(specId);
+    try {
+      const patch: Record<string, any> = { is_initiative: next, updated_at: new Date().toISOString() };
+      if (next) patch.initiative_status = 'active'; // default when first promoted
+      const { error } = await (supabase as any).from('specs').update(patch).eq('id', specId);
+      if (error) throw error;
+      toast({ title: next ? 'Promoted to initiative' : 'Removed from initiatives' });
+      await loadInitiativeMeta();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setPromoting(null);
     }
   }
 
@@ -203,29 +267,41 @@ export default function SpecsTab() {
     );
   }, [specs, search]);
 
+  // Scope filter (Initiatives vs All specs) applied before status. Counts
+  // for the scope toggle come off the search-filtered list.
+  const scopeCounts = useMemo(() => {
+    let initiatives = 0;
+    for (const s of searchedSpecs) if (initiativeMeta[s.id]) initiatives++;
+    return { initiatives, all: searchedSpecs.length };
+  }, [searchedSpecs, initiativeMeta]);
+
+  const scopedSpecs = useMemo(() => {
+    if (scope === 'all') return searchedSpecs;
+    return searchedSpecs.filter(s => !!initiativeMeta[s.id]);
+  }, [searchedSpecs, scope, initiativeMeta]);
+
   /** Status-counts roll-up — drives the mini-tab badges. Computed off
-   *  the search-filtered list so the badges stay in sync with what's
-   *  actually visible after a search. */
+   *  the scoped list so the badges stay in sync with what's visible. */
   const statusCounts = useMemo(() => {
     let finished = 0;
     let ongoing = 0;
-    for (const s of searchedSpecs) {
+    for (const s of scopedSpecs) {
       const r = s.rollup;
       const isFinished = r.untested === 0 && r.issues === 0 && r.broken === 0 && r.working > 0;
       if (isFinished) finished++;
       else ongoing++;
     }
-    return { all: searchedSpecs.length, finished, ongoing };
-  }, [searchedSpecs]);
+    return { all: scopedSpecs.length, finished, ongoing };
+  }, [scopedSpecs]);
 
   const filteredSpecs = useMemo(() => {
-    if (statusFilter === 'all') return searchedSpecs;
-    return searchedSpecs.filter(s => {
+    if (statusFilter === 'all') return scopedSpecs;
+    return scopedSpecs.filter(s => {
       const r = s.rollup;
       const isFinished = r.untested === 0 && r.issues === 0 && r.broken === 0 && r.working > 0;
       return statusFilter === 'finished' ? isFinished : !isFinished;
     });
-  }, [searchedSpecs, statusFilter]);
+  }, [scopedSpecs, statusFilter]);
 
   if (selectedSpecId) {
     return (
@@ -274,6 +350,30 @@ export default function SpecsTab() {
           <Plus className="h-3.5 w-3.5 mr-1.5" />
           New spec
         </Button>
+      </div>
+
+      {/* Scope toggle — Initiatives (promoted specs, what the dashboard
+          card shows) vs. All specs. Default Initiatives so the merged tab
+          opens on the strategic list; flip to All to promote others. */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="inline-flex rounded-md border border-cream-200 bg-cream-50 p-0.5 text-xs">
+          {([['initiatives', 'Initiatives', scopeCounts.initiatives], ['all', 'All specs', scopeCounts.all]] as const).map(([val, lbl, n]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setScope(val)}
+              className={`px-3 py-1 rounded font-medium transition-colors inline-flex items-center gap-1.5 ${
+                scope === val ? 'bg-white text-ink-warm-900 shadow-sm' : 'text-ink-warm-500 hover:text-ink-warm-700'
+              }`}
+            >
+              {lbl}
+              <span className={`text-[10px] px-1 rounded-full tabular-nums ${scope === val ? 'bg-brand-light text-brand' : 'bg-cream-100 text-ink-warm-500'}`}>{n}</span>
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-ink-warm-400">
+          {scope === 'initiatives' ? 'Promoted specs — these appear on the dashboard Initiatives card.' : 'Star a spec to promote it to an initiative.'}
+        </span>
       </div>
 
       {/* Mini-tabs — All / Ongoing / Finished. Per Andy 2026-06-14: lets
@@ -331,6 +431,9 @@ export default function SpecsTab() {
             <SpecGridCard
               key={spec.id}
               spec={spec}
+              initiative={initiativeMeta[spec.id] ?? null}
+              promoting={promoting === spec.id}
+              onTogglePromote={() => togglePromote(spec.id, !initiativeMeta[spec.id])}
               onOpen={() => setSelectedSpecId(spec.id)}
             />
           ))}
@@ -422,10 +525,21 @@ export default function SpecsTab() {
 
 // ─── Spec card on the grid ─────────────────────────────────────────
 
-function SpecGridCard({ spec, onOpen }: { spec: SpecCard; onOpen: () => void }) {
+function SpecGridCard({ spec, onOpen, initiative, promoting, onTogglePromote }: {
+  spec: SpecCard;
+  onOpen: () => void;
+  initiative: { status: string | null; ownerName: string | null; gate: string | null } | null;
+  promoting: boolean;
+  onTogglePromote: () => void;
+}) {
   const builtPct = spec.rollup.total > 0 ? Math.round((spec.rollup.built / spec.rollup.total) * 100) : 0;
   const worst = worstTestStatus(spec.rollup);
   const worstCfg = TEST_STATUS_CONFIG[worst];
+  const isInitiative = !!initiative;
+  const initStatusTone: BadgeTone =
+    initiative?.status === 'completed' ? 'success'
+    : initiative?.status === 'parked' ? 'warning'
+    : 'brand';
 
   // [2026-06-11] Colored top accent rail when the worst test status is
   // attention-grabbing — matches the v11 initiative card pattern on
@@ -442,10 +556,26 @@ function SpecGridCard({ spec, onOpen }: { spec: SpecCard; onOpen: () => void }) 
       onClick={onOpen}
       className={`group relative text-left border border-cream-200 rounded-lg bg-white p-3.5 hover:border-brand/40 hover:shadow-sm transition-all before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:rounded-t-lg ${accentRail}`}
     >
+      {/* Promote star — flips is_initiative. Rendered as a nested
+          clickable span (the card itself is a <button>, so we can't nest
+          a real button; span with role stops the outer onClick). */}
+      <span
+        role="button"
+        tabIndex={0}
+        title={isInitiative ? 'Remove from initiatives' : 'Promote to initiative'}
+        onClick={(e) => { e.stopPropagation(); if (!promoting) onTogglePromote(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!promoting) onTogglePromote(); } }}
+        className={`absolute top-2 right-2 z-10 h-6 w-6 inline-flex items-center justify-center rounded transition-colors ${
+          isInitiative ? 'text-amber-500 hover:bg-amber-50' : 'text-ink-warm-300 hover:text-amber-500 hover:bg-cream-100'
+        } ${promoting ? 'opacity-50 pointer-events-none' : ''}`}
+      >
+        <Star className={`h-3.5 w-3.5 ${isInitiative ? 'fill-amber-400' : ''}`} />
+      </span>
+
       {/* Title row — name + status badge inline, matching the dashboard
           initiative card layout. Worst test status moves to its own
           row below so the title doesn't compete with two badges. */}
-      <div className="flex items-start justify-between gap-2 mb-1.5">
+      <div className="flex items-start justify-between gap-2 mb-1.5 pr-6">
         <p className="text-sm font-semibold text-ink-warm-900 group-hover:text-brand transition-colors truncate flex-1">
           {spec.name}
         </p>
@@ -453,6 +583,27 @@ function SpecGridCard({ spec, onOpen }: { spec: SpecCard; onOpen: () => void }) 
           {titleCaseStatus(spec.status)}
         </StatusBadge>
       </div>
+
+      {/* Initiative meta — only for promoted specs. Shows the initiative
+          status + owner + current gate so this one card carries what the
+          old Initiatives tab did. */}
+      {isInitiative && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-amber-50 text-amber-700 border-amber-200">
+            <Flag className="h-2.5 w-2.5" /> Initiative
+          </span>
+          {initiative?.status && (
+            <StatusBadge tone={initStatusTone} size="sm">{titleCaseStatus(initiative.status)}</StatusBadge>
+          )}
+          {initiative?.gate && (
+            <span className="text-[10px] text-ink-warm-500">Gate: {initiative.gate}</span>
+          )}
+          {initiative?.ownerName && (
+            <span className="text-[10px] text-ink-warm-400">· {initiative.ownerName}</span>
+          )}
+        </div>
+      )}
+
       {spec.summary && (
         <p className="text-[11px] text-ink-warm-500 mb-3 line-clamp-2">{spec.summary}</p>
       )}
