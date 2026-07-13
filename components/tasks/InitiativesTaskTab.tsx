@@ -98,22 +98,25 @@ export function InitiativesTaskTab() {
       // [2026-06-17] Resolve owner name via the users JOIN so the UI has
       // a readable name without an extra round-trip. Schema fields are
       // `name` + `owner_user_id` — `title`/`owner` don't exist.
+      // [2026-07-14] Initiatives merged into specs (Plan A): read promoted
+      // specs (is_initiative). owner_id / initiative_status carry the old
+      // owner_user_id / status; milestones join by spec_id.
       const { data: initsRaw } = await (supabase as any)
-        .from('initiatives')
-        .select('id, name, owner_user_id, status, updated_at, category_tags, users:owner_user_id(name)')
-        .is('deleted_at', null)
+        .from('specs')
+        .select('id, name, owner_id, initiative_status, updated_at, category_tags, users:owner_id(name)')
+        .eq('is_initiative', true)
         .order('updated_at', { ascending: false });
       const inits = ((initsRaw ?? []) as Array<{
-        id: string; name: string; owner_user_id: string | null;
-        status: string; updated_at: string;
+        id: string; name: string; owner_id: string | null;
+        initiative_status: string; updated_at: string;
         category_tags: string[] | null;
         users: { name: string } | null;
       }>).map(i => ({
         id: i.id,
         name: i.name,
-        owner_user_id: i.owner_user_id,
+        owner_user_id: i.owner_id,
         owner_name: i.users?.name ?? null,
-        status: i.status,
+        status: i.initiative_status,
         updated_at: i.updated_at,
         category_tags: i.category_tags,
       })) as Array<Omit<Initiative, 'milestones'>>;
@@ -123,14 +126,15 @@ export function InitiativesTaskTab() {
       }
       const { data: milestonesRaw } = await (supabase as any)
         .from('initiative_milestones')
-        .select('id, initiative_id, name, sort_order, completed, completed_date, target_date')
-        .in('initiative_id', inits.map(i => i.id))
+        .select('id, initiative_id, spec_id, name, sort_order, completed, completed_date, target_date')
+        .in('spec_id', inits.map(i => i.id))
         .order('sort_order');
       const byInit = new Map<string, Milestone[]>();
-      for (const m of (milestonesRaw ?? []) as Milestone[]) {
-        const arr = byInit.get(m.initiative_id) || [];
+      for (const m of (milestonesRaw ?? []) as Array<Milestone & { spec_id: string | null }>) {
+        const key = m.spec_id ?? m.initiative_id;
+        const arr = byInit.get(key) || [];
         arr.push(m);
-        byInit.set(m.initiative_id, arr);
+        byInit.set(key, arr);
       }
       setInitiatives(inits.map(i => ({ ...i, milestones: byInit.get(i.id) || [] })));
     } finally {
@@ -162,8 +166,8 @@ export function InitiativesTaskTab() {
           .eq('id', current.id);
       }
       const { error } = await (supabase as any)
-        .from('initiatives')
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .from('specs')
+        .update({ initiative_status: 'completed', updated_at: new Date().toISOString() })
         .eq('id', initiative.id);
       if (error) toast({ title: 'Failed', description: error.message, variant: 'destructive' });
       else { toast({ title: 'Initiative completed' }); await refresh(); }
@@ -178,8 +182,8 @@ export function InitiativesTaskTab() {
     }
     // Bump status to next
     const { error } = await (supabase as any)
-      .from('initiatives')
-      .update({ status: next.name, updated_at: new Date().toISOString() })
+      .from('specs')
+      .update({ initiative_status: next.name, updated_at: new Date().toISOString() })
       .eq('id', initiative.id);
     if (error) {
       toast({ title: 'Failed', description: error.message, variant: 'destructive' });

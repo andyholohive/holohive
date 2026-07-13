@@ -66,11 +66,15 @@ export async function GET() {
         .eq('is_ad_hoc', true)
         .order('created_at', { ascending: false })
         .limit(10),
+      // [2026-07-14] Initiatives merged into specs (Plan A): read promoted
+      // specs (is_initiative) with active initiative_status. Shaped below
+      // to the same fields the card expects (owner_user_id ← owner_id,
+      // status ← initiative_status).
       (sb as any)
-        .from('initiatives')
-        .select('id, name, owner_user_id, status, category_tags, updated_at')
-        .eq('status', 'active')
-        .is('deleted_at', null)
+        .from('specs')
+        .select('id, name, owner_id, initiative_status, category_tags, updated_at')
+        .eq('is_initiative', true)
+        .eq('initiative_status', 'active')
         .order('updated_at', { ascending: false }),
       // [2026-06-11] All tasks linked to ANY initiative. We aggregate
       // counts in JS rather than running N count queries — typical
@@ -85,7 +89,7 @@ export async function GET() {
       // bulk and reduced per-initiative below.
       (sb as any)
         .from('initiative_milestones')
-        .select('initiative_id, name, sort_order, completed')
+        .select('initiative_id, spec_id, name, sort_order, completed')
         .order('sort_order', { ascending: true }),
       (sb as any)
         .from('users')
@@ -239,11 +243,13 @@ export async function GET() {
         .from('client_stints')
         .select('client_id, start_date, end_date, status')
         .order('start_date', { ascending: true }),
+      // Promoted specs completed in the last 30d (Andy scorecard). Merged
+      // model: initiatives are specs with is_initiative=true.
       (sb as any)
-        .from('initiatives')
-        .select('id, owner_user_id, status, updated_at')
-        .eq('status', 'completed')
-        .is('deleted_at', null)
+        .from('specs')
+        .select('id, owner_id, initiative_status, updated_at')
+        .eq('is_initiative', true)
+        .eq('initiative_status', 'completed')
         .gte('updated_at', SCORE_LOOKBACK_30D_ISO),
       (sb as any)
         .from('backlog_items')
@@ -624,11 +630,14 @@ export async function GET() {
     // "Current gate" = lowest sort_order milestone that isn't done.
     // The query above is already sorted ascending so we take the first
     // not-completed row per initiative.
+    // Keyed by spec id (initiatives are promoted specs now); milestones
+    // carry spec_id after the merge.
     const currentGateByInitiative = new Map<string, string>();
     for (const m of ((initiativeMilestonesRes.data ?? []) as any[])) {
       if (m.completed) continue;
-      if (!currentGateByInitiative.has(m.initiative_id)) {
-        currentGateByInitiative.set(m.initiative_id, m.name);
+      const key = m.spec_id ?? m.initiative_id;
+      if (key && !currentGateByInitiative.has(key)) {
+        currentGateByInitiative.set(key, m.name);
       }
     }
     const initiatives = ((initiativesRes.data ?? []) as any[]).map(i => {
@@ -639,11 +648,11 @@ export async function GET() {
         daysIdle >= cfg.initiative_stale_red_days ? 'red'
         : daysIdle >= cfg.initiative_stale_amber_days ? 'amber'
         : 'fresh';
-      const owner = i.owner_user_id ? usersById.get(i.owner_user_id) : null;
+      const owner = i.owner_id ? usersById.get(i.owner_id) : null;
       return {
         id: i.id,
         name: i.name,
-        owner_user_id: i.owner_user_id,
+        owner_user_id: i.owner_id,
         owner_name: owner?.name ?? null,
         category_tags: i.category_tags ?? [],
         daysIdle,

@@ -69,11 +69,12 @@ export async function GET(request: Request) {
         .from('tasks')
         .select('id, task_name, due_date, status, assigned_to, assigned_to_name')
         .neq('status', 'complete'),
+      // Initiatives merged into specs (Plan A): promoted specs, active.
       (sb as any)
-        .from('initiatives')
-        .select('id, name, updated_at, owner_user_id')
-        .eq('status', 'active')
-        .is('deleted_at', null),
+        .from('specs')
+        .select('id, name, updated_at, owner_id')
+        .eq('is_initiative', true)
+        .eq('initiative_status', 'active'),
       (sb as any)
         .from('users')
         .select('id, name, role, telegram_id'),
@@ -104,6 +105,7 @@ export async function GET(request: Request) {
     // 2. Stale initiatives
     const initiatives = ((initiativesRes.data ?? []) as any[]).map(i => ({
       ...i,
+      owner_user_id: i.owner_id ?? null, // merged model: specs.owner_id
       daysIdle: i.updated_at ? Math.floor((Date.now() - new Date(i.updated_at).getTime()) / 86_400_000) : 999,
     }));
     const staleInitiatives = initiatives.filter(i => i.daysIdle >= cfg.initiative_stale_red_days);
