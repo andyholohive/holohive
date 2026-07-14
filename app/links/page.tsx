@@ -31,7 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
-  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info
+  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info, Clock
 } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { formatDistanceToNow } from 'date-fns';
@@ -108,7 +108,7 @@ export default function LinksPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients'>('holohive');
+  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients' | 'latest'>('holohive');
   // Sort state for the in-table column headers. Click "Name" or "Added"
   // to toggle direction. Applied within each client group across all
   // tabs (the grouping itself stays — sort is per-group, not flat).
@@ -426,6 +426,11 @@ export default function LinksPage() {
       case 'clients':
         tabLinks = links.filter(link => link.client && link.client !== 'Holo Hive');
         break;
+      case 'latest':
+        // Every link, across all groups — the tab exists to surface the
+        // most recently added links regardless of client/type.
+        tabLinks = links;
+        break;
     }
 
     return tabLinks;
@@ -454,6 +459,18 @@ export default function LinksPage() {
 
   // Group links by client
   const groupedLinks = () => {
+    // [2026-07-14] Latest tab — one flat, ungrouped list ordered newest
+    // first. The tab's whole point is recency, so it ignores the
+    // client grouping and the Name/Added sort toggle.
+    if (activeTab === 'latest') {
+      const sorted = [...filteredLinks].sort((a, b) => {
+        const aT = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bT = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bT - aT; // newest first
+      });
+      return [{ clientName: 'Latest', links: sorted }];
+    }
+
     const groups: { clientName: string; links: Link[] }[] = [];
     const clientGroups = new Map<string, Link[]>();
 
@@ -532,6 +549,7 @@ export default function LinksPage() {
   const holoHiveCount = links.filter(l => l.client === 'Holo Hive').length;
   const guideCount = links.filter(l => l.link_types?.includes('guide')).length;
   const clientsCount = links.filter(l => l.client && l.client !== 'Holo Hive').length;
+  const latestCount = links.length;
 
   if (loading) {
     return (
@@ -603,9 +621,9 @@ export default function LinksPage() {
         label="Links"
         dot="brand"
         counter={`${groups.length} of ${
-          activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : clientsCount
+          activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : activeTab === 'clients' ? clientsCount : latestCount
         } link${
-          (activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : clientsCount) === 1
+          (activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : activeTab === 'clients' ? clientsCount : latestCount) === 1
             ? ''
             : 's'
         } shown`}
@@ -642,6 +660,14 @@ export default function LinksPage() {
               <Users className="h-4 w-4" />
               Clients
               <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{clientsCount}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="latest"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm px-4 py-2"
+            >
+              <Clock className="h-4 w-4" />
+              Latest
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{latestCount}</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
