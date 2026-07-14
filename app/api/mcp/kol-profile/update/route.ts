@@ -13,9 +13,14 @@ const VALID_NICHES = new Set([
   'RWA', 'Regulation', 'Macro', 'Meme/Degen',
   'Base', 'Solana', 'Ethereum', 'Infra/DePIN', 'Neobank',
 ]);
+// [2026-07-14] Dropped the CeFi/Exchange→Trading remap per Jdot's July
+// taxonomy fix: exchange content is almost never TA, so coercing it to
+// Trading mislabelled it. With no remap, an inbound 'CeFi/Exchange' now
+// falls through to the drop path (returned in `dropped`), forcing the
+// scanner/skill to route by actual topic — Neobank / Regulation / Macro /
+// Trading — instead of a lossy catch-all.
 const NICHE_REMAP: Record<string, string> = {
   'AI x Crypto': 'AI',
-  'CeFi/Exchange': 'Trading',
   'Payments/Neobank': 'Neobank',
 };
 
