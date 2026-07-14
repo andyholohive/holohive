@@ -33,6 +33,7 @@ import {
   SectionHeaderSkeleton, KpiCardSkeleton, ListCardSkeleton,
 } from './SkeletonHelpers';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
@@ -53,9 +54,15 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
 };
 
 export default function MyWorkTab() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
+  // [2026-07-14] Role-based Ready-for-Feedback visibility. super_admin
+  // (Andy / Bolt / Jdot / Yano) get a team-wide review queue of every
+  // task waiting on feedback; admin/member see only their own. The rule
+  // is by ROLE, not name, so it generalizes as the team grows.
+  const isRffReviewer = userProfile?.role === 'super_admin';
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [teamRff, setTeamRff] = useState<Task[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +102,23 @@ export default function MyWorkTab() {
       ]);
       setStats(statsData);
       setTasks(tasksData);
+      // Reviewers (super_admin) also load the whole team's ready-for-
+      // feedback queue so they can see everything awaiting their sign-off,
+      // not just their own. Everyone else's RFF list is derived from their
+      // own `tasks` further down. Best-effort — a failure just leaves the
+      // team queue empty, never blocks the personal view.
+      if (userProfile?.role === 'super_admin') {
+        try {
+          const { data: rff } = await (supabase as any)
+            .from('tasks')
+            .select('id, task_name, status, due_date, client_id, priority, assigned_to, assigned_to_name')
+            .eq('status', 'ready_for_feedback')
+            .order('due_date', { ascending: true, nullsFirst: false });
+          setTeamRff((rff || []) as Task[]);
+        } catch (rffErr) {
+          console.error('Failed to load team ready-for-feedback queue:', rffErr);
+        }
+      }
       setClients(clientsData.map((c: any) => ({ id: c.id, name: c.name })));
       setTeamMembers(
         (teamData || [])
@@ -126,6 +150,9 @@ export default function MyWorkTab() {
   const dueThisWeek = tasks.filter(t => t.due_date && t.due_date >= today && t.due_date <= weekEndStr && t.status !== 'complete');
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
   const recentlyCompleted = tasks.filter(t => t.status === 'complete').slice(0, 10);
+  // Ready-for-Feedback: reviewers see the whole team's queue, everyone
+  // else only their own (filtered from their personal task list).
+  const rffTasks = isRffReviewer ? teamRff : tasks.filter(t => t.status === 'ready_for_feedback');
 
   const getDueDateColor = (dueDate: string | null) => {
     if (!dueDate) return 'text-ink-warm-500';
@@ -277,6 +304,23 @@ export default function MyWorkTab() {
           />
         )}
 
+        {rffTasks.length > 0 && (
+          <TaskListCard
+            title={isRffReviewer ? 'Ready for Feedback — Team' : 'Ready for Feedback'}
+            subtitle={isRffReviewer
+              ? 'Everyone’s tasks waiting on sign-off · review these'
+              : 'Your tasks waiting on feedback'}
+            icon={MessageCircle}
+            accent="amber"
+            tasks={rffTasks}
+            getDueDateColor={getDueDateColor}
+            clientMap={clientMap}
+            showAssignee={isRffReviewer}
+            onTaskClick={setOpenTask}
+            onStatusChange={handleStatusChange}
+          />
+        )}
+
         {recentlyCompleted.length > 0 && (
           <TaskListCard
             title="Recently Completed"
@@ -298,7 +342,8 @@ export default function MyWorkTab() {
             "to do" but with no due date. Show a small EmptyState so
             the page doesn't end on a blank section. */}
         {overdueTasks.length === 0 && dueThisWeek.length === 0
-          && inProgressTasks.length === 0 && recentlyCompleted.length === 0 && (
+          && inProgressTasks.length === 0 && recentlyCompleted.length === 0
+          && rffTasks.length === 0 && (
           <Card className="border-cream-200 overflow-hidden">
             <EmptyState
               icon={CheckCircle2}
@@ -354,6 +399,7 @@ function TaskListCard({
   tasks,
   getDueDateColor,
   clientMap,
+  showAssignee = false,
   onTaskClick,
   onStatusChange,
 }: {
@@ -361,6 +407,10 @@ function TaskListCard({
   subtitle: string;
   icon: typeof Circle;
   accent: TaskListAccent;
+  /** Show the assignee name per row — used by the team-wide
+   *  Ready-for-Feedback review queue so a reviewer sees whose task
+   *  each one is. Off by default (personal lists are all "you"). */
+  showAssignee?: boolean;
   /** Whether to render the 2px colored top stripe. Default true. Off
    *  for sections that are reference-only (e.g. Recently Completed)
    *  where the stripe would falsely signal "needs your attention." */
@@ -467,6 +517,11 @@ function TaskListCard({
               {clientMap && task.client_id && clientMap[task.client_id] && (
                 <StatusBadge tone="brand" size="sm" bordered>
                   {clientMap[task.client_id]}
+                </StatusBadge>
+              )}
+              {showAssignee && (task as any).assigned_to_name && (
+                <StatusBadge tone="slate" size="sm" bordered>
+                  {(task as any).assigned_to_name}
                 </StatusBadge>
               )}
               {task.due_date && (
