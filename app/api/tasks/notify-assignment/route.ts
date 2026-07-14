@@ -95,6 +95,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: 'task_assigned rule disabled' });
   }
 
+  // [2026-07-14] Subtask DM suppression. Onboarding/SOP handoffs create a
+  // parent task + numbered subtasks (e.g. "Sales to Delivery Handoff" +
+  // "1. Client Snapshot…" + "2. Internal Handoff Call"). The HQ board only
+  // lists top-level tasks (parent_task_id IS NULL) — subtasks appear nested
+  // inside the parent, not as their own rows — so a subtask's "Open HQ" DM
+  // points at a board that doesn't show it. That's why a 3-task handoff DM'd
+  // 3 times but only 1 row landed on HQ. When the subtask shares the
+  // parent's assignee (the common case: one owner's checklist), the parent's
+  // DM already covers it, so skip the duplicate. A subtask assigned to a
+  // DIFFERENT person than the parent still notifies — they genuinely need it.
+  if (task.parent_task_id) {
+    const { data: parent } = await (supabase as any)
+      .from('tasks')
+      .select('assigned_to')
+      .eq('id', task.parent_task_id)
+      .maybeSingle();
+    if (parent && parent.assigned_to === task.assigned_to) {
+      return NextResponse.json({ ok: true, skipped: 'subtask; parent DM covers same assignee' });
+    }
+  }
+
   // Look up the assignee's telegram_id + name; also pull the actor's name.
   const { data: assignee } = await (supabase as any)
     .from('users')
