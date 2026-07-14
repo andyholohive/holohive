@@ -479,6 +479,17 @@ export class LineupManagerService {
       sideEffectErrors.push(`Auto-add KOLs: ${err?.message || err}`);
     }
 
+    // Confirming a lineup means those KOLs are locked in for the
+    // campaign → advance their tracker status to 'Onboarded'. Runs
+    // after the auto-add above so freshly-added rows are covered too.
+    // Never downgrades a KOL already past onboarding (Onboarded /
+    // Concluded stay put).
+    try {
+      await this.markConfirmedKolsOnboarded(lineupId, lineup.campaign_id);
+    } catch (err: any) {
+      sideEffectErrors.push(`Mark Onboarded: ${err?.message || err}`);
+    }
+
     return {
       lineup: updated as CampaignLineup,
       autoAddedKols,
@@ -995,5 +1006,41 @@ export class LineupManagerService {
     if (error) throw error;
 
     return toAdd.map(id => nameById.get(id) || id);
+  }
+
+  /**
+   * On confirm — advance every KOL slotted in the lineup to
+   * hh_status='Onboarded' on their campaign_kols row. Only promotes
+   * KOLs still earlier in the pipeline (Curated / Contacted /
+   * Interested / unset); never pulls back a KOL already Onboarded or
+   * Concluded.
+   */
+  private async markConfirmedKolsOnboarded(
+    lineupId: string,
+    campaignId: string,
+  ): Promise<void> {
+    const { data: angleRows } = await (this.supabase as any)
+      .from('lineup_angles')
+      .select('id')
+      .eq('lineup_id', lineupId);
+    const angleIds = ((angleRows || []) as Array<{ id: string }>).map(a => a.id);
+    if (angleIds.length === 0) return;
+
+    const { data: slotRows } = await (this.supabase as any)
+      .from('lineup_slots')
+      .select('kol_id')
+      .in('angle_id', angleIds);
+    const kolIds = Array.from(
+      new Set(((slotRows || []) as Array<{ kol_id: string }>).map(r => r.kol_id)),
+    );
+    if (kolIds.length === 0) return;
+
+    const { error } = await (this.supabase as any)
+      .from('campaign_kols')
+      .update({ hh_status: 'Onboarded' })
+      .eq('campaign_id', campaignId)
+      .in('master_kol_id', kolIds)
+      .or('hh_status.in.(Curated,Contacted,Interested),hh_status.is.null');
+    if (error) throw error;
   }
 }
