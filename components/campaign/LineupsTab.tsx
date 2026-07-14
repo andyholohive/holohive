@@ -1674,6 +1674,21 @@ async function notifyTransition(
       });
       return result;
     }
+    // [2026-07-14] The route returns HTTP 200 even when the Telegram send
+    // itself fails (e.g. bot not in the target chat, or the topic/thread
+    // is gone) — the failure rides in `ok: false` + `chatPostError`.
+    // Without this branch that case fell through every toast, so a lineup
+    // "proposed" but never landed in the channel with zero visible error.
+    if (json && json.ok === false) {
+      toast({
+        title: 'Notification failed',
+        description:
+          json.error || json.chatPostError ||
+          'Telegram send failed — check the bot is a member of the target chat/topic.',
+        variant: 'destructive',
+      });
+      return result;
+    }
     if (json?.ok) {
       const label =
         event === 'proposed' ? 'Lineup channel post' :

@@ -4880,15 +4880,10 @@ export default function ClientsPage() {
                         >
                           <span className="truncate">Action Board</span>
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 min-w-[110px] px-2"
-                          onClick={() => openContextModal(client, 'weekly-update')}
-                          title="Open the Weekly Update tab"
-                        >
-                          <span className="truncate">Weekly Update</span>
-                        </Button>
+                        {/* [2026-07-14] Per Andy: Weekly Update button hidden
+                            from the per-card footer. The Weekly Update tab is
+                            still reachable via the page-level "Weekly Update"
+                            hub button and the Context modal's own tab. */}
                         {(() => {
                           const lastVisitAt = portalAccessSummary[client.id]?.last_at;
                           const lastVisitRel = lastVisitAt ? relativeTimeFromNow(lastVisitAt) : null;
