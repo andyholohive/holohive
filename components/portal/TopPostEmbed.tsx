@@ -199,7 +199,10 @@ function TelegramEmbed({
       if (typeof data === 'string') {
         try { data = JSON.parse(data); } catch { return; }
       }
-      if (data && data.event === 'resize' && typeof data.height === 'number' && data.height > 0) {
+      // Telegram sends {"event":"resize","height":<n>} — height may be a
+      // number or a numeric string (the widget does `height + 'px'`), so
+      // coerce rather than type-check to avoid missing a real load.
+      if (data && data.event === 'resize' && Number(data.height) > 0) {
         settled = true;
         setLoaded(true);
       }
