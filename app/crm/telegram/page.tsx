@@ -56,7 +56,28 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
+import { KolWelcomeDialog } from '@/components/telegram/KolWelcomeDialog';
 import { CRMOpportunity } from '@/lib/crmService';
+
+/**
+ * Default Korean onboarding message sent to a KOL's group chat the
+ * first time an unassigned chat is linked to them on /crm/telegram.
+ * Editable in the confirm dialog before sending.
+ */
+const KOL_WELCOME_MESSAGE = `안녕하세요! Holo Hive와 함께하게 되신 걸 환영해요. 시작 전에 봇으로 몇 가지만 세팅해주시면 돼요.
+
+1. 입금 지갑 등록 (/wallet)
+보수는 Arbitrum(ARB) 네트워크로 지급돼요. /wallet 뒤에 지갑 주소를 붙여서 채팅창에 보내주세요.
+예시: /wallet 0x...
+봇이 주소를 확인한 뒤 저장된 주소를 그대로 다시 보여드려요. 나중에 주소를 바꾸시려면 똑같이 /wallet로 새 주소를 보내고 Confirm만 눌러주시면 됩니다.
+
+2. 콘텐츠 제출 (/submit)
+포스팅 올리신 후에 채팅창에서 /submit 뒤에 올리신 포스트 링크만 넣어주시면 돼요. 캠페인 선택해서 제출하면 끝이라, 따로 채팅으로 링크 보내주실 필요 없어요.
+
+3. 공유 딜 (Share Deal)
+다른 크리에이터 포스트를 크리에이터님 채널에 공유하고 수익을 받는 기능도 있어요. 딜이 열리면 봇이 단체방으로 오퍼를 보내드리고, 공유 단가랑 마감 시간 확인하신 뒤에 Accept / Reject만 눌러주시면 됩니다. 선착순으로 진행되고 단가는 기본 포스팅 단가의 50%로 산정해 드려요. 포워딩 진행 의사가 있으시다면 채팅창에 /repost yes를 남겨주세요.
+
+궁금한 점 있으면 편하게 알려주세요!`;
 
 interface TelegramChat {
   id: string;
@@ -236,6 +257,15 @@ export default function TelegramChatsPage() {
   const [kolLinkDialogOpen, setKolLinkDialogOpen] = useState(false);
   const [selectedKolId, setSelectedKolId] = useState<string>('');
   const [kolPopoverOpen, setKolPopoverOpen] = useState(false);
+
+  // KOL welcome-message dialog — fires the first time an unassigned
+  // chat is linked to a KOL, offering to send the onboarding message
+  // to that chat. Mirrors the payment-notification confirm popup.
+  const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
+  const [welcomeChat, setWelcomeChat] = useState<TelegramChat | null>(null);
+  const [welcomeKolName, setWelcomeKolName] = useState<string>('');
+  const [welcomeMessage, setWelcomeMessage] = useState<string>(KOL_WELCOME_MESSAGE);
+  const [sendingWelcome, setSendingWelcome] = useState(false);
 
   // Client Link dialog state — mirrors the opportunity / KOL pattern
   const [clientLinkDialogOpen, setClientLinkDialogOpen] = useState(false);
@@ -886,6 +916,10 @@ export default function TelegramChatsPage() {
     if (!selectedChat) return;
 
     const kolId = selectedKolId === '__none__' ? null : selectedKolId;
+    // First-time link = a previously-unassigned chat now points at a KOL.
+    // That's the moment we offer to send the onboarding welcome message.
+    const isFirstLink = !selectedChat.master_kol_id && !!kolId;
+    const linkedChat = selectedChat;
 
     setLinking(true);
     try {
@@ -908,6 +942,13 @@ export default function TelegramChatsPage() {
 
       setKolLinkDialogOpen(false);
       fetchChats();
+
+      if (isFirstLink) {
+        setWelcomeChat(linkedChat);
+        setWelcomeKolName(masterKOLs.find(k => k.id === kolId)?.name || '');
+        setWelcomeMessage(KOL_WELCOME_MESSAGE);
+        setWelcomeDialogOpen(true);
+      }
     } catch (error) {
       console.error('Error linking chat to KOL:', error);
       toast({
@@ -918,6 +959,50 @@ export default function TelegramChatsPage() {
     } finally {
       setLinking(false);
     }
+  };
+
+  // Send the KOL onboarding welcome message to the just-linked chat.
+  const sendKolWelcome = async () => {
+    if (!welcomeChat) return;
+    setSendingWelcome(true);
+    try {
+      const response = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: welcomeChat.chat_id,
+          message: welcomeMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      toast({
+        title: 'Welcome message sent',
+        description: welcomeKolName
+          ? `Onboarding message sent to ${welcomeKolName}'s chat`
+          : 'Onboarding message sent to the KOL chat',
+      });
+      setWelcomeDialogOpen(false);
+      setWelcomeChat(null);
+    } catch (error: any) {
+      console.error('Error sending KOL welcome message:', error);
+      toast({
+        title: 'Send failed',
+        description: error?.message ?? 'Failed to send welcome message',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingWelcome(false);
+    }
+  };
+
+  const skipKolWelcome = () => {
+    setWelcomeDialogOpen(false);
+    setWelcomeChat(null);
   };
 
   // ─── Client link handlers (mirrors opportunity / KOL pattern) ───────
@@ -3022,6 +3107,20 @@ export default function TelegramChatsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* KOL welcome-message confirm — fires the first time an unassigned
+          chat is linked to a KOL. Mirrors the payment-notification popup. */}
+      <KolWelcomeDialog
+        open={welcomeDialogOpen}
+        onOpenChange={setWelcomeDialogOpen}
+        kolName={welcomeKolName}
+        chatTitle={welcomeChat?.title}
+        message={welcomeMessage}
+        onMessageChange={setWelcomeMessage}
+        sending={sendingWelcome}
+        onSend={sendKolWelcome}
+        onSkip={skipKolWelcome}
+      />
 
       {/* Client Link Dialog — same shape as the opportunity / KOL link
           dialogs. Popover + Command for searchable picker, "__none__"
