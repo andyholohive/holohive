@@ -361,6 +361,17 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                       </span>
                     )}
                   </div>
+                  {/* KOL notes ("Style" profile) — identical block on the public
+                      campaign page. Full text, never truncated. Below the status
+                      per Andy 2026-07-14. */}
+                  {campaignKOL.master_kol.style_summary && (
+                    <div className="mt-3 w-full rounded-md bg-cream-50 border border-cream-200 px-3 py-2 text-left">
+                      <p className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500 mb-1">KOL Notes</p>
+                      <p className="text-xs text-ink-warm-700 leading-relaxed whitespace-pre-wrap break-words">
+                        {campaignKOL.master_kol.style_summary}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">

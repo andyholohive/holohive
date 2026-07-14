@@ -2341,14 +2341,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <p className="text-xs text-ink-warm-500 mt-0.5">
                                 {item.master_kol.region || 'No region'}
                               </p>
-                              {/* KOL profile / "Style" — same field as the KOL
-                                  Profile popup on /kols. Hidden in the showcase
-                                  mask (KOL identity is anonymised there). */}
-                              {!masked && item.master_kol.style_summary && (
-                                <p className="text-[11px] text-ink-warm-600 mt-1.5 leading-snug line-clamp-3">
-                                  {item.master_kol.style_summary}
-                                </p>
-                              )}
                               {!masked && item.profile_note && (
                                 <p className="text-[11px] text-ink-warm-500 italic mt-1.5 leading-snug">
                                   {item.profile_note}
@@ -2368,6 +2360,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </span>
                                 )}
                               </div>
+                              {/* KOL notes ("Style" profile) — identical block on the
+                                  internal KolDashboardCardsView. Full text, never
+                                  truncated. Below the status per Andy 2026-07-14.
+                                  Hidden in the showcase mask. */}
+                              {!masked && item.master_kol.style_summary && (
+                                <div className="mt-3 w-full rounded-md bg-cream-50 border border-cream-200 px-3 py-2 text-left">
+                                  <p className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500 mb-1">KOL Notes</p>
+                                  <p className="text-xs text-ink-warm-700 leading-relaxed whitespace-pre-wrap break-words">
+                                    {item.master_kol.style_summary}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </CardHeader>
                           <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">

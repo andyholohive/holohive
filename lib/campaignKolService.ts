@@ -48,6 +48,9 @@ export interface CampaignKOLWithDetails extends CampaignKOL {
     /** @deprecated Use notes. */
     description?: string | null;
     wallet?: string | null;
+    /** KOL "Style" profile — surfaced as the KOL-notes block on both the
+     * internal and public campaign KOL Dashboard cards. */
+    style_summary?: string | null;
   };
 }
 
