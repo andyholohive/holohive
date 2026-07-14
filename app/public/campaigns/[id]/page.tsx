@@ -2341,6 +2341,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <p className="text-xs text-ink-warm-500 mt-0.5">
                                 {item.master_kol.region || 'No region'}
                               </p>
+                              {/* KOL profile / "Style" — same field as the KOL
+                                  Profile popup on /kols. Hidden in the showcase
+                                  mask (KOL identity is anonymised there). */}
+                              {!masked && item.master_kol.style_summary && (
+                                <p className="text-[11px] text-ink-warm-600 mt-1.5 leading-snug line-clamp-3">
+                                  {item.master_kol.style_summary}
+                                </p>
+                              )}
                               {!masked && item.profile_note && (
                                 <p className="text-[11px] text-ink-warm-500 italic mt-1.5 leading-snug">
                                   {item.profile_note}
