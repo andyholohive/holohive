@@ -1405,20 +1405,45 @@ export async function listTopKols(
 
 // ─── Tool: get_kol_detail ─────────────────────────────────────────────
 
+// [2026-07-14] kol_id is no longer a strict .uuid() and `name` is a
+// first-class fallback. search_kols/list_top_kols emit the UUID in
+// [brackets], but callers that can't reliably parse it out of prose were
+// blocked here. Passing the KOL's name now resolves to the best
+// follower-count match, so the search → detail pivot always works.
 export const getKolDetailSchema = {
-  kol_id: z.string().uuid().describe('Master KOL UUID (from list_top_kols or search_kols).'),
+  kol_id: z.string().optional().describe('Master KOL UUID (the [bracketed] id from list_top_kols or search_kols). Optional if `name` is supplied.'),
+  name: z.string().optional().describe('KOL name — use when you have the name but not the UUID. Resolves to the highest-follower match.'),
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function getKolDetail(
   supabase: SupabaseClient,
-  args: { kol_id: string },
+  args: { kol_id?: string; name?: string },
 ): Promise<string> {
-  const { data: k, error } = await (supabase as any)
-    .from('master_kols')
-    .select('*')
-    .eq('id', args.kol_id)
-    .single();
-  if (error || !k) return `KOL not found: ${args.kol_id}`;
+  let k: any = null;
+  const rawId = args.kol_id?.trim();
+  if (rawId && UUID_RE.test(rawId)) {
+    const { data } = await (supabase as any)
+      .from('master_kols').select('*').eq('id', rawId).single();
+    k = data;
+  }
+  // Name fallback — also covers a kol_id that came through non-UUID.
+  if (!k && (args.name || (rawId && !UUID_RE.test(rawId)))) {
+    const term = (args.name || rawId || '').trim();
+    const { data } = await (supabase as any)
+      .from('master_kols').select('*')
+      .is('archived_at', null)
+      .ilike('name', `%${term}%`)
+      .order('followers', { ascending: false, nullsFirst: false })
+      .limit(1);
+    k = Array.isArray(data) ? data[0] : data;
+  }
+  if (!k) {
+    return rawId || args.name
+      ? `KOL not found${rawId ? `: ${rawId}` : ''}${args.name ? ` (name "${args.name}")` : ''}.`
+      : 'Provide either kol_id (UUID) or name.';
+  }
 
   const fmtFollowers = (n: number | null) => {
     if (n == null) return '—';
