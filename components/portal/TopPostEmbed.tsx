@@ -31,7 +31,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ExternalLink, Clock } from 'lucide-react';
+import { ExternalLink, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 
 type Props = {
   url: string | null;
@@ -281,6 +281,64 @@ function LinkCard({ url, notes }: { url: string | null; notes?: string | null })
   );
 }
 
+// ─── Collapsible wrapper ──────────────────────────────────────────────
+// Long posts (Telegram announcements especially) can be very tall and
+// stretch the whole "This Week | Top Post" row. Cap the embed at a fixed
+// height with a fade + "Show full post" toggle so the card stays compact
+// and the neighbouring column doesn't get a huge empty gap. Short posts
+// stay under the cap, so no fade/toggle appears for them.
+const COLLAPSED_MAX_PX = 380;
+
+function CollapsibleEmbed({ children }: { children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    // The embed iframe grows asynchronously (Telegram/Twitter resize it
+    // after load), so watch for size changes rather than measuring once.
+    const check = () => setOverflows(el.scrollHeight > COLLAPSED_MAX_PX + 24);
+    check();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div className="my-3">
+      <div
+        className="relative overflow-hidden"
+        style={{ maxHeight: expanded ? undefined : COLLAPSED_MAX_PX }}
+      >
+        <div ref={innerRef}>{children}</div>
+        {!expanded && overflows && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
+        )}
+      </div>
+      {overflows && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="h-3.5 w-3.5" /> Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3.5 w-3.5" /> Show full post
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────
 export default function TopPostEmbed({ url, notes }: Props) {
   const [embedFailed, setEmbedFailed] = useState(false);
@@ -300,26 +358,26 @@ export default function TopPostEmbed({ url, notes }: Props) {
   // the layout doesn't jump when fallback fires.
   if (parsed.platform === 'twitter') {
     return (
-      <div className="my-5">
+      <CollapsibleEmbed>
         <TwitterEmbed
           tweetId={parsed.tweetId}
           fallbackUrl={url!}
           onFailure={() => setEmbedFailed(true)}
         />
-      </div>
+      </CollapsibleEmbed>
     );
   }
 
   if (parsed.platform === 'telegram') {
     return (
-      <div className="my-5">
+      <CollapsibleEmbed>
         <TelegramEmbed
           channel={parsed.channel}
           msgId={parsed.msgId}
           fallbackUrl={url!}
           onFailure={() => setEmbedFailed(true)}
         />
-      </div>
+      </CollapsibleEmbed>
     );
   }
 
