@@ -81,7 +81,7 @@ export async function GET() {
       // active-initiative list is 5-20 entries so the join is cheap.
       (sb as any)
         .from('tasks')
-        .select('id, linked_initiative')
+        .select('id, linked_initiative, assigned_to')
         .not('linked_initiative', 'is', null),
       // [2026-06-19] Initiative milestones — used to compute the
       // "current gate" badge per TD §3.3. The current gate is the
@@ -615,12 +615,25 @@ export async function GET() {
     // [2026-06-11] Per-initiative linked task counts. Pre-aggregate
     // once for the whole map below.
     const linkedTaskCountByInitiative = new Map<string, number>();
+    // [2026-07-14] Distinct contributors per initiative — everyone with a
+    // task linked to it, not just the single owner. Powers the avatar
+    // stack on the dashboard initiative cards ("2-3 people behind a
+    // priority"). Deduped per user via the inner Map.
+    const contributorsByInitiative = new Map<string, Map<string, { id: string; name: string; photo: string | null }>>();
     for (const t of (initiativeLinkedTasksRes.data ?? []) as any[]) {
       if (!t.linked_initiative) continue;
       linkedTaskCountByInitiative.set(
         t.linked_initiative,
         (linkedTaskCountByInitiative.get(t.linked_initiative) ?? 0) + 1,
       );
+      if (t.assigned_to) {
+        const u = usersById.get(t.assigned_to);
+        if (u) {
+          let set = contributorsByInitiative.get(t.linked_initiative);
+          if (!set) { set = new Map(); contributorsByInitiative.set(t.linked_initiative, set); }
+          if (!set.has(t.assigned_to)) set.set(t.assigned_to, { id: t.assigned_to, name: u.name, photo: u.photo });
+        }
+      }
     }
 
     // Initiative stale tones + denormalized owner name + linked tasks +
@@ -649,11 +662,19 @@ export async function GET() {
         : daysIdle >= cfg.initiative_stale_amber_days ? 'amber'
         : 'fresh';
       const owner = i.owner_id ? usersById.get(i.owner_id) : null;
+      // Everyone behind this initiative = its owner + every distinct
+      // teammate with a task linked to it. Owner leads the stack.
+      const contribMap = new Map<string, { id: string; name: string; photo: string | null }>();
+      if (i.owner_id && owner) contribMap.set(i.owner_id, { id: i.owner_id, name: owner.name, photo: owner.photo });
+      for (const [uid, c] of (contributorsByInitiative.get(i.id) ?? new Map())) {
+        if (!contribMap.has(uid)) contribMap.set(uid, c);
+      }
       return {
         id: i.id,
         name: i.name,
         owner_user_id: i.owner_id,
         owner_name: owner?.name ?? null,
+        contributors: Array.from(contribMap.values()),
         category_tags: i.category_tags ?? [],
         daysIdle,
         updated_at: i.updated_at,

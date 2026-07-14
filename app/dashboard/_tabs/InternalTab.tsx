@@ -54,6 +54,9 @@ type Initiative = {
   name: string;
   owner_user_id: string | null;
   owner_name: string | null;
+  /** Everyone behind this initiative — owner + every teammate with a
+   *  linked task. Owner leads. Rendered as an avatar stack. */
+  contributors: { id: string; name: string; photo: string | null }[];
   category_tags: string[];
   daysIdle: number;
   updated_at: string | null;
@@ -551,11 +554,48 @@ export default function InternalTab() {
                       {i.currentGate}
                     </p>
                   )}
-                  <p className="text-[11px] text-ink-warm-500 mb-2">
-                    {i.owner_name ? <span className="font-medium text-ink-warm-700">{i.owner_name}</span> : 'Unassigned'}
-                    {' · '}
-                    Updated {updatedLabel}
-                  </p>
+                  {/* [2026-07-14] Avatar stack of everyone behind the
+                      initiative (owner + linked-task assignees), not just
+                      the single owner — a priority usually has 2-3 people
+                      on it. Owner leads the stack; hover shows names. */}
+                  <div className="flex items-center gap-2 mb-2">
+                    {i.contributors.length > 0 ? (
+                      <div className="flex items-center -space-x-1.5 shrink-0">
+                        {i.contributors.slice(0, 4).map(c => (
+                          c.photo ? (
+                            <img
+                              key={c.id}
+                              src={c.photo}
+                              alt={c.name}
+                              title={c.name}
+                              className="w-5 h-5 rounded-full object-cover border border-white ring-1 ring-cream-200"
+                            />
+                          ) : (
+                            <span
+                              key={c.id}
+                              title={c.name}
+                              className="w-5 h-5 rounded-full bg-brand text-white text-[9px] font-bold flex items-center justify-center border border-white ring-1 ring-cream-200"
+                            >
+                              {c.name.split(' ').map(w => w.charAt(0)).join('').slice(0, 2).toUpperCase()}
+                            </span>
+                          )
+                        ))}
+                        {i.contributors.length > 4 && (
+                          <span className="w-5 h-5 rounded-full bg-cream-100 text-ink-warm-600 text-[9px] font-semibold flex items-center justify-center border border-white ring-1 ring-cream-200">
+                            +{i.contributors.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-ink-warm-500">Unassigned</span>
+                    )}
+                    <span className="text-[11px] text-ink-warm-400 truncate">
+                      {i.contributors.length > 0 && (
+                        <span className="text-ink-warm-500">{i.contributors.length} {i.contributors.length === 1 ? 'person' : 'people'} · </span>
+                      )}
+                      Updated {updatedLabel}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1 flex-wrap">
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700 border border-cream-200 font-medium">
                       {i.linkedTaskCount} task{i.linkedTaskCount === 1 ? '' : 's'} linked
