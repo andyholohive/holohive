@@ -23,7 +23,6 @@ import {
   EyeOff,
   Megaphone,
   StickyNote,
-  Briefcase,
   Activity,
   ChevronDown,
   ChevronUp,
@@ -43,7 +42,6 @@ import {
   Lock,
   ArrowRight,
   AlertCircle,
-  Bell,
   Award,
 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
@@ -67,9 +65,6 @@ type Client = {
   email: string;
   slug: string | null;
   logo_url: string | null;
-  /** When false, suppresses the floating Bell + Recent Activity dropdown.
-   *  Added in migration 074. Per-client opt-out (default true at the DB). */
-  show_activity_notifications?: boolean;
 };
 
 type MeetingNote = {
@@ -411,11 +406,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const [statsTrends, setStatsTrends] = useState<StatsTrends | null>(null);
   const [expandedMilestoneId, setExpandedMilestoneId] = useState<string | null>(null);
   const [clientLinks, setClientLinks] = useState<{ id: string; name: string; url: string; description: string | null; link_types: string[] }[]>([]);
-  const [recentActivities, setRecentActivities] = useState<{ id: string; activity_type: string; title: string; description: string | null; created_by_name: string | null; created_at: string; is_read: boolean }[]>([]);
-  const [activityLimit, setActivityLimit] = useState(5);
-  const [totalActivities, setTotalActivities] = useState(0);
-  const [totalUnread, setTotalUnread] = useState(0);
-  const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [mindshareEnabled, setMindshareEnabled] = useState(false);
   const [mindshareWeekly, setMindshareWeekly] = useState<{ week_number: number; week_start: string; mention_count: number; mindshare_pct: number }[]>([]);
@@ -439,7 +429,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           // Fetch client email
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url, approved_emails, approved_domains, show_activity_notifications')
+            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
             .eq('id', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -457,7 +447,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           // Fetch by slug
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url, approved_emails, approved_domains, show_activity_notifications')
+            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
             .eq('slug', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -518,7 +508,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           fetchMilestones(),
           fetchMindshare(),
           fetchClientLinks(),
-          fetchRecentActivities(),
           checkOnboardingStatus(),
           fetchKolRoster(),
           fetchFormSubmissions(),
@@ -1151,50 +1140,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     }
   }
 
-  async function fetchRecentActivities(limit = 5) {
-    if (!clientId) return;
-    try {
-      // HHP Onboarding Overhaul Spec § 8.5 — filter to the 4
-      // client-visible activity categories. Hides milestone_setup
-      // (admin backtracks + setup churn). Without this, the bell
-      // shows 19 setup-noise entries per Venice's audit § 2.3 #17.
-      // All three reads + count queries use the same filter so the
-      // badge number matches what's actually rendered.
-      const VISIBLE_CATEGORIES = [
-        'milestone_completed',
-        'milestone_activated',
-        'campaign_status_changed',
-        'resource_updated',
-        'client_task_added',
-      ];
-
-      const [{ data }, { count }, { count: unreadCount }] = await Promise.all([
-        supabasePublic
-          .from('client_activity_log')
-          .select('id, activity_type, activity_category, title, description, created_by_name, created_at, is_read')
-          .eq('client_id', clientId)
-          .in('activity_category', VISIBLE_CATEGORIES)
-          .order('created_at', { ascending: false })
-          .limit(limit),
-        supabasePublic
-          .from('client_activity_log')
-          .select('*', { count: 'exact', head: true })
-          .eq('client_id', clientId)
-          .in('activity_category', VISIBLE_CATEGORIES),
-        supabasePublic
-          .from('client_activity_log')
-          .select('*', { count: 'exact', head: true })
-          .eq('client_id', clientId)
-          .in('activity_category', VISIBLE_CATEGORIES)
-          .eq('is_read', false),
-      ]);
-      setRecentActivities(data || []);
-      setTotalActivities(count || 0);
-      setTotalUnread(unreadCount || 0);
-    } catch (err) {
-      console.error('Error fetching activities:', err);
-    }
-  }
 
   async function fetchClientLinks() {
     if (!clientId) return;
@@ -2911,82 +2856,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Client Context Section — renders whenever there's data to
-            show. Was previously gated by mindshareEnabled (a leftover
-            from when mindshare was test-only); decoupled because the
-            content here (scope, contacts, start date) is general
-            client info and has nothing to do with the mindshare
-            tracker block below.
-            [2026-07-09] Gate on real BODY content (scope or contacts),
-            not just clientContext/CRM existence — otherwise the card
-            rendered as a lone header + "Since" date with nothing under
-            it, which read as broken. */}
-        {(linkedCRMAccount?.scope || clientContext?.scope || clientContext?.holohive_contacts) && (
-          <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mb-10">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
-                  <Briefcase className="h-5 w-5 text-white" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">Engagement Overview</h3>
-                {/* engagement_type pill hidden per May 2026 audit — was
-                    its only render site and the field added no real
-                    workflow value beyond the cosmetic label. Restore
-                    by un-hiding the Select on the team-side modal AND
-                    re-adding this <span> render. */}
-                {(() => {
-                  const startDate = linkedCRMAccount?.closed_at || linkedCRMAccount?.qualified_at || linkedCRMAccount?.created_at || clientContext?.start_date;
-                  return startDate ? (
-                    <span className="ml-auto text-sm text-gray-400 flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Since {fmtDate(startDate.includes('T') ? startDate : startDate + 'T00:00:00')}
-                    </span>
-                  ) : null;
-                })()}
-              </div>
-              {/* Scope — full width (use CRM scope if available, formatted nicely) */}
-              {(() => {
-                const crmScope = linkedCRMAccount?.scope;
-                // Scope labels (consistent with pipeline page)
-                const scopeLabels: Record<string, string> = {
-                  'fundraising': 'Fundraising',
-                  'advisory': 'Advisory',
-                  'kol_activation': 'KOL Activation',
-                  'gtm': 'GTM',
-                  'bd_partnerships': 'BD/Partnerships',
-                  'apac': 'APAC',
-                };
-                const formattedCRMScope = crmScope ? crmScope.split(',').map(s => scopeLabels[s.trim()] || s.trim()).join(', ') : null;
-                const displayScope = formattedCRMScope || clientContext?.scope;
-                return displayScope ? (
-                  <div className="mb-5">
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayScope}</p>
-                  </div>
-                ) : null;
-              })()}
-
-              {/* Free-text Milestones timeline removed per May 2026
-                  feedback — duplicated the structured action-board
-                  milestones rendered above. The DB field stays
-                  populated for any client that still has data; just
-                  not rendered here. */}
-
-              {/* Holo Hive Contacts — Client Contacts rendering hidden
-                  per May 2026 audit (also hidden in the Context popup
-                  on the team side). DB column kept; restore by re-adding
-                  both branches if it's ever useful again. */}
-              {clientContext?.holohive_contacts && (
-                <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
-                  <Users className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Holo Hive Contacts</p>
-                    <p className="text-sm text-gray-700">{clientContext?.holohive_contacts}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Stats Cards — discovery & tracker only.
             [2026-07-09 per Andy] Removed the 4-card stat strip above Form
@@ -3969,122 +3838,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
       </main>
 
-      {/* Floating Activity Button + Dropdown.
-          Hidden when the client has show_activity_notifications=false
-          (migration 074). Default true preserves existing behavior;
-          per-client opt-out for clients who've asked to silence the
-          notification surface (currently Altura). */}
-      {recentActivities.length > 0 && client?.show_activity_notifications !== false && (
-        <div className="fixed top-[73px] left-0 right-0 z-40 pointer-events-none">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-end">
-            <div className="pointer-events-auto relative mt-3">
-              <button
-                onClick={() => setActivityModalOpen(!activityModalOpen)}
-                className="relative w-11 h-11 rounded-full bg-brand shadow-lg flex items-center justify-center hover:bg-[#2d6570] transition-colors cursor-pointer"
-              >
-                <Bell className="h-5 w-5 text-white" />
-                {totalUnread > 0 && (
-                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center">
-                    <span className="text-white text-[10px] font-bold">!</span>
-                  </div>
-                )}
-              </button>
-
-              {/* Dropdown */}
-              {activityModalOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setActivityModalOpen(false)} />
-                  <div className="absolute right-0 top-[52px] z-50 w-[380px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-brand" />
-                        <p className="text-sm font-bold text-gray-900">Recent Activity</p>
-                      </div>
-                      <span className="text-xs text-gray-400">{totalActivities} total</span>
-                    </div>
-                    <div className="max-h-[400px] overflow-y-auto">
-                      <div className="p-3 space-y-1">
-                        {recentActivities.map((activity) => {
-                          const timeAgo = formatRelativeShort(activity.created_at);
-
-                          // [Portal notification cleanup] task_added is the
-                          // new type for client-court action items. Renders
-                          // amber so the client can distinguish "you have a
-                          // new to-do" from "we shipped something" updates.
-                          // link_added stays in the switch for historical
-                          // entries — no new ones are written.
-                          const iconColor = activity.activity_type === 'milestone_status' ? 'bg-brand'
-                            : activity.activity_type === 'task_added' ? 'bg-amber-500'
-                            : activity.activity_type === 'campaign_status' ? 'bg-blue-500'
-                            : activity.activity_type === 'link_added' ? 'bg-purple-500'
-                            : activity.activity_type === 'resource_updated' ? 'bg-emerald-500'
-                            : 'bg-gray-400';
-
-                          // Client tasks live inside the milestones section
-                          // (action items hang off each milestone), so the
-                          // bell scrolls there.
-                          const scrollTarget = activity.activity_type === 'milestone_status' ? 'section-milestones'
-                            : activity.activity_type === 'task_added' ? 'section-milestones'
-                            : activity.activity_type === 'campaign_status' ? 'section-campaigns'
-                            : activity.activity_type === 'link_added' || activity.activity_type === 'resource_updated' ? 'section-resources'
-                            : null;
-
-                          return (
-                            <div
-                              key={activity.id}
-                              className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-colors ${!activity.is_read ? 'bg-brand/[0.04]' : ''} ${scrollTarget ? 'hover:bg-gray-50 cursor-pointer' : ''}`}
-                              onClick={async () => {
-                                if (!activity.is_read) {
-                                  setRecentActivities(prev => prev.map(a => a.id === activity.id ? { ...a, is_read: true } : a));
-                                  setTotalUnread(prev => Math.max(0, prev - 1));
-                                  await supabasePublic.from('client_activity_log').update({ is_read: true }).eq('id', activity.id);
-                                }
-                                if (scrollTarget) {
-                                  const el = document.getElementById(scrollTarget);
-                                  if (el) {
-                                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                    setActivityModalOpen(false);
-                                  }
-                                }
-                              }}
-                            >
-                              <div className={`w-5 h-5 rounded-full ${iconColor} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
-                                  {!activity.is_read && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />}
-                                </div>
-                                {activity.description && <p className="text-xs text-gray-500 truncate">{activity.description}</p>}
-                              </div>
-                              <span className="text-[11px] text-gray-400 flex-shrink-0 mt-0.5">{timeAgo}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    {totalActivities > recentActivities.length && (
-                      <div className="px-4 py-2.5 border-t border-gray-100 text-center">
-                        <button
-                          onClick={() => {
-                            const newLimit = activityLimit + 5;
-                            setActivityLimit(newLimit);
-                            fetchRecentActivities(newLimit);
-                          }}
-                          className="text-xs font-medium text-brand cursor-pointer"
-                        >
-                          Show more ({totalActivities - recentActivities.length} remaining)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
