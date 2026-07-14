@@ -1462,12 +1462,21 @@ export async function getKolDetail(
 // window. Useful for "what's on my plate today" / "what's overdue
 // across the team" / "show me X's tasks for this week" questions.
 
+// [2026-07-14] The tasks table stores status as one of:
+//   to_do · in_progress · paused · ready_for_feedback · complete
+// The MCP filter used to enum on ['open','completed','blocked'] and
+// `eq('status', 'open')`, which matched ZERO rows — no task is ever
+// literally "open"/"completed"/"blocked" — so list_team_tasks returned
+// "no tasks" while the board was full. Now the enum carries the real
+// statuses plus two friendly aliases mapped in the handler:
+//   'open'      → everything NOT complete (the "what's on my plate" set)
+//   'completed' → the real 'complete' value
 export const listTeamTasksSchema = {
   owner_id: z.string().uuid().optional()
     .describe('Filter to one assignee (UUID). Omit for all-owners view.'),
-  status: z.enum(['any', 'open', 'in_progress', 'completed', 'blocked'])
+  status: z.enum(['any', 'open', 'to_do', 'in_progress', 'paused', 'ready_for_feedback', 'completed'])
     .default('open')
-    .describe('Task status filter. Default "open" excludes completed tasks.'),
+    .describe('Task status filter. Default "open" = all not-yet-complete tasks. "completed" maps to the stored "complete" status.'),
   due_within_days: z.number().int().min(1).max(60).optional()
     .describe('Only show tasks due within the next N days (also includes overdue). Omit for no due-date filter.'),
   client_id: z.string().uuid().optional()
@@ -1479,7 +1488,7 @@ export async function listTeamTasks(
   supabase: SupabaseClient,
   args: {
     owner_id?: string;
-    status: 'any' | 'open' | 'in_progress' | 'completed' | 'blocked';
+    status: 'any' | 'open' | 'to_do' | 'in_progress' | 'paused' | 'ready_for_feedback' | 'completed';
     due_within_days?: number;
     client_id?: string;
     limit: number;
@@ -1491,8 +1500,13 @@ export async function listTeamTasks(
     .order('due_date', { ascending: true, nullsFirst: false })
     .limit(args.limit);
 
-  if (args.status !== 'any') {
-    q = q.eq('status', args.status);
+  // Map friendly aliases → the real `tasks.status` vocabulary.
+  if (args.status === 'open') {
+    q = q.neq('status', 'complete');        // everything still on the board
+  } else if (args.status === 'completed') {
+    q = q.eq('status', 'complete');
+  } else if (args.status !== 'any') {
+    q = q.eq('status', args.status);        // to_do / in_progress / paused / ready_for_feedback
   }
   if (args.owner_id) q = q.eq('assigned_to', args.owner_id);
   if (args.client_id) q = q.eq('client_id', args.client_id);
