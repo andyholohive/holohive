@@ -17,9 +17,10 @@ export const dynamic = 'force-dynamic';
  *   - Notify the KOL via their per-KOL group chat (👍 on approve,
  *     "Submission issue" on reject)
  *
- * Auth:
- *   - super_admin role: always allowed (auto-included in approver list)
- *   - other users: must be in content_submission_approvers table
+ * Auth [2026-07-14, per Andy]: admin OR super_admin may approve/reject —
+ * both the web and TG paths share this bar. Members are blocked on both.
+ *   - admin / super_admin role: always allowed
+ *   - anyone else: must be in content_submission_approvers table (override)
  *
  * Body: { action: 'approve' | 'reject', rejection_reason?: string }
  */
@@ -39,9 +40,10 @@ export async function POST(
     .maybeSingle();
   if (!profile) return NextResponse.json({ error: 'No user profile' }, { status: 403 });
 
-  // Authorization: super_admin auto-included, otherwise must be in approvers
-  const isSuperAdmin = profile.role === 'super_admin';
-  let canApprove = isSuperAdmin;
+  // Authorization: admin/super_admin allowed; anyone else must be an explicit
+  // approver-list override. Mirrors the TG Approve-button bar.
+  const isAdminOrSuper = profile.role === 'admin' || profile.role === 'super_admin';
+  let canApprove = isAdminOrSuper;
   if (!canApprove) {
     const { data: approverRow } = await (supabase as any)
       .from('content_submission_approvers')
@@ -52,7 +54,7 @@ export async function POST(
   }
   if (!canApprove) {
     return NextResponse.json(
-      { error: 'You are not authorized to approve/reject content submissions. Ask a super admin to add you to /admin/telegram-comm.' },
+      { error: 'You are not authorized to approve/reject content submissions. Ask an admin to add you to /admin/telegram-comm.' },
       { status: 403 },
     );
   }

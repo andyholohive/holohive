@@ -3217,6 +3217,20 @@ async function handleSubmReviewCallback(
     return;
   }
 
+  // [2026-07-14, per Andy] Approve/reject is admin+ only — same bar as the
+  // web platform (/api/content-submissions/[id]/review). Members can be team
+  // and use other bot commands, but not gate content.
+  const { data: reviewer } = await (supabaseAdmin as any)
+    .from('users')
+    .select('role')
+    .eq('id', teamMember.id)
+    .maybeSingle();
+  const reviewerRole = (reviewer as any)?.role;
+  if (reviewerRole !== 'admin' && reviewerRole !== 'super_admin') {
+    await answerCallbackQuery(callbackId, 'Admins only — ask an admin to approve.');
+    return;
+  }
+
   // [2026-06-12] Render live names via JOIN per Appendix F2.
   const { data: sub } = await (supabaseAdmin as any)
     .from('content_submissions')
