@@ -178,34 +178,56 @@ function TelegramEmbed({
     const container = ref.current;
     if (!container) return;
     let cancelled = false;
+    let settled = false;
+
+    // Success signal: Telegram's embedded post posts a
+    //   {"event":"resize","height":<n>}
+    // message to the parent window ONLY once the post content actually
+    // renders. We treat THAT as "loaded" — NOT the mere presence of an
+    // <iframe>. Telegram injects the iframe near-instantly (~200ms) even
+    // when the post is blocked (Safari/iOS ITP, tracking protection,
+    // ad-blockers), private, or deleted, in which case it stays blank.
+    // Keying off iframe-presence meant a blank frame counted as success
+    // and the LinkCard fallback never fired — leaving a dead box.
+    const onMessage = (e: MessageEvent) => {
+      if (cancelled || settled) return;
+      const origin = e.origin || '';
+      if (origin !== 'https://t.me' && !origin.endsWith('.t.me') && !origin.includes('telegram.org')) {
+        return;
+      }
+      let data: any = e.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch { return; }
+      }
+      if (data && data.event === 'resize' && typeof data.height === 'number' && data.height > 0) {
+        settled = true;
+        setLoaded(true);
+      }
+    };
+    window.addEventListener('message', onMessage);
 
     const script = document.createElement('script');
     script.async = true;
     script.src = 'https://telegram.org/js/telegram-widget.js?22';
     script.setAttribute('data-telegram-post', `${channel}/${msgId}`);
     script.setAttribute('data-width', '100%');
-    script.onerror = () => { if (!cancelled) onFailure(); };
+    script.onerror = () => {
+      if (!cancelled && !settled) { settled = true; onFailure(); }
+    };
 
     container.appendChild(script);
 
-    // Telegram doesn't fire a clean onLoad for the embed — poll for the
-    // iframe child to appear, then mark loaded.
-    const poll = setInterval(() => {
-      if (cancelled) return;
-      if (container.querySelector('iframe')) {
-        setLoaded(true);
-        clearInterval(poll);
-      }
-    }, 200);
-
+    // No resize message within the window → the post never actually
+    // rendered (blocked third-party frame, private channel, deleted
+    // post). Fall back to the clickable link card instead of a dead box.
     const timer = setTimeout(() => {
-      if (!cancelled && !container.querySelector('iframe')) onFailure();
+      if (!cancelled && !settled) { settled = true; onFailure(); }
     }, TIMEOUT_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(poll);
       clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
       // Don't remove the script — Telegram's widget may still be
       // initializing async. Leaving it doesn't affect re-renders since
       // we re-render the whole component on prop change.
