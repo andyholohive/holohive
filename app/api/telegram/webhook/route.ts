@@ -2355,7 +2355,19 @@ const CONTENT_TYPE_BY_PLATFORM: Record<string, { platform: string; content_type:
   'youtube.com': { platform: 'YouTube',     content_type: 'video' },
   'youtu.be':    { platform: 'YouTube',     content_type: 'video' },
   't.me':        { platform: 'Telegram',    content_type: 'tg_post' },
+  'telegram.me': { platform: 'Telegram',    content_type: 'tg_post' },
 };
+
+/**
+ * True if `host` is exactly `domain` or a real subdomain of it (`foo.domain`).
+ * Guards against the classic `endsWith` false-positive where "netflix.com",
+ * "vox.com" or "linux.com" would match `.endsWith('x.com')` and get
+ * misclassified as X [fix 2026-07-14, per Jdot]. A bare `endsWith('x.com')`
+ * matches any host whose name simply ends in those two letters + ".com".
+ */
+function hostMatches(host: string, domain: string): boolean {
+  return host === domain || host.endsWith('.' + domain);
+}
 
 /** Extract the hostname from a URL string, with a tolerant parse. */
 function urlHost(input: string): string | null {
@@ -2373,10 +2385,12 @@ function detectFromLink(link: string): { platform: string; content_type: string 
   if (!host) return { platform: 'unknown', content_type: 'other' };
   const direct = CONTENT_TYPE_BY_PLATFORM[host];
   if (direct) return direct;
-  // Fallback for hosts we don't have a direct entry for (e.g. m.youtube.com)
-  if (host.endsWith('youtube.com')) return CONTENT_TYPE_BY_PLATFORM['youtube.com'];
-  if (host.endsWith('twitter.com') || host.endsWith('x.com')) return CONTENT_TYPE_BY_PLATFORM['x.com'];
-  if (host.endsWith('t.me')) return CONTENT_TYPE_BY_PLATFORM['t.me'];
+  // Fallback for subdomains we don't have a direct entry for (e.g.
+  // m.youtube.com, mobile.twitter.com). Must be an exact host or a true
+  // subdomain — NOT a bare endsWith, which would match e.g. netflix.com.
+  if (hostMatches(host, 'youtube.com')) return CONTENT_TYPE_BY_PLATFORM['youtube.com'];
+  if (hostMatches(host, 'twitter.com') || hostMatches(host, 'x.com')) return CONTENT_TYPE_BY_PLATFORM['x.com'];
+  if (hostMatches(host, 't.me')) return CONTENT_TYPE_BY_PLATFORM['t.me'];
   return { platform: 'unknown', content_type: 'other' };
 }
 
@@ -2873,25 +2887,32 @@ async function sendSubmissionProgressAlert(opts: {
     weekStart.setUTCHours(0, 0, 0, 0);
   }
 
-  // Live count: distinct content_items this week (F3 path) — fallback to
-  // content_submissions if F3 isn't fully wired yet.
-  const { data: liveRows } = await (supabaseAdmin as any)
-    .from('content_items')
-    .select('id, kol_id')
-    .eq('campaign_id', opts.campaignId)
-    .gte('submitted_at', weekStart.toISOString())
-    .neq('status', 'rejected');
-  const liveCount = (liveRows ?? []).length;
-
-  // Today's count
+  // Live count: posts that went LIVE this week, bucketed by their real
+  // POST date (contents.activation_date), NOT the submission date — a KOL
+  // may submit this week a link they posted last week (or vice versa), and
+  // ops pace by when content actually went live [per Jdot 2026-07-14].
+  // Source is `contents` (status='posted') since that's where the verified
+  // post + its activation_date live; content_items only carries the
+  // submission timestamp. activation_date is a DATE, so compare on YYYY-MM-DD.
+  const weekStartDate = weekStart.toISOString().slice(0, 10);
   const todayStart = new Date(today);
   todayStart.setUTCHours(0, 0, 0, 0);
-  const { data: todayRows } = await (supabaseAdmin as any)
-    .from('content_items')
+  const todayDate = todayStart.toISOString().slice(0, 10);
+
+  const { data: liveRows } = await (supabaseAdmin as any)
+    .from('contents')
     .select('id')
     .eq('campaign_id', opts.campaignId)
-    .gte('submitted_at', todayStart.toISOString())
-    .neq('status', 'rejected');
+    .eq('status', 'posted')
+    .gte('activation_date', weekStartDate);
+  const liveCount = (liveRows ?? []).length;
+
+  const { data: todayRows } = await (supabaseAdmin as any)
+    .from('contents')
+    .select('id')
+    .eq('campaign_id', opts.campaignId)
+    .eq('status', 'posted')
+    .gte('activation_date', todayDate);
   const todayCount = (todayRows ?? []).length;
 
   // Planned count = KOL slots in THIS week's confirmed lineup.

@@ -68,7 +68,7 @@ export async function createApprovedContentsRow(
       campaign_kols_id: campaignKol.id,
       campaign_id: input.campaignId,
       content_link: input.link,
-      platform: mapSubmissionPlatformToContents(input.platform),
+      platform: mapSubmissionPlatformToContents(input.platform, input.link),
       type: contentsType,
       status: 'pending_verification',
       activation_date: nowIso.slice(0, 10),
@@ -145,12 +145,49 @@ export async function createApprovedContentsRow(
 
 /**
  * contents.platform CHECK: ('X', 'Telegram', 'YouTube')
+ *
+ * The link is the source of truth — a stored `platform` string can be stale
+ * or wrong (e.g. a submission logged before the detector was fixed), and the
+ * CHECK has no "Other" bucket, so a bare string map used to default EVERYTHING
+ * unrecognized to 'X'. That mislabelled non-X links as X [Jdot 2026-07-14].
+ * We now derive from the link host first, only falling back to the stored
+ * string, and only landing on 'X' when the link genuinely looks like X.
  */
-export function mapSubmissionPlatformToContents(p: string | null | undefined): string {
+export function mapSubmissionPlatformToContents(
+  p: string | null | undefined,
+  link?: string | null,
+): string {
+  const fromLink = platformFromLinkHost(link);
+  if (fromLink) return fromLink;
+
   const s = (p ?? '').toLowerCase();
   if (s.includes('telegram') || s === 'tg') return 'Telegram';
   if (s.includes('youtube') || s === 'yt') return 'YouTube';
+  if (s.includes('x') || s.includes('twitter')) return 'X';
+  // Genuinely unknown: default to X (constraint has no Other), but this is
+  // now only reached when neither the link nor the stored string identify a
+  // supported platform.
   return 'X';
+}
+
+/**
+ * Map a submitted link's host to a contents.platform value, or null when the
+ * host isn't a recognized platform. Exact-host / true-subdomain match only —
+ * never a bare `endsWith`, which would match e.g. netflix.com as x.com.
+ */
+function platformFromLinkHost(link: string | null | undefined): 'X' | 'Telegram' | 'YouTube' | null {
+  if (!link) return null;
+  let host: string;
+  try {
+    host = new URL(link.trim()).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+  const matches = (domain: string) => host === domain || host.endsWith('.' + domain);
+  if (matches('t.me') || matches('telegram.me')) return 'Telegram';
+  if (matches('youtube.com') || matches('youtu.be')) return 'YouTube';
+  if (matches('x.com') || matches('twitter.com')) return 'X';
+  return null;
 }
 
 /**
