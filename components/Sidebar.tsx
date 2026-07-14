@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -60,6 +61,33 @@ export default function Sidebar({ children }: SidebarProps) {
   // same pattern — if multiple people share a machine, that's already
   // a bigger problem than misaligned bookmarks.
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+
+  // [2026-07-14] Red attention dot on TG Chats when any chat is
+  // unassigned — mirrors the /crm/telegram "Unassigned" tab filter
+  // (not linked to a lead/client/KOL, not internal, not a private DM,
+  // and not hidden). super_admin-only since only they see the nav item.
+  // Refetches on navigation so the dot clears once the queue is triaged.
+  const [unassignedTgCount, setUnassignedTgCount] = useState(0);
+  useEffect(() => {
+    if (userProfile?.role !== 'super_admin') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { count } = await (supabase as any)
+          .from('telegram_chats')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_hidden', false)
+          .is('opportunity_id', null)
+          .is('master_kol_id', null)
+          .is('client_id', null)
+          .neq('chat_type', 'private')
+          .or('is_internal.is.null,is_internal.eq.false');
+        if (!cancelled) setUnassignedTgCount(count ?? 0);
+      } catch { /* non-fatal — dot just won't show */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.role, pathname]);
   const [bookmarkedHrefs, setBookmarkedHrefs] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -348,11 +376,14 @@ export default function Sidebar({ children }: SidebarProps) {
     icon: Icon,
     label,
     force = false,
+    dot = false,
   }: {
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     label: string;
     force?: boolean;
+    /** Rose attention dot (e.g. TG Chats has unassigned chats to triage). */
+    dot?: boolean;
   }) => {
     if (!force && hiddenSet.has(href)) return null;
     const isActive = isHrefActive(href);
@@ -373,9 +404,15 @@ export default function Sidebar({ children }: SidebarProps) {
           className={`w-full h-8 text-[13px] font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'} ${activeClass}`}
           title={isSidebarCollapsed ? label : undefined}
         >
-          <span data-nav-active={isActive ? 'true' : undefined}>
+          <span data-nav-active={isActive ? 'true' : undefined} className="relative">
             <Icon className={`h-[15px] w-[15px] ${!isSidebarCollapsed ? 'mr-2.5' : ''}`} />
             {!isSidebarCollapsed && label}
+            {dot && (
+              <span
+                className={`h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0 ${isSidebarCollapsed ? 'absolute -top-0.5 -right-0.5' : 'ml-auto'}`}
+                aria-label="Unassigned items to triage"
+              />
+            )}
           </span>
         </Button>
       </Link>
@@ -780,7 +817,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   <NavItem href="/reminders" icon={Bell} label="Reminders" />
                   {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
                   {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
+                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" dot={unassignedTgCount > 0} />}
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                 </CollapsibleSection>
               )}
