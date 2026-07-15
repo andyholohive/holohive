@@ -312,7 +312,7 @@ export function KrSignalSettingsDialog({
             </Section>
 
             {/* ── Telegram destination ───────────────────── */}
-            <Section title="Telegram destination" help="Which group chat (and optional topic) the digest posts to.">
+            <Section title="Telegram destination — override (optional)" help="Overrides where the digest posts. Leave blank to send to the client's linked /crm/telegram chat.">
               <ChatThreadPicker
                 chatId={form.telegram_chat_id}
                 threadId={form.telegram_thread_id}

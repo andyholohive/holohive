@@ -27,9 +27,13 @@ export interface WeeklyReportData {
   /** SoV line renders only when showSov is true — otherwise a flat "+0%" would
    *  read as a real (zero) metric. */
   sovArrow: Arrow; sovPct: number; showSov?: boolean;
-  /** null when peer_basket is empty → the "#N vs peers" line is suppressed
-   *  rather than printing a fabricated "#1". */
+  /** null when peer_basket is empty OR the token isn't KR-listed → the
+   *  "#N vs peers" line is suppressed rather than printing a fabricated rank. */
   peerRank: number | null;
+  /** Whether the token trades on a Korean exchange. When false, the Korea
+   *  Demand share/vol lines are meaningless (all zero) and get reframed to a
+   *  "watching for a KR listing" note [Andy 2026-07-16]. */
+  krListed?: boolean;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -78,9 +82,15 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   const B: string[] = [];
   B.push(HR); // §7.A — divider between the title block and Korea Demand
   B.push(`🇰🇷 Korea Demand`);
-  B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
-  B.push(`${pad(`KR Vol (${W})`, 15)}${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
-  B.push(d.koreaReadLabel);
+  if (d.krListed === false) {
+    // Not on Upbit/Bithumb yet — the share/vol/read lines would all be a
+    // meaningless 0%. Reframe as a watch note instead [Andy 2026-07-16].
+    B.push(`Not yet on a Korean exchange — watching for a KR debut.`);
+  } else {
+    B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
+    B.push(`${pad(`KR Vol (${W})`, 15)}${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
+    B.push(d.koreaReadLabel);
+  }
   B.push(HR);
   B.push(`🏦 By Venue (${W} volume)`);
   for (const v of d.byVenue) {
@@ -102,7 +112,7 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   // printing a fabricated "#1" / inert "+0%" [Andy 2026-07-15].
   const tail: string[] = [];
   if (d.showSov) tail.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
-  if (d.peerRank != null) tail.push(`vs AI-token peers   $${d.ticker} #${d.peerRank} in KR vol share`);
+  if (d.peerRank != null) tail.push(`vs peers   $${d.ticker} #${d.peerRank} in KR vol share`);
   if (tail.length) { B.push(HR); B.push(...tail); }
 
   const brand = `${logo()} <b>Holo Hive Signal</b>`;

@@ -171,7 +171,11 @@ export async function assembleWeekly(
   // rather than printing a fabricated "#1" that looks like a real ranking
   // [Andy 2026-07-15].
   let peerRank: number | null = null;
-  if (!cfg.peer_basket?.length) {
+  if (!cfg.kr_listed) {
+    // Ranking a non-KR-listed token by KR vol share is meaningless (it's 0);
+    // suppress the line rather than print a spurious "#N" [Andy 2026-07-16].
+    pending.push("peer rank (#N in KR vol share) — token not KR-listed (line hidden)");
+  } else if (!cfg.peer_basket?.length) {
     pending.push("peer rank (#N in KR vol share) — peer_basket empty (line hidden)");
   } else {
     const peerResults = await Promise.allSettled(
@@ -217,6 +221,7 @@ export async function assembleWeekly(
     sovPct,
     showSov,
     peerRank,
+    krListed: cfg.kr_listed,
   };
 
   const global: GlobalSnapshot = {
