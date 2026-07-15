@@ -62,6 +62,24 @@ export async function createApprovedContentsRow(
 
   const contentsType = mapSubmissionTypeToContents(input.contentType);
   const nowIso = new Date().toISOString();
+
+  // Use the KOL-reported post date (content_items.posted_at, captured at
+  // /submit) as the activation_date, not the approval date [Andy + Jdot
+  // 2026-07-15]. Falls back to today when absent (legacy submissions). Keeps
+  // the Content Dashboard's activation_date consistent with the SPA's week
+  // bucketing.
+  let activationDate = nowIso.slice(0, 10);
+  const { data: itemRow } = await (admin as any)
+    .from('content_items')
+    .select('posted_at')
+    .eq('campaign_id', input.campaignId)
+    .eq('link', input.link)
+    .neq('status', 'rejected')
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if ((itemRow as any)?.posted_at) activationDate = (itemRow as any).posted_at;
+
   const { data: contentRow, error: contentErr } = await (admin as any)
     .from('contents')
     .insert({
@@ -71,7 +89,7 @@ export async function createApprovedContentsRow(
       platform: mapSubmissionPlatformToContents(input.platform, input.link),
       type: contentsType,
       status: 'pending_verification',
-      activation_date: nowIso.slice(0, 10),
+      activation_date: activationDate,
     })
     .select('id')
     .single();

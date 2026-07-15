@@ -1397,6 +1397,14 @@ async function handleCallbackQuery(cq: any) {
     return;
   }
 
+  // `pdate:<content_item_id>:<daysAgo>` — the post-date buttons on the
+  // /submit receipt. Sets content_items.posted_at back N days so the SPA
+  // buckets a backfilled post into the week it actually went live.
+  if (data.startsWith('pdate:')) {
+    await handlePostDateCallback(cq);
+    return;
+  }
+
   // `bulk:create:<id>` / `bulk:cancel:<id>` — confirm flow for the
   // /bulk multi-task batch. Single handler for both because the
   // post-action work (edit preview message, dismiss spinner) is the
@@ -2227,7 +2235,10 @@ async function sendTelegramMessageWithButtons(
       console.error('[Telegram Webhook] sendMessageWithButtons error:', await res.json().catch(() => ({})));
       return false;
     }
-    return true;
+    // Return the sent message_id (truthy positive int) so callers that need to
+    // edit the message later can capture it; falls back to `true`.
+    const data = await res.json().catch(() => null);
+    return (data?.result?.message_id as number | undefined) ?? true;
   } catch (err) {
     console.error('[Telegram Webhook] sendMessageWithButtons threw:', err);
     return false;
@@ -2692,8 +2703,14 @@ async function finalizeSubmission(opts: {
   // never reject — the previous .then()/.catch() chain silently swallowed
   // EVERY mirror-insert failure (including non-dup CHECK violations),
   // which also skewed the SPA live counts that read content_items.
+  // Post date defaults to today (UTC) — the KOL/team can bump it earlier via
+  // the receipt buttons for a backfilled post. The SPA buckets this-week
+  // counts by posted_at, so a late-submitted prior-week post lands in the
+  // right week [per Andy + Jdot 2026-07-15].
+  const postedAtDefault = new Date().toISOString().slice(0, 10);
+  let contentItemId: string | null = null;
   {
-    const { error: mirrorErr } = await (supabaseAdmin as any)
+    const { data: mirrorRow, error: mirrorErr } = await (supabaseAdmin as any)
       .from('content_items')
       .insert({
         kol_id: opts.kolId,
@@ -2701,12 +2718,16 @@ async function finalizeSubmission(opts: {
         type: opts.contentType,
         link: opts.link,
         status: 'submitted',
-      });
+        posted_at: postedAtDefault,
+      })
+      .select('id')
+      .single();
     // 23505 (duplicate link) is expected + idempotent; the staging-row
     // dup path below handles user feedback. Warn on anything else.
     if (mirrorErr && mirrorErr.code !== '23505') {
       console.warn('[/submit F3] content_items mirror insert failed:', mirrorErr);
     }
+    contentItemId = (mirrorRow as any)?.id ?? null;
   }
 
   // [2026-06-12] Per Appendix v3 F2 + Andy: kol_id + campaign_id FKs are
@@ -2768,15 +2789,34 @@ async function finalizeSubmission(opts: {
   // review handler edits THIS message to drop the tail ("…, submitted for X.").
   // We record the receipt's (chat_id, message_id) on the submission so the
   // approve handler can find it.
-  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`;
+  // Post-date buttons: default is today; one tap sets an earlier post date for
+  // a backfilled submission. Encodes the content_items id + days-ago. Only
+  // shown when we captured the content_items id (the SPA counts that table).
+  const postDateButtons = contentItemId
+    ? [[
+        { text: 'Yesterday', callback_data: `pdate:${contentItemId}:1` },
+        { text: '2d', callback_data: `pdate:${contentItemId}:2` },
+        { text: '3d', callback_data: `pdate:${contentItemId}:3` },
+        { text: '4d', callback_data: `pdate:${contentItemId}:4` },
+        { text: '5d', callback_data: `pdate:${contentItemId}:5` },
+      ]]
+    : null;
+  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`
+    + `\n📅 Posted <b>${escapeHtml(formatDate(postedAtDefault))}</b> (today). Posted earlier? Tap below.`;
   let receiptChatId: string | null = null;
   let receiptMessageId: number | null = null;
   if (opts.editTarget) {
-    await editMessageText(opts.editTarget.chatId, opts.editTarget.messageId, receiptText);
+    if (postDateButtons) {
+      await editMessageTextWithButtons(opts.editTarget.chatId, opts.editTarget.messageId, receiptText, postDateButtons);
+    } else {
+      await editMessageText(opts.editTarget.chatId, opts.editTarget.messageId, receiptText);
+    }
     receiptChatId = opts.editTarget.chatId;
     receiptMessageId = opts.editTarget.messageId;
   } else {
-    const sent = await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
+    const sent = postDateButtons
+      ? await sendTelegramMessageWithButtons(opts.chatId, receiptText, postDateButtons, opts.threadId)
+      : await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
     receiptChatId = opts.chatId;
     receiptMessageId = typeof sent === 'number' ? sent : null;
   }
@@ -2887,23 +2927,25 @@ async function sendSubmissionProgressAlert(opts: {
     weekStart.setUTCHours(0, 0, 0, 0);
   }
 
-  // Live count: content SUBMITTED this week [per Andy 2026-07-15]. The alert
-  // fires the moment a KOL runs /submit, so the count must reflect that
-  // submission immediately — counting only fully-verified `contents`
-  // (status='posted') lagged the whole approve→verify pipeline and read "0 of
-  // N" right after a KOL posted (Bolt's report). KOLs /submit right after
-  // posting, so submitted_at ≈ post date in practice. A later REJECTION drops
-  // the row out (neq 'rejected') — and because each alert recomputes live, a
-  // rejected submission self-corrects on the next ping.
+  // Live count: content that went LIVE this week, bucketed by its actual POST
+  // date (content_items.posted_at), not the submission timestamp [per Andy +
+  // Jdot 2026-07-15]. posted_at defaults to the submission date, so a normal
+  // "post now, submit now" counts immediately; a prior-week post /submitted
+  // this Monday (Jdot's Jammin case) is dated back via the receipt buttons and
+  // lands in the right week. Excludes rejected; each alert recomputes live, so
+  // a later rejection or post-date change self-corrects on the next ping.
+  // posted_at is a DATE, so compare on YYYY-MM-DD.
+  const weekStartDate = weekStart.toISOString().slice(0, 10);
   const todayStart = new Date(today);
   todayStart.setUTCHours(0, 0, 0, 0);
+  const todayDate = todayStart.toISOString().slice(0, 10);
 
   const { data: liveRows } = await (supabaseAdmin as any)
     .from('content_items')
     .select('id')
     .eq('campaign_id', opts.campaignId)
     .neq('status', 'rejected')
-    .gte('submitted_at', weekStart.toISOString());
+    .gte('posted_at', weekStartDate);
   const liveCount = (liveRows ?? []).length;
 
   const { data: todayRows } = await (supabaseAdmin as any)
@@ -2911,7 +2953,7 @@ async function sendSubmissionProgressAlert(opts: {
     .select('id')
     .eq('campaign_id', opts.campaignId)
     .neq('status', 'rejected')
-    .gte('submitted_at', todayStart.toISOString());
+    .gte('posted_at', todayDate);
   const todayCount = (todayRows ?? []).length;
 
   // Planned count = KOL slots in THIS week's confirmed lineup.
@@ -3064,6 +3106,59 @@ async function forwardSubmissionToReviewChannel(opts: {
  *   subm:approve:<submission_id>                   — team approved
  *   subm:reject:<submission_id>                    — team rejected (generic reason)
  */
+/**
+ * `pdate:<content_item_id>:<daysAgo>` — post-date buttons on the /submit
+ * receipt. Sets content_items.posted_at back N days (UTC) so the SPA buckets a
+ * backfilled post into the week it actually went live [Andy + Jdot 2026-07-15].
+ * Re-renders the receipt with the new date; the SPA self-heals on the next ping.
+ */
+async function handlePostDateCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const parts = (cq.data || '').split(':');
+  const contentItemId = parts[1];
+  const daysAgo = Math.max(0, Math.min(31, parseInt(parts[2], 10) || 0));
+  const chatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  if (!contentItemId) {
+    await answerCallbackQuery(callbackId, 'Expired — resubmit if needed.');
+    return;
+  }
+
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  const postedAt = d.toISOString().slice(0, 10);
+
+  const { error } = await (supabaseAdmin as any)
+    .from('content_items')
+    .update({ posted_at: postedAt })
+    .eq('id', contentItemId);
+  if (error) {
+    console.warn('[pdate] posted_at update failed:', error);
+    await answerCallbackQuery(callbackId, 'Could not update. Try again.');
+    return;
+  }
+
+  await answerCallbackQuery(callbackId, `Post date set to ${formatDate(postedAt)}.`);
+
+  // Re-render the receipt: keep the first line (submission ack), refresh the
+  // date line, keep the buttons so the date can be re-adjusted (incl. reset).
+  if (chatId && messageId) {
+    const firstLine = String(cq.message?.text || '').split('\n')[0] || '✅ Got it — submitted.';
+    const newText = `${escapeHtml(firstLine)}\n📅 Posted <b>${escapeHtml(formatDate(postedAt))}</b>. Tap to change.`;
+    const buttons = [[
+      { text: 'Today', callback_data: `pdate:${contentItemId}:0` },
+      { text: 'Yesterday', callback_data: `pdate:${contentItemId}:1` },
+      { text: '2d', callback_data: `pdate:${contentItemId}:2` },
+      { text: '3d', callback_data: `pdate:${contentItemId}:3` },
+      { text: '4d', callback_data: `pdate:${contentItemId}:4` },
+      { text: '5d', callback_data: `pdate:${contentItemId}:5` },
+    ]];
+    await editMessageTextWithButtons(chatId, messageId, newText, buttons);
+  }
+}
+
 async function handleSubmCallback(cq: any) {
   const callbackId: string = cq.id;
   const data: string = cq.data || '';
