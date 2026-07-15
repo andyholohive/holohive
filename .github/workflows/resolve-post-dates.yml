@@ -1,0 +1,36 @@
+name: Resolve Post Dates
+
+# Auto-detects the real Telegram post date for freshly-submitted content, so a
+# post from a prior week that's /submitted late is attributed to the week it
+# actually went live — without anyone tapping the receipt buttons.
+
+on:
+  schedule:
+    # Every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r scripts/tg-mindshare/requirements.txt
+
+      - name: Resolve post dates
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION_STRING: ${{ secrets.TG_SESSION_STRING }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          POSTDATE_LOOKBACK_DAYS: '14'
+        run: python scripts/tg-mindshare/resolve_post_dates.py

@@ -3132,7 +3132,8 @@ async function handlePostDateCallback(cq: any) {
 
   const { error } = await (supabaseAdmin as any)
     .from('content_items')
-    .update({ posted_at: postedAt })
+    // 'manual' → the Telegram auto-detector will never override this.
+    .update({ posted_at: postedAt, posted_at_source: 'manual' })
     .eq('id', contentItemId);
   if (error) {
     console.warn('[pdate] posted_at update failed:', error);
