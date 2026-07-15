@@ -5535,7 +5535,7 @@ export default function ClientsPage() {
         <KrSignalSettingsDialog
           open={krSignalOpen}
           onOpenChange={setKrSignalOpen}
-          clients={clientsWithStatus.map(c => ({ id: c.id, name: c.name }))}
+          clients={weeklyHubClients.map(c => ({ id: c.id, name: c.name }))}
         />
 
         {/* Client Context Modal */}
