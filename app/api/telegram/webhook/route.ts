@@ -2887,32 +2887,31 @@ async function sendSubmissionProgressAlert(opts: {
     weekStart.setUTCHours(0, 0, 0, 0);
   }
 
-  // Live count: posts that went LIVE this week, bucketed by their real
-  // POST date (contents.activation_date), NOT the submission date — a KOL
-  // may submit this week a link they posted last week (or vice versa), and
-  // ops pace by when content actually went live [per Jdot 2026-07-14].
-  // Source is `contents` (status='posted') since that's where the verified
-  // post + its activation_date live; content_items only carries the
-  // submission timestamp. activation_date is a DATE, so compare on YYYY-MM-DD.
-  const weekStartDate = weekStart.toISOString().slice(0, 10);
+  // Live count: content SUBMITTED this week [per Andy 2026-07-15]. The alert
+  // fires the moment a KOL runs /submit, so the count must reflect that
+  // submission immediately — counting only fully-verified `contents`
+  // (status='posted') lagged the whole approve→verify pipeline and read "0 of
+  // N" right after a KOL posted (Bolt's report). KOLs /submit right after
+  // posting, so submitted_at ≈ post date in practice. A later REJECTION drops
+  // the row out (neq 'rejected') — and because each alert recomputes live, a
+  // rejected submission self-corrects on the next ping.
   const todayStart = new Date(today);
   todayStart.setUTCHours(0, 0, 0, 0);
-  const todayDate = todayStart.toISOString().slice(0, 10);
 
   const { data: liveRows } = await (supabaseAdmin as any)
-    .from('contents')
+    .from('content_items')
     .select('id')
     .eq('campaign_id', opts.campaignId)
-    .eq('status', 'posted')
-    .gte('activation_date', weekStartDate);
+    .neq('status', 'rejected')
+    .gte('submitted_at', weekStart.toISOString());
   const liveCount = (liveRows ?? []).length;
 
   const { data: todayRows } = await (supabaseAdmin as any)
-    .from('contents')
+    .from('content_items')
     .select('id')
     .eq('campaign_id', opts.campaignId)
-    .eq('status', 'posted')
-    .gte('activation_date', todayDate);
+    .neq('status', 'rejected')
+    .gte('submitted_at', todayStart.toISOString());
   const todayCount = (todayRows ?? []).length;
 
   // Planned count = KOL slots in THIS week's confirmed lineup.
