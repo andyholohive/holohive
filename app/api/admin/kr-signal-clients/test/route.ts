@@ -2,21 +2,25 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireSuperAdmin } from '@/lib/requireSuperAdmin';
 import { sendMessage } from '@/lib/krSignal/telegram';
+import { assembleWeekly } from '@/lib/krSignal/assembleWeekly';
+import type { KrSignalClient } from '@/lib/krSignal/config';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /**
  * POST /api/admin/kr-signal-clients/test  — body: { id }
  *
- * Sends a short, clearly-labeled test ping to a KR Signal client's resolved
- * digest chat, via the KR Signal bot's OWN token (KR_SIGNAL_BOT_TOKEN). This
- * confirms the one thing that's otherwise unverifiable from HHP: that the
- * KR Signal bot is a member of that chat and can post there.
+ * Sends the ACTUAL Weekly KR Market Report (the same builder the Sunday cron
+ * uses) to a KR Signal client's resolved digest chat, via the KR Signal bot's
+ * OWN token (KR_SIGNAL_BOT_TOKEN) — so the operator previews the real output
+ * AND confirms the bot can post to that chat.
  *
  * The destination is resolved the same way the crons resolve it:
  *   override (kr_signal_clients.telegram_chat_id) ?? the client's /crm/telegram GC.
- * Because that resolved chat can be a live client GC, this deliberately sends a
- * brief test message, NOT the full weekly report.
+ * A one-line "test send" marker is prepended so recipients don't mistake it for
+ * the scheduled Sunday post. This does NOT persist weekly snapshots, so it
+ * can't corrupt the week-over-week history.
  *
  * Auth: super_admin. Returns { ok, sent, chat_id, source, error? } — Telegram's
  * own error description is forwarded so the operator can act (chat-not-found →
@@ -44,9 +48,10 @@ export async function POST(request: Request) {
   const supabase = serviceClient();
   if (!supabase) return NextResponse.json({ ok: false, error: 'Missing Supabase config' }, { status: 500 });
 
+  // Full config — assembleWeekly needs coingecko_id, venues, peer_basket, etc.
   const { data: c, error } = await (supabase as any)
     .from('kr_signal_clients')
-    .select('id, name, ticker, telegram_chat_id, telegram_thread_id, client_id')
+    .select('*')
     .eq('id', id)
     .maybeSingle();
   if (error || !c) return NextResponse.json({ ok: false, error: error?.message || 'client not found' }, { status: 200 });
@@ -76,17 +81,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'No override and no linked client chat — nothing to test.' }, { status: 200 });
   }
 
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const html =
-    `☆ <b>KR Signal test</b>\n`
-    + `If you can see this, the KR Signal bot can post to this chat — <b>$${esc(c.ticker)}</b> digests will land here `
-    + `(${source === 'override' ? 'override' : 'client default chat'}).`;
-
   try {
+    // Build the ACTUAL weekly report (assembleWeekly persists nothing on its
+    // own — the cron does the saves separately — so this has no side effects
+    // on the WoW history).
+    const report = await assembleWeekly(supabase, c as unknown as KrSignalClient);
+    // Small marker so recipients don't mistake it for the scheduled Sunday post.
+    const html = `🧪 <b>Test send</b> · not the scheduled post\n${report.html}`;
     const res = await sendMessage(chatId, html, threadId);
-    return NextResponse.json({ ok: true, sent: true, chat_id: chatId, source, message_id: (res as any)?.message_id ?? null });
+    return NextResponse.json({
+      ok: true, sent: true, chat_id: chatId, source,
+      message_id: (res as any)?.message_id ?? null,
+      pending: report.pending?.length ?? 0,
+    });
   } catch (err: any) {
-    // KR sendMessage throws with Telegram's description in the message.
+    // KR sendMessage / assembleWeekly throw with a descriptive message.
     return NextResponse.json({ ok: false, sent: false, chat_id: chatId, source, error: String(err?.message || err) }, { status: 200 });
   }
 }
