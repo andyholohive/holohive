@@ -27,6 +27,9 @@ export type DeliverableTemplateStep = {
   default_role: string;
   role_label: string;
   estimated_duration_days: number;
+  /** Days after the cycle start this step is due (0 = same day). Replaces
+   *  cumulative estimated_duration_days for scheduling [Bolt 2026-07-15]. */
+  day_offset: number;
   task_type: string;
   checklist_items: string[];
   is_blocking: boolean;
@@ -167,10 +170,11 @@ export class DeliverableService {
       roleAssignmentsFlat[role] = info.userId;
     }
 
-    // Calculate target completion from start + sum of durations
-    const totalDays = steps.reduce((sum, s) => sum + s.estimated_duration_days, 0);
+    // Target completion = the latest step's day_offset (no longer the SUM of
+    // durations, which over-inflated the timeline) [Bolt 2026-07-15].
+    const maxOffset = steps.reduce((max, s) => Math.max(max, s.day_offset || 0), 0);
     const targetDate = new Date(config.startDate);
-    targetDate.setDate(targetDate.getDate() + totalDays);
+    targetDate.setDate(targetDate.getDate() + maxOffset);
     const targetCompletion = targetDate.toISOString().split('T')[0];
 
     // 3. Insert deliverables record
@@ -196,16 +200,15 @@ export class DeliverableService {
     // Update parent task due_date to target completion
     await TaskService.updateTask(parentTask.id, { due_date: targetCompletion });
 
-    // 4. Create subtasks for each step
+    // 4. Create subtasks for each step. Due = startDate + step.day_offset, so
+    //    offset-0 steps land on the start day and steps can share a day.
     const subtasks: Task[] = [];
-    let cumulativeDays = 0;
 
     for (const step of steps) {
-      cumulativeDays += step.estimated_duration_days;
       const dueDate = config.dueDateOverrides?.[step.step_order]
         || (() => {
           const d = new Date(config.startDate);
-          d.setDate(d.getDate() + cumulativeDays);
+          d.setDate(d.getDate() + (step.day_offset || 0));
           return d.toISOString().split('T')[0];
         })();
 
@@ -306,10 +309,10 @@ export class DeliverableService {
       description: `<p>Deliverable: ${template.name}</p><p>${template.description || ''}</p><p><em>Auto-spawned by recurring cron.</em></p>`,
     });
 
-    // 2. Compute target completion from cumulative step durations
-    const totalDays = steps.reduce((sum, s) => sum + s.estimated_duration_days, 0);
+    // 2. Target completion = latest step's day_offset (was sum of durations).
+    const maxOffset = steps.reduce((max, s) => Math.max(max, s.day_offset || 0), 0);
     const target = new Date(opts.startDate);
-    target.setDate(target.getDate() + totalDays);
+    target.setDate(target.getDate() + maxOffset);
     const targetCompletion = target.toISOString().slice(0, 10);
 
     // 3. Deliverable row
@@ -339,13 +342,11 @@ export class DeliverableService {
     // Sync parent task due_date to target completion
     await TaskService.updateTask(parentTask.id, { due_date: targetCompletion });
 
-    // 4. Subtask per step — all unassigned
+    // 4. Subtask per step — all unassigned. Due = startDate + step.day_offset.
     const subtasks: Task[] = [];
-    let cumulativeDays = 0;
     for (const step of steps) {
-      cumulativeDays += step.estimated_duration_days;
       const due = new Date(opts.startDate);
-      due.setDate(due.getDate() + cumulativeDays);
+      due.setDate(due.getDate() + (step.day_offset || 0));
       const dueDate = due.toISOString().slice(0, 10);
 
       const subtask = await TaskService.createTask({

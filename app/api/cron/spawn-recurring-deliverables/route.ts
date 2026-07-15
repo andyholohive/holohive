@@ -362,7 +362,7 @@ async function spawnTemplateAsServiceRole(
   // 1. Pull the template's steps (service-role bypasses RLS).
   const { data: steps, error: stepsErr } = await (db as any)
     .from('deliverable_template_steps')
-    .select('id, step_name, step_order, description, estimated_duration_days, task_type')
+    .select('id, step_name, step_order, description, day_offset, task_type')
     .eq('template_id', args.templateId)
     .order('step_order');
   if (stepsErr) throw stepsErr;
@@ -395,13 +395,14 @@ async function spawnTemplateAsServiceRole(
     .single();
   if (parentErr) throw parentErr;
 
-  // 3. Compute target completion from cumulative step durations.
-  const totalDays = steps.reduce(
-    (sum: number, s: any) => sum + (s.estimated_duration_days || 0),
+  // 3. Target completion = the latest step's day_offset (no longer the SUM of
+  //    durations — that inflated a 5-day cycle to 12). Steps can share a day.
+  const maxOffset = steps.reduce(
+    (max: number, s: any) => Math.max(max, s.day_offset || 0),
     0,
   );
   const target = new Date(args.startDate + 'T00:00:00Z');
-  target.setUTCDate(target.getUTCDate() + totalDays);
+  target.setUTCDate(target.getUTCDate() + maxOffset);
   const targetCompletion = target.toISOString().slice(0, 10);
 
   // 4. Deliverable row (UI lookup key for the parent task's progress card).
@@ -430,13 +431,12 @@ async function spawnTemplateAsServiceRole(
     .update({ due_date: targetCompletion })
     .eq('id', (parentTask as any).id);
 
-  // 6. One subtask per step — all unassigned. Due date = startDate +
-  //    cumulative duration so a 3-day step starting on Mon shows due Thu.
-  let cumulativeDays = 0;
+  // 6. One subtask per step. Due date = startDate + step.day_offset, so an
+  //    offset-0 step is due on the cycle's Monday and multiple steps can share
+  //    a day. No more cumulative auto-push.
   for (const step of steps as any[]) {
-    cumulativeDays += step.estimated_duration_days || 0;
     const due = new Date(args.startDate + 'T00:00:00Z');
-    due.setUTCDate(due.getUTCDate() + cumulativeDays);
+    due.setUTCDate(due.getUTCDate() + (step.day_offset || 0));
     const dueDate = due.toISOString().slice(0, 10);
     // Pre-assignment: stamp assigned_to from the recurring row's step map.
     // Because the cron inserts directly (not via TaskService), this fires NO

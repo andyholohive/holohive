@@ -98,7 +98,9 @@ function SortableStepRow({ step, onEdit, onDelete }: { step: DeliverableTemplate
         <span className="text-xs font-medium text-ink-warm-500 w-5">{step.step_order}.</span>
         <span className="text-sm">{step.step_name}</span>
         <Badge variant="outline" className="text-[10px]">{step.role_label}</Badge>
-        <span className="text-[10px] text-ink-warm-400">{step.estimated_duration_days}d</span>
+        <span className="text-[10px] text-ink-warm-400" title={`Due day ${step.day_offset ?? 0} of the cycle`}>
+          {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][step.day_offset ?? 0]) ?? `+${step.day_offset ?? 0}d`}
+        </span>
         {step.is_blocking && <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0 hover:bg-amber-100">Blocking</Badge>}
       </div>
       <div className="flex items-center gap-1">
@@ -153,7 +155,7 @@ export default function DeliverableTemplatesTab() {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [stepForm, setStepForm] = useState({
     step_name: '', description: '', default_role: '', role_label: '',
-    estimated_duration_days: 1, task_type: 'Client Delivery', is_blocking: false,
+    estimated_duration_days: 1, day_offset: 0, task_type: 'Client Delivery', is_blocking: false,
     checklist_items: '',
   });
   const [stepTemplateId, setStepTemplateId] = useState('');
@@ -290,6 +292,7 @@ export default function DeliverableTemplatesTab() {
         default_role: step.default_role,
         role_label: step.role_label,
         estimated_duration_days: step.estimated_duration_days,
+        day_offset: step.day_offset ?? 0,
         task_type: step.task_type,
         is_blocking: step.is_blocking,
         checklist_items: items.join('\n'),
@@ -298,7 +301,7 @@ export default function DeliverableTemplatesTab() {
       setEditingStep(null);
       setStepForm({
         step_name: '', description: '', default_role: '', role_label: '',
-        estimated_duration_days: 1, task_type: 'Client Delivery', is_blocking: false,
+        estimated_duration_days: 1, day_offset: 0, task_type: 'Client Delivery', is_blocking: false,
         checklist_items: '',
       });
     }
@@ -696,8 +699,21 @@ export default function DeliverableTemplatesTab() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Duration (days)</Label>
-                <Input type="number" min={1} className="focus-brand" value={stepForm.estimated_duration_days} onChange={e => setStepForm(f => ({ ...f, estimated_duration_days: parseInt(e.target.value) || 1 }))} />
+                <Label className="text-xs">Due day</Label>
+                <Select
+                  value={String(stepForm.day_offset)}
+                  onValueChange={(v) => setStepForm(f => ({ ...f, day_offset: parseInt(v) || 0 }))}
+                >
+                  <SelectTrigger className="h-9 focus-brand">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
+                      <SelectItem key={i} value={String(i)}>{d}{i === 0 ? ' (cycle start)' : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-ink-warm-400">Which day of the cycle this task is due. Multiple steps can share a day.</p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Task Type</Label>
