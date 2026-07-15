@@ -29,7 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
-  CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio, Newspaper,
+  CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio, Newspaper, Send,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
@@ -1522,6 +1522,7 @@ function KrSignalClientsSection() {
   const [clients, setClients] = useState<KrClient[]>([]);
   const [edits, setEdits] = useState<Record<string, KrEdit>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
   // HHP clients for the content-source picker (§6.5 — SoV counts posted
   // content across the linked client's campaigns).
   const [hhpClients, setHhpClients] = useState<{ id: string; name: string }[]>([]);
@@ -1636,6 +1637,29 @@ function KrSignalClientsSection() {
   const defaultOf = (c: KrClient) => (c.client_id ? defaultChatByClient[c.client_id] : undefined);
   const configured = clients.filter(c => c.is_active && (!!c.telegram_chat_id || !!defaultOf(c))).length;
 
+  // Fire a real test ping via the KR Signal bot to the client's resolved chat
+  // (override ?? client default) — confirms the bot can actually post there.
+  async function handleTest(c: KrClient) {
+    setTestingId(c.id);
+    try {
+      const res = await fetch('/api/admin/kr-signal-clients/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id }),
+      });
+      const json = await res.json();
+      if (json?.ok) {
+        toast({ title: `Test sent to ${c.name}`, description: `Posted to the ${json.source === 'override' ? 'override' : 'client default'} chat (${json.chat_id}).` });
+      } else {
+        toast({ title: `Test failed for ${c.name}`, description: json?.error || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Test failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setTestingId(null);
+    }
+  }
+
   return (
     <CollapsibleSection
       icon={Radio}
@@ -1734,10 +1758,22 @@ function KrSignalClientsSection() {
                     <Checkbox checked={e.is_active} disabled={savingId === c.id} onCheckedChange={() => setEdit(c.id, { is_active: !e.is_active })} />
                     <span className="text-xs text-ink-warm-600">Active</span>
                   </label>
-                  <Button variant="brand" size="sm" onClick={() => handleSave(c)} disabled={savingId === c.id || !dirty(c)}>
-                    <Save className="h-3.5 w-3.5 mr-1.5" />
-                    {savingId === c.id ? 'Saving…' : 'Save'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTest(c)}
+                      disabled={testingId === c.id || savingId === c.id || dirty(c) || (!c.telegram_chat_id && !defaultOf(c))}
+                      title={dirty(c) ? 'Save your changes first' : (!c.telegram_chat_id && !defaultOf(c)) ? 'No chat to send to' : 'Send a test ping to the resolved chat'}
+                    >
+                      <Send className="h-3.5 w-3.5 mr-1.5" />
+                      {testingId === c.id ? 'Sending…' : 'Send test'}
+                    </Button>
+                    <Button variant="brand" size="sm" onClick={() => handleSave(c)} disabled={savingId === c.id || !dirty(c)}>
+                      <Save className="h-3.5 w-3.5 mr-1.5" />
+                      {savingId === c.id ? 'Saving…' : 'Save'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
