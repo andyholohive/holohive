@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const COLUMNS =
-  'id, key, name, ticker, kr_listed, telegram_chat_id, telegram_thread_id, features, is_active, peer_basket, content_log_source';
+  'id, key, name, ticker, kr_listed, telegram_chat_id, telegram_thread_id, features, is_active, peer_basket, content_log_source, client_id';
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -120,7 +120,7 @@ export async function GET(request: Request) {
     }
 
     // 2. Client alert (§7.C) — a client's own token just listed.
-    const alertClients = clients.filter((c) => c.features?.client_listing_alert && c.telegram_chat_id);
+    const alertClients = clients.filter((c) => c.features?.client_listing_alert && c.resolved_chat_id);
     for (const l of detected) {
       for (const c of alertClients) {
         if (c.ticker.toUpperCase() !== l.symbol) continue;
@@ -135,9 +135,9 @@ export async function GET(request: Request) {
           const pm = c.coingecko_id
             ? await getCoinPriceAndMcapUsd(c.coingecko_id)
             : { priceUsd: null, mcapUsd: null };
-          const m = await sendMessage(c.telegram_chat_id!, buildStage1Alert(c.ticker, l, pm), c.telegram_thread_id);
+          const m = await sendMessage(c.resolved_chat_id!, buildStage1Alert(c.ticker, l, pm), c.resolved_thread_id);
           await supabase.from('kr_signal_alert_messages').insert({
-            client_id: c.id, ticker: c.ticker, chat_id: String(c.telegram_chat_id), message_id: m.message_id,
+            client_id: c.id, ticker: c.ticker, chat_id: String(c.resolved_chat_id), message_id: m.message_id,
             stage: 1, listed_on_key: l.listedOn, edit_due_at: new Date(now.getTime() + 24 * 3600 * 1000).toISOString(),
           });
           // §6.7 — the curated client coingecko_id beats the symbol-search guess:
@@ -243,9 +243,9 @@ export async function GET(request: Request) {
         entries.push(entry);
       }
       const html = buildListingsDigest(entries, weekLabelFor(now), fx);
-      const digestClients = clients.filter((c) => c.features?.korea_listings_digest && c.telegram_chat_id);
+      const digestClients = clients.filter((c) => c.features?.korea_listings_digest && c.resolved_chat_id);
       for (const c of digestClients) {
-        try { await sendMessage(c.telegram_chat_id!, html, c.telegram_thread_id); summary.digests++; } catch (e) { /* keep sweeping */ }
+        try { await sendMessage(c.resolved_chat_id!, html, c.resolved_thread_id); summary.digests++; } catch (e) { /* keep sweeping */ }
       }
     }
 

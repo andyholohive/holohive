@@ -54,12 +54,13 @@ export async function GET(request: Request) {
   const sent: any[] = [];
   try {
     const clients = await loadActiveClients(supabase);
-    const targets = clients.filter((c) => c.features?.weekly_market_report && c.telegram_chat_id);
+    // resolved_chat_id = override (telegram_chat_id) ?? the client's /crm/telegram GC.
+    const targets = clients.filter((c) => c.features?.weekly_market_report && c.resolved_chat_id);
 
     for (const c of targets) {
       try {
         const res = await assembleWeekly(supabase, c);
-        const m = await sendMessage(c.telegram_chat_id!, res.html, c.telegram_thread_id);
+        const m = await sendMessage(c.resolved_chat_id!, res.html, c.resolved_thread_id);
         // Persist AFTER a successful send so history reflects delivered reports.
         await saveGlobalWeekly(supabase, res.weekEnding, res.global);
         await saveClientWeekly(supabase, c.id, res.weekEnding, res.client);

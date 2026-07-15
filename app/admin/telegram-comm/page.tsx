@@ -1502,6 +1502,8 @@ interface KrClient {
   peer_basket: string[] | null;
   /** §6.5 — SoV source ref; 'hhp:<clients.id>' counts posted HHP content. */
   content_log_source: string | null;
+  /** Linked HHP client — drives the default digest chat (its /crm/telegram GC). */
+  client_id: string | null;
 }
 
 type KrEdit = {
@@ -1523,6 +1525,9 @@ function KrSignalClientsSection() {
   // HHP clients for the content-source picker (§6.5 — SoV counts posted
   // content across the linked client's campaigns).
   const [hhpClients, setHhpClients] = useState<{ id: string; name: string }[]>([]);
+  // Default digest chat per linked client (its /crm/telegram GC) — the picker
+  // below is an OVERRIDE; when empty the digest falls back to this.
+  const [defaultChatByClient, setDefaultChatByClient] = useState<Record<string, { chatId: string; title: string | null }>>({});
 
   const toEdit = (c: KrClient): KrEdit => ({
     telegram_chat_id: c.telegram_chat_id ?? '',
@@ -1544,6 +1549,30 @@ function KrSignalClientsSection() {
         const e: Record<string, KrEdit> = {};
         for (const c of list) e[c.id] = toEdit(c);
         setEdits(e);
+
+        // Resolve each linked client's default GC (same rule as the Weekly
+        // Content Recap) so the picker below can be framed as an override.
+        const linkedIds = Array.from(new Set(list.map(c => c.client_id).filter((x): x is string => !!x)));
+        if (linkedIds.length > 0) {
+          const { data: chats } = await (supabase as any)
+            .from('telegram_chats')
+            .select('chat_id, title, client_id, is_internal, is_hidden, last_message_at')
+            .in('client_id', linkedIds)
+            .or('is_hidden.is.null,is_hidden.eq.false');
+          const byClient: Record<string, { chatId: string; title: string | null }> = {};
+          for (const cid of linkedIds) {
+            const cands = ((chats as any[]) ?? []).filter(x => x.client_id === cid && x.chat_id);
+            cands.sort((a, b) => {
+              const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0;
+              if (ai !== bi) return ai - bi;
+              const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
+              const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
+              return bt - at;
+            });
+            if (cands[0]?.chat_id) byClient[cid] = { chatId: String(cands[0].chat_id), title: cands[0].title ?? null };
+          }
+          setDefaultChatByClient(byClient);
+        }
       } catch {
         /* leave empty */
       } finally {
@@ -1595,7 +1624,7 @@ function KrSignalClientsSection() {
       const updated: KrClient = json.client;
       setClients(prev => prev.map(x => (x.id === c.id ? updated : x)));
       setEdits(prev => ({ ...prev, [c.id]: toEdit(updated) }));
-      toast({ title: `${updated.name} saved`, description: updated.telegram_chat_id ? 'Chat linked — reports will post here.' : 'No chat set — skipped until you add one.' });
+      toast({ title: `${updated.name} saved`, description: updated.telegram_chat_id ? 'Override set — digests post here.' : (defaultOf(updated) ? 'Override cleared — digests use the client chat.' : 'No override + no client chat — skipped until one is set.') });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally {
@@ -1603,14 +1632,16 @@ function KrSignalClientsSection() {
     }
   }
 
-  const configured = clients.filter(c => !!c.telegram_chat_id && c.is_active).length;
+  // A client is reachable if it has an override OR a default client chat.
+  const defaultOf = (c: KrClient) => (c.client_id ? defaultChatByClient[c.client_id] : undefined);
+  const configured = clients.filter(c => c.is_active && (!!c.telegram_chat_id || !!defaultOf(c))).length;
 
   return (
     <CollapsibleSection
       icon={Radio}
       title="KR Signal Bot"
       badge={!loading ? <CountChip n={configured} total={clients.length} /> : null}
-      subtitle={<>Client-facing Korea market-intel bot (separate token). Set each client&#39;s group chat ID and toggle features. Clients with no chat are skipped.</>}
+      subtitle={<>Client-facing Korea market-intel bot (separate token). Digests default to the client&#39;s linked chat (from <code className="bg-cream-100 px-1 rounded text-[10px]">/crm/telegram</code>); set an <b>override</b> below only to send somewhere else. Clients with no default and no override are skipped.</>}
     >
       <WhenItSends>
         Weekly report posts Sundays 12:00 UTC. Listing alerts + Saturday digest run off the hourly Korea-listings sweep.
@@ -1626,20 +1657,29 @@ function KrSignalClientsSection() {
             if (!e) return null;
             return (
               <div key={c.id} className="rounded-lg border border-cream-200 p-3 space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold text-ink-warm-900">{c.name}</span>
                   <StatusBadge tone="neutral" size="sm">${c.ticker}</StatusBadge>
                   {c.telegram_chat_id
-                    ? <StatusBadge tone="success" size="sm">Linked</StatusBadge>
-                    : <StatusBadge tone="warning" size="sm">No chat</StatusBadge>}
+                    ? <StatusBadge tone="brand" size="sm">Override set</StatusBadge>
+                    : defaultOf(c)
+                      ? <StatusBadge tone="success" size="sm">Default chat</StatusBadge>
+                      : <StatusBadge tone="warning" size="sm">No chat</StatusBadge>}
                 </div>
                 <ChatThreadPicker
                   chatId={e.telegram_chat_id}
                   threadId={e.telegram_thread_id}
                   onChange={({ chatId: nextChat, threadId: nextThread }) => setEdit(c.id, { telegram_chat_id: nextChat, telegram_thread_id: nextThread })}
-                  label="Group chat"
+                  label="Override chat (optional)"
                   disabled={savingId === c.id}
                 />
+                <p className="text-[11px] text-ink-warm-500 -mt-1">
+                  {e.telegram_chat_id
+                    ? 'Override active — digests post here instead of the client chat.'
+                    : defaultOf(c)
+                      ? <>Defaults to <b>{defaultOf(c)!.title || defaultOf(c)!.chatId}</b> (the client&#39;s linked chat). Set an override only to redirect.</>
+                      : 'No client chat linked in /crm/telegram — set an override here, or link one there.'}
+                </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                   {(([
                     ['weekly_market_report', 'Weekly report'],

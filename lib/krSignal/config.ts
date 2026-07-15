@@ -36,14 +36,22 @@ export interface KrSignalClient {
   thresholds: KrSignalThresholds;
   is_active: boolean;
   /** HHP clients.id this config belongs to (nullable). Set from the /clients
-   *  Korea Signal dialog; the crons don't read it. */
+   *  Korea Signal dialog; links the config to a client so digests can default
+   *  to that client's chat. */
   client_id?: string | null;
+  /** Resolved digest destination, filled by loadActiveClients: the override
+   *  (telegram_chat_id) when set, else the client's /crm/telegram GC. The crons
+   *  send here so an unset override falls back to the client chat, mirroring
+   *  the Weekly Content Recap [Andy 2026-07-15]. */
+  resolved_chat_id?: string | null;
+  resolved_thread_id?: string | null;
 }
 
 const COLUMNS =
   "id, key, name, ticker, contract, chain, coingecko_id, kr_listed, kr_venues, global_venues, peer_basket, content_log_source, telegram_chat_id, telegram_thread_id, features, thresholds, is_active, client_id";
 
-/** All active clients (config source for the crons). */
+/** All active clients (config source for the crons), each with its digest
+ *  destination resolved (override → client chat). */
 export async function loadActiveClients(supabase: SupabaseClient): Promise<KrSignalClient[]> {
   const { data, error } = await supabase
     .from("kr_signal_clients")
@@ -51,7 +59,48 @@ export async function loadActiveClients(supabase: SupabaseClient): Promise<KrSig
     .eq("is_active", true)
     .order("name");
   if (error) throw new Error(`loadActiveClients: ${error.message}`);
-  return (data ?? []) as unknown as KrSignalClient[];
+  const clients = (data ?? []) as unknown as KrSignalClient[];
+  await attachResolvedChats(supabase, clients);
+  return clients;
+}
+
+/**
+ * Fill resolved_chat_id / resolved_thread_id on each client:
+ *   - override set (telegram_chat_id) → use it (+ its thread)
+ *   - else → the client's /crm/telegram GC (telegram_chats.client_id,
+ *            non-internal, most-recently-active), no thread
+ * Same default-chat resolution the Weekly Content Recap cron uses, so the two
+ * bots post to the same client GC by default.
+ */
+async function attachResolvedChats(supabase: SupabaseClient, clients: KrSignalClient[]): Promise<void> {
+  const clientIds = Array.from(
+    new Set(clients.map((c) => c.client_id).filter((x): x is string => !!x)),
+  );
+  const defaultByClient = new Map<string, string>();
+  if (clientIds.length > 0) {
+    const { data: chats } = await supabase
+      .from("telegram_chats")
+      .select("chat_id, client_id, is_internal, is_hidden, last_message_at")
+      .in("client_id", clientIds)
+      .or("is_hidden.is.null,is_hidden.eq.false");
+    for (const cid of clientIds) {
+      const cands = ((chats ?? []) as any[]).filter((x) => x.client_id === cid && x.chat_id);
+      cands.sort((a, b) => {
+        const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0; // prefer client-facing
+        if (ai !== bi) return ai - bi;
+        const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
+        const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
+        return bt - at;
+      });
+      if (cands[0]?.chat_id) defaultByClient.set(cid, String(cands[0].chat_id));
+    }
+  }
+  for (const c of clients) {
+    const override = c.telegram_chat_id || null;
+    const dflt = c.client_id ? (defaultByClient.get(c.client_id) ?? null) : null;
+    c.resolved_chat_id = override ?? dflt;
+    c.resolved_thread_id = override ? (c.telegram_thread_id ?? null) : null;
+  }
 }
 
 /** One client by lookup key (e.g. 'venice'), or null. */
