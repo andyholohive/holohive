@@ -29,7 +29,8 @@ import MeetingActionItems from '@/components/clients/MeetingActionItems';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, CheckCircle2, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users, Star, Save, History } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, CheckCircle2, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users, Star, Save, History, Radio } from 'lucide-react';
+import { KrSignalSettingsDialog } from '@/components/krsignal/KrSignalSettingsDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -385,6 +386,9 @@ export default function ClientsPage() {
   // instead of opening each client's Context modal in turn.
   const [weeklyHubOpen, setWeeklyHubOpen] = useState(false);
   const [weeklyHubClientId, setWeeklyHubClientId] = useState<string | null>(null);
+  // [2026-07-15] Korea Signal settings hub — per-client config for the KR
+  // market-intel TG digest (peer basket, venues, SoV source, TG destination).
+  const [krSignalOpen, setKrSignalOpen] = useState(false);
   const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; telegram_chat_id: string; shared_drive_url: string; gtm_sync_url: string; kol_content_brief_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', telegram_chat_id: '', shared_drive_url: '', gtm_sync_url: '', kol_content_brief_url: '', onboarding_phase: '' });
   // [Phase edit in popup] The latest in-window campaign for the client
   // whose Context popup is currently open. Fetched lazily when the
@@ -3509,6 +3513,12 @@ export default function ClientsPage() {
                 Weekly Update
               </Button>
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                <Button variant="outline" onClick={() => setKrSignalOpen(true)}>
+                  <Radio className="h-4 w-4 mr-2" />
+                  Korea Signal
+                </Button>
+              )}
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
             <>
               {/* "Start Client" trigger hidden 2026-06-02 — Add Client is
                   the primary CTA. Dialog tree below still wired to
@@ -5520,6 +5530,13 @@ export default function ClientsPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* [2026-07-15] Korea Signal per-client settings hub */}
+        <KrSignalSettingsDialog
+          open={krSignalOpen}
+          onOpenChange={setKrSignalOpen}
+          clients={clientsWithStatus.map(c => ({ id: c.id, name: c.name }))}
+        />
 
         {/* Client Context Modal */}
         <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } }}>
