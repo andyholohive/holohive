@@ -33,9 +33,13 @@ export interface ApproveResult {
 /**
  * Insert a `contents` row for an approved submission. Idempotent at the
  * boundary — duplicate (campaign_id, content_link) just returns the
- * existing row's id rather than erroring. Status lands at
- * 'pending_verification' per TGB-V2 — team flips to 'posted' via the
- * Verify button on the campaign Content Dashboard.
+ * existing row's id rather than erroring.
+ *
+ * [2026-07-15, per Andy] Status lands directly at 'posted' — approve is the
+ * single human gate (admin+ only, same on TG and web), so the separate
+ * 'pending_verification' → Verify step was redundant and confused users. The
+ * Content Dashboard's Verify button still works for any manually-created
+ * pending rows.
  */
 export async function createApprovedContentsRow(
   admin: SupabaseClient,
@@ -88,7 +92,7 @@ export async function createApprovedContentsRow(
       content_link: input.link,
       platform: mapSubmissionPlatformToContents(input.platform, input.link),
       type: contentsType,
-      status: 'pending_verification',
+      status: 'posted',
       activation_date: activationDate,
     })
     .select('id')
