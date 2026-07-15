@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { StatusBadge, toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import { DeliverableService } from '@/lib/deliverableService';
+import { RecurringCyclesPanel } from '@/components/sops/RecurringCyclesPanel';
 import dynamic from 'next/dynamic';
 
 // Dynamically import ReactQuill to avoid SSR issues
@@ -840,6 +841,10 @@ export default function SOPsPage() {
             </Button>
           )}
         />
+
+        {/* Recurring cycle management — Pause/Resume/Delete auto-generating
+            deliverable cycles. Per Bolt 2026-07-15 ("stop function"). */}
+        <RecurringCyclesPanel />
 
         {/* Search and Filters */}
         <div className="flex items-center space-x-4">

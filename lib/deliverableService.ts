@@ -439,6 +439,100 @@ export class DeliverableService {
   }
 
   /**
+   * [2026-07-15, per Bolt] List every recurring binding for the management
+   * panel on /sops, joined to client + template names so the row is
+   * self-describing. Ordered active-first, then by client name.
+   */
+  static async listRecurringDeliverables(): Promise<Array<{
+    id: string;
+    client_id: string;
+    template_id: string;
+    cadence: 'weekly' | 'biweekly' | 'monthly';
+    day_of_week: number;
+    active: boolean;
+    last_fired_at: string | null;
+    client_name: string | null;
+    template_name: string | null;
+    /** true when the cron will auto-skip this row because the client's
+     *  engagement has lapsed (coverage_tone = 'inactive') even though the
+     *  recurring row itself is still `active`. Lets the UI explain why a
+     *  seemingly-active cycle stops generating. */
+    client_lapsed: boolean;
+  }>> {
+    const { data, error } = await (supabase as any)
+      .from('recurring_deliverables')
+      .select(`
+        id, client_id, template_id, cadence, day_of_week, active, last_fired_at,
+        client:clients(name),
+        template:deliverable_templates(name)
+      `)
+      .order('active', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('[listRecurringDeliverables] load failed:', error);
+      return [];
+    }
+    const rows = (data ?? []) as any[];
+
+    // Merge in coverage status so the panel can flag auto-skipped (lapsed)
+    // clients. One extra query keyed by the distinct client_ids.
+    const clientIds = Array.from(new Set(rows.map((r) => r.client_id).filter(Boolean)));
+    const lapsedSet = new Set<string>();
+    if (clientIds.length > 0) {
+      const { data: coverage } = await (supabase as any)
+        .from('client_coverage_status')
+        .select('client_id, coverage_tone')
+        .in('client_id', clientIds);
+      for (const c of (coverage ?? []) as any[]) {
+        if (c.coverage_tone === 'inactive') lapsedSet.add(c.client_id);
+      }
+    }
+
+    return rows.map((r) => ({
+      id: r.id,
+      client_id: r.client_id,
+      template_id: r.template_id,
+      cadence: r.cadence,
+      day_of_week: r.day_of_week,
+      active: r.active,
+      last_fired_at: r.last_fired_at,
+      client_name: r.client?.name ?? null,
+      template_name: r.template?.name ?? null,
+      client_lapsed: lapsedSet.has(r.client_id),
+    }));
+  }
+
+  /**
+   * Pause / resume a recurring cycle. `active=false` makes the Monday cron
+   * skip it entirely — a manual stop that complements the automatic
+   * client-paused guard in the cron.
+   */
+  static async setRecurringActive(id: string, active: boolean): Promise<boolean> {
+    const { error } = await (supabase as any)
+      .from('recurring_deliverables')
+      .update({ active })
+      .eq('id', id);
+    if (error) {
+      console.error('[setRecurringActive] update failed:', error);
+      return false;
+    }
+    return true;
+  }
+
+  /** Permanently remove a recurring binding. Already-spawned tasks are untouched. */
+  static async deleteRecurringDeliverable(id: string): Promise<boolean> {
+    const { error } = await (supabase as any)
+      .from('recurring_deliverables')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.error('[deleteRecurringDeliverable] delete failed:', error);
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Build the list of templates that a Run Next flow should offer for a
    * given SOP. Excludes `recurring` entries (those auto-fire via cron) and
    * `on_sop_start` (that's what Run All handled). Returns entries in

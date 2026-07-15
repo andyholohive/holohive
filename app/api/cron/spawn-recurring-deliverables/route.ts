@@ -156,6 +156,7 @@ export async function GET(request: Request) {
     let spawned = 0;
     let skippedNotDue = 0;
     let skippedAlreadyFired = 0;
+    let skippedClientPaused = 0;
     let failed = 0;
     const failures: Array<{ id: string; reason: string }> = [];
     const spawnedSummary: Array<{ id: string; client_id: string; template_id: string; parent_task_id: string }> = [];
@@ -200,13 +201,37 @@ export async function GET(request: Request) {
         continue;
       }
 
-      // Resolve client name for a useful title
+      // Resolve client name + active flag for the title and the pause guard.
       const { data: client } = await (supabase as any)
         .from('clients')
-        .select('name')
+        .select('name, is_active')
         .eq('id', row.client_id)
         .maybeSingle();
       const clientName = (client as any)?.name || 'Client';
+
+      // [2026-07-15, per Bolt] Stop generating cycles for clients whose
+      // engagement has lapsed or been switched off. The recurring row's own
+      // `active` flag is a manual stop (see the /sops management panel); this
+      // is the automatic one so a paused client self-heals without anyone
+      // remembering to toggle it. Skip when EITHER:
+      //   - the client is switched off (clients.is_active = false), OR
+      //   - coverage has lapsed (client_coverage_status.coverage_tone =
+      //     'inactive' — no stint covers today). red/amber/green all still
+      //     count as covered, so an expiring-soon client keeps generating.
+      const clientActive = (client as any)?.is_active !== false;
+      let coverageLapsed = false;
+      const { data: coverage } = await (supabase as any)
+        .from('client_coverage_status')
+        .select('coverage_tone')
+        .eq('client_id', row.client_id)
+        .maybeSingle();
+      if (coverage && (coverage as any).coverage_tone === 'inactive') {
+        coverageLapsed = true;
+      }
+      if (!clientActive || coverageLapsed) {
+        skippedClientPaused++;
+        continue;
+      }
 
       // Resolve template name + slug — same call but lighter shape
       const { data: template } = await (supabase as any)
@@ -268,6 +293,7 @@ export async function GET(request: Request) {
       spawned,
       skippedNotDue,
       skippedAlreadyFired,
+      skippedClientPaused,
       failed,
       failures,
       spawnedSummary,
