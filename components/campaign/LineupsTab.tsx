@@ -272,8 +272,12 @@ export default function LineupsTab({
 
   const campaignStartDateRef = useRef(campaignStartDate);
   campaignStartDateRef.current = campaignStartDate;
+  // True once the user manually picks a week — stops the auto-select
+  // effect below from snapping back to the current week. Reset per campaign.
+  const userPickedWeekRef = useRef(false);
 
   useEffect(() => {
+    userPickedWeekRef.current = false; // new campaign → auto-select is live again
     (async () => {
       setLoading(true);
       try {
@@ -323,6 +327,22 @@ export default function LineupsTab({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedWeek, allLineups]);
+
+  // Default the week selector to the *current* campaign week — and keep
+  // re-deriving it as the inputs resolve. The [campaignId] load effect
+  // above runs once on mount, where `totalWeeks` can still be 1 (covered_
+  // through / end_date not loaded yet), which clamps the default down to
+  // Week 1 and never recovers. This effect recomputes whenever the start
+  // date or total-week count changes, until the user picks a week
+  // themselves [Andy 2026-07-16].
+  useEffect(() => {
+    if (userPickedWeekRef.current) return;
+    const curr = currentWeekNumber(campaignStartDate);
+    if (curr == null) return; // start date not ready yet
+    const week = Math.max(1, Math.min(curr, totalWeeks));
+    setSelectedWeek(prev => (prev === week ? prev : week));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignStartDate, totalWeeks, campaignId]);
 
   // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -627,6 +647,7 @@ export default function LineupsTab({
       const next = await service.duplicateToNextWeek(lineup.id, currentUserId);
       await refreshAll();
       toast({ title: `Duplicated to Week ${next.week_number}` });
+      userPickedWeekRef.current = true; // jump to the duplicated week; don't let auto-select override
       setSelectedWeek(next.week_number);
     } catch (err: any) {
       toast({ title: 'Duplicate failed', description: err?.message, variant: 'destructive' });
@@ -804,7 +825,7 @@ export default function LineupsTab({
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <Select value={String(selectedWeek)} onValueChange={(v) => setSelectedWeek(parseInt(v, 10))}>
+            <Select value={String(selectedWeek)} onValueChange={(v) => { userPickedWeekRef.current = true; setSelectedWeek(parseInt(v, 10)); }}>
               <SelectTrigger className="w-[160px] h-9 focus-brand">
                 <SelectValue />
               </SelectTrigger>

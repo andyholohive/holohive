@@ -29,8 +29,16 @@ export interface SuperAdminGuardFailure {
   response: NextResponse;
 }
 
-export async function requireSuperAdmin(
+/**
+ * Role-parameterized guard. `requireSuperAdmin` is the `['super_admin']`
+ * case; pass `['admin', 'super_admin']` for routes any team lead may hit
+ * (e.g. the lineup-notify dispatch, which admins like CMs legitimately
+ * trigger when they propose/confirm a lineup — gating it to super_admin
+ * silently dropped the Telegram post [Andy 2026-07-16]).
+ */
+export async function requireRole(
   request: Request,
+  allowedRoles: string[],
 ): Promise<SuperAdminGuardSuccess | SuperAdminGuardFailure> {
   // ─── Cron / server-to-server bypass ────────────────────────────────
   const cronSecret = process.env.CRON_SECRET;
@@ -48,7 +56,7 @@ export async function requireSuperAdmin(
     const { data: { user } } = await sb.auth.getUser();
     sessionUser = user ? { id: user.id } : null;
   } catch (err) {
-    console.error('[requireSuperAdmin] session lookup failed:', err);
+    console.error('[requireRole] session lookup failed:', err);
   }
 
   if (!sessionUser) {
@@ -82,10 +90,13 @@ export async function requireSuperAdmin(
       response: NextResponse.json({ error: 'User profile missing' }, { status: 403 }),
     };
   }
-  if (profile.role !== 'super_admin') {
+  if (!allowedRoles.includes(profile.role)) {
     return {
       ok: false,
-      response: NextResponse.json({ error: 'Super-admin only' }, { status: 403 }),
+      response: NextResponse.json(
+        { error: `Requires one of: ${allowedRoles.join(', ')}` },
+        { status: 403 },
+      ),
     };
   }
 
@@ -94,4 +105,10 @@ export async function requireSuperAdmin(
     isCron: false,
     user: { id: profile.id, name: profile.name, role: profile.role },
   };
+}
+
+export async function requireSuperAdmin(
+  request: Request,
+): Promise<SuperAdminGuardSuccess | SuperAdminGuardFailure> {
+  return requireRole(request, ['super_admin']);
 }

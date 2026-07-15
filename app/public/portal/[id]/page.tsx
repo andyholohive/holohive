@@ -1753,19 +1753,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               }}
             >
               <p className="text-xs font-medium uppercase tracking-[0.35em] mb-8" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                {/* [Portal load-together v1] Locked to "Welcome back" —
-                    no longer derived from hasOnboardingResponse. The
-                    earlier ternary caused a brief "Welcome" → "Welcome
-                    back" flicker on the entrance screen because the
-                    onboarding check completes a few hundred ms after
-                    the door-opening animation starts.
-
-                    Trade-off: brand-new clients on their very first
-                    authenticated visit also see "Welcome back" (very
-                    rare case — first auth is usually immediately after
-                    they submit the onboarding form, so they ARE
-                    technically returning). Worth the no-flicker UX. */}
-                Welcome back
+                {/* Greeting reflects onboarding state [Andy 2026-07-16]:
+                    clients who haven't submitted the onboarding form see
+                    "Welcome" (they're new); everyone else "Welcome back".
+                    Defaults to "Welcome" while the onboarding check is in
+                    flight (hasOnboardingResponse === null) so brand-new
+                    clients — the case this serves — never flicker. A
+                    returning, already-onboarded client may briefly settle
+                    "Welcome" → "Welcome back" as the check resolves;
+                    acceptable on this transient entrance screen. */}
+                {onboardingComplete ? 'Welcome back' : 'Welcome'}
               </p>
             </div>
 
@@ -2036,12 +2033,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {!isCampaignLiveMode && (
           <div className="mb-10">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {/* [Portal load-together v1] Locked to "Welcome back" —
-                  same reasoning as the entrance screen above. The
-                  portalReady gate already covers most of the flicker
-                  here, but locking the text is a belt-and-braces
-                  guarantee in case any path bypasses the gate. */}
-              Welcome back, <span className="text-brand">{client?.name}</span>
+              {/* Greeting reflects onboarding state [Andy 2026-07-16]:
+                  "Welcome" until the onboarding form is submitted, then
+                  "Welcome back". No flicker here — this block is behind
+                  the portalReady gate, so hasOnboardingResponse is
+                  already resolved by the time it paints. */}
+              {onboardingComplete ? 'Welcome back' : 'Welcome'}, <span className="text-brand">{client?.name}</span>
             </h1>
             <p className="text-gray-500 text-lg">
               {welcomeSubtitle}

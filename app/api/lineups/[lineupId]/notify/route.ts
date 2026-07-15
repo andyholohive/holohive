@@ -51,9 +51,12 @@ export async function POST(
   request: Request,
   { params }: { params: { lineupId: string } },
 ) {
-  // Auth check via the existing super-admin helper.
-  const { requireSuperAdmin } = await import('@/lib/requireSuperAdmin');
-  const guard = await requireSuperAdmin(request);
+  // Auth: any team lead (admin or super_admin) may trigger a lineup
+  // notification — CMs like Jaymz propose lineups and must be able to
+  // fire the channel post. Gating this to super_admin silently dropped
+  // the Telegram post after an admin proposed [Andy 2026-07-16].
+  const { requireRole } = await import('@/lib/requireSuperAdmin');
+  const guard = await requireRole(request, ['admin', 'super_admin']);
   if (!guard.ok) return guard.response;
 
   const { lineupId } = params;
