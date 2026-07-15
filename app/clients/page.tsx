@@ -545,7 +545,9 @@ export default function ClientsPage() {
     is_whitelisted: false,
     whitelist_partner_id: null as string | null,
     logo_url: null as string | null,
-    approved_domains: [] as string[],
+    // [2026-07-16] Every new client is pre-approved for holohive.io so the
+    // HoloHive team can always access the portal. Enforced again at insert.
+    approved_domains: ['holohive.io'] as string[],
     // Dashboard v2: specialized engagement models (Impossible, Robonet, …)
     // EXCLUDED from priority dashboard rollups so they don't skew KPIs.
     is_ad_hoc: false,
@@ -2456,7 +2458,7 @@ export default function ClientsPage() {
       is_whitelisted: false,
       whitelist_partner_id: null,
       logo_url: null,
-      approved_domains: [],
+      approved_domains: ['holohive.io'],
       is_ad_hoc: false,
       start_date: undefined,
     });
@@ -2595,14 +2597,17 @@ export default function ClientsPage() {
           newClient.whitelist_partner_id
         );
 
-        // Save approved_domains + is_ad_hoc after client is created
+        // Save approved_domains + is_ad_hoc after client is created.
+        // holohive.io is always included so HoloHive staff can access the
+        // portal, even if it was removed from the form [Andy 2026-07-16].
         if (client) {
           const extras: Record<string, any> = {};
-          if (newClient.approved_domains.length > 0) extras.approved_domains = newClient.approved_domains;
+          extras.approved_domains = Array.from(new Set([
+            'holohive.io',
+            ...newClient.approved_domains.map(d => d.trim().toLowerCase()).filter(Boolean),
+          ]));
           if (newClient.is_ad_hoc) extras.is_ad_hoc = true;
-          if (Object.keys(extras).length > 0) {
-            await ClientService.updateClient(client.id, extras as any);
-          }
+          await ClientService.updateClient(client.id, extras as any);
         }
 
         // Upload logo after client is created
@@ -2664,6 +2669,9 @@ export default function ClientsPage() {
           startClientForm.location.trim() || undefined
         );
         clientId = client.id;
+        // Pre-approve holohive.io so HoloHive staff can access the portal
+        // [Andy 2026-07-16] — mirrors the Add Client flow.
+        await ClientService.updateClient(clientId, { approved_domains: ['holohive.io'] } as any);
       }
       const accessUserIds = [
         startClientForm.campaignManager,
