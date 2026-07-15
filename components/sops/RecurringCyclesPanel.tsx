@@ -12,10 +12,112 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { RefreshCw, Pause, Play, Trash2, Repeat, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  Select, SelectTrigger, SelectContent, SelectItem, SelectValue,
+} from '@/components/ui/select';
+import { RefreshCw, Pause, Play, Trash2, Repeat, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { DeliverableService } from '@/lib/deliverableService';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
+
+const UNASSIGNED = '__unassigned__';
+
+/** Per-step assignee editor for one recurring cycle. Loads the template's
+ *  steps + current map, saves the step->user map back. */
+function AssigneesDialog({
+  cycle, teamMembers, onClose, onSaved,
+}: {
+  cycle: { id: string; client_name: string | null; template_name: string | null } | null;
+  teamMembers: Array<{ id: string; name: string }>;
+  onClose: () => void;
+  onSaved: (cycleId: string, assignedCount: number) => void;
+}) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [steps, setSteps] = useState<Array<{ id: string; step_name: string; step_order: number }>>([]);
+  const [map, setMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!cycle) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const cfg = await DeliverableService.getRecurringAssigneeConfig(cycle.id);
+      if (cancelled) return;
+      setSteps(cfg.steps);
+      setMap(cfg.assignees);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [cycle]);
+
+  const save = async () => {
+    if (!cycle) return;
+    setSaving(true);
+    // Strip empty selections so the stored map only holds real assignments.
+    const clean: Record<string, string> = {};
+    for (const [k, v] of Object.entries(map)) if (v) clean[k] = v;
+    const ok = await DeliverableService.setRecurringStepAssignees(cycle.id, clean);
+    setSaving(false);
+    if (!ok) {
+      toast({ title: 'Save failed', description: 'Could not save assignees.', variant: 'destructive' });
+      return;
+    }
+    onSaved(cycle.id, Object.keys(clean).length);
+    toast({ title: 'Assignees saved', description: 'Applies automatically every cycle.' });
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!cycle} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Assignees</DialogTitle>
+          <DialogDescription>
+            {cycle && <>{cycle.template_name} · {cycle.client_name} — set once, auto-assigns every cycle. No notifications fire on spawn.</>}
+          </DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <div className="space-y-2 py-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-md" />)}
+          </div>
+        ) : steps.length === 0 ? (
+          <p className="text-sm text-ink-warm-500 py-4">This template has no steps.</p>
+        ) : (
+          <div className="space-y-2 py-1 max-h-[50vh] overflow-y-auto">
+            {steps.map((s) => (
+              <div key={s.id} className="flex items-center gap-3">
+                <span className="text-sm text-ink-warm-800 flex-1 min-w-0 truncate">
+                  <span className="text-ink-warm-400 tabular-nums mr-1">{s.step_order}.</span>{s.step_name}
+                </span>
+                <Select
+                  value={map[s.id] || UNASSIGNED}
+                  onValueChange={(v) => setMap((prev) => ({ ...prev, [s.id]: v === UNASSIGNED ? '' : v }))}
+                >
+                  <SelectTrigger className="h-8 w-44 focus-brand text-xs">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                    {teamMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="brand" onClick={save} disabled={saving || loading}>Save assignees</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 type Cycle = Awaited<ReturnType<typeof DeliverableService.listRecurringDeliverables>>[number];
 
@@ -44,6 +146,8 @@ export function RecurringCyclesPanel() {
   const [open, setOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Cycle | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [assigneeCycle, setAssigneeCycle] = useState<Cycle | null>(null);
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string }>>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +157,18 @@ export function RecurringCyclesPanel() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Team members for the assignee pickers (active users, name-sorted).
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('users')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      setTeamMembers(((data ?? []) as any[]).map((u) => ({ id: u.id, name: u.name })));
+    })();
+  }, []);
 
   const toggleActive = async (c: Cycle) => {
     setBusyId(c.id);
@@ -161,6 +277,15 @@ export function RecurringCyclesPanel() {
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-xs"
+                          onClick={() => setAssigneeCycle(c)}
+                        >
+                          <Users className="h-3.5 w-3.5 mr-1" />
+                          {c.assigned_count > 0 ? `${c.assigned_count} assigned` : 'Assign'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
                           disabled={busyId === c.id}
                           onClick={() => toggleActive(c)}
                         >
@@ -210,6 +335,15 @@ export function RecurringCyclesPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AssigneesDialog
+        cycle={assigneeCycle}
+        teamMembers={teamMembers}
+        onClose={() => setAssigneeCycle(null)}
+        onSaved={(cycleId, assignedCount) =>
+          setCycles((prev) => prev.map((x) => (x.id === cycleId ? { ...x, assigned_count: assignedCount } : x)))
+        }
+      />
     </Card>
   );
 }

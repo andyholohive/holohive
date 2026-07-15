@@ -458,11 +458,13 @@ export class DeliverableService {
      *  recurring row itself is still `active`. Lets the UI explain why a
      *  seemingly-active cycle stops generating. */
     client_lapsed: boolean;
+    /** Number of steps with a pre-assigned person (keys in step_assignees). */
+    assigned_count: number;
   }>> {
     const { data, error } = await (supabase as any)
       .from('recurring_deliverables')
       .select(`
-        id, client_id, template_id, cadence, day_of_week, active, last_fired_at,
+        id, client_id, template_id, cadence, day_of_week, active, last_fired_at, step_assignees,
         client:clients(name),
         template:deliverable_templates(name)
       `)
@@ -499,6 +501,8 @@ export class DeliverableService {
       client_name: r.client?.name ?? null,
       template_name: r.template?.name ?? null,
       client_lapsed: lapsedSet.has(r.client_id),
+      assigned_count: Object.values((r.step_assignees ?? {}) as Record<string, string>)
+        .filter(Boolean).length,
     }));
   }
 
@@ -514,6 +518,56 @@ export class DeliverableService {
       .eq('id', id);
     if (error) {
       console.error('[setRecurringActive] update failed:', error);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * [2026-07-15, per Bolt] Load the per-step assignee config for a recurring
+   * cycle: the template's steps (for labels) + the current step->user map.
+   * Powers the "Assignees" dialog on the Recurring Cycles panel.
+   */
+  static async getRecurringAssigneeConfig(recurringId: string): Promise<{
+    steps: Array<{ id: string; step_name: string; step_order: number }>;
+    assignees: Record<string, string>;
+  }> {
+    const { data: row, error: rowErr } = await (supabase as any)
+      .from('recurring_deliverables')
+      .select('template_id, step_assignees')
+      .eq('id', recurringId)
+      .maybeSingle();
+    if (rowErr || !row) {
+      console.error('[getRecurringAssigneeConfig] row load failed:', rowErr);
+      return { steps: [], assignees: {} };
+    }
+    const { data: steps } = await (supabase as any)
+      .from('deliverable_template_steps')
+      .select('id, step_name, step_order')
+      .eq('template_id', (row as any).template_id)
+      .order('step_order');
+    return {
+      steps: ((steps ?? []) as any[]).map((s) => ({
+        id: s.id, step_name: s.step_name, step_order: s.step_order,
+      })),
+      assignees: ((row as any).step_assignees ?? {}) as Record<string, string>,
+    };
+  }
+
+  /**
+   * Persist the step->user assignee map on a recurring cycle. The Monday cron
+   * stamps spawned subtasks from this — set once, applies every cycle.
+   */
+  static async setRecurringStepAssignees(
+    recurringId: string,
+    assignees: Record<string, string>,
+  ): Promise<boolean> {
+    const { error } = await (supabase as any)
+      .from('recurring_deliverables')
+      .update({ step_assignees: assignees })
+      .eq('id', recurringId);
+    if (error) {
+      console.error('[setRecurringStepAssignees] update failed:', error);
       return false;
     }
     return true;

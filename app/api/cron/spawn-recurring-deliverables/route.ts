@@ -64,6 +64,9 @@ type RecurringRow = {
   active: boolean;
   last_fired_at: string | null;
   created_by: string | null;
+  /** Map of deliverable_template_steps.id -> users.id. Pre-assignment set on
+   *  the recurring row; cron stamps spawned subtask assigned_to from it. */
+  step_assignees: Record<string, string> | null;
 };
 
 export async function GET(request: Request) {
@@ -151,6 +154,14 @@ export async function GET(request: Request) {
       .maybeSingle();
     const systemUserId = systemUser?.id ?? null;
     const systemUserName = systemUser?.name ?? 'System';
+
+    // Resolve assignee names once for the pre-assignment feature (small table).
+    const { data: allUsers } = await (supabase as any)
+      .from('users')
+      .select('id, name');
+    const userNameById = new Map<string, string>(
+      ((allUsers ?? []) as any[]).map((u) => [u.id, u.name]),
+    );
 
     let considered = 0;
     let spawned = 0;
@@ -263,6 +274,8 @@ export async function GET(request: Request) {
           createdByName: systemUserName,
           templateName,
           templateCategory: (await getTemplateCategory(supabase, row.template_id)) || 'client',
+          stepAssignees: row.step_assignees ?? {},
+          userNameById,
         });
 
         // Stamp the recurring row's last_fired_at so we don't dup later today
@@ -336,6 +349,10 @@ type SpawnArgs = {
   createdByName: string | null;
   templateName: string;
   templateCategory: string;  // 'client' | 'internal' | 'bd'
+  /** Map of template step id -> user id (pre-assignment). Empty = unassigned. */
+  stepAssignees: Record<string, string>;
+  /** Resolver for assigned_to_name so the task shows a name without a join. */
+  userNameById: Map<string, string>;
 };
 
 async function spawnTemplateAsServiceRole(
@@ -421,6 +438,12 @@ async function spawnTemplateAsServiceRole(
     const due = new Date(args.startDate + 'T00:00:00Z');
     due.setUTCDate(due.getUTCDate() + cumulativeDays);
     const dueDate = due.toISOString().slice(0, 10);
+    // Pre-assignment: stamp assigned_to from the recurring row's step map.
+    // Because the cron inserts directly (not via TaskService), this fires NO
+    // notification — replacing the manual weekly reassignment that generated
+    // ~100 Telegram DMs. Unmapped steps stay unassigned (legacy behaviour).
+    const assignedTo = args.stepAssignees[step.id] || null;
+    const assignedToName = assignedTo ? (args.userNameById.get(assignedTo) ?? null) : null;
     const { error: subErr } = await (db as any)
       .from('tasks')
       .insert({
@@ -431,8 +454,8 @@ async function spawnTemplateAsServiceRole(
         status: 'to_do',
         priority: 'medium',
         client_id: args.clientId,
-        assigned_to: null,
-        assigned_to_name: null,
+        assigned_to: assignedTo,
+        assigned_to_name: assignedToName,
         created_by: args.createdBy,
         created_by_name: args.createdByName,
         due_date: dueDate,
