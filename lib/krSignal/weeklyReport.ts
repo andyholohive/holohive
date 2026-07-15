@@ -24,8 +24,12 @@ export interface WeeklyReportData {
   kospi: number; kospiWoWPct: number; kospiYtdPct: number; kospiAtAth: boolean;
   fxUsdKrw: number;
   kimchiUsdtPct: number;
-  sovArrow: Arrow; sovPct: number;
-  peerRank: number;
+  /** SoV line renders only when showSov is true — otherwise a flat "+0%" would
+   *  read as a real (zero) metric. */
+  sovArrow: Arrow; sovPct: number; showSov?: boolean;
+  /** null when peer_basket is empty → the "#N vs peers" line is suppressed
+   *  rather than printing a fabricated "#1". */
+  peerRank: number | null;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -93,9 +97,13 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   B.push(`               ${sign(d.kospiYtdPct)} YTD${d.kospiAtAth ? " (at ATH)" : ""}`);
   B.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   B.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
-  B.push(HR);
-  B.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
-  B.push(`vs AI-token peers   $${d.ticker} #${d.peerRank} in KR vol share`);
+  // Tail lines are conditional — a missing peer_basket or unconfigured
+  // content_log_source suppresses its line (and the divider) rather than
+  // printing a fabricated "#1" / inert "+0%" [Andy 2026-07-15].
+  const tail: string[] = [];
+  if (d.showSov) tail.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
+  if (d.peerRank != null) tail.push(`vs AI-token peers   $${d.ticker} #${d.peerRank} in KR vol share`);
+  if (tail.length) { B.push(HR); B.push(...tail); }
 
   const brand = `${logo()} <b>Holo Hive Signal</b>`;
   const title = `<b>$${esc(d.ticker)} Weekly Report · ${esc(d.weekLabel)}</b>`;

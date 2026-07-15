@@ -67,6 +67,9 @@ export interface ClientWeekly {
   kr_vol_share: number;
   by_venue: unknown;
   sov_pieces_cum?: number | null;
+  /** Window kr_token_vol_usd was measured over ("24h" | "Nd" | "7d"). Lets the
+   *  WoW math refuse to compare across a window change (e.g. 7d-vs-24h ramp-up). */
+  kr_token_vol_window?: string | null;
 }
 
 /** Most recent per-client value for a metric strictly before `beforeWeek`, or null. */
@@ -86,6 +89,28 @@ export async function getClientPrior(
     .maybeSingle();
   const v = (data as any)?.[metric];
   return typeof v === "number" ? v : null;
+}
+
+/** Most recent per-client KR-token volume + the window it was measured over,
+ *  strictly before `beforeWeek`. The window lets the caller refuse a WoW
+ *  comparison when this week's window differs (a 7d sum vs a stored 24h/partial
+ *  reading during ramp-up would otherwise print a garbage +X%). */
+export async function getClientKrVolPrior(
+  supabase: SupabaseClient,
+  clientId: string,
+  beforeWeek: string
+): Promise<{ value: number; window: string | null } | null> {
+  const { data } = await supabase
+    .from("kr_signal_client_weekly")
+    .select("week_ending, kr_token_vol_usd, kr_token_vol_window")
+    .eq("client_id", clientId)
+    .lt("week_ending", beforeWeek)
+    .order("week_ending", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const v = (data as any)?.kr_token_vol_usd;
+  if (typeof v !== "number") return null;
+  return { value: v, window: (data as any)?.kr_token_vol_window ?? null };
 }
 
 /** Persist this week's per-client token metrics (upsert on client_id+week_ending). */

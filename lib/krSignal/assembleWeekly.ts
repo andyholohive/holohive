@@ -10,6 +10,7 @@ import type { KrSignalClient } from "./config";
 import {
   getGlobalPrior,
   getClientPrior,
+  getClientKrVolPrior,
   getBaseline,
   type GlobalSnapshot,
   type ClientWeekly,
@@ -97,15 +98,22 @@ export async function assembleWeekly(
 
   // Trend (vs prior week) + regime (vs stored baseline)
   const db = cfg.thresholds?.trend_deadband ?? 0.05;
-  const [fxPrior, krPrior, krVolPrior, fbBase, krBase] = await Promise.all([
+  const [fxPrior, krPrior, krVolPriorRow, fbBase, krBase] = await Promise.all([
     getGlobalPrior(supabase, "futures_total", weekEnding),
     getGlobalPrior(supabase, "kr_cex_vol", weekEnding),
-    getClientPrior(supabase, cfg.id, "kr_token_vol_usd", weekEnding),
+    getClientKrVolPrior(supabase, cfg.id, weekEnding),
     getBaseline(supabase, "futures_total"),
     getBaseline(supabase, "kr_cex_vol"),
   ]);
-  if (fxPrior == null || krPrior == null || krVolPrior == null)
+  // Only compare KR-vol WoW when the prior was measured over the SAME window.
+  // During ramp-up (24h → Nd → 7d) the window changes week to week, and a
+  // 7d sum divided by a stored 24h reading prints a garbage +X% [Andy 2026-07-15].
+  const krVolPrior =
+    krVolPriorRow != null && krVolPriorRow.window === volWindow ? krVolPriorRow.value : null;
+  if (fxPrior == null || krPrior == null || krVolPriorRow == null)
     pending.push("trend arrows — no prior-week snapshot yet (flat until the 2nd weekly run persists state)");
+  else if (krVolPrior == null)
+    pending.push(`KR vol WoW — prior window (${krVolPriorRow.window ?? "unknown"}) ≠ this week (${volWindow}); arrow held flat until two same-window weeks exist`);
   if (!fbBase || !krBase) pending.push("regime labels — baseline job not run yet (defaulting 'neutral')");
 
   const krVolArrow = krVolPrior != null ? calc.trendArrow(krTok, krVolPrior, db) : "⟷";
@@ -122,14 +130,18 @@ export async function assembleWeekly(
   // mindshare. Supported source ref: 'hhp:<clients.id uuid>' → count posted
   // contents across that HHP client's campaigns. Prior cumulative comes from
   // kr_signal_client_weekly.sov_pieces_cum (persisted after each send).
+  // showSov gates the whole line: only render it once we have a real WoW
+  // comparison. When content_log_source is unset/unsupported or it's the first
+  // run, a flat "+0%" reads as a real (zero) metric — hide it instead [Andy 2026-07-15].
   let sovArrow: calc.Arrow = "⟷";
   let sovPct = 0;
+  let showSov = false;
   let sovPiecesCum: number | null = null;
   const hhpRef = /^hhp:([0-9a-f-]{36})$/i.exec(cfg.content_log_source ?? "");
   if (!cfg.content_log_source) {
-    pending.push("KR share-of-voice line — content_log_source not set");
+    pending.push("KR share-of-voice line — content_log_source not set (line hidden)");
   } else if (!hhpRef) {
-    pending.push(`KR share-of-voice line — unsupported content_log_source (use hhp:<client uuid>)`);
+    pending.push(`KR share-of-voice line — unsupported content_log_source (use hhp:<client uuid>) (line hidden)`);
   } else {
     try {
       const { count } = await (supabase as any)
@@ -144,19 +156,23 @@ export async function assembleWeekly(
         const g = calc.sovPlaceholder(cum, prevCum);
         sovPct = Math.round(g * 100);
         sovArrow = calc.trendArrow(cum, prevCum, db);
+        showSov = true;
       } else {
-        pending.push("KR share-of-voice trend — first run, no prior cumulative yet");
+        pending.push("KR share-of-voice trend — first run, no prior cumulative yet (line hidden)");
       }
     } catch {
-      pending.push("KR share-of-voice line — content count query failed");
+      pending.push("KR share-of-voice line — content count query failed (line hidden)");
     }
   }
 
   // Peer rank (§6.4 / §7.A) — client KR-vol-share ranked against the
   // peer_basket (CoinGecko ids). Failed peer fetches drop out of the basket.
-  let peerRank = 1;
+  // null when the basket is empty → the render suppresses the line entirely,
+  // rather than printing a fabricated "#1" that looks like a real ranking
+  // [Andy 2026-07-15].
+  let peerRank: number | null = null;
   if (!cfg.peer_basket?.length) {
-    pending.push("peer rank (#N in KR vol share) — peer_basket empty");
+    pending.push("peer rank (#N in KR vol share) — peer_basket empty (line hidden)");
   } else {
     const peerResults = await Promise.allSettled(
       cfg.peer_basket.map((id) => adapters.getPerVenueVolume(id))
@@ -199,6 +215,7 @@ export async function assembleWeekly(
     kimchiUsdtPct: +(kimchi * 100).toFixed(1),
     sovArrow,
     sovPct,
+    showSov,
     peerRank,
   };
 
@@ -215,6 +232,9 @@ export async function assembleWeekly(
     by_venue: byVenue,
     // §6.5 — persist this week's cumulative so next week's SOV growth has a prior.
     sov_pieces_cum: sovPiecesCum,
+    // Persist the window this figure was measured over so next week's WoW can
+    // refuse a cross-window comparison (7d-vs-24h during ramp-up).
+    kr_token_vol_window: volWindow,
   };
 
   return {
