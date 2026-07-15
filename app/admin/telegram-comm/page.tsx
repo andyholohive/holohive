@@ -833,11 +833,34 @@ function WeeklyContentRecapChannelSection() {
       setLoading(true);
       try {
         const [clientsRes, overrideRes] = await Promise.all([
-          (supabase as any).from('clients').select('id, name, is_active').eq('is_active', true).order('name'),
+          (supabase as any).from('clients').select('id, name, is_active, is_ad_hoc').eq('is_active', true).order('name'),
           (supabase as any).from('app_settings').select('value').eq('key', 'weekly_recap_client_overrides').maybeSingle(),
         ]);
-        const clientRows = ((clientsRes.data as any[]) ?? []);
-        const clientIds = clientRows.map(c => c.id);
+        const allActive = ((clientsRes.data as any[]) ?? []);
+
+        // Restrict to the same "Active" bucket the /clients cards show:
+        // is_active && !is_ad_hoc && covered_through >= today (else it's
+        // Ad-hoc / Paused / Inactive). covered_through is the max stint
+        // coverage from the client_coverage view [Andy 2026-07-15].
+        const today = new Date().toISOString().slice(0, 10);
+        const coveredByClient = new Map<string, string>();
+        if (allActive.length > 0) {
+          const { data: cov } = await (supabase as any)
+            .from('client_coverage')
+            .select('client_id, covered_through')
+            .in('client_id', allActive.map((c: any) => c.id));
+          for (const row of ((cov as any[]) ?? [])) {
+            if (!row.covered_through) continue;
+            const prev = coveredByClient.get(row.client_id);
+            if (!prev || row.covered_through > prev) coveredByClient.set(row.client_id, row.covered_through);
+          }
+        }
+        const clientRows = allActive.filter((c: any) => {
+          if (c.is_ad_hoc) return false;
+          const covered = coveredByClient.get(c.id) ?? null;
+          return !!covered && covered >= today;
+        });
+        const clientIds = clientRows.map((c: any) => c.id);
 
         // Default per-client chat title (client-facing GC from /crm/telegram)
         // so the user can see what happens without an override.
