@@ -79,6 +79,9 @@ export type CreateDeliverableConfig = {
    *  step even when multiple steps share a default_role. */
   stepAssignments?: Record<string, { userId: string; userName: string }>;
   dueDateOverrides?: Record<number, string>; // stepOrder -> date override
+  /** step.id[] to SKIP when spawning — lets the run wizard drop steps the
+   *  user doesn't want for this run [Andy 2026-07-16]. */
+  excludeStepIds?: string[];
   createdBy: string;
   createdByName: string;
 };
@@ -146,7 +149,11 @@ export class DeliverableService {
     const templateData = await this.getTemplateWithSteps(config.templateId);
     if (!templateData) throw new Error('Template not found');
 
-    const { template, steps } = templateData;
+    const { template, steps: allSteps } = templateData;
+    // Drop any steps the caller chose to skip for this run [Andy 2026-07-16].
+    const excludeSet = new Set(config.excludeStepIds || []);
+    const steps = allSteps.filter(s => !excludeSet.has(s.id));
+    if (steps.length === 0) throw new Error('At least one step must be kept.');
 
     // 1. Create parent task
     const parentTask = await TaskService.createTask({

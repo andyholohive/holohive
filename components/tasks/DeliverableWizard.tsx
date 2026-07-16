@@ -30,6 +30,8 @@ import {
   BarChart3,
   ClipboardList,
   Loader2,
+  X,
+  RotateCcw,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, any> = {
@@ -112,6 +114,9 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
   // step.id so each row in the wizard table is independently assigned.
   // Picking a person in one row no longer overwrites peers (2026-05-07).
   const [stepAssignments, setStepAssignments] = useState<Record<string, { userId: string; userName: string }>>({});
+  // Steps the user removed for this run (by step.id). Kept out of the
+  // spawn in handleSubmit [Andy 2026-07-16].
+  const [excludedStepIds, setExcludedStepIds] = useState<Set<string>>(new Set());
   const [dueDateOverrides, setDueDateOverrides] = useState<Record<number, string>>({});
 
   useEffect(() => {
@@ -233,6 +238,11 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
 
   const handleSubmit = async () => {
     if (!user?.id || !userProfile) return;
+    // Guard: at least one step must survive the removals.
+    if (templateSteps.length > 0 && excludedStepIds.size >= templateSteps.length) {
+      toast({ title: 'Keep at least one step', description: 'You removed every step — add one back before creating.', variant: 'destructive' });
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await DeliverableService.createDeliverable({
@@ -247,6 +257,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
         roleAssignments: {},
         stepAssignments,
         dueDateOverrides,
+        excludeStepIds: Array.from(excludedStepIds),
         createdBy: user.id,
         createdByName: userProfile.name || userProfile.email || '',
       });
@@ -524,8 +535,24 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                     {templateSteps.map(s => (
                       <tr key={s.id} className="border-b last:border-0">
                         <td className="p-2">
-                          <div className="text-xs font-medium">{s.step_order}. {s.step_name}</div>
-                          <div className="text-[10px] text-gray-400">{s.estimated_duration_days}d</div>
+                          <div className="flex items-start gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setExcludedStepIds(prev => {
+                                const n = new Set(prev);
+                                if (n.has(s.id)) n.delete(s.id); else n.add(s.id);
+                                return n;
+                              })}
+                              className="mt-0.5 text-ink-warm-300 hover:text-rose-500 transition-colors flex-shrink-0"
+                              title={excludedStepIds.has(s.id) ? 'Add this step back to the run' : 'Remove this step from this run'}
+                            >
+                              {excludedStepIds.has(s.id) ? <RotateCcw className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                            </button>
+                            <div className={excludedStepIds.has(s.id) ? 'line-through text-ink-warm-300' : ''}>
+                              <div className="text-xs font-medium">{s.step_order}. {s.step_name}</div>
+                              <div className="text-[10px] text-gray-400">{s.estimated_duration_days}d</div>
+                            </div>
+                          </div>
                         </td>
                         {/* Role <td> hidden — see top-of-table comment. */}
                         <td className="p-2">
