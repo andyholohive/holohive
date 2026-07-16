@@ -5666,7 +5666,7 @@ export default function ClientsPage() {
                       use case shows up. */}
                   <div className="grid gap-2">
                     <div className="flex items-center justify-between">
-                      <Label>Scope</Label>
+                      <Label>Handoff Snapshot</Label>
                       {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
                         <span className="text-xs text-brand font-medium">From Pipeline</span>
                       )}
@@ -5674,7 +5674,7 @@ export default function ClientsPage() {
                     {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
                       <div className="flex h-auto min-h-[80px] w-full rounded-md border border-cream-200 bg-cream-50 px-3 py-2 text-sm text-ink-warm-700">{contextForm.scope || '—'}</div>
                     ) : (
-                      <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="focus-brand" rows={3} />
+                      <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Handoff snapshot link + context" className="focus-brand" rows={3} />
                     )}
                   </div>
                   {/* [2026-06-08] Start Date moved out of this popup

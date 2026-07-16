@@ -1075,22 +1075,16 @@ export default function KOLsPage() {
           }
         }
 
-        // Platform → default content-type cascade. When a KOL's
-        // platforms gain X/Telegram, pre-select 'Post'. YouTube →
-        // 'Video'. Idempotent: only appends if not already in the
-        // KOL's deliverables[]. Mirrors the group_chat → in_house
-        // cascade already in this handler.
+        // Platform → default content-type cascade. Every newly-added
+        // platform pre-selects a default deliverable: YouTube → 'Video',
+        // every other platform (X, Telegram, Facebook, TikTok, …) →
+        // 'Post' [Andy 2026-07-16, "…etc."]. Idempotent: only appends if
+        // not already in the KOL's deliverables[]. Mirrors the
+        // group_chat → in_house cascade already in this handler.
         if (editingCell.field === 'platform' && Array.isArray(editingValue)) {
           const prevPlatforms: string[] = Array.isArray(kolToUpdate.platform) ? kolToUpdate.platform : [];
           const newlyAdded = (editingValue as string[]).filter(p => !prevPlatforms.includes(p));
-          const PLATFORM_DEFAULT: Record<string, string> = {
-            'X': 'Post',
-            'Telegram': 'Post',
-            'YouTube': 'Video',
-          };
-          const toAdd = newlyAdded
-            .map(p => PLATFORM_DEFAULT[p])
-            .filter((d): d is string => !!d);
+          const toAdd = newlyAdded.map(p => (p === 'YouTube' ? 'Video' : 'Post'));
           if (toAdd.length > 0) {
             const currentDeliv: string[] = Array.isArray(kolToUpdate.deliverables) ? kolToUpdate.deliverables : [];
             const merged = Array.from(new Set([...currentDeliv, ...toAdd]));
