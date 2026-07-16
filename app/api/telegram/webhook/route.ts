@@ -2871,9 +2871,11 @@ async function finalizeSubmission(opts: {
  * a Vercel redeploy. Skips silently if no channel is set (logs).
  */
 /**
- * [2026-06-12] HHP Submission-Progress Alert — fires after every
- * successful /submit. Posts day-split + daily quota push to the
- * global SPA chat. Bot counts; team paces.
+ * [2026-06-12] HHP Submission-Progress Alert — fires on every successful
+ * /submit AND on every team Approve [2026-07-16]. Posts day-split + daily
+ * quota push to the global SPA chat. Bot counts; team paces. The approve fire
+ * is the authoritative one: liveCount reads `contents`, whose rows are created
+ * at approval, so the approve fire is the moment the count actually changes.
  *
  * [2026-06-30] Destination consolidated to a single global chat
  * (app_settings.spa_chat_id + spa_chat_thread_id) to match the
@@ -2883,7 +2885,8 @@ async function finalizeSubmission(opts: {
  * dropped once /admin/telegram-comm is configured).
  *
  * Data sources:
- *   - Live count: distinct content_items WHERE campaign + this week
+ *   - Live count: contents WHERE campaign + status live + activation_date this
+ *     week, deduped by multipost_group_id (a multi-post deliverable counts once)
  *   - Planned count: lineup_slots for campaign's current confirmed week
  *   - KOL name + campaign name: included in the body so a single shared
  *     chat can route alerts from all campaigns
@@ -2958,21 +2961,28 @@ async function sendSubmissionProgressAlert(opts: {
   todayStart.setUTCHours(0, 0, 0, 0);
   const todayDate = todayStart.toISOString().slice(0, 10);
 
+  // Dedupe by multipost_group_id so a KOL who logs one deliverable as several
+  // posts counts once — matching how the Content Dashboard / budget dedupe.
+  // Rows with a NULL group each count on their own (key falls back to id).
+  const dedupeCount = (
+    rows: Array<{ id: string; multipost_group_id: string | null }> | null,
+  ) => new Set((rows ?? []).map(r => r.multipost_group_id ?? r.id)).size;
+
   const { data: liveRows } = await (supabaseAdmin as any)
     .from('contents')
-    .select('id')
+    .select('id, multipost_group_id')
     .eq('campaign_id', opts.campaignId)
     .in('status', ['posted', 'published', 'live'])
     .gte('activation_date', weekStartDate);
-  const liveCount = (liveRows ?? []).length;
+  const liveCount = dedupeCount(liveRows);
 
   const { data: todayRows } = await (supabaseAdmin as any)
     .from('contents')
-    .select('id')
+    .select('id, multipost_group_id')
     .eq('campaign_id', opts.campaignId)
     .in('status', ['posted', 'published', 'live'])
     .gte('activation_date', todayDate);
-  const todayCount = (todayRows ?? []).length;
+  const todayCount = dedupeCount(todayRows);
 
   // Planned count = KOL slots in THIS week's confirmed lineup.
   // Schema: campaign_lineups → lineup_angles (lineup_id) → lineup_slots
@@ -3452,6 +3462,20 @@ async function handleSubmReviewCallback(
         Number((sub as any).kol_receipt_message_id),
         `✅ Got it — submitted for <b>${escapeHtml(displayName)}</b>.`,
       );
+    }
+
+    // [2026-07-16] Re-fire the SPA now that the contents row exists — this is
+    // the moment liveCount actually changes (it reads `contents`, written on
+    // approve). The submit-time fire showed the prior approved state as a
+    // heads-up; this fire reflects the newly-live post, so "of X live", the
+    // 100% "week goal hit" ping, and the daily-quota nudge are all correct.
+    // Only when the row landed — otherwise the count wouldn't have moved.
+    if (!approveSideEffectError) {
+      await sendSubmissionProgressAlert({
+        campaignId: (sub as any).campaign_id,
+        campaignName,
+        kolName,
+      });
     }
   }
 
