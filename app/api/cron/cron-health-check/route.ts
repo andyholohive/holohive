@@ -67,6 +67,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   WEEKLY_CONTENT_RECAP: 1,     // Mon 12:00 UTC — per-campaign weekly content recap post
   DAILY_PULSE_DM: 1,           // weekdays 06:00 UTC — Daily Pulse morning blocker DM
   DAILY_PULSE_DIGEST: 1,       // weekdays 12:00 UTC — Daily Pulse digest to HH Ops terminal
+  KOL_BRIEF_NUDGE: 1,          // Fri 00:00 UTC (09:00 KST) — un-opened KOL brief nudge to team
   KR_SIGNAL_WEEKLY: 1,         // weekly (Sunday 12:00 UTC) — KR Signal Weekly Market Report to client GCs
   KR_SIGNAL_BASELINES: 1,      // weekly (Sunday 12:30 UTC) — KR Signal §5 regime baseline refresh
   KR_SIGNAL_LISTINGS: 24,      // hourly — KR Signal listings alert + digest sweep (Feature B)

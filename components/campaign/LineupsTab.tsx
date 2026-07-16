@@ -62,6 +62,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 import { AddKOLsDialog } from '@/components/campaign/AddKOLsDialog';
+import BriefDeliveryPanel from '@/components/campaign/BriefDeliveryPanel';
 import { formatDateTime } from '@/lib/dateFormat';
 import {
   LineupManagerService,
@@ -912,7 +913,16 @@ export default function LineupsTab({
             </EmptyState>
           </div>
         ) : isReadOnlySummary ? (
-          <SummaryView lineup={lineup} rosterById={rosterById} />
+          <>
+            <SummaryView lineup={lineup} rosterById={rosterById} />
+            {lineup.status === 'confirmed' && (
+              <BriefDeliveryPanel
+                lineupId={lineup.id}
+                campaignId={campaignId}
+                currentUserId={currentUserId}
+              />
+            )}
+          </>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* ─── Left: Roster ─── */}
