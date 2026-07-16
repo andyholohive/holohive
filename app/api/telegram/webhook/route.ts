@@ -2703,14 +2703,14 @@ async function finalizeSubmission(opts: {
   // never reject — the previous .then()/.catch() chain silently swallowed
   // EVERY mirror-insert failure (including non-dup CHECK violations),
   // which also skewed the SPA live counts that read content_items.
-  // Post date defaults to today (UTC) — the KOL/team can bump it earlier via
-  // the receipt buttons for a backfilled post. The SPA buckets this-week
-  // counts by posted_at, so a late-submitted prior-week post lands in the
-  // right week [per Andy + Jdot 2026-07-15].
+  // Post date defaults to today (UTC). The async resolver
+  // (scripts/tg-mindshare/resolve_post_dates.py) later corrects Telegram links
+  // to their real post date; X/YouTube keep the default. The SPA buckets
+  // this-week counts by posted_at [per Andy + Jdot 2026-07-15]. The manual
+  // "Posted earlier?" receipt buttons were removed [Andy 2026-07-16].
   const postedAtDefault = new Date().toISOString().slice(0, 10);
-  let contentItemId: string | null = null;
   {
-    const { data: mirrorRow, error: mirrorErr } = await (supabaseAdmin as any)
+    const { error: mirrorErr } = await (supabaseAdmin as any)
       .from('content_items')
       .insert({
         kol_id: opts.kolId,
@@ -2719,15 +2719,12 @@ async function finalizeSubmission(opts: {
         link: opts.link,
         status: 'submitted',
         posted_at: postedAtDefault,
-      })
-      .select('id')
-      .single();
+      });
     // 23505 (duplicate link) is expected + idempotent; the staging-row
     // dup path below handles user feedback. Warn on anything else.
     if (mirrorErr && mirrorErr.code !== '23505') {
       console.warn('[/submit F3] content_items mirror insert failed:', mirrorErr);
     }
-    contentItemId = (mirrorRow as any)?.id ?? null;
   }
 
   // [2026-06-12] Per Appendix v3 F2 + Andy: kol_id + campaign_id FKs are
@@ -2789,34 +2786,19 @@ async function finalizeSubmission(opts: {
   // review handler edits THIS message to drop the tail ("…, submitted for X.").
   // We record the receipt's (chat_id, message_id) on the submission so the
   // approve handler can find it.
-  // Post-date buttons: default is today; one tap sets an earlier post date for
-  // a backfilled submission. Encodes the content_items id + days-ago. Only
-  // shown when we captured the content_items id (the SPA counts that table).
-  const postDateButtons = contentItemId
-    ? [[
-        { text: 'Yesterday', callback_data: `pdate:${contentItemId}:1` },
-        { text: '2d', callback_data: `pdate:${contentItemId}:2` },
-        { text: '3d', callback_data: `pdate:${contentItemId}:3` },
-        { text: '4d', callback_data: `pdate:${contentItemId}:4` },
-        { text: '5d', callback_data: `pdate:${contentItemId}:5` },
-      ]]
-    : null;
-  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`
-    + `\n📅 Posted <b>${escapeHtml(formatDate(postedAtDefault))}</b> (today). Posted earlier? Tap below.`;
+  // [2026-07-16] Post-date correction buttons removed per Andy. The async
+  // resolver auto-fills the real Telegram post date; X/YouTube keep the
+  // submission-date default. Receipt is now a plain acknowledgement. The
+  // pdate: callback handler is kept so taps on already-sent receipts still work.
+  const receiptText = `✅ Got it — submitted for <b>${escapeHtml(opts.displayName)}</b>, pending review.`;
   let receiptChatId: string | null = null;
   let receiptMessageId: number | null = null;
   if (opts.editTarget) {
-    if (postDateButtons) {
-      await editMessageTextWithButtons(opts.editTarget.chatId, opts.editTarget.messageId, receiptText, postDateButtons);
-    } else {
-      await editMessageText(opts.editTarget.chatId, opts.editTarget.messageId, receiptText);
-    }
+    await editMessageText(opts.editTarget.chatId, opts.editTarget.messageId, receiptText);
     receiptChatId = opts.editTarget.chatId;
     receiptMessageId = opts.editTarget.messageId;
   } else {
-    const sent = postDateButtons
-      ? await sendTelegramMessageWithButtons(opts.chatId, receiptText, postDateButtons, opts.threadId)
-      : await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
+    const sent = await sendTelegramMessage(opts.chatId, receiptText, 'HTML', opts.threadId);
     receiptChatId = opts.chatId;
     receiptMessageId = typeof sent === 'number' ? sent : null;
   }
