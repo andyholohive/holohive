@@ -2940,33 +2940,38 @@ async function sendSubmissionProgressAlert(opts: {
     weekStart.setUTCHours(0, 0, 0, 0);
   }
 
-  // Live count: content that went LIVE this week, bucketed by its actual POST
-  // date (content_items.posted_at), not the submission timestamp [per Andy +
-  // Jdot 2026-07-15]. posted_at defaults to the submission date, so a normal
-  // "post now, submit now" counts immediately; a prior-week post /submitted
-  // this Monday (Jdot's Jammin case) is dated back via the receipt buttons and
-  // lands in the right week. Excludes rejected; each alert recomputes live, so
-  // a later rejection or post-date change self-corrects on the next ping.
-  // posted_at is a DATE, so compare on YYYY-MM-DD.
+  // Live count: content that went LIVE this week, read from `contents` — the
+  // authoritative table every dashboard/budget/public page uses — bucketed by
+  // `activation_date` (the go-live date) [Andy 2026-07-16]. Was reading the
+  // sparse `content_items` /submit-mirror (~48 rows, bot submissions only), so
+  // any post logged directly in the Content Dashboard was invisible and the
+  // alert read "0 of X live" while posts were plainly live. contents.activation_date
+  // stays consistent with the KOL-reported post date: on approval,
+  // contentSubmissionApproval copies content_items.posted_at (X links dated from
+  // the tweet-ID Snowflake at /submit) into activation_date, so a prior-week X
+  // post submitted late still buckets into the right week here. status='posted'
+  // is the only live status; pending/scheduled/pending_verification are excluded.
+  // activation_date is a DATE, so compare on YYYY-MM-DD; each alert recomputes
+  // live, so a later status/date change self-corrects on the next ping.
   const weekStartDate = weekStart.toISOString().slice(0, 10);
   const todayStart = new Date(today);
   todayStart.setUTCHours(0, 0, 0, 0);
   const todayDate = todayStart.toISOString().slice(0, 10);
 
   const { data: liveRows } = await (supabaseAdmin as any)
-    .from('content_items')
+    .from('contents')
     .select('id')
     .eq('campaign_id', opts.campaignId)
-    .neq('status', 'rejected')
-    .gte('posted_at', weekStartDate);
+    .in('status', ['posted', 'published', 'live'])
+    .gte('activation_date', weekStartDate);
   const liveCount = (liveRows ?? []).length;
 
   const { data: todayRows } = await (supabaseAdmin as any)
-    .from('content_items')
+    .from('contents')
     .select('id')
     .eq('campaign_id', opts.campaignId)
-    .neq('status', 'rejected')
-    .gte('posted_at', todayDate);
+    .in('status', ['posted', 'published', 'live'])
+    .gte('activation_date', todayDate);
   const todayCount = (todayRows ?? []).length;
 
   // Planned count = KOL slots in THIS week's confirmed lineup.
