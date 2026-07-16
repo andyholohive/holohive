@@ -75,6 +75,12 @@ function isPublicMidPath(pathname: string): boolean {
   // email's own status, never broader data.
   if (/^\/api\/lists\/[^/]+\/access-check\/?$/.test(pathname)) return true;
 
+  // Link Log Automation write endpoint: EXACT /api/links only (not the
+  // session-gated /api/links/submit intake). The handler validates its own
+  // LINKS_WRITE_TOKEN / CRON_SECRET bearer, so no Supabase session is needed
+  // for the server-to-server plugin + weekly reconcile writes.
+  if (/^\/api\/links\/?$/.test(pathname)) return true;
+
   return false;
 }
 

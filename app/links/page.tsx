@@ -31,7 +31,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
-  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info, Clock
+  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info, Clock,
+  FileClock, CheckCircle2
 } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { formatDistanceToNow } from 'date-fns';
@@ -54,7 +55,7 @@ interface Link {
   client_id: string | null;
   link_types: string[] | null;
   access: 'public' | 'partners' | 'team' | 'client';
-  status: 'active' | 'inactive' | 'archived';
+  status: 'draft' | 'active' | 'inactive' | 'archived';
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -108,7 +109,7 @@ export default function LinksPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients' | 'latest'>('holohive');
+  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients' | 'latest' | 'drafts'>('holohive');
   // Sort state for the in-table column headers. Click "Name" or "Added"
   // to toggle direction. Applied within each client group across all
   // tabs (the grouping itself stays — sort is per-group, not flat).
@@ -365,6 +366,30 @@ export default function LinksPage() {
     setDeletePending(link);
   };
 
+  /**
+   * Publish a draft link into the canonical log (draft → active). Drafts are
+   * written by the automation write path (delivery plugin / weekly Drive
+   * reconcile); a human confirms them here before they count as canonical.
+   */
+  const handlePublish = async (link: Link) => {
+    try {
+      const { error } = await supabase
+        .from('links')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', link.id);
+      if (error) throw error;
+      toast({ title: 'Link published', description: link.name });
+      fetchLinks();
+    } catch (error) {
+      console.error('Error publishing link:', error);
+      toast({
+        title: 'Publish failed',
+        description: error instanceof Error ? error.message : 'Failed to publish link',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deletePending) return;
     setDeleting(true);
@@ -413,23 +438,32 @@ export default function LinksPage() {
 
   // Filter links based on active tab
   const getTabLinks = () => {
-    let tabLinks = links;
+    // Drafts (automation review queue) never appear in the live tabs — an
+    // auto-registered link stays out of the canonical log until a human
+    // publishes it. The Drafts tab is the only place they surface.
+    const live = links.filter(link => link.status !== 'draft');
+    let tabLinks = live;
 
     // Filter by tab
     switch (activeTab) {
       case 'holohive':
-        tabLinks = links.filter(link => link.client === 'Holo Hive');
+        tabLinks = live.filter(link => link.client === 'Holo Hive');
         break;
       case 'guide':
-        tabLinks = links.filter(link => link.link_types?.includes('guide'));
+        tabLinks = live.filter(link => link.link_types?.includes('guide'));
         break;
       case 'clients':
-        tabLinks = links.filter(link => link.client && link.client !== 'Holo Hive');
+        tabLinks = live.filter(link => link.client && link.client !== 'Holo Hive');
         break;
       case 'latest':
-        // Every link, across all groups — the tab exists to surface the
-        // most recently added links regardless of client/type.
-        tabLinks = links;
+        // Every published link, across all groups — the tab exists to surface
+        // the most recently added links regardless of client/type.
+        tabLinks = live;
+        break;
+      case 'drafts':
+        // The automation review queue: draft rows written by the plugin /
+        // weekly reconcile, awaiting a human publish.
+        tabLinks = links.filter(link => link.status === 'draft');
         break;
     }
 
@@ -545,11 +579,14 @@ export default function LinksPage() {
     return <span className="ml-1 text-[10px] text-ink-warm-400">{sortDirection === 'asc' ? '▲' : '▼'}</span>;
   };
 
-  // Count links per tab
-  const holoHiveCount = links.filter(l => l.client === 'Holo Hive').length;
-  const guideCount = links.filter(l => l.link_types?.includes('guide')).length;
-  const clientsCount = links.filter(l => l.client && l.client !== 'Holo Hive').length;
-  const latestCount = links.length;
+  // Count links per tab. Drafts are the automation review queue, excluded
+  // from the live tab counts and surfaced on their own tab.
+  const draftCount = links.filter(l => l.status === 'draft').length;
+  const publishedLinks = links.filter(l => l.status !== 'draft');
+  const holoHiveCount = publishedLinks.filter(l => l.client === 'Holo Hive').length;
+  const guideCount = publishedLinks.filter(l => l.link_types?.includes('guide')).length;
+  const clientsCount = publishedLinks.filter(l => l.client && l.client !== 'Holo Hive').length;
+  const latestCount = publishedLinks.length;
 
   if (loading) {
     return (
@@ -621,9 +658,9 @@ export default function LinksPage() {
         label="Links"
         dot="brand"
         counter={`${groups.length} of ${
-          activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : activeTab === 'clients' ? clientsCount : latestCount
+          activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : activeTab === 'clients' ? clientsCount : activeTab === 'drafts' ? draftCount : latestCount
         } link${
-          (activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : activeTab === 'clients' ? clientsCount : latestCount) === 1
+          (activeTab === 'holohive' ? holoHiveCount : activeTab === 'guide' ? guideCount : activeTab === 'clients' ? clientsCount : activeTab === 'drafts' ? draftCount : latestCount) === 1
             ? ''
             : 's'
         } shown`}
@@ -669,6 +706,16 @@ export default function LinksPage() {
               Latest
               <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{latestCount}</span>
             </TabsTrigger>
+            {draftCount > 0 && (
+              <TabsTrigger
+                value="drafts"
+                className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-amber-600 text-sm px-4 py-2"
+              >
+                <FileClock className="h-4 w-4" />
+                Drafts
+                <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{draftCount}</span>
+              </TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
 
@@ -895,6 +942,15 @@ export default function LinksPage() {
                                     <ExternalLink className="h-4 w-4 mr-2" />
                                     Open Link
                                   </DropdownMenuItem>
+                                  {link.status === 'draft' && (
+                                    <DropdownMenuItem
+                                      onClick={() => handlePublish(link)}
+                                      className="text-emerald-600"
+                                    >
+                                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                                      Publish
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem onClick={() => openDialog(link)}>
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit
