@@ -2390,6 +2390,30 @@ function urlHost(input: string): string | null {
   }
 }
 
+/**
+ * X/Twitter post date from the tweet ID (Snowflake). The numeric status ID
+ * encodes the post time: ms = (id >> 22) + 1288834974657 (Twitter epoch), so
+ * we can date an X post from the link ALONE — no API, no buttons — and bucket
+ * a prior-week post into the right week even when it's submitted late
+ * [Andy 2026-07-16]. Returns YYYY-MM-DD (UTC), or null when it isn't an X
+ * status link / the derived date is out of a sane range. Telegram is handled
+ * by the async resolver; YouTube keeps the submission-date default.
+ */
+function xPostedAtFromLink(link: string): string | null {
+  const m = link.match(/(?:twitter\.com|x\.com)\/[^/]+\/status(?:es)?\/(\d+)/i);
+  if (!m) return null;
+  try {
+    const ms = Number(BigInt(m[1]) >> BigInt(22)) + 1288834974657;
+    if (!Number.isFinite(ms)) return null;
+    // Sanity window: after the first-ever tweet (2006) and no more than a day
+    // ahead of now — a garbage ID falls back to the submission-date default.
+    if (ms < 1140000000000 || ms > Date.now() + 86400000) return null;
+    return new Date(ms).toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
 /** Auto-detect (platform, content_type) from a submitted link. */
 function detectFromLink(link: string): { platform: string; content_type: string } {
   const host = urlHost(link);
@@ -2708,12 +2732,14 @@ async function finalizeSubmission(opts: {
   // never reject — the previous .then()/.catch() chain silently swallowed
   // EVERY mirror-insert failure (including non-dup CHECK violations),
   // which also skewed the SPA live counts that read content_items.
-  // Post date defaults to today (UTC). The async resolver
-  // (scripts/tg-mindshare/resolve_post_dates.py) later corrects Telegram links
-  // to their real post date; X/YouTube keep the default. The SPA buckets
-  // this-week counts by posted_at [per Andy + Jdot 2026-07-15]. The manual
-  // "Posted earlier?" receipt buttons were removed [Andy 2026-07-16].
+  // Post date: X links are dated exactly from the tweet-ID Snowflake at submit
+  // time (xPostedAtFromLink); Telegram links are corrected later by the async
+  // resolver; YouTube (and anything else) keeps today's date. The SPA buckets
+  // this-week counts by posted_at [per Andy + Jdot 2026-07-15], so an X post
+  // made in a prior week but submitted late now lands in the right week
+  // without any manual tap [Andy 2026-07-16].
   const postedAtDefault = new Date().toISOString().slice(0, 10);
+  const postedAt = xPostedAtFromLink(opts.link) ?? postedAtDefault;
   {
     const { error: mirrorErr } = await (supabaseAdmin as any)
       .from('content_items')
@@ -2723,7 +2749,7 @@ async function finalizeSubmission(opts: {
         type: opts.contentType,
         link: opts.link,
         status: 'submitted',
-        posted_at: postedAtDefault,
+        posted_at: postedAt,
       });
     // 23505 (duplicate link) is expected + idempotent; the staging-row
     // dup path below handles user feedback. Warn on anything else.
