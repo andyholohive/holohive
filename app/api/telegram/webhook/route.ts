@@ -2564,7 +2564,12 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
   // Content Dashboard banner) still catch anything wrong before it hits
   // published metrics.
 
-  const link = args.join(' ').trim();
+  // Auto-fix a doubled protocol — users occasionally paste
+  // "https://https://t.me/…" (copy artifact / autocorrect). Collapse any
+  // repeated leading protocol (with optional whitespace between) down to the
+  // first one so the stored link + downstream metrics aren't broken
+  // [Andy 2026-07-16].
+  const link = args.join(' ').trim().replace(/^(https?:\/\/)(?:\s*https?:\/\/)+/i, '$1');
   if (!link) {
     await sendTelegramMessage(
       chatId,
