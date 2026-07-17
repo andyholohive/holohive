@@ -32,8 +32,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
   ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info, Clock,
-  FileClock, CheckCircle2
+  FileClock, CheckCircle2, FileText
 } from 'lucide-react';
+import ActiveClientsDocuments from '@/components/documents/ActiveClientsDocuments';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { formatDistanceToNow } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -109,7 +110,7 @@ export default function LinksPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients' | 'latest' | 'drafts'>('holohive');
+  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients' | 'latest' | 'drafts' | 'documents'>('holohive');
   // Sort state for the in-table column headers. Click "Name" or "Added"
   // to toggle direction. Applied within each client group across all
   // tabs (the grouping itself stays — sort is per-group, not flat).
@@ -654,6 +655,7 @@ export default function LinksPage() {
       />
 
       {/* Chapter divider above the grouped client links sections. */}
+      {activeTab !== 'documents' && (
       <SectionHeader
         label="Links"
         dot="brand"
@@ -666,6 +668,7 @@ export default function LinksPage() {
         } shown`}
         first
       />
+      )}
 
       {/* Filter toolbar — tabs + search + filters on a single row. */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -716,9 +719,17 @@ export default function LinksPage() {
                 <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full pointer-events-none tabular-nums">{draftCount}</span>
               </TabsTrigger>
             )}
+            <TabsTrigger
+              value="documents"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm px-4 py-2"
+            >
+              <FileText className="h-4 w-4" />
+              Active Clients
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
+        {activeTab !== 'documents' && (
         <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
           <Input
@@ -728,7 +739,10 @@ export default function LinksPage() {
             className="pl-10 focus-brand"
           />
         </div>
+        )}
 
+        {activeTab !== 'documents' && (
+        <>
         <Select value={filterAccess} onValueChange={setFilterAccess}>
           <SelectTrigger className="w-[140px] focus-brand">
             <SelectValue placeholder="Access" />
@@ -759,10 +773,14 @@ export default function LinksPage() {
             Clear
           </Button>
         )}
+        </>
+        )}
       </div>
 
-      {/* Grouped Links by Client */}
-      {groups.length === 0 ? (
+      {/* Active Clients documents (Document Portal) — replaces the links list on this tab. */}
+      {activeTab === 'documents' ? (
+        <ActiveClientsDocuments />
+      ) : groups.length === 0 ? (
         <Card className="border-cream-200">
           <EmptyState
             icon={LinkIcon}
