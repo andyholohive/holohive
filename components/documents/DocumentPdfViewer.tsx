@@ -29,11 +29,14 @@ export default function DocumentPdfViewer({
   documentId,
   versionId,
   portalUserId,
+  viewerEmail,
 }: {
   signedUrl: string;
   documentId: string;
   versionId: string | null;
   portalUserId?: string | null;
+  /** Gate email the portal viewer authenticated with — the recipient key. */
+  viewerEmail?: string | null;
 }) {
   const [numPages, setNumPages] = useState(0);
   const [width, setWidth] = useState(800);
@@ -46,7 +49,7 @@ export default function DocumentPdfViewer({
   const lastActivity = useRef<number>(Date.now());
 
   const post = (payload: Record<string, any>) => {
-    const body = JSON.stringify({ document_id: documentId, version_id: versionId, session_id: sessionId, portal_user_id: portalUserId ?? null, ...payload });
+    const body = JSON.stringify({ document_id: documentId, version_id: versionId, session_id: sessionId, portal_user_id: portalUserId ?? null, viewer_email: viewerEmail ?? null, ...payload });
     try {
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/documents/log', new Blob([body], { type: 'application/json' }));
@@ -110,7 +113,15 @@ export default function DocumentPdfViewer({
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full">
+    <div
+      ref={containerRef}
+      className="w-full doc-portal-viewer"
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {/* Best-effort print/save deterrent for confidential deliveries: hide the
+          rendered pages from print media. Not DRM — a determined user can still
+          screenshot — but it stops casual Cmd-P/right-click-save. */}
+      <style>{`@media print { .doc-portal-viewer { display: none !important; } }`}</style>
       <Document
         file={signedUrl}
         onLoadSuccess={({ numPages }) => setNumPages(numPages)}

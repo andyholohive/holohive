@@ -47,6 +47,7 @@ export interface AccessEventInput {
   event_type: DocAccessEvent;
   document_id: string;
   portal_user_id?: string | null;
+  viewer_email?: string | null;
   client_id?: string | null;
   stint_id?: string | null;
   version_id?: string | null;
@@ -59,6 +60,8 @@ export interface AccessEventInput {
 
 /** One row per recipient (contact) in the document detail analytics table. */
 export interface RecipientAnalytics {
+  /** The gate email the recipient authenticated with (the portal's only identity). */
+  viewer_email: string | null;
   portal_user_id: string | null;
   opens: number;            // distinct sessions with a doc_opened
   totalFocusedMs: number;   // sum of dwell_ms across page_view
@@ -66,6 +69,17 @@ export interface RecipientAnalytics {
   completion: number;       // pagesViewed / version page_count (0..1)
   lastOpened: string | null;
   hot: boolean;
+  /** Per-page focused ms for the L3 drill-down (page_no → summed dwell_ms). */
+  pageDwell: Record<number, number>;
+}
+
+/** L1 per-document rollup for the team document list. */
+export interface DocumentRollup {
+  document_id: string;
+  opens: number;        // distinct doc_opened sessions
+  recipients: number;   // distinct viewer_email (non-null)
+  hotCount: number;     // recipients meeting the HOT rule
+  lastOpened: string | null;
 }
 
 /** Team-tunable "hot" thresholds (spec §5 — a tunable rule, not stored). */
@@ -188,6 +202,7 @@ export class DocumentPortalService {
       event_type: ev.event_type,
       document_id: ev.document_id,
       portal_user_id: ev.portal_user_id ?? null,
+      viewer_email: ev.viewer_email ?? null,
       client_id: ev.client_id ?? null,
       stint_id: ev.stint_id ?? null,
       version_id: ev.version_id ?? null,
@@ -210,22 +225,25 @@ export class DocumentPortalService {
 
     const { data: events } = await (this.supabase as any)
       .from('document_access_log')
-      .select('event_type, portal_user_id, page_no, dwell_ms, session_id, occurred_at')
+      .select('event_type, portal_user_id, viewer_email, page_no, dwell_ms, session_id, occurred_at')
       .eq('document_id', documentId);
     const rows = (events ?? []) as Array<{
-      event_type: DocAccessEvent; portal_user_id: string | null; page_no: number | null;
-      dwell_ms: number | null; session_id: string | null; occurred_at: string;
+      event_type: DocAccessEvent; portal_user_id: string | null; viewer_email: string | null;
+      page_no: number | null; dwell_ms: number | null; session_id: string | null; occurred_at: string;
     }>;
 
-    const byUser = new Map<string, typeof rows>();
+    // Recipients are keyed by the gate email; team-internal previews (no email)
+    // collapse under a single "Internal preview" bucket so they never masquerade
+    // as a client read.
+    const byRecipient = new Map<string, typeof rows>();
     for (const r of rows) {
-      const key = r.portal_user_id ?? 'anonymous';
-      if (!byUser.has(key)) byUser.set(key, []);
-      byUser.get(key)!.push(r);
+      const key = r.viewer_email ?? ' internal';
+      if (!byRecipient.has(key)) byRecipient.set(key, []);
+      byRecipient.get(key)!.push(r);
     }
 
     const out: RecipientAnalytics[] = [];
-    for (const [key, evs] of byUser) {
+    for (const [key, evs] of byRecipient) {
       const openSessions = new Set(evs.filter(e => e.event_type === 'doc_opened').map(e => e.session_id));
       const pages = new Set(evs.filter(e => e.event_type === 'page_view' && e.page_no != null).map(e => e.page_no));
       const totalFocusedMs = evs.reduce((s, e) => s + (e.event_type === 'page_view' ? (e.dwell_ms ?? 0) : 0), 0);
@@ -235,18 +253,85 @@ export class DocumentPortalService {
         openSessions.size >= HOT.minSessions ||
         totalFocusedMs >= HOT.minFocusedMs ||
         completion >= HOT.minCompletion;
+      const pageDwell: Record<number, number> = {};
+      for (const e of evs) {
+        if (e.event_type === 'page_view' && e.page_no != null) {
+          pageDwell[e.page_no] = (pageDwell[e.page_no] ?? 0) + (e.dwell_ms ?? 0);
+        }
+      }
       out.push({
-        portal_user_id: key === 'anonymous' ? null : key,
+        viewer_email: key === ' internal' ? null : key,
+        portal_user_id: evs.find(e => e.portal_user_id)?.portal_user_id ?? null,
         opens: openSessions.size,
         totalFocusedMs,
         pagesViewed: pages.size,
         completion,
         lastOpened,
         hot,
+        pageDwell,
       });
     }
     // Most-engaged first.
     out.sort((a, b) => b.totalFocusedMs - a.totalFocusedMs);
     return out;
+  }
+
+  /**
+   * L1 rollup for a set of documents — one AccessLog scan, grouped by document.
+   * Recipients count distinct gate emails; hot re-applies the HOT rule per email.
+   */
+  async getRollupsForDocuments(documentIds: string[]): Promise<Map<string, DocumentRollup>> {
+    const result = new Map<string, DocumentRollup>();
+    if (documentIds.length === 0) return result;
+
+    const { data: events } = await (this.supabase as any)
+      .from('document_access_log')
+      .select('document_id, event_type, viewer_email, page_no, dwell_ms, session_id, occurred_at')
+      .in('document_id', documentIds);
+    const rows = (events ?? []) as Array<{
+      document_id: string; event_type: DocAccessEvent; viewer_email: string | null;
+      page_no: number | null; dwell_ms: number | null; session_id: string | null; occurred_at: string;
+    }>;
+
+    const byDoc = new Map<string, typeof rows>();
+    for (const r of rows) {
+      if (!byDoc.has(r.document_id)) byDoc.set(r.document_id, []);
+      byDoc.get(r.document_id)!.push(r);
+    }
+
+    for (const id of documentIds) {
+      const evs = byDoc.get(id) ?? [];
+      const openSessions = new Set(evs.filter(e => e.event_type === 'doc_opened').map(e => e.session_id));
+      const recipients = new Set(evs.map(e => e.viewer_email).filter((e): e is string => !!e));
+      let hotCount = 0;
+      for (const email of recipients) {
+        const rev = evs.filter(e => e.viewer_email === email);
+        const sessions = new Set(rev.filter(e => e.event_type === 'doc_opened').map(e => e.session_id)).size;
+        const focused = rev.reduce((s, e) => s + (e.event_type === 'page_view' ? (e.dwell_ms ?? 0) : 0), 0);
+        if (sessions >= HOT.minSessions || focused >= HOT.minFocusedMs) hotCount += 1;
+      }
+      const lastOpened = evs.reduce<string | null>((m, e) => (!m || e.occurred_at > m ? e.occurred_at : m), null);
+      result.set(id, { document_id: id, opens: openSessions.size, recipients: recipients.size, hotCount, lastOpened });
+    }
+    return result;
+  }
+
+  /**
+   * Documents a client may see in their portal: shared + published + not revoked
+   * + not past expiry. Scoped by client (the portal is stint-agnostic).
+   */
+  async listSharedForClient(clientId: string): Promise<Array<DocumentRow & { page_count: number | null }>> {
+    const { data, error } = await (this.supabase as any)
+      .from('documents')
+      .select('*, document_versions!documents_current_version_fk(page_count)')
+      .eq('client_id', clientId)
+      .eq('shared', true)
+      .eq('status', 'published')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    const now = Date.now();
+    return ((data ?? []) as any[])
+      .filter(d => !d.expires_at || new Date(d.expires_at).getTime() > now)
+      .map(d => ({ ...d, page_count: d.document_versions?.page_count ?? null }));
   }
 }

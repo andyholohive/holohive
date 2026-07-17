@@ -100,7 +100,7 @@ export async function GET(request: Request) {
       return NextResponse.json(empty);
     }
 
-    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes, extVisitsRes] = await Promise.all([
+    const [tasksRes, contentsThisWeekRes, contentsAllTimeRes, campaignsRes, meetingNotesRes, extVisitsRes, docOpensRes] = await Promise.all([
       // Open tasks linked to standard clients
       (sb as any)
         .from('tasks')
@@ -162,6 +162,16 @@ export async function GET(request: Request) {
         .in('client_id', standardClientIds)
         .eq('is_external', true)
         .gte('visited_at', weekStartIso),
+      // [2026-07-17 Document Portal] External document opens this week feed the
+      // same Ext. Visits column — a client reading a hosted delivery PDF is an
+      // external engagement. Distinct (client, session) doc_opened events from a
+      // non-@holohive.io viewer, deduped below so a multi-open session counts once.
+      (sb as any)
+        .from('document_access_log')
+        .select('client_id, session_id, viewer_email')
+        .eq('event_type', 'doc_opened')
+        .in('client_id', standardClientIds)
+        .gte('occurred_at', weekStartIso),
     ]);
 
     const tasks = (tasksRes.data ?? []) as any[];
@@ -232,6 +242,22 @@ export async function GET(request: Request) {
       extVisitsByClient.set(v.client_id, (extVisitsByClient.get(v.client_id) ?? 0) + 1);
     }
 
+    // [2026-07-17 Document Portal] Supplement with external document opens.
+    // Count each (client, session) once, and only external viewers (a null or
+    // @holohive.io email is a team preview and must not inflate client engagement).
+    const docOpens = (docOpensRes.data ?? []) as Array<{ client_id: string; session_id: string | null; viewer_email: string | null }>;
+    const docOpenSessions = new Set<string>();
+    let extDocOpensTotal = 0;
+    for (const o of docOpens) {
+      const email = (o.viewer_email || '').toLowerCase();
+      if (!email || email.endsWith('@holohive.io')) continue; // team preview — skip
+      const key = `${o.client_id}::${o.session_id ?? email}`;
+      if (docOpenSessions.has(key)) continue;
+      docOpenSessions.add(key);
+      extVisitsByClient.set(o.client_id, (extVisitsByClient.get(o.client_id) ?? 0) + 1);
+      extDocOpensTotal += 1;
+    }
+
     // [2026-06-11] Output Signals row — spec § 4.1.
     // Activations live: count of standard clients with non-empty
     // activations[] array. Subtitle lists the names. The array column
@@ -253,10 +279,9 @@ export async function GET(request: Request) {
         count: activationNames.length,
         names: activationNames,
       },
-      // Ext. visits — see route header comment. Reads from
-      // portal_visits; returns 0 until portal-side instrumentation
-      // starts inserting rows.
-      totalExtVisitsLast7d: extVisitsThisWeek.length,
+      // Ext. visits — portal page visits (portal_visits) + external document
+      // opens (document_access_log). Both are real external engagement signals.
+      totalExtVisitsLast7d: extVisitsThisWeek.length + extDocOpensTotal,
     };
 
     // [2026-06-15] Flatten client_context.call_notes JSONB into the

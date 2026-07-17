@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PortalDocumentsCard from '@/components/documents/PortalDocumentsCard';
 import {
   Building2,
   Calendar,
@@ -3192,6 +3193,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       </div>
                     </div>
                   )}
+                  {/* Document Portal — shared hosted PDFs with tracked in-portal
+                      viewing. Self-contained; renders nothing when there are none. */}
+                  <PortalDocumentsCard portalId={idOrSlug} email={email} />
                 </CardContent>
               </Card>
             )}

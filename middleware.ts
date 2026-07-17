@@ -81,6 +81,12 @@ function isPublicMidPath(pathname: string): boolean {
   // for the server-to-server plugin + weekly reconcile writes.
   if (/^\/api\/links\/?$/.test(pathname)) return true;
 
+  // Document Portal access-event sink: EXACT /api/documents/log only. Fired by
+  // both the team preview (cookie) and the unauthenticated client-portal viewer's
+  // sendBeacon. The handler validates event_type + document_id and DERIVES
+  // client_id/stint_id from the document, so the caller can't spoof scope.
+  if (/^\/api\/documents\/log\/?$/.test(pathname)) return true;
+
   return false;
 }
 

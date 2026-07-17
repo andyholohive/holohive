@@ -573,7 +573,111 @@ export default function LineupSettingsPage() {
 
       {/* ─── KR Signal Bot section [2026-07-10] ─── */}
       <KrSignalClientsSection />
+
+      {/* ─── Document Portal Alerts section [2026-07-17] ─── */}
+      <DocumentPortalAlertsSection />
     </div>
+  );
+}
+
+/**
+ * DocumentPortalAlertsSection — picker for the team chat that receives a
+ * best-effort alert when a client opens (or finishes a session on) a hosted
+ * delivery document (Document Portal spec §7). Unset → alerts are suppressed.
+ */
+function DocumentPortalAlertsSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'document_portal_alert_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'document_portal_alert_chat_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c); setSavedThreadId(t); setChatId(c); setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any).from('app_settings').upsert({ key: 'document_portal_alert_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any).from('app_settings').upsert({ key: 'document_portal_alert_chat_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId); setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Document alert destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'Alerts will post in this topic.' : 'Alerts will post in this chat.'
+          : 'Alerts are suppressed silently until set.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={MessagesSquare}
+      title="Document Portal Alerts"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm"><span className="inline-flex items-center gap-1"><AlertTriangle className="h-2.5 w-2.5" />Unset</span></StatusBadge>)
+        : null}
+      subtitle={<>Team chat that gets a heads-up when a <b>client</b> opens a hosted delivery document, plus a session summary (time focused · pages read) when they close it. Only external viewers trigger it — internal previews never do.</>}
+    >
+      <WhenItSends>
+        Instantly when a client opens a shared document in their portal, and again when they finish the session.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              {!savedChatId && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusBadge tone="warning" size="sm">
+                    <span className="inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Not configured</span>
+                  </StatusBadge>
+                  <span className="text-xs text-ink-warm-500">Document-open alerts are suppressed silently until set.</span>
+                </div>
+              )}
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => { setChatId(nextChat); setThreadId(nextThread); }}
+                label="Alert destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
   );
 }
 
