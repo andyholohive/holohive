@@ -6,9 +6,41 @@ import { authorizePortalEmail } from '@/lib/portalDocAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+// Best-effort capture of a failed form submission so the client's answers are
+// never silently lost. Writes the raw payload + error to form_submission_failures
+// with its own service-role client; any error here is swallowed and never blocks
+// the response. This is the safety net for when an insert/resolve/exception fails.
+async function captureFormFailure(
+  request: NextRequest,
+  payload: { form_id?: any; client_id?: any; response_data?: any; submitted_by_email?: any; submitted_by_name?: any },
+  errorMessage: string,
+  stage: 'resolve' | 'insert' | 'exception',
+) {
   try {
-    const body = await request.json();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return;
+    const admin = createClient<Database>(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+    await (admin as any).from('form_submission_failures').insert({
+      form_id_raw: payload.form_id != null ? String(payload.form_id) : null,
+      client_id_raw: payload.client_id != null ? String(payload.client_id) : null,
+      response_data: payload.response_data ?? null,
+      submitted_by_email: payload.submitted_by_email ?? null,
+      submitted_by_name: payload.submitted_by_name ?? null,
+      error_message: errorMessage,
+      error_stage: stage,
+      user_agent: request.headers.get('user-agent'),
+      ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || null,
+    });
+  } catch (e) {
+    console.error('[Form Submit] Failed to capture failure row:', e);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  let body: any = null;
+  try {
+    body = await request.json();
     const { form_id, response_data, submitted_by_email, submitted_by_name, client_id } = body;
 
     // Validate required fields
@@ -52,6 +84,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (!form) {
+      await captureFormFailure(request, { form_id, client_id, response_data, submitted_by_email, submitted_by_name }, `Form not found for form_id "${String(form_id)}"`, 'resolve');
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
     const realFormId = (form as any).id as string;
@@ -71,6 +104,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error inserting form response:', error);
+      await captureFormFailure(request, { form_id, client_id, response_data, submitted_by_email, submitted_by_name }, error.message || 'insert error', 'insert');
       return NextResponse.json(
         { error: 'Failed to submit form response' },
         { status: 500 }
@@ -209,8 +243,14 @@ export async function POST(request: NextRequest) {
       { success: true, data: response },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in form submission API:', error);
+    await captureFormFailure(
+      request,
+      { form_id: body?.form_id, client_id: body?.client_id, response_data: body?.response_data, submitted_by_email: body?.submitted_by_email, submitted_by_name: body?.submitted_by_name },
+      error?.message || 'unknown exception',
+      'exception',
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
