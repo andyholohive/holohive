@@ -41,6 +41,7 @@ interface ViewMeta {
   download_enabled: boolean;
   version_id: string | null;
   document_id: string;
+  log_token?: string | null;
 }
 
 export default function PortalDocumentsCard({ portalId, email }: { portalId: string; email: string }) {
@@ -141,6 +142,7 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
                 documentId={active.document_id}
                 versionId={active.version_id}
                 viewerEmail={trimmedEmail}
+                logToken={active.log_token ?? null}
               />
             </div>
           )}

@@ -27,6 +27,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { fetchAllRows } from '@/lib/paginateSelect';
 import { adminSupabase, getStandardClients, getAdHocClients, renewalToneFor, overdueToneFor } from '@/lib/dashboard/queries';
 import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { getDashboardConfig } from '@/lib/dashboard/config';
@@ -123,11 +124,13 @@ export async function GET(request: Request) {
       // [2026-06-11] All-time content posted per client — drives spec § 4.2's
       // "Content Posted" column (total count, not just this week).
       // [2026-06-17] Same client_id-via-campaign fix as above.
-      (sb as any)
+      // Paginated (audit H4): the all-time posted-contents scan capped at 1000
+      // rows and every client's "Content Posted" total silently plateaued.
+      fetchAllRows(() => (sb as any)
         .from('contents')
         .select('id, campaign_id, multipost_group_id, campaigns!inner(client_id)')
         .eq('status', 'posted')
-        .in('campaigns.client_id', standardClientIds),
+        .in('campaigns.client_id', standardClientIds)),
       // [2026-06-11] Active campaigns for the Output Signals KPI row — spec
       // § 4.1. status is TitleCase ("Active") not lowercase per a sample query.
       (sb as any)

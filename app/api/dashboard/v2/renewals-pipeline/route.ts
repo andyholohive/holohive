@@ -19,6 +19,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { fetchAllRows } from '@/lib/paginateSelect';
 import { adminSupabase, getStandardClients, getRelevantClients, renewalToneFor } from '@/lib/dashboard/queries';
 import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { getDashboardConfig } from '@/lib/dashboard/config';
@@ -53,11 +54,11 @@ export async function GET() {
       // ever, so ~46% of the number came from archived test campaigns.
       // contents has no client_id — embed the campaign to filter by client.
       liveClientIds.length > 0
-        ? (sb as any)
+        ? fetchAllRows(() => (sb as any) // paginated (audit H4): don't cap "Total content delivered" at 1000
             .from('contents')
             .select('id, multipost_group_id, campaigns!inner(client_id)')
             .eq('status', 'posted')
-            .in('campaigns.client_id', liveClientIds)
+            .in('campaigns.client_id', liveClientIds))
         : Promise.resolve({ data: [] }),
       // [2026-06-19] Active client_stints — used to anchor Average
       // Engagement to the current stint per TD §5.1 "anchors to the

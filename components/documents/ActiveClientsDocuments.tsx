@@ -126,15 +126,30 @@ export default function ActiveClientsDocuments() {
         .from('client-documents').upload(path, form.file, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw upErr;
 
-      const doc = await service.createDocument({
-        client_id: form.client_id,
-        stint_id: (stint as any)?.id ?? null,
-        title: form.title.trim(),
-        shared: form.shared,
-        created_by: user?.id ?? null,
-      });
-      await service.addVersion(doc.id, { storage_ref: path, page_count: pageCount, uploaded_by: user?.id ?? null });
-      if (form.download) await service.setDownloadEnabled(doc.id, true);
+      // The three writes below (create doc → add version → optional download flag)
+      // aren't a transaction. If a later step fails we must roll back the earlier
+      // ones (audit H3) — otherwise we strand the uploaded PDF in the bucket and/or
+      // leave a version-less draft doc that renders in the list but can't be opened.
+      let createdDocId: string | null = null;
+      try {
+        const doc = await service.createDocument({
+          client_id: form.client_id,
+          stint_id: (stint as any)?.id ?? null,
+          title: form.title.trim(),
+          shared: form.shared,
+          created_by: user?.id ?? null,
+        });
+        createdDocId = doc.id;
+        await service.addVersion(doc.id, { storage_ref: path, page_count: pageCount, uploaded_by: user?.id ?? null });
+        if (form.download) await service.setDownloadEnabled(doc.id, true);
+      } catch (inner) {
+        // Best-effort compensation, then re-throw so the user still sees the error.
+        try { await (supabase as any).storage.from('client-documents').remove([path]); } catch { /* ignore */ }
+        if (createdDocId) {
+          try { await (supabase as any).from('documents').delete().eq('id', createdDocId); } catch { /* ignore */ }
+        }
+        throw inner;
+      }
 
       toast({ title: 'Document uploaded', description: form.title.trim() });
       setOpen(false);

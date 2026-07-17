@@ -9,6 +9,10 @@ import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { classifyReply, isFridayUTC, pulseDateFor, PULSE_CUTOFF_HOUR_UTC } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
+// Audit H5: give handlers headroom so a slow update finishes and returns 200
+// before Telegram's retry timer fires (the default ~10s could 504 mid-work and
+// trigger a duplicate delivery).
+export const maxDuration = 60;
 
 // Use service role for webhook (no user auth context)
 const supabaseAdmin = createClient(
@@ -49,6 +53,25 @@ export async function POST(request: NextRequest) {
     }
 
     const update = await request.json();
+
+    // Audit H5: idempotency guard. Telegram re-delivers an update whenever it
+    // doesn't get a prompt 200, so without this a slow /submit, /wallet, /done
+    // or PSG completion could run twice (double insert / double side-effect).
+    // Claim the update_id first; if it's already recorded, ack and stop.
+    const updateId = update?.update_id;
+    if (typeof updateId === 'number') {
+      const { error: dupErr } = await (supabaseAdmin as any)
+        .from('telegram_processed_updates')
+        .insert({ update_id: updateId });
+      if (dupErr) {
+        if ((dupErr as any).code === '23505') {
+          console.log('[Telegram Webhook] Duplicate update_id, skipping:', updateId);
+          return NextResponse.json({ ok: true, deduped: true });
+        }
+        // A ledger hiccup shouldn't drop a real update — log and continue.
+        console.error('[Telegram Webhook] dedup ledger insert failed:', dupErr);
+      }
+    }
 
     // Log incoming update for debugging
     console.log('[Telegram Webhook] Received update:', JSON.stringify(update, null, 2));

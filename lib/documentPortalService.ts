@@ -146,10 +146,16 @@ export class DocumentPortalService {
       .single();
     if (error) throw new Error(error.message);
 
-    await (this.supabase as any)
+    // Publish the doc by pointing it at the new version. This MUST be checked
+    // (audit H3): if it silently failed, addVersion returned "success" while the
+    // document stayed draft with a dangling, unreferenced version row — the doc
+    // renders but its View button is hidden. Surface the error so the caller can
+    // clean up rather than reporting a half-created document as uploaded.
+    const { error: pubErr } = await (this.supabase as any)
       .from('documents')
       .update({ current_version_id: (version as any).id, status: 'published', updated_at: new Date().toISOString() })
       .eq('id', documentId);
+    if (pubErr) throw new Error(`version saved but publish failed: ${pubErr.message}`);
     return version as DocumentVersionRow;
   }
 
@@ -216,6 +222,25 @@ export class DocumentPortalService {
   }
 
   /**
+   * Page through a document_access_log query in 1000-row windows so an
+   * aggregation never silently truncates at the PostgREST default cap
+   * (audit H4). Orders by `id` for a stable window and throws on error rather
+   * than swallowing it. `build` must return a fresh query builder each call.
+   */
+  private async fetchAllAccessRows<T>(build: () => any): Promise<T[]> {
+    const PAGE = 1000;
+    const all: T[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await build().order('id', { ascending: true }).range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      const chunk = (data ?? []) as T[];
+      all.push(...chunk);
+      if (chunk.length < PAGE) break;
+    }
+    return all;
+  }
+
+  /**
    * Per-recipient analytics for a document — all derived from the AccessLog
    * (spec §5/§6). Denominator for completion is the current version page_count.
    */
@@ -223,14 +248,16 @@ export class DocumentPortalService {
     const { version } = await this.getDocument(documentId);
     const pageCount = version?.page_count ?? 0;
 
-    const { data: events } = await (this.supabase as any)
-      .from('document_access_log')
-      .select('event_type, portal_user_id, viewer_email, page_no, dwell_ms, session_id, occurred_at')
-      .eq('document_id', documentId);
-    const rows = (events ?? []) as Array<{
+    // Paginate + surface errors (audit H4). document_access_log is the
+    // fastest-growing table here; a plain select silently capped at 1000 rows
+    // and every recipient's opens/completion/hot flag under-reported at once.
+    const rows = await this.fetchAllAccessRows<{
       event_type: DocAccessEvent; portal_user_id: string | null; viewer_email: string | null;
       page_no: number | null; dwell_ms: number | null; session_id: string | null; occurred_at: string;
-    }>;
+    }>(() => (this.supabase as any)
+      .from('document_access_log')
+      .select('event_type, portal_user_id, viewer_email, page_no, dwell_ms, session_id, occurred_at')
+      .eq('document_id', documentId));
 
     // Recipients are keyed by the gate email; team-internal previews (no email)
     // collapse under a single "Internal preview" bucket so they never masquerade
@@ -284,14 +311,14 @@ export class DocumentPortalService {
     const result = new Map<string, DocumentRollup>();
     if (documentIds.length === 0) return result;
 
-    const { data: events } = await (this.supabase as any)
-      .from('document_access_log')
-      .select('document_id, event_type, viewer_email, page_no, dwell_ms, session_id, occurred_at')
-      .in('document_id', documentIds);
-    const rows = (events ?? []) as Array<{
+    // Paginate + surface errors (audit H4) — see getDocumentAnalytics.
+    const rows = await this.fetchAllAccessRows<{
       document_id: string; event_type: DocAccessEvent; viewer_email: string | null;
       page_no: number | null; dwell_ms: number | null; session_id: string | null; occurred_at: string;
-    }>;
+    }>(() => (this.supabase as any)
+      .from('document_access_log')
+      .select('document_id, event_type, viewer_email, page_no, dwell_ms, session_id, occurred_at')
+      .in('document_id', documentIds));
 
     const byDoc = new Map<string, typeof rows>();
     for (const r of rows) {

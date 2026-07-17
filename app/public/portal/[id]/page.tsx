@@ -49,6 +49,7 @@ import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
 import { formatDate as fmtDate, formatRelativeShort } from '@/lib/dateFormat';
 import { getCampaignWeek, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
+import { FREE_MAIL_DOMAINS } from '@/lib/portalDocAuth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -544,8 +545,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
     if (emailLower === clientEmailLower) return 'exact';
     if (approvedEmails.some(e => e.toLowerCase() === emailLower)) return 'approved_email';
-    if (inputDomain && inputDomain === clientDomain) return 'same_domain';
-    if (inputDomain && approvedDomains.some(d => inputDomain === d.toLowerCase())) return 'approved_domain';
+    // Same-domain (and approved-domain) matches must never apply to free-mail
+    // providers — otherwise any @gmail.com would pass when the client's own
+    // email is a gmail address (audit H1). Mirrors lib/portalDocAuth so the UI
+    // gate and the server document routes agree.
+    if (inputDomain && inputDomain === clientDomain && !FREE_MAIL_DOMAINS.has(clientDomain)) return 'same_domain';
+    if (inputDomain && !FREE_MAIL_DOMAINS.has(inputDomain) && approvedDomains.some(d => inputDomain === d.toLowerCase())) return 'approved_domain';
     return null;
   };
 

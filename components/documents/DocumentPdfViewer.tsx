@@ -30,6 +30,7 @@ export default function DocumentPdfViewer({
   versionId,
   portalUserId,
   viewerEmail,
+  logToken,
 }: {
   signedUrl: string;
   documentId: string;
@@ -37,6 +38,12 @@ export default function DocumentPdfViewer({
   portalUserId?: string | null;
   /** Gate email the portal viewer authenticated with — the recipient key. */
   viewerEmail?: string | null;
+  /**
+   * Signed beacon token from the gated view-url route (audit H6). Threaded to
+   * /api/documents/log so it can trust the attribution; without it the server
+   * ignores viewer_email and fires no alert.
+   */
+  logToken?: string | null;
 }) {
   const [numPages, setNumPages] = useState(0);
   const [width, setWidth] = useState(800);
@@ -49,7 +56,7 @@ export default function DocumentPdfViewer({
   const lastActivity = useRef<number>(Date.now());
 
   const post = (payload: Record<string, any>) => {
-    const body = JSON.stringify({ document_id: documentId, version_id: versionId, session_id: sessionId, portal_user_id: portalUserId ?? null, viewer_email: viewerEmail ?? null, ...payload });
+    const body = JSON.stringify({ document_id: documentId, version_id: versionId, session_id: sessionId, portal_user_id: portalUserId ?? null, viewer_email: viewerEmail ?? null, log_token: logToken ?? null, ...payload });
     try {
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/documents/log', new Blob([body], { type: 'application/json' }));

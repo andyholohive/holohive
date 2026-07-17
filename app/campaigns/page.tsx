@@ -20,6 +20,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
+import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { CampaignTemplateService, CampaignTemplateWithDetails } from "@/lib/campaignTemplateService";
@@ -962,9 +963,9 @@ export default function CampaignsPage() {
                         inputMode="numeric"
                         pattern="[0-9,]*"
                         className="focus-brand pl-6 w-full"
-                        value={newCampaign.total_budget ? Number(newCampaign.total_budget.replace(/,/g, '')).toLocaleString('en-US') : ''}
+                        value={formatMoneyDisplay(newCampaign.total_budget)}
                         onChange={e => {
-                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          const raw = sanitizeMoneyInput(e.target.value);
                           setNewCampaign({ ...newCampaign, total_budget: raw });
                         }}
                         placeholder="Enter total budget"
@@ -979,9 +980,7 @@ export default function CampaignsPage() {
                         <div className="text-ink-warm-400 text-sm">No allocations yet.</div>
                       )}
                       {newCampaign.budgetAllocations.map((alloc, idx) => {
-                        const formattedAmount = alloc.amount
-                          ? Number(alloc.amount.replace(/,/g, '')).toLocaleString('en-US')
-                          : '';
+                        const formattedAmount = formatMoneyDisplay(alloc.amount);
                         return (
                           <div key={idx} className="flex items-center gap-2">
                             <Select
@@ -1009,7 +1008,7 @@ export default function CampaignsPage() {
                                 className="focus-brand pl-6 w-full"
                                 value={formattedAmount}
                                 onChange={e => {
-                                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                                  const raw = sanitizeMoneyInput(e.target.value);
                                   const newAllocs = [...newCampaign.budgetAllocations];
                                   newAllocs[idx].amount = raw;
                                   setNewCampaign({ ...newCampaign, budgetAllocations: newAllocs });

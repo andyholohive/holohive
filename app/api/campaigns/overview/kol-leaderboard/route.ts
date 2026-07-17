@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { fetchAllRows } from '@/lib/paginateSelect';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -100,13 +101,18 @@ export async function GET(request: Request) {
   // 2. All-time contents (posted only, deduped by multipost_group_id).
   // Content platform is the axis per Q5 default — a multi-platform KOL
   // shows in both filters with different metrics.
-  let contentsQuery = (admin as any)
-    .from('contents')
-    .select('id, campaign_kols_id, campaign_id, platform, impressions, likes, comments, retweets, bookmarks, multipost_group_id, status');
-  if (platformFilter && platformFilter !== 'all') {
-    contentsQuery = contentsQuery.eq('platform', platformFilter);
-  }
-  const { data: contentRows } = await contentsQuery.eq('status', 'posted');
+  // Paginate the all-time posted-contents scan (audit H4) — a plain select
+  // capped at 1000 rows and the whole leaderboard reshuffled + KPIs plateaued
+  // silently once `contents` crossed it. Factory returns a FRESH builder per page.
+  const makeContentsQuery = () => {
+    let q = (admin as any)
+      .from('contents')
+      .select('id, campaign_kols_id, campaign_id, platform, impressions, likes, comments, retweets, bookmarks, multipost_group_id, status')
+      .eq('status', 'posted');
+    if (platformFilter && platformFilter !== 'all') q = q.eq('platform', platformFilter);
+    return q;
+  };
+  const { data: contentRows } = await fetchAllRows(makeContentsQuery);
 
   // Dedupe multipost: keep one row per (multipost_group_id) picking the
   // one with the highest impressions to represent the group. Non-grouped

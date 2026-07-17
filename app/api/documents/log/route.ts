@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { verifyLogToken } from '@/lib/portalLogToken';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +56,12 @@ export async function POST(request: Request) {
     .from('documents').select('id, client_id, stint_id, title').eq('id', body.document_id).maybeSingle();
   if (!doc) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const viewerEmail = typeof body.viewer_email === 'string' ? body.viewer_email : null;
+  // Attribution is trusted ONLY from the signed log token minted by the gated
+  // view-url route (audit H6). The raw body.viewer_email is never trusted — an
+  // unauthenticated caller can't attribute an open to (or spam an alert about)
+  // an email they don't hold a token for. No/invalid token → event still logged
+  // for volume, but with no attributed email and no Telegram alert.
+  const viewerEmail = verifyLogToken(body.log_token, doc.id);
 
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

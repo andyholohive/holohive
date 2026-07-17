@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { authorizePortalEmail } from '@/lib/portalDocAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +76,34 @@ export async function POST(request: NextRequest) {
     // submitted against a client (e.g. brand-asset upload form) don't
     // accidentally trigger this. Best-effort — failures here are
     // logged but never block the form submission response.
+    //
+    // SECURITY (audit C2): this route is public/unauthenticated and
+    // client_id is caller-supplied (there is no forms→client FK to
+    // validate against). Advancing a client's onboarding milestones is a
+    // state mutation, so we gate it behind the SAME portal email check the
+    // portal itself enforces: submitted_by_email must authorize for this
+    // client (exact email / approved_emails / same corp domain /
+    // approved_domains). A crafted POST with a victim client_id but no
+    // authorized email can no longer flip their milestones. The response
+    // row itself is still stored (harmless data); only the mutation is
+    // gated. Legit portal submitters carry their gate email in the body.
+    let milestoneAuthorized = false;
     if (client_id && form?.slug === 'holo-hive-onboarding') {
+      try {
+        const auth = await authorizePortalEmail(supabaseAdmin as any, client_id, submitted_by_email || '');
+        milestoneAuthorized = auth.ok && auth.clientId === client_id;
+        if (!milestoneAuthorized) {
+          console.warn(
+            '[Form Submit] Milestone auto-complete SKIPPED — submitter email not authorized for client',
+            { client_id, hasEmail: !!submitted_by_email },
+          );
+        }
+      } catch (authErr) {
+        console.error('[Form Submit] Portal auth check failed:', authErr);
+        milestoneAuthorized = false;
+      }
+    }
+    if (milestoneAuthorized) {
       try {
         // Find this client's milestones in display_order. Filter to
         // status != 'complete' so re-submission of the form (rare but

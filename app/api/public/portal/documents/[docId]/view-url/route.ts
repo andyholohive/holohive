@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { authorizePortalEmail } from '@/lib/portalDocAuth';
+import { signLogToken } from '@/lib/portalLogToken';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,11 @@ export async function POST(request: Request, { params }: { params: { docId: stri
     return NextResponse.json({ error: signErr?.message || 'could not sign URL' }, { status: 500 });
   }
 
+  // Signed beacon token (audit H6) — binds this doc to the gate-verified email
+  // so the public /api/documents/log can trust the attribution and can't be
+  // spammed with spoofed opens.
+  const logToken = signLogToken(doc.id, email);
+
   return NextResponse.json({
     ok: true,
     title: doc.title,
@@ -62,5 +68,6 @@ export async function POST(request: Request, { params }: { params: { docId: stri
     download_enabled: doc.download_enabled,
     version_id: version.id,
     document_id: doc.id,
+    log_token: logToken,
   });
 }

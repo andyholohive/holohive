@@ -23,6 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { sanitizeMoneyInput, formatMoneyDisplay } from '@/lib/moneyInput';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
 import { FormService, FormWithStats } from '@/lib/formService';
 import MeetingActionItems from '@/components/clients/MeetingActionItems';
@@ -3923,10 +3924,8 @@ export default function ClientsPage() {
                                <div className="text-ink-warm-400 text-sm">No allocations yet.</div>
                              )}
                              {startClientForm.budgetAllocations.map((alloc, idx) => {
-                               // Format the amount with commas for display
-                               const formattedAmount = alloc.amount
-                                 ? Number(alloc.amount.replace(/,/g, '')).toLocaleString('en-US')
-                                 : '';
+                               // Format the amount with commas for display (decimal-aware, audit H2)
+                               const formattedAmount = formatMoneyDisplay(alloc.amount);
                                return (
                                  <div key={idx} className="flex items-center gap-2">
                                    <Select
@@ -3956,8 +3955,9 @@ export default function ClientsPage() {
                                        placeholder="Amount"
                                        value={formattedAmount}
                                        onChange={e => {
-                                         // Remove all non-digit and non-comma characters, then remove commas
-                                         const raw = e.target.value.replace(/[^\d,]/g, '').replace(/,/g, '');
+                                         // Decimal-aware sanitize (audit H2): keep the decimal so a
+                                         // pasted "12,500.00" stays 12500.00, not 1250000.
+                                         const raw = sanitizeMoneyInput(e.target.value);
                                          const newAllocs = [...startClientForm.budgetAllocations];
                                          newAllocs[idx].amount = raw;
                                          setStartClientForm({ ...startClientForm, budgetAllocations: newAllocs });

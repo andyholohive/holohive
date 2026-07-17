@@ -760,8 +760,13 @@ export default function LineupsTab({
       }),
     });
     try {
-      await service.removeSlot(sourceSlot.id, currentUserId);
+      // Add-then-remove, NOT remove-then-add (audit H3). This is a non-atomic
+      // pair; ordering it this way makes the failure modes safe:
+      //   • addSlot throws  → source slot untouched in the DB, no loss (refresh restores it).
+      //   • removeSlot throws → KOL briefly in BOTH angles — a visible, recoverable
+      //     duplicate. The old order lost the KOL from both angles entirely.
       const newSlot = await service.addSlot(targetAngleId, sourceSlot.kol_id, nextOrder, currentUserId);
+      await service.removeSlot(sourceSlot.id, currentUserId);
       setLineup((prev) => prev && {
         ...prev,
         angles: prev.angles.map(a => a.id === targetAngleId

@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
+import { sanitizeMoneyInput } from '@/lib/moneyInput';
 import {
   Select,
   SelectContent,
@@ -519,9 +520,10 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
                                   inputMode="numeric"
                                   pattern="[0-9,]*"
                                   className="focus-brand pl-6 w-full"
-                                  value={payment.amount ? Number(payment.amount).toLocaleString('en-US') : ''}
+                                  value={payment.amount ? Number(payment.amount).toLocaleString('en-US', { maximumFractionDigits: 2 }) : ''}
                                   onChange={(e) => {
-                                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                                    // Decimal-aware (audit H2): keep the "." so 100.50 stays 100.5, not 10050.
+                                    const raw = sanitizeMoneyInput(e.target.value);
                                     setMultiKOLPayments(prev => {
                                       const newPayments = [...(prev[kolId]?.payments || [])];
                                       newPayments[paymentIndex] = { ...newPayments[paymentIndex], amount: parseFloat(raw) || 0 };
@@ -708,9 +710,10 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
                     inputMode="numeric"
                     pattern="[0-9,]*"
                     className="focus-brand pl-6 w-full"
-                    value={nonKOLPayment.amount ? Number(nonKOLPayment.amount).toLocaleString('en-US') : ''}
+                    value={nonKOLPayment.amount ? Number(nonKOLPayment.amount).toLocaleString('en-US', { maximumFractionDigits: 2 }) : ''}
                     onChange={(e) => {
-                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      // Decimal-aware (audit H2): keep the "." so 100.50 stays 100.5, not 10050.
+                      const raw = sanitizeMoneyInput(e.target.value);
                       setNonKOLPayment(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
                     }}
                     placeholder="Enter amount"

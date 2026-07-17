@@ -266,11 +266,25 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         }
       }
 
+      // Thread the portal gate email through the POST body (never the URL —
+      // it's PII). The server uses it to authorize the onboarding milestone
+      // auto-complete for this client (audit C2). Read from the same-origin
+      // portal auth cache the portal writes on sign-in.
+      let gateEmail: string | undefined;
+      try {
+        const globalRaw = localStorage.getItem('portal_global_auth');
+        if (globalRaw) {
+          const parsed = JSON.parse(globalRaw);
+          if (parsed?.email && typeof parsed.email === 'string') gateEmail = parsed.email;
+        }
+      } catch { /* no cached portal auth — milestone side-effect simply won't fire */ }
+
       await FormService.submitResponse(
         {
           form_id: form!.id,
           response_data: responseDataWithFiles,
           client_id: clientId || undefined,
+          submitted_by_email: gateEmail,
         },
         supabasePublic
       );
