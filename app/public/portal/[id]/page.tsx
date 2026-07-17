@@ -49,7 +49,7 @@ import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
 import { formatDate as fmtDate, formatRelativeShort } from '@/lib/dateFormat';
 import { getCampaignWeek, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
-import { FREE_MAIL_DOMAINS } from '@/lib/portalDocAuth';
+import { authorizePortalGate, type GateReason } from '@/lib/portalGateClient';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -326,9 +326,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // Auth states
   const [clientId, setClientId] = useState<string | null>(null);
   const [client, setClient] = useState<Client | null>(null);
-  const [clientEmail, setClientEmail] = useState<string | null>(null);
-  const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
-  const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
+  // audit C1 Phase 2: the email-gate authorization lists (email/approved_emails/
+  // approved_domains) are NO LONGER read via the anon key. clientLoaded just marks
+  // that the client's display record resolved; the gate itself runs server-side.
+  const [clientLoaded, setClientLoaded] = useState(false);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -431,7 +432,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           // Fetch client email
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
+            .select('id, name, slug, logo_url')
             .eq('id', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -441,15 +442,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             setLoadingClientEmail(false);
             return;
           }
-          setClient(data);
-          setClientEmail(data.email);
-          setApprovedEmails(data.approved_emails || []);
-          setApprovedDomains(data.approved_domains || []);
+          setClient(data as any);
+          setClientLoaded(true);
         } else {
           // Fetch by slug
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
+            .select('id, name, slug, logo_url')
             .eq('slug', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -460,10 +459,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             return;
           }
           setClientId(data.id);
-          setClient(data);
-          setClientEmail(data.email);
-          setApprovedEmails(data.approved_emails || []);
-          setApprovedDomains(data.approved_domains || []);
+          setClient(data as any);
+          setClientLoaded(true);
         }
       } catch (err) {
         setError('Failed to load client');
@@ -473,13 +470,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     resolveClientId();
   }, [idOrSlug]);
 
-  // Check cached auth when client email is available
+  // Check cached auth once the client record has resolved.
   useEffect(() => {
-    if (clientEmail) {
-      checkCachedAuth();
+    if (clientLoaded) {
+      void checkCachedAuth();
       setLoadingClientEmail(false);
     }
-  }, [clientEmail]);
+  }, [clientLoaded]);
 
   // Fetch data when authenticated.
   //
@@ -526,32 +523,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     return () => { cancelled = true; };
   }, [clientId, isAuthenticated]);
 
-  // Shared email authorization check (matches campaign page pattern)
-  const isEmailAuthorized = (inputEmail: string): boolean => {
-    return resolveAuthorizationReason(inputEmail) !== null;
-  };
-
-  // Like isEmailAuthorized but returns which rule passed (or null if
-  // none). Used by the access-log call so admins can see "Bob got in
-  // by domain" vs "Bob got in by exact-email match".
-  const resolveAuthorizationReason = (
+  // Server-side email authorization (audit C1 Phase 2). The authorization lists
+  // (email / approved_emails / approved_domains) are no longer exposed to the
+  // browser — the gate runs on the server via /api/public/portal-gate/authorize,
+  // which reuses lib/portalDocAuth (same rules, incl. the free-mail denylist).
+  // Returns which rule matched (for the access log) or null if not authorized.
+  const resolveAuthorizationReason = async (
     inputEmail: string
-  ): 'exact' | 'approved_email' | 'same_domain' | 'approved_domain' | null => {
-    if (!clientEmail) return null;
-    const emailLower = inputEmail.toLowerCase();
-    const clientEmailLower = clientEmail.toLowerCase();
-    const inputDomain = emailLower.split('@')[1];
-    const clientDomain = clientEmailLower.split('@')[1];
-
-    if (emailLower === clientEmailLower) return 'exact';
-    if (approvedEmails.some(e => e.toLowerCase() === emailLower)) return 'approved_email';
-    // Same-domain (and approved-domain) matches must never apply to free-mail
-    // providers — otherwise any @gmail.com would pass when the client's own
-    // email is a gmail address (audit H1). Mirrors lib/portalDocAuth so the UI
-    // gate and the server document routes agree.
-    if (inputDomain && inputDomain === clientDomain && !FREE_MAIL_DOMAINS.has(clientDomain)) return 'same_domain';
-    if (inputDomain && !FREE_MAIL_DOMAINS.has(inputDomain) && approvedDomains.some(d => inputDomain === d.toLowerCase())) return 'approved_domain';
-    return null;
+  ): Promise<GateReason> => {
+    const res = await authorizePortalGate(idOrSlug, inputEmail);
+    return res.ok ? res.reason : null;
   };
 
   // Fire-and-forget POST to the access-log endpoint. Failures are
@@ -573,54 +554,42 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     }
   };
 
-  // Check if user is already authenticated via cache
-  const checkCachedAuth = () => {
-    if (!clientEmail) return;
+  // Check if user is already authenticated via cache. Async now — the gate
+  // re-check runs server-side (audit C1 Phase 2).
+  const checkCachedAuth = async () => {
+    if (!clientLoaded) return;
+
+    const enterAuthenticated = (authedEmail: string) => {
+      setEmail(authedEmail);
+      setIsAuthenticated(true);
+      setWelcomePhase('enter');
+      setShowWelcome(true);
+      void logPortalAccess(authedEmail, 'cache');
+      requestAnimationFrame(() => {
+        setTimeout(() => setWelcomePhase('ready'), 50);
+      });
+    };
 
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const { email: cachedEmail, timestamp } = JSON.parse(cached);
-        const now = Date.now();
-
-        if (now - timestamp < CACHE_DURATION) {
-          if (cachedEmail && isEmailAuthorized(cachedEmail)) {
-            setEmail(cachedEmail);
-            setIsAuthenticated(true);
-            setWelcomePhase('enter');
-            setShowWelcome(true);
-            // Returning visitor — record as 'cache' so admins can see
-            // re-visits separately from fresh authentications.
-            void logPortalAccess(cachedEmail, 'cache');
-            requestAnimationFrame(() => {
-              setTimeout(() => setWelcomePhase('ready'), 50);
-            });
-            return;
-          }
+        if (Date.now() - timestamp < CACHE_DURATION && cachedEmail) {
+          const { ok } = await authorizePortalGate(idOrSlug, cachedEmail);
+          if (ok) { enterAuthenticated(cachedEmail); return; }
         }
         localStorage.removeItem(cacheKey);
       }
 
       // [2026-07-06] Unified access — accept a sign-in from any other
       // public surface (campaign tracker, reports) as long as that
-      // email passes THIS client's authorization rules. Completes the
-      // loop: the portal always WROTE portal_global_auth for the other
-      // pages but never read it back, so tracker-first visitors hit
-      // the gate twice.
+      // email passes THIS client's authorization rules.
       const globalRaw = localStorage.getItem('portal_global_auth');
       if (globalRaw) {
         const { email: globalEmail, timestamp: globalTs } = JSON.parse(globalRaw);
-        if (globalEmail && Date.now() - globalTs < CACHE_DURATION && isEmailAuthorized(globalEmail)) {
-          setEmail(globalEmail);
-          setIsAuthenticated(true);
-          setWelcomePhase('enter');
-          setShowWelcome(true);
-          saveAuthToCache(globalEmail);
-          void logPortalAccess(globalEmail, 'cache');
-          requestAnimationFrame(() => {
-            setTimeout(() => setWelcomePhase('ready'), 50);
-          });
-          return;
+        if (globalEmail && Date.now() - globalTs < CACHE_DURATION) {
+          const { ok } = await authorizePortalGate(idOrSlug, globalEmail);
+          if (ok) { saveAuthToCache(globalEmail); enterAuthenticated(globalEmail); return; }
         }
       }
     } catch (error) {
@@ -638,11 +607,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         timestamp: Date.now()
       };
       localStorage.setItem(cacheKey, JSON.stringify(authData));
-      // Save global portal auth for cross-page navigation (campaign/report pages)
+      // Save global portal auth for cross-page navigation (campaign/report pages).
+      // Only the visitor's email is shared — the client's authorization lists are
+      // no longer held client-side (audit C1 Phase 2).
       const globalAuthData = {
         email,
         clientId,
-        clientEmail,
         timestamp: Date.now()
       };
       localStorage.setItem('portal_global_auth', JSON.stringify(globalAuthData));
@@ -661,12 +631,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       return;
     }
 
-    if (!clientEmail) {
+    if (!clientLoaded) {
       setEmailError('Unable to verify access. Please try again.');
       return;
     }
 
-    const reason = resolveAuthorizationReason(email);
+    const reason = await resolveAuthorizationReason(email);
     if (!reason) {
       setEmailError('This email address is not authorized to access this portal');
       return;
@@ -832,17 +802,30 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     }
   }
 
+  // Meeting notes + decision log are confidential client content — fetched via
+  // the gated server endpoint (audit C1 Phase 2), which re-checks the email gate
+  // and returns only this client's rows. Both come back in one call; each fetcher
+  // sets its own slice so the existing Promise.all wiring is untouched.
+  async function fetchGatedContent(): Promise<{ meetingNotes: any[]; decisionLog: any[] }> {
+    if (!clientId || !email) return { meetingNotes: [], decisionLog: [] };
+    try {
+      const res = await fetch('/api/public/portal-gate/content', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idOrSlug, email }), cache: 'no-store',
+      });
+      if (!res.ok) return { meetingNotes: [], decisionLog: [] };
+      const json = await res.json();
+      return { meetingNotes: json.meetingNotes ?? [], decisionLog: json.decisionLog ?? [] };
+    } catch {
+      return { meetingNotes: [], decisionLog: [] };
+    }
+  }
+
   async function fetchMeetingNotes() {
     if (!clientId) return;
     try {
-      const { data, error } = await supabasePublic
-        .from('client_meeting_notes')
-        .select('id, title, content, attendees, action_items, meeting_date, created_at')
-        .eq('client_id', clientId)
-        .order('meeting_date', { ascending: false });
-
-      if (error) throw error;
-      setMeetingNotes(data || []);
+      const { meetingNotes } = await fetchGatedContent();
+      setMeetingNotes(meetingNotes);
     } catch (err) {
       console.error('Error fetching meeting notes:', err);
     }
@@ -879,12 +862,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   async function fetchDecisionLog() {
     if (!clientId) return;
     try {
-      const { data } = await supabasePublic
-        .from('client_decision_log')
-        .select('id, decision_date, summary')
-        .eq('client_id', clientId)
-        .order('decision_date', { ascending: false });
-      setDecisionLog(data || []);
+      const { decisionLog } = await fetchGatedContent();
+      setDecisionLog(decisionLog);
     } catch (err) {
       console.error('Error fetching decision log:', err);
     }
@@ -1637,7 +1616,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   }
 
   // Error state
-  if (error && !clientEmail) {
+  if (error && !clientLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
         <div className="max-w-md w-full mx-4 text-center p-10 rounded-2xl" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.12)' }}>
