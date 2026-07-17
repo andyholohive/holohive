@@ -38,11 +38,29 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Resolve form_id BEFORE inserting. It normally arrives as a UUID, but it
+    // can arrive as the form's SLUG (e.g. a client on an older cached bundle, or
+    // a slug-based share link). form_responses.form_id is a UUID column, so a
+    // slug would 500 the insert with "invalid input syntax for type uuid" and
+    // the client just sees "Failed to submit". Look the form up by id-or-slug and
+    // always store the canonical UUID.
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(form_id));
+    const { data: form } = await supabaseAdmin
+      .from('forms')
+      .select('id, name, slug')
+      .eq(isUUID ? 'id' : 'slug', form_id)
+      .maybeSingle();
+
+    if (!form) {
+      return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    }
+    const realFormId = (form as any).id as string;
+
     // Insert form response
     const { data: response, error } = await supabaseAdmin
       .from('form_responses')
       .insert([{
-        form_id,
+        form_id: realFormId,
         response_data,
         submitted_by_email: submitted_by_email || null,
         submitted_by_name: submitted_by_name || null,
@@ -58,13 +76,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    // Fetch form details for Telegram notification + slug check below.
-    const { data: form } = await supabaseAdmin
-      .from('forms')
-      .select('name, slug')
-      .eq('id', form_id)
-      .single();
 
     // Auto-complete Milestone 1 ("Kickoff & Setup") when the holo-hive
     // onboarding form is submitted. Per May 2026 spec: M1 is the only
