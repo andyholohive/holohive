@@ -14,7 +14,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useSearchParams } from 'next/navigation';
 import { FormService, FormWithFields, FieldType } from '@/lib/formService';
-import { CheckCircle2, FileText, Loader, Calendar as CalendarIcon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, FileText, Loader, Calendar as CalendarIcon, Upload, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 // Create a standalone Supabase client for public access
@@ -46,6 +46,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   // Form data
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  // Inline banner shown when a submit attempt is blocked by missing required
+  // fields. Distinct from `error` (which is a full-page takeover) so a failed
+  // validation never replaces the form with a scary "Form Not Available" page.
+  const [submitBlockedMsg, setSubmitBlockedMsg] = useState<string | null>(null);
 
   // Multiple answer tracking - stores arrays of values for fields that allow multiple
   const [multipleAnswers, setMultipleAnswers] = useState<Record<string, string[]>>({});
@@ -164,6 +168,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     if (validateCurrentPage()) {
       setCurrentPage(prev => Math.min(prev + 1, totalPages));
       setValidationErrors({});
+      setSubmitBlockedMsg(null);
     }
   };
 
@@ -172,12 +177,13 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     e?.stopPropagation();
     setCurrentPage(prev => Math.max(prev - 1, 1));
     setValidationErrors({});
+    setSubmitBlockedMsg(null);
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = (): Record<string, string> => {
     const errors: Record<string, string> = {};
 
-    if (!form) return false;
+    if (!form) return errors;
 
     // Validate required fields (skip section headers and descriptions)
     form.fields.filter(f => !['section', 'description'].includes(f.field_type)).forEach(field => {
@@ -213,15 +219,35 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     });
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
+    // Validate. If anything is missing, DON'T silently no-op (the old bug: the
+    // per-field error rendered on a wizard page the user wasn't looking at, so
+    // the Submit button just appeared dead and clients resubmitted endlessly).
+    // Instead, jump to the first page that has a problem, show a clear banner,
+    // and scroll it into view.
+    const errors = validateForm();
+    const errorIds = Object.keys(errors);
+    if (errorIds.length > 0 && form) {
+      const firstInvalid = [...form.fields]
+        .filter(f => errors[f.id])
+        .sort((a, b) => (a.page_number - b.page_number) || (a.display_order - b.display_order))[0];
+      if (firstInvalid && firstInvalid.page_number !== currentPage) {
+        setCurrentPage(firstInvalid.page_number);
+      }
+      setSubmitBlockedMsg(
+        errorIds.length === 1
+          ? 'One required question still needs an answer. We’ve taken you to it — look for the field highlighted in red below.'
+          : `${errorIds.length} required questions still need answers. We’ve taken you to the first one — look for the fields highlighted in red below.`
+      );
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    setSubmitBlockedMsg(null);
 
     try {
       setSubmitting(true);
@@ -294,9 +320,21 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         setCurrentPage(totalPages);
       }
       setSubmitted(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting form:', error);
-      setError('Failed to submit form. Please try again.');
+      // Show a recoverable inline banner on the form itself instead of the
+      // full-page `error` takeover ("Form Not Available"). A transient network
+      // hiccup or an oversized file attachment is a "try again" situation — it
+      // must not read to the client as "the whole form is broken/gone". The
+      // full-page `error` state stays reserved for load-time failures
+      // (form not found / not published).
+      const raw = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+      setSubmitBlockedMsg(
+        raw.includes('upload')
+          ? 'We couldn’t upload one of your files — it may be too large (about 50 MB max) or the connection dropped. Remove or shrink the file, then click Submit again.'
+          : 'Something went wrong submitting your form. Please check your connection and click Submit again — your answers are still here.'
+      );
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSubmitting(false);
     }
@@ -312,6 +350,8 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         return newErrors;
       });
     }
+    // Any edit means the user is fixing things — retire the submit-blocked banner.
+    if (submitBlockedMsg) setSubmitBlockedMsg(null);
   };
 
   const handleCheckboxChange = (fieldId: string, option: string, checked: boolean) => {
@@ -962,6 +1002,16 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       />
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Submit-blocked banner — shown when a submit attempt fails
+                  validation. Jumps the user to the offending page and tells
+                  them what's wrong (replaces the old silent no-op). */}
+              {submitBlockedMsg && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-rose-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-rose-700 leading-relaxed">{submitBlockedMsg}</p>
                 </div>
               )}
 
