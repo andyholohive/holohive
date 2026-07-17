@@ -4163,7 +4163,9 @@ export default function ClientsPage() {
                   {/* Form itself flex-col flex-1 so the body grid grows
                       and the DialogFooter (also inside <form> for submit
                       semantics) stays pinned at the bottom. */}
-                  <form onSubmit={handleCreateClient} className="flex flex-col flex-1 min-h-0">
+                  {/* autoComplete off — stop the browser offering previously-typed
+                      client names/emails as dropdown suggestions [Andy 2026-07-17]. */}
+                  <form onSubmit={handleCreateClient} autoComplete="off" className="flex flex-col flex-1 min-h-0">
                     {/* [2026-06-30] Per Andy: Engagement editor lives
                         here, not on the Client Context modal. Add Client
                         sees Details only (no client id yet); Edit Client
@@ -4184,7 +4186,7 @@ export default function ClientsPage() {
                     <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                       <div className="grid gap-2">
                         <Label htmlFor="name">Company Name</Label>
-                        <Input id="name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Enter company name" className="focus-brand" required />
+                        <Input id="name" autoComplete="off" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Enter company name" className="focus-brand" required />
                       </div>
                       <div className="grid gap-2">
                         <Label>Company Logo</Label>

@@ -81,9 +81,11 @@ export async function getDigestDestination(
 /** The morning DM text for a member, by day variant. */
 export function promptFor(name: string | null, isFriday: boolean): string {
   const who = (name || 'there').split(' ')[0];
+  // A bold emoji header makes the DM stand out in the chat list + notification
+  // preview so it isn't scrolled past. Keeps Jdot's casual tone in the body.
   return isFriday
-    ? `gm ${who}. blockers today? and drop one win from the week worth sharing — prefix it with "win:". reply "clear" if no blockers`
-    : `gm ${who}. anything blocking you today? reply with what + who you're waiting on, or reply "clear" if you're good`;
+    ? `🟢 <b>DAILY PULSE · Friday</b>\n\ngm ${who} — <b>any blockers today?</b>\nAnd drop one <b>win</b> from the week worth sharing (prefix it <code>win:</code>).\n\n👉 Reply with what + who you're waiting on, or just <b>clear</b> if you're good.`
+    : `🟢 <b>DAILY PULSE</b>\n\ngm ${who} — <b>anything blocking you today?</b>\n\n👉 Reply with what + who you're waiting on, or just <b>clear</b> if you're good.`;
 }
 
 const CLEAR_PHRASES = new Set([

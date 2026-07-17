@@ -95,10 +95,13 @@ export async function GET(request: Request) {
     const threeWeeksAgo = new Date(now.getTime() - 21 * 86_400_000).toISOString().slice(0, 10);
     const { data: campaigns } = await (supabase as any)
       .from('campaigns')
-      .select('id, name, status, archived_at, client:clients(is_active)')
+      .select('id, name, status, archived_at, is_test, client:clients(is_active)')
       .eq('status', 'Active')
       .is('archived_at', null);
-    const activeCampaigns = ((campaigns as any[]) ?? []).filter(c => c.client?.is_active !== false);
+    // Exclude test campaigns (is_test) — they should never nag the team. Filter
+    // in JS (not .neq) so real campaigns with a null is_test aren't dropped too.
+    const activeCampaigns = ((campaigns as any[]) ?? [])
+      .filter(c => c.client?.is_active !== false && c.is_test !== true);
     const campaignIds = activeCampaigns.map(c => c.id);
     if (campaignIds.length === 0) {
       await logRun('completed', 'No active campaigns.');
@@ -167,7 +170,8 @@ export async function GET(request: Request) {
         const pending = ((pendingSlots as any[]) ?? []);
         if (pending.length > 0) {
           const names = pending.map(s => s.kol?.name).filter(Boolean).slice(0, 8).join(', ');
-          offenders.push(`  • ${escapeHtml(c.name)} — ${pending.length} not posted${names ? ` (${escapeHtml(names)})` : ''}`);
+          // KOL names on their own line under the client for readability.
+          offenders.push(`  • ${escapeHtml(c.name)} — ${pending.length} not posted${names ? `\n${escapeHtml(names)}` : ''}`);
         }
       }
     }
@@ -177,7 +181,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: true, check, findings: 0, inScope: inScope.length });
     }
 
-    const message = [header, ...offenders].join('\n');
+    // Blank line between the header and each client block for scanability.
+    const message = `${header}\n\n${offenders.join('\n\n')}`;
     const sent = await TelegramService.sendToChat(chatId, message, 'HTML', threadId);
 
     await logRun('completed', `${check} check: ${offenders.length} finding(s), ping ${sent ? 'sent' : 'FAILED'}.`);

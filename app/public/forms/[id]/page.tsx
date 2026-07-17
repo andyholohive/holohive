@@ -26,6 +26,17 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   const formId = params.id;
   const searchParams = useSearchParams();
   const clientId = searchParams.get('client');
+  // Where to send the client after they submit (passed by the portal's
+  // "Fill Out Form" button). Same-origin relative paths only — guard against
+  // open-redirect to an external URL [Andy 2026-07-17].
+  const returnRaw = searchParams.get('return');
+  const returnUrl = (() => {
+    if (!returnRaw) return null;
+    try {
+      const decoded = decodeURIComponent(returnRaw);
+      return /^\/(?!\/)/.test(decoded) ? decoded : null;
+    } catch { return null; }
+  })();
   const [form, setForm] = useState<FormWithFields | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -886,6 +897,17 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank you!</h2>
           <p className="text-lg text-gray-600 leading-relaxed">Your response has been submitted successfully.</p>
+          {returnUrl ? (
+            <a
+              href={returnUrl}
+              className="mt-8 inline-flex items-center gap-1.5 rounded-lg bg-brand px-6 py-3 text-white font-medium hover:bg-[#2d6570] transition-colors"
+            >
+              Return to your portal
+              <ChevronRight className="h-4 w-4" />
+            </a>
+          ) : (
+            <p className="mt-6 text-sm text-gray-500">You can now close this tab and head back to your portal.</p>
+          )}
         </div>
       </div>
     );

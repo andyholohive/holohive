@@ -2468,7 +2468,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               </div>
               <Button
                 onClick={() => {
-                  window.open(`${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}`, '_blank');
+                  // Same tab (not _blank) + a return param so the form can send
+                  // the client straight back to this portal after submitting
+                  // [Andy 2026-07-17].
+                  const ret = encodeURIComponent(window.location.pathname + window.location.search);
+                  window.location.href = `${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}&return=${ret}`;
                 }}
                 className="bg-brand hover:bg-[#2d6570] text-white px-6"
               >
