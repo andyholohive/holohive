@@ -30,6 +30,9 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import {
   Zap, Plug, RefreshCw, CheckCircle2, AlertTriangle, Trash2, Save,
@@ -132,12 +135,17 @@ export default function ActivationSettingsDialog({
   const [apiBaseUrl, setApiBaseUrl] = useState('');
   const [savingUrl, setSavingUrl] = useState(false);
   const [testResult, setTestResult] = useState<
-    | { ok: true; data: any }
-    | { ok: false; error: string }
+    | { ok: true; status: number; data: any }
+    | { ok: false; status?: number; error: string }
     | null
   >(null);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  // Inspector controls (ad-hoc testing only — prod sync uses Vercel env tokens).
+  const [testEndpoint, setTestEndpoint] = useState('summary');
+  const [testToken, setTestToken] = useState('');
+  const [testActivationId, setTestActivationId] = useState('');
 
   // Latest snapshot — read-only view + edit baseline
   const [latest, setLatest] = useState<Snapshot | null>(null);
@@ -248,22 +256,37 @@ export default function ActivationSettingsDialog({
   const handleTest = async () => {
     const trimmed = apiBaseUrl.trim();
     if (!trimmed) {
-      setTestResult({ ok: false, error: 'Enter a URL first.' });
+      setTestResult({ ok: false, error: 'Enter a base URL first.' });
       return;
     }
     setTesting(true);
     setTestResult(null);
     try {
-      const url = `${trimmed.replace(/\/+$/, '')}/api/activation/summary`;
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(10_000),
-        headers: { Accept: 'application/json' },
+      // Route through the super-admin server proxy so the Bearer token is
+      // actually sent (Bolt 401s without it) and there's no browser CORS.
+      const res = await fetch('/api/admin/activation-probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base: trimmed,
+          endpoint: testEndpoint,
+          activation_id: testActivationId.trim() || undefined,
+          token: testToken.trim() || undefined,
+        }),
       });
+      const json = await res.json();
       if (!res.ok) {
-        setTestResult({ ok: false, error: `HTTP ${res.status} ${res.statusText}` });
+        setTestResult({ ok: false, error: json?.error || `Proxy error HTTP ${res.status}` });
+      } else if (json.ok) {
+        setTestResult({ ok: true, status: json.status, data: json.data });
       } else {
-        const data = await res.json();
-        setTestResult({ ok: true, data });
+        setTestResult({
+          ok: false,
+          status: json.status,
+          error: json.status
+            ? `HTTP ${json.status}${json.status === 401 ? ' — token missing or wrong' : ''}${typeof json.data === 'string' ? ` · ${json.data.slice(0, 120)}` : ''}`
+            : (json.error || 'Fetch failed'),
+        });
       }
     } catch (err: any) {
       setTestResult({ ok: false, error: err?.message || 'Fetch failed' });
@@ -431,6 +454,48 @@ export default function ActivationSettingsDialog({
                 </p>
               </div>
 
+              {/* Live check — endpoint + optional activation_id + Bearer
+                  token, sent through the super-admin proxy so it actually
+                  authenticates. Token here is for ad-hoc testing only; the
+                  hourly sync reads its token from Vercel env. */}
+              <div className="rounded-md border border-cream-200 bg-cream-50/50 p-3 space-y-2.5">
+                <p className="text-[11px] font-medium text-ink-warm-600 uppercase tracking-wider">Live check</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Endpoint</Label>
+                    <Select value={testEndpoint} onValueChange={setTestEndpoint}>
+                      <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
+                      <SelectContent className="!bg-white">
+                        <SelectItem value="summary">summary</SelectItem>
+                        <SelectItem value="entries-daily">entries-daily</SelectItem>
+                        <SelectItem value="entries-by-kol">entries-by-kol</SelectItem>
+                        <SelectItem value="clicks">clicks</SelectItem>
+                        <SelectItem value="ugc">ugc</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">activation_id <span className="text-ink-warm-400">(optional)</span></Label>
+                    <Input
+                      value={testActivationId}
+                      onChange={(e) => setTestActivationId(e.target.value)}
+                      placeholder="venice-pro-rebate-2026q3"
+                      className="focus-brand h-9"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Bearer token <span className="text-ink-warm-400">(FOGO / VENICE — testing only)</span></Label>
+                  <Input
+                    type="password"
+                    value={testToken}
+                    onChange={(e) => setTestToken(e.target.value)}
+                    placeholder="paste token to authenticate"
+                    className="focus-brand h-9 font-mono"
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={handleTest} disabled={testing}>
                   {testing ? <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plug className="h-3.5 w-3.5 mr-1" />}
@@ -452,7 +517,7 @@ export default function ActivationSettingsDialog({
                     <>
                       <div className="flex items-center gap-1.5 font-medium text-emerald-700 mb-1">
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        Connection OK
+                        Connection OK — HTTP {testResult.status} · <code className="font-mono">{testEndpoint}</code>
                       </div>
                       <pre className="text-[10px] font-mono text-ink-warm-700 overflow-auto max-h-32 bg-white/60 p-2 rounded">
                         {JSON.stringify(testResult.data, null, 2)}
