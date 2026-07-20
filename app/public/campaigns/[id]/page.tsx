@@ -404,6 +404,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   // section just doesn't render and nothing in the rest of the
   // page depends on this state.
   const [activation, setActivation] = useState<ActivationSnapshot | null>(null);
+  // All activations for this campaign (a campaign can host several — e.g.
+  // Venice: product + upbit + live rebate). `activation` kept = the first for
+  // any legacy single-reference; the render maps over `activations`.
+  const [activations, setActivations] = useState<ActivationSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Showcase masking helpers. Centralized so the spec's per-flag
@@ -1212,14 +1216,24 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           .from('activation_snapshots')
           .select('*')
           .eq('campaign_id', actualCampaignId)
-          .order('synced_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order('synced_at', { ascending: false });
         if (snapErr) {
           console.warn('Activation snapshot fetch error:', snapErr);
+          setActivations([]);
           setActivation(null);
         } else {
-          setActivation((snapData as ActivationSnapshot | null) || null);
+          // One row per activation_key (upsert guarantees this; the filter is a
+          // belt-and-braces guard against legacy dupes / null keys).
+          const list = (snapData as ActivationSnapshot[] | null) || [];
+          const seen = new Set<string>();
+          const deduped = list.filter((r: any) => {
+            const k = r.activation_key || r.id;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          setActivations(deduped);
+          setActivation(deduped[0] || null);
         }
       } catch (snapErr) {
         console.warn('Activation snapshot fetch failed:', snapErr);
@@ -2652,7 +2666,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       a simple PFP activation shows 3-4 blocks; a
                       Trader Card style shows all 8. Showcase mode
                       masks KOL names where they appear. */}
-                  {activation && (() => {
+                  {activations.map((activation) => (
+                  <div key={activation.id} className="mb-8 last:mb-0">{(() => {
                     const s = activation.summary_json;
                     const daily = activation.entries_daily_json;
                     const byKol = activation.entries_by_kol_json;
@@ -2669,15 +2684,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     // applied. We look up the campaign_kol by kol_id
                     // when the portal provides it; fall back to the
                     // portal's pre-baked `label` field otherwise.
-                    const labelForKol = (entry: { kol_id?: string; label?: string }, idx: number): string => {
+                    const labelForKol = (entry: { kol_id?: string; label?: string; handle?: string }, idx: number): string => {
                       if (entry.kol_id) {
                         const kolIdx = kols.findIndex(k => k.id === entry.kol_id);
                         if (kolIdx >= 0) return maskedKolName(kols[kolIdx].master_kol.name, kolIdx);
                       }
-                      // No mapping → use whatever label the portal
-                      // returned. In showcase mode we still mask by
-                      // position so the chart axis doesn't leak.
-                      return mask.kolHandles ? `KOL #${idx + 1}` : (entry.label || `KOL #${idx + 1}`);
+                      // No mapping → prefer the activation API's `handle`
+                      // (the KOL/community name, same format as our roster),
+                      // then a legacy `label`. In showcase mode we still mask
+                      // by position so the chart axis doesn't leak.
+                      return mask.kolHandles ? `KOL #${idx + 1}` : (entry.handle || entry.label || `KOL #${idx + 1}`);
                     };
 
                     const totalEntries = byKol ? byKol.reduce((sum, e) => sum + (e.entries || 0), 0) : 0;
@@ -2997,7 +3013,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </div>
                     );
-                  })()}
+                  })()}</div>
+                  ))}
 
                   {/* Content View Toggle */}
                   <div className="mb-4">
