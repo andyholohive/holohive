@@ -5,6 +5,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/activation-sync",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/kr-signal-weekly",
       "schedule": "0 12 * * 0"
     },

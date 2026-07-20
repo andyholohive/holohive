@@ -43,6 +43,7 @@ export const maxDuration = 60;
 // (24 expected, 120 = 5× threshold).
 const EXPECTED_DAILY_MAX: Record<string, number> = {
   KOREAN_EXCHANGES: 24,        // hourly
+  ACTIVATION_SYNC: 24,         // hourly — activation microsite snapshot sync
   MINDSHARE_SCAN: 48,          // every 30 min
   GOOGLE_MEETING_REMINDERS: 288, // every 5 min
   DISCOVERY: 2,                // daily (sometimes 2x if runs_per_day=2)

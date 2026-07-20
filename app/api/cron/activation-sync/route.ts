@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { activationFetch, activationUrl } from '@/lib/activationFetch';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -7,46 +8,35 @@ export const maxDuration = 60;
 /**
  * GET /api/cron/activation-sync
  *
- * Spec section 4.2 of the HHP Campaign Dashboard (Jdot, 2026-06-05).
- * Polls each campaign's `activation_api_base_url` (when set) and
- * snapshots the result into `activation_snapshots`. The campaign
- * page reads from the cache, never live from the portal.
+ * Polls each row in `campaign_activation_sources` (base + optional
+ * activation_id + token_family) and snapshots the result into
+ * `activation_snapshots`, keyed (campaign_id, activation_key). The campaign
+ * page reads from the cache, never live.
  *
- * Endpoints fetched per the spec:
- *   GET <base>/api/activation/summary         → KPI totals + meta
- *   GET <base>/api/activation/entries-daily   → date / count series
- *   GET <base>/api/activation/entries-by-kol  → per-KOL entry counts
- *   GET <base>/api/activation/clicks          → ecosystem clicks
- *   GET <base>/api/activation/ugc             → UGC performance
+ * Auth per source: Bearer token read server-side from `activation_api_tokens`
+ * by the source's token_family. Tokens never leave the server.
  *
- * Schedule: hourly is sufficient per spec section 4.2. Register in
- * vercel.json once Andy is ready for the first activation to go
- * live; until then this route is a no-op for every campaign with
- * activation_api_base_url unset.
+ * Redirect-safe: microsites 308 apex→www; activationFetch re-attaches the
+ * token across same-site hops (the built-in follower would strip it → 401).
  *
- * Auth: Bearer ${CRON_SECRET}.
+ * Status-gate: a source whose stored status is 'completed' AND which already
+ * has a snapshot is FROZEN (skipped) — completed activations are final, only
+ * live ones keep moving. Force a resync of a completed one with ?force=1.
  *
- * Graceful degrade:
- *   • Per-campaign per-endpoint failures don't stop the run; logged
- *     per row and included in the response. Other campaigns still
- *     snapshot cleanly.
- *   • If summary endpoint is missing entirely we skip the campaign
- *     (no point storing a row with no headline data).
- *   • Empty bases (most campaigns today) skip silently.
+ * Endpoints: /api/activation/{summary,entries-daily,entries-by-kol,clicks,ugc}.
+ * Schedule: hourly (vercel.json). Route auth: Bearer CRON_SECRET, or a
+ * super_admin session (admin "Sync now"). Optional ?campaign_id= / ?source_id=.
  */
 export async function GET(request: Request) {
-  // Auth — accept either CRON_SECRET (cron schedule) OR an
-  // authenticated Supabase session cookie (admin-triggered "Sync Now"
-  // button from the activation settings dialog). The session path
-  // re-validates the user is super_admin so it can't be exploited
-  // by random session holders.
   const url = new URL(request.url);
   const campaignIdFilter = url.searchParams.get('campaign_id');
+  const sourceIdFilter = url.searchParams.get('source_id');
+  const force = url.searchParams.get('force') === '1';
+
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization') || '';
   const cronAuthOk = cronSecret && authHeader === `Bearer ${cronSecret}`;
   if (!cronAuthOk) {
-    // Admin path — require super_admin.
     const { requireSuperAdmin } = await import('@/lib/requireSuperAdmin');
     const guard = await requireSuperAdmin(request);
     if (!guard.ok) return guard.response;
@@ -59,98 +49,93 @@ export async function GET(request: Request) {
   );
 
   const start = Date.now();
+  type EndpointKey = 'summary' | 'entries-daily' | 'entries-by-kol' | 'clicks' | 'ugc';
+  const endpoints: EndpointKey[] = ['summary', 'entries-daily', 'entries-by-kol', 'clicks', 'ugc'];
 
   try {
-    // Per-campaign filter when called from the admin Sync Now button.
-    // Without it, the route iterates every campaign that has an
-    // activation_api_base_url set (cron's job).
-    let query = (supabase as any)
-      .from('campaigns')
-      .select('id, activation_api_base_url')
-      .not('activation_api_base_url', 'is', null)
-      .is('archived_at', null);
-    if (campaignIdFilter) query = query.eq('id', campaignIdFilter);
-    const { data: campaigns, error } = await query;
-    if (error) throw error;
+    // Load enabled sources (+ filters).
+    let q = (supabase as any)
+      .from('campaign_activation_sources')
+      .select('*')
+      .eq('enabled', true);
+    if (campaignIdFilter) q = q.eq('campaign_id', campaignIdFilter);
+    if (sourceIdFilter) q = q.eq('id', sourceIdFilter);
+    const { data: sources, error: srcErr } = await q;
+    if (srcErr) throw srcErr;
 
-    const rows = (campaigns || []) as Array<{ id: string; activation_api_base_url: string }>;
-
+    const rows = (sources || []) as Array<any>;
     if (rows.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        campaignsConsidered: 0,
-        snapshotsWritten: 0,
-        skipReason: 'no campaigns have activation_api_base_url set',
-        durationMs: Date.now() - start,
-      });
+      return NextResponse.json({ ok: true, sourcesConsidered: 0, snapshotsWritten: 0, skipReason: 'no enabled activation sources', durationMs: Date.now() - start });
     }
 
-    type EndpointKey = 'summary' | 'entries-daily' | 'entries-by-kol' | 'clicks' | 'ugc';
-    const endpoints: EndpointKey[] = ['summary', 'entries-daily', 'entries-by-kol', 'clicks', 'ugc'];
+    // Tokens by family (fetched once).
+    const { data: tokenRows } = await (supabase as any).from('activation_api_tokens').select('token_family, token');
+    const tokens: Record<string, string> = {};
+    for (const t of tokenRows || []) tokens[t.token_family] = t.token;
 
     let snapshotsWritten = 0;
-    const errors: Array<{ campaign_id: string; error: string }> = [];
+    let skippedCompleted = 0;
+    const errors: Array<{ source: string; error: string }> = [];
 
-    for (const c of rows) {
+    for (const s of rows) {
       try {
-        const base = c.activation_api_base_url.replace(/\/+$/, '');
-        const fetches = await Promise.all(endpoints.map(async (ep): Promise<[EndpointKey, any | null]> => {
-          try {
-            const res = await fetch(`${base}/api/activation/${ep}`, {
-              // Conservative timeout via AbortController. Microsite
-              // hosts can be flaky and we don't want the cron to
-              // run long. 10s is plenty for a typical KV-backed
-              // microsite endpoint.
-              signal: AbortSignal.timeout(10_000),
-              headers: { Accept: 'application/json' },
-            });
-            if (!res.ok) return [ep, null];
-            return [ep, await res.json()];
-          } catch {
-            return [ep, null];
-          }
-        }));
+        // Freeze completed activations that already have a snapshot.
+        if (!force && s.status === 'completed') {
+          const { count } = await (supabase as any)
+            .from('activation_snapshots')
+            .select('id', { count: 'exact', head: true })
+            .eq('campaign_id', s.campaign_id)
+            .eq('activation_key', s.activation_key);
+          if ((count ?? 0) > 0) { skippedCompleted++; continue; }
+        }
 
-        const blobs = Object.fromEntries(fetches) as Record<EndpointKey, any | null>;
+        const token = tokens[s.token_family];
+        if (!token) { errors.push({ source: s.activation_key, error: `no token set for family '${s.token_family}'` }); continue; }
+
+        const results = await Promise.all(endpoints.map(async (ep): Promise<[EndpointKey, any | null]> => {
+          const r = await activationFetch(activationUrl(s.base_url, ep, s.activation_id_param), token).catch(() => null);
+          return [ep, r && r.ok ? r.data : null];
+        }));
+        const blobs = Object.fromEntries(results) as Record<EndpointKey, any | null>;
 
         if (!blobs.summary) {
-          // No summary = no point snapshotting. Skip this campaign
-          // for this run; we'll try again next cron tick.
-          errors.push({ campaign_id: c.id, error: 'summary endpoint returned no data' });
+          errors.push({ source: s.activation_key, error: 'summary returned no data (auth/URL/redirect?)' });
           continue;
         }
-
         const summary = blobs.summary || {};
-        const insertPayload: Record<string, any> = {
-          campaign_id: c.id,
-          activation_name: summary.name || null,
-          activation_type: summary.type || null,
-          status:          summary.status || null,
-          start_date:      summary.start_date || null,
-          end_date:        summary.end_date || null,
-          summary_json:        blobs.summary,
-          entries_daily_json:  blobs['entries-daily'],
-          entries_by_kol_json: blobs['entries-by-kol'],
-          clicks_json:         blobs.clicks,
-          ugc_json:            blobs.ugc,
-          synced_at: new Date().toISOString(),
-        };
+        const newStatus = summary.status || s.status || null;
 
-        const { error: insertErr } = await (supabase as any)
+        const { error: upErr } = await (supabase as any)
           .from('activation_snapshots')
-          .insert(insertPayload);
-        if (insertErr) {
-          errors.push({ campaign_id: c.id, error: insertErr.message });
-        } else {
-          snapshotsWritten++;
-        }
+          .upsert({
+            campaign_id: s.campaign_id,
+            activation_key: s.activation_key,
+            activation_name: summary.name || s.display_name || null,
+            activation_type: summary.type || null,
+            status: newStatus,
+            start_date: summary.start_date || null,
+            end_date: summary.end_date || null,
+            summary_json: blobs.summary,
+            entries_daily_json: blobs['entries-daily'],
+            entries_by_kol_json: blobs['entries-by-kol'],
+            clicks_json: blobs.clicks,
+            ugc_json: blobs.ugc,
+            synced_at: new Date().toISOString(),
+          }, { onConflict: 'campaign_id,activation_key' });
+
+        if (upErr) { errors.push({ source: s.activation_key, error: upErr.message }); continue; }
+        snapshotsWritten++;
+
+        // Mirror status + last_synced_at back onto the source (drives the freeze gate).
+        await (supabase as any)
+          .from('campaign_activation_sources')
+          .update({ status: newStatus, last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('id', s.id);
       } catch (err: any) {
-        errors.push({ campaign_id: c.id, error: err?.message || String(err) });
+        errors.push({ source: s.activation_key, error: err?.message || String(err) });
       }
     }
 
-    // agent_runs log for cron-health-check coverage. Best-effort so
-    // a logging hiccup doesn't mask the real result.
     try {
       await (supabase as any).from('agent_runs').insert({
         agent_name: 'ACTIVATION_SYNC',
@@ -158,22 +143,20 @@ export async function GET(request: Request) {
         started_at: new Date(start).toISOString(),
         completed_at: new Date().toISOString(),
         status: errors.length === rows.length ? 'failed' : 'success',
-        output_summary: `Snapshotted ${snapshotsWritten} of ${rows.length} campaign(s).`,
+        output_summary: `Wrote ${snapshotsWritten}/${rows.length} snapshot(s); ${skippedCompleted} frozen; ${errors.length} error(s).`,
       });
     } catch {/* swallow */}
 
     return NextResponse.json({
       ok: true,
-      campaignsConsidered: rows.length,
+      sourcesConsidered: rows.length,
       snapshotsWritten,
-      errors: errors.length > 0 ? errors : undefined,
+      skippedCompleted,
+      errors: errors.length ? errors : undefined,
       durationMs: Date.now() - start,
     });
   } catch (err: any) {
     console.error('[cron/activation-sync] error:', err);
-    return NextResponse.json(
-      { ok: false, error: err?.message || 'sync failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: err?.message || 'sync failed' }, { status: 500 });
   }
 }
