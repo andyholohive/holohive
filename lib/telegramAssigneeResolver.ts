@@ -70,6 +70,7 @@ export async function resolveAssigneeFromMessage(
   // Pass 2: mention entities. Slice the @handle out of the message
   // text using offset/length (the entity points at the substring).
   // Strip the leading @ before lookup.
+  const unmatchedHandles: string[] = [];
   for (const entity of entities) {
     if (entity.type !== 'mention') continue;
     const handleWithAt = messageText.slice(entity.offset, entity.offset + entity.length);
@@ -89,9 +90,63 @@ export async function resolveAssigneeFromMessage(
         matched_via: 'mention',
       };
     }
+    unmatchedHandles.push(handle);
+  }
+
+  // Pass 3: fuzzy fallback for @handles that don't exactly match a
+  // telegram_username — e.g. "@quazo" for the user named "Quazo" whose
+  // handle is "Elquazo". An @-tag is unambiguous intent to assign
+  // SOMEONE, so try matching the handle against team member names and
+  // username substrings. Only auto-picks when exactly ONE member
+  // matches; ambiguity still returns null rather than guessing.
+  if (unmatchedHandles.length > 0) {
+    const { data: roster } = await (supabase as any)
+      .from('users')
+      .select('id, name, telegram_username')
+      .not('telegram_id', 'is', null);
+    for (const handle of unmatchedHandles) {
+      const match = matchHandleToRoster(handle, (roster || []) as RosterMember[]);
+      if (match) {
+        return {
+          user_id: match.id,
+          name: match.name || match.telegram_username || handle,
+          telegram_username: match.telegram_username,
+          matched_via: 'mention',
+        };
+      }
+    }
   }
 
   return null;
+}
+
+export interface RosterMember {
+  id: string;
+  name: string | null;
+  telegram_username: string | null;
+}
+
+/**
+ * Match a bare handle (no @) against the team roster by name/username
+ * similarity. Returns the member ONLY if exactly one matches — two or
+ * more candidates means ambiguity, and picking wrong is worse than
+ * asking. Exported for testability.
+ */
+export function matchHandleToRoster(handle: string, roster: RosterMember[]): RosterMember | null {
+  const h = handle.toLowerCase().trim();
+  if (h.length < 3) return null;
+  const candidates = roster.filter((m) => {
+    const name = (m.name || '').toLowerCase().trim();
+    const username = (m.telegram_username || '').toLowerCase().trim();
+    if (name && (name === h || senderNameTokens({ name: m.name, telegram_username: null }).includes(h))) {
+      return true;
+    }
+    // Substring either way: "@quazo" ⊂ "elquazo", or a typed
+    // "@elquazo1" ⊃ "elquazo". Both sides length-gated by the ≥3 check.
+    if (username && (username.includes(h) || h.includes(username))) return true;
+    return false;
+  });
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 // ─── Self-reference fallback ─────────────────────────────────────────────
