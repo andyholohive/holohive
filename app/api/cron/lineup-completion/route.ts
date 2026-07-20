@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       const globalThreadRaw = (globalThreadSetting.data as any)?.value as string | undefined;
 
       for (const co of result.closeOuts) {
+        if (co.isTest) continue; // Test campaigns never post [2026-07-21].
         const targetChatId = globalChatId || co.opsChatId;
         if (!targetChatId) continue; // No destination — skip silently.
         const targetThreadId = globalChatId && globalThreadRaw ? parseInt(globalThreadRaw, 10) : undefined;

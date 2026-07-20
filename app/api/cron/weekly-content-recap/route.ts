@@ -96,11 +96,12 @@ export async function GET(request: Request) {
     // Campaigns with a confirmed/completed lineup for the ended week.
     const { data: lineups } = await (supabase as any)
       .from('campaign_lineups')
-      .select('campaign_id, campaign:campaigns(id, name, status, archived_at, client_id, client:clients(is_active))')
+      .select('campaign_id, campaign:campaigns(id, name, status, archived_at, is_test, client_id, client:clients(is_active))')
       .eq('week_of', prevMonday)
       .in('status', ['confirmed', 'completed']);
 
-    // De-dup campaigns + filter to active/non-archived.
+    // De-dup campaigns + filter to active/non-archived. Test campaigns
+    // never send client-facing recaps [2026-07-21].
     const seen = new Set<string>();
     const campaigns: Array<{ id: string; name: string; clientId: string | null }> = [];
     for (const l of ((lineups as any[]) ?? [])) {
@@ -108,6 +109,7 @@ export async function GET(request: Request) {
       if (!c || seen.has(c.id)) continue;
       if (c.status !== 'Active' || c.archived_at) continue;
       if (c.client?.is_active === false) continue;
+      if (c.is_test === true) continue;
       seen.add(c.id);
       campaigns.push({ id: c.id, name: c.name, clientId: c.client_id ?? null });
     }

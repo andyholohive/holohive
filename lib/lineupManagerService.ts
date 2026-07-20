@@ -102,6 +102,8 @@ export type LineupCloseOut = {
   missedNames: string[];
   /** Per-campaign ops chat fallback (campaigns.tg_ops_group_id). */
   opsChatId: string | null;
+  /** Test campaigns get marked completed but never post to TG. */
+  isTest: boolean;
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -628,7 +630,7 @@ export class LineupManagerService {
     const today = new Date().toISOString().slice(0, 10);
     const { data: candidates, error: cErr } = await (this.supabase as any)
       .from('campaign_lineups')
-      .select('id, week_of, week_number, campaign:campaigns(id, name, tg_ops_group_id)')
+      .select('id, week_of, week_number, campaign:campaigns(id, name, tg_ops_group_id, is_test)')
       .eq('status', 'confirmed');
     if (cErr) throw cErr;
 
@@ -636,7 +638,7 @@ export class LineupManagerService {
       id: string;
       week_of: string;
       week_number: number;
-      campaign: { id: string; name: string; tg_ops_group_id: string | null } | null;
+      campaign: { id: string; name: string; tg_ops_group_id: string | null; is_test: boolean | null } | null;
     }>).filter(c => {
       // week_of is the Monday; the week ends 6 days later (Sunday inclusive).
       const weekEnd = new Date(c.week_of + 'T00:00:00Z');
@@ -693,6 +695,7 @@ export class LineupManagerService {
         total,
         missedNames,
         opsChatId: lineup.campaign?.tg_ops_group_id ?? null,
+        isTest: lineup.campaign?.is_test === true,
       });
     }
 

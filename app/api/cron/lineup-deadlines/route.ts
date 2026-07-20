@@ -95,13 +95,36 @@ export async function GET(request: Request) {
     const threeWeeksAgo = new Date(now.getTime() - 21 * 86_400_000).toISOString().slice(0, 10);
     const { data: campaigns } = await (supabase as any)
       .from('campaigns')
-      .select('id, name, status, archived_at, is_test, client:clients(is_active)')
+      .select('id, name, status, archived_at, is_test, client_id, client:clients(is_active, is_ad_hoc)')
       .eq('status', 'Active')
       .is('archived_at', null);
+    // [2026-07-21 per Andy] Also exclude PAUSED clients — same derivation
+    // as /clients: active + not ad-hoc + engagement coverage lapsed
+    // (max client_coverage.covered_through missing or before today).
+    const clientIdsForCoverage = [...new Set(((campaigns as any[]) ?? []).map(c => c.client_id).filter(Boolean))];
+    const coveredThroughByClient = new Map<string, string>();
+    if (clientIdsForCoverage.length > 0) {
+      const { data: coverage } = await (supabase as any)
+        .from('client_coverage')
+        .select('client_id, covered_through')
+        .in('client_id', clientIdsForCoverage);
+      for (const row of ((coverage as any[]) ?? [])) {
+        if (!row.covered_through) continue;
+        const prev = coveredThroughByClient.get(row.client_id);
+        if (!prev || row.covered_through > prev) coveredThroughByClient.set(row.client_id, row.covered_through);
+      }
+    }
+    const todayIso = now.toISOString().slice(0, 10);
+    const isClientPaused = (c: any) => {
+      if (c.client?.is_active === false) return false; // inactive handled separately
+      if (c.client?.is_ad_hoc) return false;           // ad-hoc clients have no coverage by design
+      const covered = c.client_id ? coveredThroughByClient.get(c.client_id) : undefined;
+      return !covered || covered < todayIso;
+    };
     // Exclude test campaigns (is_test) — they should never nag the team. Filter
     // in JS (not .neq) so real campaigns with a null is_test aren't dropped too.
     const activeCampaigns = ((campaigns as any[]) ?? [])
-      .filter(c => c.client?.is_active !== false && c.is_test !== true);
+      .filter(c => c.client?.is_active !== false && c.is_test !== true && !isClientPaused(c));
     const campaignIds = activeCampaigns.map(c => c.id);
     if (campaignIds.length === 0) {
       await logRun('completed', 'No active campaigns.');

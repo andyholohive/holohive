@@ -31,11 +31,17 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   // open-redirect to an external URL [Andy 2026-07-17].
   const returnRaw = searchParams.get('return');
   const returnUrl = (() => {
-    if (!returnRaw) return null;
-    try {
-      const decoded = decodeURIComponent(returnRaw);
-      return /^\/(?!\/)/.test(decoded) ? decoded : null;
-    } catch { return null; }
+    if (returnRaw) {
+      try {
+        const decoded = decodeURIComponent(returnRaw);
+        if (/^\/(?!\/)/.test(decoded)) return decoded;
+      } catch { /* fall through to the client-portal default */ }
+    }
+    // [2026-07-21 per Andy] No explicit return target, but a
+    // client-scoped link means the client's portal IS the source —
+    // always give them a real button back instead of the "you can
+    // close this tab" text.
+    return clientId ? `/public/portal/${clientId}` : null;
   })();
   const [form, setForm] = useState<FormWithFields | null>(null);
   const [loading, setLoading] = useState(true);

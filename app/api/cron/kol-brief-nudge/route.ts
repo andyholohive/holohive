@@ -40,15 +40,16 @@ export async function GET(request: Request) {
     // Sent, not opened, still live (not past expiry).
     const { data: rows, error } = await (supabase as any)
       .from('kol_brief_tokens')
-      .select('campaign_id, week_number, kol_id, master_kols:master_kols(name), campaigns:campaigns(name)')
+      .select('campaign_id, week_number, kol_id, master_kols:master_kols(name), campaigns:campaigns(name, is_test)')
       .not('sent_at', 'is', null)
       .is('opened_at', null)
       .gt('expires_at', nowIso);
     if (error) throw error;
 
-    // Group by campaign + week.
+    // Group by campaign + week. Test campaigns never nudge [2026-07-21].
     const groups = new Map<string, { campaign: string; week: number | null; names: string[] }>();
     for (const r of (rows ?? []) as any[]) {
+      if (r.campaigns?.is_test === true) continue;
       const key = `${r.campaign_id}:${r.week_number}`;
       if (!groups.has(key)) {
         groups.set(key, { campaign: r.campaigns?.name ?? 'Campaign', week: r.week_number, names: [] });
