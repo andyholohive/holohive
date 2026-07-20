@@ -1564,7 +1564,9 @@ export function KolDashboardTableView({
                                                   campaign_id: campaign?.id,
                                                   campaign_kols_id: campaignKOL.id,
                                                   type: type,
-                                                  status: 'pending',
+                                                  // Team-logged content defaults to live; the TG /submit
+                                                  // pipeline is the path that needs pending states.
+                                                  status: 'posted',
                                                   activation_date: null,
                                                   content_link: null,
                                                   platform: autoPlatform,
