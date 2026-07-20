@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
+import { getCampaignWeek, getTotalCampaignWeeksFromCoverage } from "@/lib/campaignWeekHelpers";
 import { CampaignTemplateService, CampaignTemplateWithDetails } from "@/lib/campaignTemplateService";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1205,7 +1206,25 @@ export default function CampaignsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paginatedCampaigns.map((campaign) => {
             const counts = contentCounts[campaign.id];
-            const pct = counts && counts.total > 0 ? Math.round((counts.posted / counts.total) * 100) : 0;
+            // Week progress — IDENTICAL math to the client portal tracker hero
+            // (campaignWeekHelpers + client covered_through), so the internal
+            // card and the client-facing "Week N of M" bar always agree.
+            // Previously this bar showed posted/total content %, which read
+            // differently from what the client sees. [Andy 2026-07-20]
+            const termEndIso = campaign.client_covered_through ?? campaign.end_date;
+            const startMs = campaign.start_date ? new Date(`${campaign.start_date}T00:00:00`).getTime() : null;
+            const endMs = termEndIso ? new Date(`${termEndIso}T00:00:00`).getTime() : null;
+            let weekN = 0, weekOf = 0, weekPct = 0;
+            if (startMs && endMs && endMs > startMs) {
+              const week = getCampaignWeek(campaign.start_date);
+              weekOf = getTotalCampaignWeeksFromCoverage(
+                campaign.start_date,
+                campaign.client_covered_through,
+                campaign.end_date,
+              );
+              weekN = week ? Math.min(weekOf, week.weekNumber) : 0;
+              weekPct = Math.round(Math.max(0, Math.min(1, (Date.now() - startMs) / (endMs - startMs))) * 100);
+            }
             return (
               // v11 campaign card — same shape as /clients, /lists cards.
               // Logo tile (client logo if set, else brand-soft Megaphone)
@@ -1288,18 +1307,21 @@ export default function CampaignsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
-                  {/* Progress section — label + percentage + 2px brand
-                      bar. Matches the onboarding-progress pattern on
-                      the /clients card. */}
+                  {/* Progress section — time-based Week N of M, mirroring the
+                      client portal tracker's hero bar (same helpers, same
+                      covered_through end anchor). Content counts stay as
+                      subtext below. */}
                   <div className="mb-3">
                     <div className="flex items-baseline justify-between text-sm mb-1.5">
                       <span className="font-semibold text-ink-warm-700">Progress</span>
-                      <span className="text-xs text-ink-warm-500 tabular-nums">{pct}%</span>
+                      <span className="text-xs text-ink-warm-500 tabular-nums">
+                        {weekOf > 0 ? `Week ${weekN} of ${weekOf}` : 'Dates TBD'}
+                      </span>
                     </div>
                     <div className="w-full h-2 bg-cream-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-brand transition-all duration-300"
-                        style={{ width: `${pct}%` }}
+                        style={{ width: `${weekPct}%` }}
                       />
                     </div>
                     <div className="mt-2 space-y-0.5 text-xs text-ink-warm-500">
