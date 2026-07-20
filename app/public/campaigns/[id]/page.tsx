@@ -2669,8 +2669,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   {activations.map((activation) => (
                   <div key={activation.id} className="mb-8 last:mb-0">{(() => {
                     const s = activation.summary_json;
-                    const daily = activation.entries_daily_json;
-                    const byKol = activation.entries_by_kol_json;
+                    // Bolt wraps the array payloads in an object envelope
+                    // (`{ series: [...] }`, `{ kols: [...] }`); older manual
+                    // snapshots stored a bare array. Normalize both shapes so
+                    // the chart/reduce code always sees a plain array.
+                    const dailyRaw: any = activation.entries_daily_json;
+                    const daily: any[] | null = Array.isArray(dailyRaw) ? dailyRaw : (dailyRaw?.series ?? null);
+                    const byKolRaw: any = activation.entries_by_kol_json;
+                    const byKol: any[] | null = Array.isArray(byKolRaw) ? byKolRaw : (byKolRaw?.kols ?? null);
                     const clicks = activation.clicks_json;
                     const ugc = activation.ugc_json;
 
