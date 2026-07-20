@@ -41,6 +41,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
+import ActivationSourcesManager from './ActivationSourcesManager';
 
 // ─── DateField — matches the canonical project pattern from
 //     app/expenses/page.tsx (Popover + Button trigger + Calendar
@@ -133,7 +134,6 @@ export default function ActivationSettingsDialog({
 
   // Connect tab
   const [apiBaseUrl, setApiBaseUrl] = useState('');
-  const [savingUrl, setSavingUrl] = useState(false);
   const [testResult, setTestResult] = useState<
     | { ok: true; status: number; data: any }
     | { ok: false; status?: number; error: string }
@@ -233,26 +233,6 @@ export default function ActivationSettingsDialog({
   }
 
   // ─── Connect tab actions ────────────────────────────────────────
-  const handleSaveUrl = async () => {
-    setSavingUrl(true);
-    const trimmed = apiBaseUrl.trim();
-    const { error } = await (supabase as any)
-      .from('campaigns')
-      .update({ activation_api_base_url: trimmed || null })
-      .eq('id', campaignId);
-    setSavingUrl(false);
-    if (error) {
-      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-    toast({
-      title: trimmed ? 'API URL saved' : 'API URL cleared',
-      description: trimmed
-        ? 'Cron will pick this up on its next run.'
-        : 'Sync is now paused for this campaign.',
-    });
-  };
-
   const handleTest = async () => {
     const trimmed = apiBaseUrl.trim();
     if (!trimmed) {
@@ -439,18 +419,22 @@ export default function ActivationSettingsDialog({
             </TabsList>
 
             {/* ─── Connect tab ─────────────────────────────────── */}
-            <TabsContent value="connect" className="flex-1 overflow-y-auto min-h-0 mt-3 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="api-base-url" className="text-xs">Activation portal API base URL</Label>
+            <TabsContent value="connect" className="flex-1 overflow-y-auto min-h-0 mt-3 space-y-5">
+              {/* Tokens + activation sources — the real config. The hourly
+                  cron reads these; the campaign page renders their snapshots. */}
+              <ActivationSourcesManager campaignId={campaignId} />
+
+              <div className="border-t border-cream-200 pt-4 space-y-2">
+                <Label htmlFor="api-base-url" className="text-xs uppercase tracking-wider text-ink-warm-500">Live check — test any base</Label>
                 <Input
                   id="api-base-url"
                   value={apiBaseUrl}
                   onChange={(e) => setApiBaseUrl(e.target.value)}
-                  placeholder="https://venicekorea.app"
+                  placeholder="https://www.venicekorea.app"
                   className="focus-brand"
                 />
                 <p className="text-[11px] text-ink-warm-500">
-                  HHP will hit <code className="bg-cream-100 px-1 rounded">{`<url>/api/activation/summary`}</code>, <code className="bg-cream-100 px-1 rounded">.../entries-daily</code>, <code className="bg-cream-100 px-1 rounded">.../entries-by-kol</code>, <code className="bg-cream-100 px-1 rounded">.../clicks</code>, and <code className="bg-cream-100 px-1 rounded">.../ugc</code> hourly.
+                  Ad-hoc check of one endpoint on one base (auth + redirects handled server-side). Configuration lives in the list above — this just probes.
                 </p>
               </div>
 
@@ -500,10 +484,6 @@ export default function ActivationSettingsDialog({
                 <Button size="sm" variant="outline" onClick={handleTest} disabled={testing}>
                   {testing ? <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plug className="h-3.5 w-3.5 mr-1" />}
                   Test connection
-                </Button>
-                <Button size="sm" variant="brand" onClick={handleSaveUrl} disabled={savingUrl}>
-                  <Save className="h-3.5 w-3.5 mr-1" />
-                  Save URL
                 </Button>
               </div>
 
