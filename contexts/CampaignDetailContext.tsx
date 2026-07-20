@@ -64,6 +64,9 @@ export type PaymentNotificationTriggerOpts = {
   chatId: string;
   chatTitle: string | null;
   date: Date;
+  /** Linked contents on the payment — the message header uses their
+   *  post (activation) date instead of the payment date when present. */
+  contentIds?: string[];
 };
 
 /** Toast caller — kept loose to match the project's `useToast` hook. */

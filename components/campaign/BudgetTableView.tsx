@@ -16,7 +16,7 @@
  * + selection + inline-edit + delete-dialog slots.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -105,6 +105,60 @@ export function BudgetTableView() {
 
   // ── Filter / sort / search state ───────────────────────────────
   const [paymentsSearchTerm, setPaymentsSearchTerm] = useState('');
+
+  // Content-tag chips for the Content column — one fetch covering every
+  // content row in this campaign (vs the per-row self-fetch pattern in
+  // ContentTagCell, which would be N queries here).
+  const [contentTagMap, setContentTagMap] = useState<Map<string, { label: string; color: string | null }[]>>(new Map());
+  useEffect(() => {
+    const ids = contents.map((c: any) => c.id).filter(Boolean);
+    if (ids.length === 0) { setContentTagMap(new Map()); return; }
+    let alive = true;
+    Promise.all([
+      (supabase as any)
+        .from('content_tags')
+        .select('id, name, color')
+        .is('archived_at', null),
+      (supabase as any)
+        .from('content_tag_assignments')
+        .select('content_id, tag_id, sequence_n, sequence_of')
+        .in('content_id', ids),
+    ]).then(([tagsRes, asgsRes]: any[]) => {
+      if (!alive || tagsRes.error || asgsRes.error) return;
+      const tagsById = new Map<string, any>((tagsRes.data || []).map((t: any) => [t.id, t]));
+      const m = new Map<string, { label: string; color: string | null }[]>();
+      for (const a of asgsRes.data || []) {
+        const t = tagsById.get(a.tag_id);
+        if (!t) continue;
+        const label = t.name === 'Multi-Post' && a.sequence_n && a.sequence_of
+          ? `Post ${a.sequence_n} of ${a.sequence_of}`
+          : t.name;
+        const arr = m.get(a.content_id) || [];
+        arr.push({ label, color: t.color });
+        m.set(a.content_id, arr);
+      }
+      setContentTagMap(m);
+    });
+    return () => { alive = false; };
+  }, [contents]);
+
+  const renderContentTagChips = (contentId: string) => {
+    const chips = contentTagMap.get(contentId);
+    if (!chips || chips.length === 0) return null;
+    return (
+      <span className="inline-flex flex-wrap gap-1 ml-1.5 align-middle">
+        {chips.map((c, i) => (
+          <span
+            key={i}
+            className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white whitespace-nowrap"
+            style={{ backgroundColor: c.color || '#64748b' }}
+          >
+            {c.label}
+          </span>
+        ))}
+      </span>
+    );
+  };
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [paymentSort, setPaymentSort] = useState<{ field: PaymentSortField; direction: 'asc' | 'desc' }>({ field: null, direction: 'asc' });
   const [paymentFilters, setPaymentFilters] = useState({
@@ -347,6 +401,9 @@ export function BudgetTableView() {
             chatId: telegramChat.chat_id,
             chatTitle: telegramChat.title,
             date: new Date(newValue),
+            contentIds: Array.isArray(payment.content_id)
+              ? payment.content_id
+              : (payment.content_id ? [payment.content_id] : []),
           });
           return;
         }
@@ -1302,17 +1359,27 @@ export function BudgetTableView() {
                                           if (contentIds.length === 1) {
                                             const content = contents.find(c => c.id === contentIds[0]);
                                             return content ?
-                                              <span className="text-xs">{content.type || 'Content'} - {content.platform || 'Unknown'}{content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}</span> :
+                                              <span className="text-xs">{content.type || 'Content'} - {content.platform || 'Unknown'}{content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}{renderContentTagChips(content.id)}</span> :
                                               <span className="text-xs">Content not found</span>;
                                           }
-                                          return <span className="text-xs">{contentIds.length} contents linked</span>;
+                                          return (
+                                            <span className="text-xs">
+                                              {contentIds.length} contents linked
+                                              {contentIds.map((cid: string) => renderContentTagChips(cid))}
+                                            </span>
+                                          );
                                         })()}
                                       </div>
                                     }
                                     renderOption={(contentId) => {
                                       const content = contents.find(c => c.id === contentId);
                                       if (!content) return contentId;
-                                      return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
+                                      return (
+                                        <span>
+                                          {content.type || 'Content'} - {content.platform || 'Unknown'}{content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}
+                                          {renderContentTagChips(content.id)}
+                                        </span>
+                                      );
                                     }}
                                   />
                                   ) : (

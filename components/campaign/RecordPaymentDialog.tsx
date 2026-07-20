@@ -239,6 +239,9 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
       chatId: telegramChat.chat_id,
       chatTitle: telegramChat.title,
       date,
+      contentIds: Array.isArray(payment.content_id)
+        ? payment.content_id
+        : (payment.content_id && payment.content_id !== 'none' ? [payment.content_id] : []),
     });
   };
 

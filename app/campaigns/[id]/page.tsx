@@ -1518,18 +1518,32 @@ const CampaignDetailsPage = () => {
     chatId: string;
     chatTitle: string | null;
     date: Date;
+    /** Linked contents on the payment — header date uses their post
+     *  (activation) date instead of the payment date when present. */
+    contentIds?: string[];
   }) => {
     setPendingPaymentNotification(opts);
     // [2026-06-05] Message format updated per Andy:
     //   1) prepend `[Client Name] - Post (DD MMM YYYY)` header line
     //   2) drop the `!` after the wallet
     //   3) "Thanks for" → "Thank you for"
+    // [2026-07-21] Per Andy: header date = the linked content's POST
+    // date (activation_date), not the payment date. Latest post date
+    // wins when several contents are linked; payment date remains the
+    // fallback for unlinked payments or contents with no date yet.
     // Date formatted in the canonical mm/dd/yyyy shape (e.g. "06/05/2026");
     // falls back to "Date TBD" if the picker handed us an invalid date.
     const clientName = campaign?.client_name?.trim() || 'Holo Hive';
-    const dateStr = opts.date && !isNaN(opts.date.getTime())
-      ? formatDate(opts.date)
-      : 'Date TBD';
+    const linkedPostDates = (opts.contentIds || [])
+      .map(id => contents.find(c => c.id === id)?.activation_date)
+      .filter(Boolean)
+      .sort();
+    const postDate = linkedPostDates.length > 0 ? linkedPostDates[linkedPostDates.length - 1] : null;
+    const dateStr = postDate
+      ? formatDate(postDate)
+      : opts.date && !isNaN(opts.date.getTime())
+        ? formatDate(opts.date)
+        : 'Date TBD';
     setPaymentNotificationMessage(
       `${clientName} - Post (${dateStr})\n\n` +
       `$${opts.amount.toLocaleString()} has been deposited to ${opts.wallet}\n\n` +
