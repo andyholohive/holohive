@@ -2408,11 +2408,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   100% of valid content_link rows are X or Telegram. */}
               <TopPostEmbed url={topPost.contentLink} notes={topPost.notes} />
 
-              {/* 3 stats horizontal — Views/Reactions/Replies per the
-                  Andy 2026-06-19 platform-native vocab decision (spec
+              {/* 4 stats horizontal — Views/Reactions/Reposts/Replies per
+                  the Andy 2026-06-19 platform-native vocab decision (spec
                   originally said "Likes" but UI standard is now
                   "Reactions" everywhere). */}
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.impressions)}</p>
                   <p className="text-xs text-gray-500 uppercase tracking-wider mt-0.5">Views</p>
@@ -2420,6 +2420,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 <div>
                   <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.likes)}</p>
                   <p className="text-xs text-gray-500 uppercase tracking-wider mt-0.5">Reactions</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.retweets)}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mt-0.5">Reposts</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900">{formatNumber(topPost.comments)}</p>
