@@ -83,6 +83,7 @@ import { ReportTabContent } from '@/components/campaign/ReportTabContent';
 import ShowcaseSettingsDialog from './_components/ShowcaseSettingsDialog';
 import ContentTagDialog from './_components/ContentTagDialog';
 import ActivationSettingsDialog from './_components/ActivationSettingsDialog';
+import ActivationResultsSection from '@/components/activations/ActivationResultsSection';
 import LineupsTab from '@/components/campaign/LineupsTab';
 import { AddActivationDialog } from '@/components/campaign/AddActivationDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -204,6 +205,10 @@ const CampaignDetailsPage = () => {
 
   // Campaign KOLs state
   const [campaignKOLs, setCampaignKOLs] = useState<any[]>([]);
+  // Activation snapshots — the Activations tab renders these through the
+  // same shared component the public tracker uses (client-facing preview).
+  const [activationSnapshots, setActivationSnapshots] = useState<any[]>([]);
+  const [activationsLoading, setActivationsLoading] = useState(false);
   const [availableKOLs, setAvailableKOLs] = useState<any[]>([]);
   const [loadingKOLs, setLoadingKOLs] = useState(false);
 
@@ -485,6 +490,33 @@ const CampaignDetailsPage = () => {
       fetchReportData();
     }
   }, [activeTab, id]);
+
+  // Activations tab — lazy-load the campaign's snapshots (one row per
+  // activation_key). Same dedupe + newest-first order the public page uses.
+  useEffect(() => {
+    if (activeTab !== 'activations' || !campaign) return;
+    let cancelled = false;
+    setActivationsLoading(true);
+    (supabase as any)
+      .from('activation_snapshots')
+      .select('*')
+      .eq('campaign_id', campaign.id)
+      .order('synced_at', { ascending: false })
+      .then(({ data }: any) => {
+        if (cancelled) return;
+        const list = (data ?? []) as any[];
+        const seen = new Set<string>();
+        const deduped = list.filter((r) => {
+          const k = r.activation_key || r.id;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        setActivationSnapshots(deduped);
+        setActivationsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeTab, campaign]);
 
   // Fetch campaign KOLs when campaign changes
   useEffect(() => {
@@ -2376,6 +2408,14 @@ const CampaignDetailsPage = () => {
               >
                 Content Dashboard
               </TabsTrigger>
+              {/* Activations — renders the exact client-facing activation
+                  results from the public tracker (unmasked for the team). */}
+              <TabsTrigger
+                value="activations"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
+              >
+                Activations
+              </TabsTrigger>
               {/* HHP Lineup Manager Spec § 4 — Lineups tab. Per-week
                   KOL selection + approval flow. Sits between Content
                   Dashboard (results) and Budget (money). */}
@@ -2730,6 +2770,30 @@ const CampaignDetailsPage = () => {
                     selection + inline-edit + bulk-actions state. */}
                 {contentsViewMode === 'table' && <ContentDashboardTableView />}
               </div>
+          </TabsContent>
+
+          {/* Activations — mirrors the public tracker's Activation Results
+              section exactly (shared component), unmasked for the team.
+              Lazy-fetched on first open via the activeTab effect above. */}
+          <TabsContent value="activations" className="mt-4">
+            {activationsLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-40 rounded-xl" />
+                <Skeleton className="h-64 rounded-lg" />
+              </div>
+            ) : activationSnapshots.length === 0 ? (
+              <EmptyState
+                icon={Zap}
+                title="No activations yet"
+                description="Once an activation microsite is connected and synced, its results appear here — exactly as the client sees them on the tracker. Configure sources in Activation Settings."
+              />
+            ) : (
+              <ActivationResultsSection
+                activations={activationSnapshots}
+                kols={campaignKOLs.map((k) => ({ id: k.id, name: k.master_kol?.name || k.name || '' }))}
+                maskHandles={false}
+              />
+            )}
           </TabsContent>
 
           {/* HHP Lineup Manager Spec § 4 — Lineups tab. Self-contained
