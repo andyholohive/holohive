@@ -1332,6 +1332,25 @@ async function handleTaskCommand(chatId: string, message: any) {
     return;
   }
 
+  // ── Claude-identified assignee fallback ────────────────────────
+  // If entity resolution found nobody but the parser identified a
+  // clear delegate from the roster (per Andy 2026-07-21: "the AI knows
+  // who's meant — just assign it"), re-validate the suggestion against
+  // the real roster and use it. A hallucinated/ambiguous username
+  // fails matchHandleToRoster and the task stays unassigned.
+  if (!assignee && parsed.suggested_assignee) {
+    const { matchHandleToRoster } = await import('@/lib/telegramAssigneeResolver');
+    const suggested = matchHandleToRoster(parsed.suggested_assignee, (roster || []) as any);
+    if (suggested) {
+      assignee = {
+        user_id: suggested.id,
+        name: suggested.name || suggested.telegram_username || parsed.suggested_assignee,
+        telegram_username: suggested.telegram_username,
+        matched_via: 'mention',
+      } as any;
+    }
+  }
+
   // ── Store pending row ──────────────────────────────────────────
   const pendingPayload = {
     created_by_user_id: (teamMember as any).id,

@@ -30,6 +30,10 @@ export interface ParsedTask {
   good_looks_like: string | null;      // Reference (Context Protocol field 3)
   description: string | null;          // Combined long-form notes if any
   clarification_needed: string | null; // Human-readable hint of what's missing/ambiguous
+  /** telegram_username of the roster member the message clearly
+   *  delegates to, when entity resolution found nobody. The caller
+   *  re-validates against the roster before assigning. */
+  suggested_assignee: string | null;
 }
 
 export interface ParseTaskInput {
@@ -76,7 +80,12 @@ const SUBMIT_TASK_TOOL = {
       clarification_needed: {
         type: ['string', 'null'],
         description:
-          'If something critical is ambiguous (e.g. no assignee was tagged, deadline is unclear, or the request is too vague to act on), a short human-readable note about what to clarify. NULL if the parse is confident.',
+          'If something critical is ambiguous (e.g. no assignee is identifiable, deadline is unclear, or the request is too vague to act on), a short human-readable note about what to clarify. NULL if the parse is confident.',
+      },
+      suggested_assignee: {
+        type: ['string', 'null'],
+        description:
+          'When no assignee was pre-resolved but the message clearly delegates to exactly ONE team member from the roster (by name, nickname, or approximate handle — e.g. "@quazo" or "quazo" for the member named Quazo), the telegram_username of that member. NULL when an assignee was already resolved, when nobody is identifiable, or when it could plausibly be more than one member.',
       },
     },
     required: [
@@ -86,6 +95,7 @@ const SUBMIT_TASK_TOOL = {
       'good_looks_like',
       'description',
       'clarification_needed',
+      'suggested_assignee',
     ],
   },
 };
@@ -106,9 +116,14 @@ export async function parseTaskFromText(input: ParseTaskInput): Promise<ParsedTa
     .map(m => `- ${m.name}${m.telegram_username ? ` (@${m.telegram_username})` : ''}`)
     .join('\n');
 
+  // [2026-07-21] Per Andy: if the AI can tell who's meant, just assign
+  // them — no more "re-send with @handle" nagging (the old v1 policy;
+  // Jdot hit it 4 times with "@quazo" → Quazo/@Elquazo). The caller
+  // re-validates suggested_assignee against the roster before using it,
+  // so a hallucinated username degrades to unassigned, never misassigned.
   const assigneeNote = input.assignee
-    ? `Assignee already resolved from @-mention: ${input.assignee.name}. Don't extract assignee — it's handled.`
-    : 'No assignee was @-tagged. Set clarification_needed to flag that the creator should re-send with @<person> tagged, unless the message clearly delegates to a specific named person on the team (in which case still flag — we want explicit @-tagging).';
+    ? `Assignee already resolved from @-mention: ${input.assignee.name}. Don't extract assignee — it's handled. Set suggested_assignee to NULL.`
+    : 'No assignee was @-tagged. If the message clearly delegates to exactly one team member from the roster above — by name, nickname, or an approximate handle — set suggested_assignee to that member\'s telegram_username and do NOT mention assignee in clarification_needed. Only if nobody is identifiable (or two members are equally plausible) set suggested_assignee to NULL and note the missing assignee in clarification_needed.';
 
   const systemPrompt = `You parse free-form task delegation messages from a crypto KOL agency's Telegram into structured task fields.
 
@@ -167,5 +182,6 @@ Always call the submit_task tool exactly once. Don't ask questions; if something
     good_looks_like: parsed.good_looks_like || null,
     description: parsed.description || null,
     clarification_needed: parsed.clarification_needed || null,
+    suggested_assignee: parsed.suggested_assignee || null,
   };
 }
