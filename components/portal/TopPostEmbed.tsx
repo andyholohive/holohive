@@ -89,6 +89,13 @@ function TwitterEmbed({
     const container = ref.current;
     if (!container) return;
     let cancelled = false;
+    // Closure-visible success flag, same pattern as TelegramEmbed below.
+    // The timeout MUST check this local, not the `loaded` React state:
+    // state read inside setTimeout is a stale closure from the initial
+    // render (the effect only re-runs on tweetId change), so a
+    // successfully-rendered tweet still "failed" at the 6s mark and got
+    // swapped for the link card — the embed visibly flickered away.
+    let settled = false;
 
     const renderTweet = () => {
       const w = (window as any).twttr;
@@ -102,16 +109,18 @@ function TwitterEmbed({
           align: 'center',
         })
         .then((el: HTMLElement | undefined) => {
-          if (cancelled) return;
+          if (cancelled || settled) return;
           if (!el) {
             // Tweet missing / deleted / protected — fall back
+            settled = true;
             onFailure();
           } else {
+            settled = true;
             setLoaded(true);
           }
         })
         .catch(() => {
-          if (!cancelled) onFailure();
+          if (!cancelled && !settled) { settled = true; onFailure(); }
         });
     };
 
@@ -123,7 +132,7 @@ function TwitterEmbed({
       script.src = 'https://platform.twitter.com/widgets.js';
       script.async = true;
       script.onload = renderTweet;
-      script.onerror = () => { if (!cancelled) onFailure(); };
+      script.onerror = () => { if (!cancelled && !settled) { settled = true; onFailure(); } };
       document.body.appendChild(script);
     } else {
       // Another instance is loading the script — poll for it briefly
@@ -136,9 +145,10 @@ function TwitterEmbed({
       setTimeout(() => clearInterval(poll), TIMEOUT_MS);
     }
 
-    // Timeout fallback — covers script failure + render hang
+    // Timeout fallback — covers script failure + render hang. Checks the
+    // local `settled` flag (NOT the `loaded` state — see comment above).
     const timer = setTimeout(() => {
-      if (!cancelled && !loaded) onFailure();
+      if (!cancelled && !settled) { settled = true; onFailure(); }
     }, TIMEOUT_MS);
 
     return () => {
