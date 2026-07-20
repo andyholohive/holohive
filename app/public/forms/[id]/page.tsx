@@ -51,6 +51,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   // validation never replaces the form with a scary "Form Not Available" page.
   const [submitBlockedMsg, setSubmitBlockedMsg] = useState<string | null>(null);
 
+  // ── Draft autosave ── in-progress answers persist to localStorage so a
+  // closed tab doesn't lose the client's work (Andy 2026-07-20, post-Tria).
+  // Keyed by the URL's form id + client param so two clients on a shared
+  // device don't collide. Files can't be drafted (File objects don't
+  // serialize) — after a restore the client re-attaches them.
+  const draftKey = `hh_form_draft_${formId}${clientId ? `_${clientId}` : ''}`;
+  const [draftRestored, setDraftRestored] = useState(false);
+
   // Multiple answer tracking - stores arrays of values for fields that allow multiple
   const [multipleAnswers, setMultipleAnswers] = useState<Record<string, string[]>>({});
 
@@ -95,6 +103,56 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     fetchForm();
   }, [formId]);
 
+  // Debounced draft write — fires 600ms after the last edit. An all-empty
+  // form removes the draft instead (so "Start fresh" + no typing leaves no
+  // residue). Stops entirely once submitted.
+  useEffect(() => {
+    if (!form || submitted || loading) return;
+    const t = setTimeout(() => {
+      try {
+        const hasContent =
+          Object.values(formData).some(v => (Array.isArray(v) ? v.length > 0 : v !== '' && v != null)) ||
+          Object.values(yesNoReasons).some(Boolean) ||
+          Object.values(otherFieldValues).some(Boolean);
+        if (!hasContent) {
+          localStorage.removeItem(draftKey);
+          return;
+        }
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            v: 1,
+            savedAt: Date.now(),
+            currentPage,
+            formData,
+            multipleAnswers,
+            otherFieldValues,
+            otherFieldSelected,
+            yesNoReasons,
+          })
+        );
+      } catch { /* private mode / quota — drafting is best-effort */ }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [form, submitted, loading, formData, multipleAnswers, otherFieldValues, otherFieldSelected, yesNoReasons, currentPage, draftKey]);
+
+  // "Start fresh" on the restore notice — wipe the draft and reset the form.
+  const discardDraft = () => {
+    try { localStorage.removeItem(draftKey); } catch { /* best-effort */ }
+    const blank: Record<string, any> = {};
+    form?.fields.forEach(field => {
+      blank[field.id] = field.field_type === 'checkbox' ? [] : '';
+    });
+    setFormData(blank);
+    setMultipleAnswers({});
+    setOtherFieldValues({});
+    setOtherFieldSelected({});
+    setYesNoReasons({});
+    setValidationErrors({});
+    setCurrentPage(1);
+    setDraftRestored(false);
+  };
+
   const fetchForm = async () => {
     try {
       setLoading(true);
@@ -126,6 +184,41 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         }
       });
       setFormData(initialData);
+
+      // ── Draft restore ── if the client started this form earlier on this
+      // device, bring their answers back (7-day TTL). Only field ids that
+      // still exist on the form are restored, so editing the form can't
+      // resurrect stale answers. Best-effort: any parse/storage error just
+      // means a blank form, never a broken one.
+      try {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem(draftKey) : null;
+        if (raw) {
+          const draft = JSON.parse(raw);
+          const fresh = typeof draft?.savedAt === 'number' && Date.now() - draft.savedAt < 7 * 24 * 60 * 60 * 1000;
+          if (fresh && draft.formData && typeof draft.formData === 'object') {
+            const validIds = new Set(data.fields.map(f => f.id));
+            const restored: Record<string, any> = { ...initialData };
+            let restoredAny = false;
+            for (const [k, v] of Object.entries(draft.formData)) {
+              if (validIds.has(k) && v != null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
+                restored[k] = v;
+                restoredAny = true;
+              }
+            }
+            if (restoredAny) {
+              setFormData(restored);
+              if (draft.multipleAnswers && typeof draft.multipleAnswers === 'object') setMultipleAnswers(draft.multipleAnswers);
+              if (draft.otherFieldValues && typeof draft.otherFieldValues === 'object') setOtherFieldValues(draft.otherFieldValues);
+              if (draft.otherFieldSelected && typeof draft.otherFieldSelected === 'object') setOtherFieldSelected(draft.otherFieldSelected);
+              if (draft.yesNoReasons && typeof draft.yesNoReasons === 'object') setYesNoReasons(draft.yesNoReasons);
+              if (typeof draft.currentPage === 'number') setCurrentPage(Math.min(Math.max(1, draft.currentPage), maxPage));
+              setDraftRestored(true);
+            }
+          } else if (!fresh) {
+            localStorage.removeItem(draftKey);
+          }
+        }
+      } catch { /* corrupt or inaccessible draft — start blank */ }
     } catch (error) {
       console.error('Error fetching form:', error);
       setError('Failed to load form');
@@ -314,6 +407,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         },
         supabasePublic
       );
+
+      // Submission landed — the draft has served its purpose.
+      try { localStorage.removeItem(draftKey); } catch { /* best-effort */ }
+      setDraftRestored(false);
 
       // If thank you page is enabled, navigate to last page instead of showing full-page success
       if (form?.enable_thank_you_page) {
@@ -1002,6 +1099,26 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       />
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Draft-restored notice — the client returned to a form they
+                  had started on this device; their answers came back from
+                  the local draft. Files can't be drafted, so they're asked
+                  to re-attach. "Start fresh" wipes the draft + resets. */}
+              {draftRestored && !submitted && (
+                <div className="rounded-lg border border-brand/30 bg-brand/5 px-4 py-3 flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-brand flex-shrink-0 mt-0.5" />
+                  <p className="flex-1 text-sm text-gray-700 leading-relaxed">
+                    Welcome back — we restored the answers you started earlier on this device. Any file attachments will need to be re-added.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={discardDraft}
+                    className="text-xs text-gray-500 underline hover:text-gray-800 shrink-0 mt-0.5"
+                  >
+                    Start fresh
+                  </button>
                 </div>
               )}
 
