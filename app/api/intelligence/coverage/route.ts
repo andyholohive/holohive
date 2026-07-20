@@ -63,6 +63,23 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
+  const { id, callprep_draft: callprepDraft } = body;
+  if (!id || typeof id !== 'string') {
+    return NextResponse.json({ error: 'contract id required' }, { status: 400 });
+  }
+
+  const supabase = serviceClient();
+  const { error } = await (supabase as any)
+    .from('tg_coverage_contracts')
+    .update({ callprep_draft: callprepDraft ?? null })
+    .eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const subjectType = url.searchParams.get('subject_type') ?? '';
