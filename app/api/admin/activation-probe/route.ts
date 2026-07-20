@@ -39,29 +39,54 @@ export async function POST(request: Request) {
   }
 
   const qs = activationId ? `?activation_id=${encodeURIComponent(activationId)}` : '';
-  const url = `${base}/api/activation/${endpoint}${qs}`;
+  const startUrl = `${base}/api/activation/${endpoint}${qs}`;
+
+  // Follow redirects MANUALLY so the Authorization header survives. The
+  // built-in fetch redirect follower strips Authorization on any cross-origin
+  // hop — and these microsites 308 apex→https→www (e.g. venicekorea.app →
+  // www.venicekorea.app), which silently drops the token and 401s. We
+  // re-attach the token only across same-site hops (apex↔www / scheme
+  // upgrade) so it can never leak to an unrelated host.
+  const relatedHost = (a: string, b: string) =>
+    a === b || `www.${a}` === b || a === `www.${b}`;
 
   try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(12_000),
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    const text = await res.text();
+    let current = startUrl;
+    let carryAuth = true;
+    let res: Response | null = null;
+    for (let hop = 0; hop < 5; hop++) {
+      res = await fetch(current, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(12_000),
+        headers: {
+          Accept: 'application/json',
+          ...(token && carryAuth ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('location');
+        if (!loc) break;
+        const next = new URL(loc, current);
+        carryAuth = relatedHost(new URL(current).host, next.host);
+        current = next.toString();
+        continue;
+      }
+      break;
+    }
+
+    const finalRes = res!;
+    const text = await finalRes.text();
     let data: any;
     try {
       data = JSON.parse(text);
     } catch {
-      // Non-JSON body (HTML error page, etc.) — return a truncated preview
-      // so the admin can see what came back.
+      // Non-JSON body (HTML error page, etc.) — return a truncated preview.
       data = text.slice(0, 2000);
     }
-    return NextResponse.json({ ok: res.ok, status: res.status, url, data }, { status: 200 });
+    return NextResponse.json({ ok: finalRes.ok, status: finalRes.status, url: current, data }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, status: 0, url, error: err?.name === 'TimeoutError' ? 'Request timed out (12s).' : err?.message || 'Fetch failed' },
+      { ok: false, status: 0, url: startUrl, error: err?.name === 'TimeoutError' ? 'Request timed out (12s).' : err?.message || 'Fetch failed' },
       { status: 200 },
     );
   }
