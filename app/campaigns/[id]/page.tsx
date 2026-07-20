@@ -939,9 +939,16 @@ const CampaignDetailsPage = () => {
   // Fetch latest costs for all KOLs (most recent payment amount per master_kol_id)
   const fetchLatestCosts = async () => {
     try {
+      // Only actually-paid, non-zero payments count as a "latest cost".
+      // Without these filters, unpaid placeholder rows (NULL payment_date
+      // sorts FIRST in Postgres DESC order) and $0 auto-created rows
+      // shadow the KOL's real payment history — and since this map also
+      // seeds auto-created payment amounts, a $0 read perpetuates itself.
       const { data, error } = await supabase
         .from('payments')
         .select('amount, payment_date, campaign_kol:campaign_kols!inner(master_kol_id)')
+        .not('payment_date', 'is', null)
+        .gt('amount', 0)
         .order('payment_date', { ascending: false });
 
       if (!error && data) {

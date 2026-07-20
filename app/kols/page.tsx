@@ -486,9 +486,15 @@ export default function KOLsPage() {
 
   const fetchLatestCosts = async () => {
     try {
+      // Only actually-paid, non-zero payments count as a "latest cost".
+      // Without these filters, unpaid placeholder rows (NULL payment_date
+      // sorts FIRST in Postgres DESC order) and $0 auto-created rows
+      // shadow the KOL's real payment history.
       const { data: rawData, error: rawError } = await supabase
         .from('payments')
         .select('amount, payment_date, campaign:campaigns!inner(id, slug), campaign_kol:campaign_kols!inner(master_kol_id)')
+        .not('payment_date', 'is', null)
+        .gt('amount', 0)
         .order('payment_date', { ascending: false });
       if (!rawError && rawData) {
         const map = new Map<string, { amount: number; campaignSlug: string }>();
