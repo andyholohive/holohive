@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
@@ -134,6 +135,10 @@ export default function ActivationSettingsDialog({
 
   // Connect tab
   const [apiBaseUrl, setApiBaseUrl] = useState('');
+  // Master switch: hides the Activation Results section on the public
+  // page without touching synced snapshots. Default on.
+  const [resultsEnabled, setResultsEnabled] = useState(true);
+  const [togglingEnabled, setTogglingEnabled] = useState(false);
   const [testResult, setTestResult] = useState<
     | { ok: true; status: number; data: any }
     | { ok: false; status?: number; error: string }
@@ -174,7 +179,7 @@ export default function ActivationSettingsDialog({
     Promise.all([
       (supabase as any)
         .from('campaigns')
-        .select('activation_api_base_url')
+        .select('activation_api_base_url, activation_results_enabled')
         .eq('id', campaignId)
         .maybeSingle(),
       (supabase as any)
@@ -189,6 +194,7 @@ export default function ActivationSettingsDialog({
         toast({ title: 'Load failed', description: cRes.error.message, variant: 'destructive' });
       } else {
         setApiBaseUrl(cRes.data?.activation_api_base_url || '');
+        setResultsEnabled(cRes.data?.activation_results_enabled !== false);
       }
       if (sRes.data) {
         setLatest(sRes.data as Snapshot);
@@ -313,6 +319,30 @@ export default function ActivationSettingsDialog({
     }
   };
 
+  const handleToggleEnabled = async (next: boolean) => {
+    setTogglingEnabled(true);
+    // Optimistic — flip immediately, roll back on error.
+    setResultsEnabled(next);
+    try {
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update({ activation_results_enabled: next })
+        .eq('id', campaignId);
+      if (error) throw error;
+      toast({
+        title: next ? 'Activation Results shown' : 'Activation Results hidden',
+        description: next
+          ? 'The section is live on the public campaign page again.'
+          : 'The section is hidden from the public page. Synced snapshots are kept.',
+      });
+    } catch (err: any) {
+      setResultsEnabled(!next);
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setTogglingEnabled(false);
+    }
+  };
+
   // ─── Manual tab actions ─────────────────────────────────────────
   const handleManualSave = async () => {
     setSavingManual(true);
@@ -420,6 +450,25 @@ export default function ActivationSettingsDialog({
 
             {/* ─── Connect tab ─────────────────────────────────── */}
             <TabsContent value="connect" className="flex-1 overflow-y-auto min-h-0 mt-3 space-y-5">
+              {/* Master switch — hide the whole Activation Results section
+                  from the public page without deleting synced snapshots. */}
+              <div className="flex items-start justify-between gap-3 rounded-md border border-cream-200 bg-cream-50/50 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink-warm-900">Show on public page</p>
+                  <p className="text-[11px] text-ink-warm-500 mt-0.5">
+                    {resultsEnabled
+                      ? 'Activation Results are visible to the client. Turn off to hide the section — snapshots are kept and keep syncing.'
+                      : 'Hidden from the client. Snapshots still sync in the background; flip back on any time.'}
+                  </p>
+                </div>
+                <Switch
+                  checked={resultsEnabled}
+                  disabled={togglingEnabled}
+                  onCheckedChange={handleToggleEnabled}
+                  className="mt-0.5 shrink-0 data-[state=checked]:bg-brand"
+                />
+              </div>
+
               {/* Tokens + activation sources — the real config. The hourly
                   cron reads these; the campaign page renders their snapshots. */}
               <ActivationSourcesManager campaignId={campaignId} />

@@ -1211,7 +1211,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       // Soft-fail to null: the Activation Results section just won't
       // render. Logged at warn-level so the rest of the page never
       // breaks if the table is missing or the row is unparsed.
+      // Master switch: when `activation_results_enabled` is false the
+      // whole section is hidden regardless of what's synced (lets ops
+      // pull it off the client page without deleting snapshots).
       try {
+        if ((campaignData as any)?.activation_results_enabled === false) {
+          setActivations([]);
+          setActivation(null);
+          return;
+        }
         const { data: snapData, error: snapErr } = await (supabasePublic as any)
           .from('activation_snapshots')
           .select('*')
@@ -2686,6 +2694,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
                       return n.toLocaleString();
                     };
+                    // Prettify machine-y activation strings for display:
+                    // "trading_card" → "Trading Card", "pfp" → "PFP", protocol
+                    // / source slugs → Title Case, with crypto acronyms kept
+                    // upper. Values come from Bolt so treat everything as data.
+                    const ACRONYMS: Record<string, string> = {
+                      pfp: 'PFP', ugc: 'UGC', nft: 'NFT', dapp: 'dApp', dex: 'DEX',
+                      kol: 'KOL', defi: 'DeFi', ai: 'AI', p2e: 'P2E', tg: 'TG',
+                    };
+                    const prettify = (raw: string | null | undefined): string => {
+                      if (!raw) return '';
+                      return String(raw)
+                        .split(/[\s_-]+/)
+                        .filter(Boolean)
+                        .map((w) => ACRONYMS[w.toLowerCase()] ?? (w.charAt(0).toUpperCase() + w.slice(1)))
+                        .join(' ');
+                    };
                     // Build per-KOL labels with showcase masking
                     // applied. We look up the campaign_kol by kol_id
                     // when the portal provides it; fall back to the
@@ -2725,7 +2749,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <div className="flex items-center gap-3 mt-1.5 text-sm text-ink-warm-700 flex-wrap">
                                 {activation.activation_type && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand">
-                                    {activation.activation_type}
+                                    {prettify(activation.activation_type)}
                                   </span>
                                 )}
                                 {activation.start_date && activation.end_date && (
@@ -2887,7 +2911,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* ─── Ecosystem engagement ─────────── */}
-                            {clicks && (clicks.by_protocol?.length || clicks.by_source?.length || clicks.total_referrals) && (
+                            {!!(clicks && (clicks.by_protocol?.length || clicks.by_source?.length || clicks.total_referrals)) && (
                               <div className="bg-white border border-cream-200 rounded-lg p-4 space-y-3">
                                 <p className="text-sm font-semibold text-ink-warm-900">Ecosystem Engagement</p>
                                 {typeof clicks.total_referrals === 'number' && (
@@ -2902,7 +2926,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <ul className="space-y-1.5">
                                       {clicks.by_protocol.map((p, idx) => (
                                         <li key={p.protocol + idx} className="flex items-center justify-between text-xs">
-                                          <span className="text-ink-warm-700">{p.protocol}</span>
+                                          <span className="text-ink-warm-700">{prettify(p.protocol)}</span>
                                           <span className="font-medium text-ink-warm-900 tabular-nums">{formatNum(p.clicks)}</span>
                                         </li>
                                       ))}
@@ -2915,7 +2939,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <ul className="space-y-1.5">
                                       {clicks.by_source.map((p, idx) => (
                                         <li key={p.source + idx} className="flex items-center justify-between text-xs">
-                                          <span className="text-ink-warm-700">{p.source}</span>
+                                          <span className="text-ink-warm-700">{prettify(p.source)}</span>
                                           <span className="font-medium text-ink-warm-900 tabular-nums">{formatNum(p.clicks)}</span>
                                         </li>
                                       ))}
@@ -2947,7 +2971,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <ul className="space-y-1.5">
                                       {s.points_by_source.map((p, idx) => (
                                         <li key={p.source + idx} className="flex items-center justify-between text-xs">
-                                          <span className="text-ink-warm-700">{p.source}</span>
+                                          <span className="text-ink-warm-700">{prettify(p.source)}</span>
                                           <span className="font-medium text-ink-warm-900 tabular-nums">{formatNum(p.points)}</span>
                                         </li>
                                       ))}
