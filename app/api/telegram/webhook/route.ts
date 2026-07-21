@@ -3519,6 +3519,19 @@ async function handleSubmReviewCallback(
         kolName,
       });
     }
+  } else if (action === 'reject') {
+    // [2026-07-21] Per Andy: mirror the approve path on reject — edit the
+    // KOL's original /submit receipt so "…, pending review." becomes a clear
+    // rejection instead of sitting there implying it's still in the queue.
+    // Best-effort; only if we recorded the receipt's coordinates at submit.
+    if ((sub as any).kol_receipt_chat_id && (sub as any).kol_receipt_message_id) {
+      const displayName = (sub as any).campaign?.client?.name || campaignName;
+      await editMessageText(
+        (sub as any).kol_receipt_chat_id,
+        Number((sub as any).kol_receipt_message_id),
+        `❌ Your <b>${escapeHtml(displayName)}</b> submission wasn’t approved. Message your HoloHive lead for details.`,
+      );
+    }
   }
 
   // Edit the review-channel message to reflect the decision (replaces the
@@ -3545,9 +3558,10 @@ async function handleSubmReviewCallback(
     );
   }
 
-  // No KOL-facing notification on approve/reject (removed 2026-07-03 per
-  // Andy — /submit is fully silent toward the KOL on the success path;
-  // the review-channel card is the team-facing record).
+  // No NEW KOL-facing message on approve/reject — instead both paths EDIT
+  // the KOL's original /submit receipt in place (approve drops the "pending
+  // review" tail; reject flips it to a rejection). The review-channel card
+  // remains the team-facing record.
 
   await answerCallbackQuery(
     callbackId,
