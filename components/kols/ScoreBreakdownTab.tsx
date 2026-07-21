@@ -28,9 +28,12 @@ interface Props {
   kolId: string;
   /** Bump to force a refetch when the parent knows snapshots/deliverables changed. */
   refreshKey?: number;
+  /** KOL platform(s) — decides which profiler the Refresh button fires:
+   *  X-only KOLs use the Grok X-profile route, everyone else the TG scan. */
+  platform?: string[] | null;
 }
 
-export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
+export function ScoreBreakdownTab({ kolId, refreshKey = 0, platform }: Props) {
   const [data, setData] = useState<ScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,9 +61,39 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
     return () => { cancelled = true; };
   }, [kolId, refreshKey, bumpKey]);
 
+  // X-only KOLs can't be scanned via Telethon — they use the Grok X-profile
+  // route instead (reads the timeline live + infers creator_type/niche). A
+  // KOL on both TG and X uses the TG scan (richer channel data).
+  const isXOnly = !!platform?.includes('X') && !platform?.includes('Telegram');
+
   async function handleRefresh() {
     setRefreshing(true);
     try {
+      if (isXOnly) {
+        // Synchronous: Grok reads + writes the profile in one call (~10-60s).
+        const res = await fetch(`/api/kols/${kolId}/profile-x`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast({ title: 'X profile failed', description: json.hint || json.error || `HTTP ${res.status}`, variant: 'destructive' });
+          return;
+        }
+        if (json.ok === false) {
+          toast({ title: 'Nothing to profile', description: json.reason || 'Grok found no readable content.', variant: 'destructive' });
+          return;
+        }
+        const ct = Array.isArray(json.creator_types) ? json.creator_types.join(', ') : '';
+        const nt = Array.isArray(json.niche_tags) ? json.niche_tags.join(', ') : '';
+        toast({
+          title: `Profiled @${json.handle}`,
+          description: `${ct}${ct && nt ? ' · ' : ''}${nt}`.trim() || 'Profile updated.',
+        });
+        setBumpKey(k => k + 1); // refetch score/profile now
+        return;
+      }
+
       const res = await fetch(`/api/kols/${kolId}/refresh-tg`, {
         method: 'POST',
         credentials: 'include',
@@ -144,10 +177,12 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0 }: Props) {
             onClick={handleRefresh}
             disabled={refreshing}
             className="shrink-0"
-            title="Re-scan this KOL's Telegram channel + AI-refresh their profile fields"
+            title={isXOnly
+              ? "Read this KOL's X timeline with Grok + AI-refresh their creator type / niche"
+              : "Re-scan this KOL's Telegram channel + AI-refresh their profile fields"}
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Queuing…' : 'Refresh from TG'}
+            {refreshing ? (isXOnly ? 'Reading…' : 'Queuing…') : (isXOnly ? 'Refresh from X' : 'Refresh from TG')}
           </Button>
         </div>
       </Card>

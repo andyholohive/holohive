@@ -145,7 +145,7 @@ export function KolProfileModal({
           </TabsContent>
 
           <TabsContent value="score" className="mt-4 flex-1 overflow-y-auto px-1">
-            <ScoreBreakdownTab kolId={kol.id} />
+            <ScoreBreakdownTab kolId={kol.id} platform={kol.platform} />
           </TabsContent>
 
           <TabsContent value="deliverables" className="mt-4 flex-1 overflow-y-auto px-1">
