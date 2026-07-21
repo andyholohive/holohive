@@ -38,7 +38,6 @@ interface SharedListItem {
     region: string | null;
     link: string | null;
     creator_type: string[] | null;
-    rating?: number | null;
     status?: string | null;
     notes?: string | null;
   }[];
@@ -212,10 +211,6 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
         case 'status':
           aVal = a.status?.toLowerCase() || '';
           bVal = b.status?.toLowerCase() || '';
-          break;
-        case 'rating':
-          aVal = a.rating || 0;
-          bVal = b.rating || 0;
           break;
         default:
           return 0;
@@ -420,8 +415,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
             followers,
             region,
             link,
-            creator_type,
-            rating
+            creator_type
           )
         `)
         .eq('list_id', actualListId);
@@ -786,40 +780,41 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* KOLs Table - Exactly matching view list popup */}
+        {/* KOLs Table — styled to match the public campaign KOL Dashboard
+            table (v11 cream/ink-warm palette, zebra rows). */}
         {sortedKols && sortedKols.length > 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-            <div className="px-6 py-4 border-b">
-              <h4 className="font-semibold text-sm text-gray-700">
+          <div className="bg-white rounded-lg border border-cream-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-cream-200">
+              <h4 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                 KOLs in this list ({sortedKols.length})
               </h4>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-cream-50/80 border-b border-cream-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Followers</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-12">#</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Followers</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Region</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Platform</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Creator Type</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody>
                   {sortedKols.map((kol, index) => (
-                    <tr key={`${kol.id}-${index}`} className="hover:bg-gray-50 group">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                    <tr key={`${kol.id}-${index}`} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200 group`}>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-ink-warm-500 tabular-nums">{index + 1}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <div className="font-medium text-gray-900">{kol.name}</div>
+                          <div className="font-bold text-ink-warm-900">{kol.name}</div>
                           {kol.link && (
                             <a
                               href={kol.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200 whitespace-nowrap"
+                              className="text-sm underline hover:no-underline font-normal text-ink-warm-500 hover:text-ink-warm-700 whitespace-nowrap"
                               onClick={() => {
                                 // Fire-and-forget click event tracking. Don't
                                 // await — the link should open immediately.
@@ -833,10 +828,10 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-ink-warm-700">
                         {formatFollowers(kol.followers)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-ink-warm-700">
                         {kol.region ? (
                           <div className="flex items-center space-x-1">
                             <span>{getRegionIcon(kol.region).flag}</span>
@@ -844,7 +839,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                           </div>
                         ) : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-ink-warm-700">
                         {Array.isArray(kol.platform) ? (
                           <div className="flex gap-1">
                             {kol.platform.map((platform: string, idx: number) => (
@@ -855,7 +850,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                           </div>
                         ) : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-ink-warm-700">
                         {Array.isArray(kol.creator_type) ? (
                           <div className="flex flex-wrap gap-1">
                             {kol.creator_type.map((type: string, idx: number) => (
@@ -866,7 +861,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                           </div>
                         ) : '-'}
                       </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-ink-warm-700">
                           {editingKolNotes?.kolId === kol.id ? (
                             <Input
                               value={editingKolNotes.notes}
@@ -897,9 +892,9 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
-            <List className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No KOLs in this list.</p>
+          <div className="bg-white rounded-lg border border-cream-200 p-8 text-center">
+            <List className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+            <p className="text-ink-warm-500">No KOLs in this list.</p>
           </div>
         )}
 
