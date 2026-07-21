@@ -484,8 +484,10 @@ export class LineupManagerService {
     // Confirming a lineup means those KOLs are locked in for the
     // campaign → advance their tracker status to 'Onboarded'. Runs
     // after the auto-add above so freshly-added rows are covered too.
-    // Never downgrades a KOL already past onboarding (Onboarded /
-    // Concluded stay put).
+    // Promotes from earlier stages AND reactivates a previously
+    // 'Concluded' KOL back to 'Onboarded' [2026-07-21, per Andy] — being
+    // re-slotted means they're active again (and can /submit).
+    // Already-Onboarded KOLs are untouched.
     try {
       await this.markConfirmedKolsOnboarded(lineupId, lineup.campaign_id);
     } catch (err: any) {
@@ -1013,10 +1015,12 @@ export class LineupManagerService {
 
   /**
    * On confirm — advance every KOL slotted in the lineup to
-   * hh_status='Onboarded' on their campaign_kols row. Only promotes
-   * KOLs still earlier in the pipeline (Curated / Contacted /
-   * Interested / unset); never pulls back a KOL already Onboarded or
-   * Concluded.
+   * hh_status='Onboarded' on their campaign_kols row. Promotes KOLs
+   * earlier in the pipeline (Curated / Contacted / Interested / unset)
+   * AND reactivates any that were marked Concluded — re-slotting a
+   * concluded KOL into a confirmed lineup means they're active on the
+   * campaign again, so they should be Onboarded (and thus able to
+   * /submit). [2026-07-21, per Andy] Already-Onboarded KOLs are a no-op.
    */
   private async markConfirmedKolsOnboarded(
     lineupId: string,
@@ -1043,7 +1047,7 @@ export class LineupManagerService {
       .update({ hh_status: 'Onboarded' })
       .eq('campaign_id', campaignId)
       .in('master_kol_id', kolIds)
-      .or('hh_status.in.(Curated,Contacted,Interested),hh_status.is.null');
+      .or('hh_status.in.(Curated,Contacted,Interested,Concluded),hh_status.is.null');
     if (error) throw error;
   }
 }
