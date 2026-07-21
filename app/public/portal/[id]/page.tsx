@@ -171,15 +171,15 @@ type TopPostData = {
 //   - impressions   = SUM of impressions on those posts
 //   - engagements   = SUM of (likes + retweets + comments + bookmarks)
 //                     across those posts
-//   - postsLast7Days = subset of contentLive whose activation_date is
-//     within the last 7 days. Used by the This Week feed to auto-derive
-//     a "N posts went live this week" item.
+//   - postsThisWeek = subset of contentLive whose activation_date falls
+//     in the current Mon–Sun calendar week (UTC). Used by the This Week
+//     feed to auto-derive a "N posts went live" item.
 type ActiveCampaignStats = {
   kolsActivated: number;
   contentLive: number;
   impressions: number;
   engagements: number;
-  postsLast7Days: number;
+  postsThisWeek: number;
 };
 
 // [Campaign Live v1] Week-over-week deltas for the Stats Row trend
@@ -981,13 +981,21 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       // match the spec literal. Same data already computed for the
       // Stats Row engagementsSum, so no extra pass over rows.
       let topEngagement = -1;
-      let postsLast7Days = 0;
-      // Cutoff for "this week" — anything posted within the last 7 days.
-      // Compared as YYYY-MM-DD strings to avoid timezone foot-guns.
-      const sevenDaysAgoStr = (() => {
-        const d = new Date();
-        d.setUTCDate(d.getUTCDate() - 7);
-        return d.toISOString().slice(0, 10);
+      let postsThisWeek = 0;
+      // "This week" = the current Mon–Sun calendar week (UTC), not a
+      // rolling 7-day window [2026-07-21, per Andy]. Compared as
+      // YYYY-MM-DD strings to avoid timezone foot-guns.
+      const { weekStartStr, weekEndStr } = (() => {
+        const now = new Date();
+        const dow = now.getUTCDay() || 7; // 1 (Mon) … 7 (Sun)
+        const monday = new Date(now);
+        monday.setUTCDate(now.getUTCDate() - (dow - 1));
+        const sunday = new Date(monday);
+        sunday.setUTCDate(monday.getUTCDate() + 6);
+        return {
+          weekStartStr: monday.toISOString().slice(0, 10),
+          weekEndStr: sunday.toISOString().slice(0, 10),
+        };
       })();
 
       for (const r of rows) {
@@ -1013,10 +1021,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           topEngagement = rowEngagement;
           topRow = r;
         }
-        // Posted in the last 7 days?
+        // Posted in the current Mon–Sun week?
         // Need to also fetch activation_date — added to the SELECT above.
-        if (r.activation_date && r.activation_date >= sevenDaysAgoStr) {
-          postsLast7Days++;
+        if (r.activation_date && r.activation_date >= weekStartStr && r.activation_date <= weekEndStr) {
+          postsThisWeek++;
         }
       }
 
@@ -1025,7 +1033,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         contentLive: rows.length,
         impressions: impressionsSum,
         engagements: engagementsSum,
-        postsLast7Days,
+        postsThisWeek,
       };
       setActiveStats(currentStats);
 
@@ -1522,9 +1530,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     const items: ThisWeekItem[] = [];
 
     // 1) Auto-derived green items
-    if (activeStats && activeStats.postsLast7Days > 0) {
+    if (activeStats && activeStats.postsThisWeek > 0) {
       items.push({
-        text: `${activeStats.postsLast7Days} KOL post${activeStats.postsLast7Days === 1 ? '' : 's'} went live`,
+        text: `${activeStats.postsThisWeek} KOL post${activeStats.postsThisWeek === 1 ? '' : 's'} went live`,
         dateLabel: 'This week',
         status: 'done',
       });
