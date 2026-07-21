@@ -190,6 +190,7 @@ export default function KOLsPage() {
   const [isSavingNewKOL, setIsSavingNewKOL] = useState(false);
   // Bulk avatar refresh (super_admin only) — sits in the PageHeader actions.
   const [bulkAvatarRunning, setBulkAvatarRunning] = useState(false);
+  const [bulkXRunning, setBulkXRunning] = useState(false);
 
   // [2026-07-02 ANN.4] Send Announcement — bulk-message the selected
   // KOLs' group chats. Composer dialog gates itself on reachability.
@@ -1996,6 +1997,58 @@ export default function KOLsPage() {
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${bulkAvatarRunning ? 'animate-spin' : ''}`} />
                 {bulkAvatarRunning ? 'Refreshing...' : 'Refresh avatars'}
+              </Button>
+            )}
+            {/* Bulk X-profile backfill — Grok reads each untagged X KOL's
+                timeline to infer creator type + niche. Super_admin only;
+                walks the set in batches with a running cost tally. */}
+            {userProfile?.role === 'super_admin' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (bulkXRunning) return;
+                  // Preview eligible count + rough cost before committing spend.
+                  let preview: { eligible?: number; est_cost_usd?: number } = {};
+                  try {
+                    preview = await (await fetch('/api/kols/profile-x/bulk')).json();
+                  } catch {
+                    toast({ title: 'Preview failed', description: 'Could not reach the profiler.', variant: 'destructive' });
+                    return;
+                  }
+                  const n = preview.eligible ?? 0;
+                  if (n === 0) { toast({ title: 'Nothing to profile', description: 'All X KOLs already have a creator type.' }); return; }
+                  if (!confirm(`Profile ${n} untagged X KOL${n === 1 ? '' : 's'} with Grok (~$${preview.est_cost_usd ?? '?'})? Runs in batches; ~30s per KOL.`)) return;
+
+                  setBulkXRunning(true);
+                  let done = 0, spent = 0, guard = 0;
+                  try {
+                    // Walk batches until nothing remains (guard caps runaway loops).
+                    while (guard++ < 60) {
+                      const res = await fetch('/api/kols/profile-x/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ execute: true, limit: 6 }),
+                      });
+                      const json = await res.json();
+                      if (!res.ok) { toast({ title: 'Bulk profiling failed', description: json?.error || `HTTP ${res.status}`, variant: 'destructive' }); break; }
+                      done += json.succeeded ?? 0;
+                      spent += json.cost_usd ?? 0;
+                      toast({ title: `Profiling X KOLs… ${done} done`, description: `~$${spent.toFixed(2)} spent · ${json.remaining ?? 0} left` });
+                      if (!json.remaining || (json.processed ?? 0) === 0) break;
+                    }
+                    toast({ title: 'X profiling complete', description: `${done} KOLs tagged · ~$${spent.toFixed(2)}.` });
+                    fetchKOLs();
+                  } catch (err: any) {
+                    toast({ title: 'Network error', description: err?.message || 'Could not reach server', variant: 'destructive' });
+                  } finally {
+                    setBulkXRunning(false);
+                  }
+                }}
+                disabled={bulkXRunning}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${bulkXRunning ? 'animate-spin' : ''}`} />
+                {bulkXRunning ? 'Profiling X…' : 'Profile X KOLs'}
               </Button>
             )}
             <Button variant="brand" size="sm" onClick={handleAddNew} disabled={isSavingNewKOL}>
