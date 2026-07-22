@@ -523,6 +523,26 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     return () => { cancelled = true; };
   }, [clientId, isAuthenticated]);
 
+  // [2026-07-22, per Andy] Reveal the welcome greeting only once the
+  // onboarding check has resolved, so the entrance screen paints the
+  // correct greeting on first show ("Welcome" for brand-new clients,
+  // "Welcome back" for returning ones) instead of showing "Welcome" and
+  // flipping to "Welcome back" ~1s later when the check settles. Both auth
+  // paths set welcomePhase='enter' + showWelcome=true and defer the 'ready'
+  // reveal to this effect. A 1200ms fallback guarantees the door animation
+  // never stalls if the onboarding check is slow or hangs.
+  useEffect(() => {
+    if (!showWelcome || welcomePhase !== 'enter') return;
+    let raf = 0;
+    const reveal = () => { raf = requestAnimationFrame(() => setWelcomePhase('ready')); };
+    // Check resolved (true/false) → reveal after a brief frame so the
+    // entrance transition still eases in. Still in flight (null) → wait
+    // for it to settle, but cap the wait so we never hang the animation.
+    const delay = hasOnboardingResponse !== null ? 50 : 1200;
+    const t = setTimeout(reveal, delay);
+    return () => { clearTimeout(t); cancelAnimationFrame(raf); };
+  }, [showWelcome, welcomePhase, hasOnboardingResponse]);
+
   // Server-side email authorization (audit C1 Phase 2). The authorization lists
   // (email / approved_emails / approved_domains) are no longer exposed to the
   // browser — the gate runs on the server via /api/public/portal-gate/authorize,
@@ -565,9 +585,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       setWelcomePhase('enter');
       setShowWelcome(true);
       void logPortalAccess(authedEmail, 'cache');
-      requestAnimationFrame(() => {
-        setTimeout(() => setWelcomePhase('ready'), 50);
-      });
+      // Reveal ('ready') is scheduled by the effect below, which waits for
+      // the onboarding check to resolve so the greeting doesn't flip.
     };
 
     try {
@@ -649,10 +668,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     setIsAuthenticated(true);
     setWelcomePhase('enter');
     setShowWelcome(true);
-    // Animate in after a brief frame
-    requestAnimationFrame(() => {
-      setTimeout(() => setWelcomePhase('ready'), 50);
-    });
+    // Reveal ('ready') is scheduled by the effect below, which waits for
+    // the onboarding check to resolve so the greeting doesn't flip.
   };
 
   const handleWelcomeContinue = () => {

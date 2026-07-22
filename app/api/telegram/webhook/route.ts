@@ -2893,15 +2893,11 @@ async function finalizeSubmission(opts: {
     submittedAt: submittedLabel,
   });
 
-  // [2026-06-12] Fire the Submission-Progress Alert to the campaign's
-  // tg_ops_group_id. Bot counts live posts + shows target cadence + tells
-  // team when a day is full. Safe to call; suppresses silently if no
-  // ops group configured.
-  await sendSubmissionProgressAlert({
-    campaignId: opts.campaignId,
-    campaignName: opts.campaignName,
-    kolName: opts.kolName,
-  });
+  // [2026-07-22, per Andy] Pre-approval SPA fire DISABLED. It read the same
+  // "N of M live" template as the post-approval fire but with the prior
+  // count (e.g. "0 of 4"), so it looked like a duplicate. The SPA now fires
+  // ONCE — on Approve (see the approve handler) — when the post is actually
+  // live. Re-enable by restoring the sendSubmissionProgressAlert call here.
 
   return submissionId;
 }
