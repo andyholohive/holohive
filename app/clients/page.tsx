@@ -43,7 +43,7 @@ import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
-import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeek, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import { EngagementTab } from '@/components/clients/EngagementTab';
 import dynamic from 'next/dynamic';
@@ -4679,7 +4679,12 @@ export default function ClientsPage() {
                           • Last portal visit relative time */}
                     {(() => {
                       const milestones = (clientMilestones[client.id] || []).slice().sort((a, b) => a.display_order - b.display_order);
-                      const m1Complete = milestones.length > 0 && milestones[0].status === 'complete';
+                      // [2026-07-23] Show "Week N" only once ALL onboarding
+                      // milestones are complete (was: first milestone only),
+                      // via the shared isOnboardingComplete helper so this
+                      // card and the client portal agree. A client mid-
+                      // onboarding (e.g. 3 of 6) stays on the milestone bar.
+                      const onboardingDone = isOnboardingComplete(milestones);
                       const ctx = clientContexts[client.id];
                       const total = milestones.length;
                       const completed = milestones.filter(m => m.status === 'complete').length;
@@ -4702,7 +4707,7 @@ export default function ClientsPage() {
                       return (
                         <div className="space-y-3 mb-3">
                           {/* Onboarding progress OR Week-N */}
-                          {!m1Complete ? (
+                          {!onboardingDone ? (
                             total > 0 ? (
                               <div>
                                 <div className="flex items-baseline justify-between text-sm mb-1.5">
@@ -4891,15 +4896,35 @@ export default function ClientsPage() {
                             <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Set up" />
                           )}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 min-w-[110px] px-2"
-                          onClick={() => openContextModal(client, 'actionboard')}
-                          title="Open the Action Board tab"
-                        >
-                          <span className="truncate">Action Board</span>
-                        </Button>
+                        {/* [2026-07-23 per Andy] "Action Board" → "Onboarding".
+                            Once every milestone is complete, onboarding is done,
+                            so this button becomes "Weekly Update" (opens that tab
+                            instead). Same is-onboarding-complete rule as the
+                            Milestone/Week card header + the client portal. */}
+                        {(() => {
+                          const onboardingDone = isOnboardingComplete(clientMilestones[client.id] || []);
+                          return onboardingDone ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 min-w-[110px] px-2"
+                              onClick={() => openContextModal(client, 'weekly-update')}
+                              title="Open the Weekly Update tab"
+                            >
+                              <span className="truncate">Weekly Update</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 min-w-[110px] px-2"
+                              onClick={() => openContextModal(client, 'actionboard')}
+                              title="Open the Onboarding tab"
+                            >
+                              <span className="truncate">Onboarding</span>
+                            </Button>
+                          );
+                        })()}
                         {/* [2026-07-14] Per Andy: Weekly Update button hidden
                             from the per-card footer. The Weekly Update tab is
                             still reachable via the page-level "Weekly Update"
@@ -5588,7 +5613,7 @@ export default function ClientsPage() {
                   medium so all dialog selectors read the same. */}
               <TabsList className="bg-cream-100 p-1 mb-3 shrink-0 w-fit">
                 <TabsTrigger value="context" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Context</TabsTrigger>
-                <TabsTrigger value="actionboard" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Action Board</TabsTrigger>
+                <TabsTrigger value="actionboard" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">Onboarding</TabsTrigger>
                 {/* [2026-06-08] 3rd tab — Weekly Update per Phase 2 of
                     the Post-Onboarding Campaign View spec. Three-zone
                     form inside: Strategic Direction (internal),

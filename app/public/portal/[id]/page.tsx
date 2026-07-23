@@ -48,7 +48,7 @@ import {
 import 'react-quill/dist/quill.snow.css';
 import TopPostEmbed from '@/components/portal/TopPostEmbed';
 import { formatDate as fmtDate, formatRelativeShort } from '@/lib/dateFormat';
-import { getCampaignWeek, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeek, getTotalCampaignWeeksFromCoverage, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
 import { authorizePortalGate, type GateReason } from '@/lib/portalGateClient';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -1459,7 +1459,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     return campaigns[0];
   }, [campaigns]);
 
-  const allMilestonesComplete = milestones.length > 0 && milestones.every(m => m.status === 'complete');
+  const allMilestonesComplete = isOnboardingComplete(milestones);
   // Live mode requires both an all-complete onboarding AND a campaign to
   // show. Without a campaign the hero would be empty, so we'd rather
   // stay in onboarding mode than render a stub.

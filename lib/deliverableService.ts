@@ -837,12 +837,39 @@ export class DeliverableService {
     return data as DeliverableTemplate;
   }
 
-  static async deleteTemplate(id: string): Promise<void> {
+  /**
+   * Delete a template. Templates that have never spawned a deliverable are
+   * hard-deleted (steps + recurring schedules cascade). Once a template has
+   * spawned real deliverables, those history rows reference it via
+   * `deliverables.template_id` (ON DELETE NO ACTION), so a hard delete is
+   * blocked by Postgres — we ARCHIVE instead (`is_active = false`), which the
+   * template list already filters out, so it disappears from the UI while the
+   * historical link is preserved. Archiving also clears the template's
+   * recurring schedules (a hard delete would have cascaded them) so an
+   * archived template can't keep spawning weekly deliverables.
+   *
+   * Returns `{ archived }` — true when it was archived rather than hard-deleted,
+   * so callers can word the toast honestly.
+   */
+  static async deleteTemplate(id: string): Promise<{ archived: boolean }> {
     const { error } = await supabase
       .from('deliverable_templates')
       .delete()
       .eq('id', id);
-    if (error) throw error;
+    if (!error) return { archived: false };
+
+    // 23503 = foreign_key_violation — historical deliverables still point here.
+    if ((error as any).code === '23503') {
+      // Stop it spawning (parity with the CASCADE a hard delete would do).
+      await supabase.from('recurring_deliverables').delete().eq('template_id', id);
+      const { error: archiveErr } = await supabase
+        .from('deliverable_templates')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (archiveErr) throw archiveErr;
+      return { archived: true };
+    }
+    throw error;
   }
 
   static async createStep(step: Partial<DeliverableTemplateStep>): Promise<DeliverableTemplateStep> {

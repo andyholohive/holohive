@@ -113,6 +113,23 @@ export function getTotalCampaignWeeksFromCoverage(
   return getTotalCampaignWeeks(startDateIso, endDateFallbackIso ?? null);
 }
 
+/**
+ * Onboarding-complete = the single graduation line between the milestone
+ * tracker and the "Week N" cadence view. True only when there is at least
+ * one milestone and EVERY one is `complete`.
+ *
+ * Both the /clients card and the public portal call this so they can never
+ * drift apart — previously the card flipped to "Week N" as soon as the FIRST
+ * milestone completed (`milestones[0].status === 'complete'`) while the portal
+ * waited for all of them, so a mid-onboarding client (e.g. 3 of 6 done) showed
+ * "Week 1" internally but the milestone tracker on its own portal. [Andy 2026-07-23]
+ */
+export function isOnboardingComplete(
+  milestones: ReadonlyArray<{ status: string }>,
+): boolean {
+  return milestones.length > 0 && milestones.every((m) => m.status === 'complete');
+}
+
 /** Monday anchoring week N (1-indexed) for a campaign. Useful for
  *  "Week N runs Mon X → Sun Y" labels. */
 export function mondayOfCampaignWeek(

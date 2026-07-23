@@ -267,11 +267,18 @@ export default function DeliverableTemplatesTab() {
     if (!deleteTemplatePending) return;
     setDeleting(true);
     try {
-      await DeliverableService.deleteTemplate(deleteTemplatePending.id);
-      toast({
-        title: 'Template deleted',
-        description: `"${deleteTemplatePending.name}" and its steps are gone.`,
-      });
+      const { archived } = await DeliverableService.deleteTemplate(deleteTemplatePending.id);
+      toast(
+        archived
+          ? {
+              title: 'Template archived',
+              description: `"${deleteTemplatePending.name}" has past deliverables, so it was archived (hidden) instead of deleted to keep that history intact. It will no longer spawn recurring work.`,
+            }
+          : {
+              title: 'Template deleted',
+              description: `"${deleteTemplatePending.name}" and its steps are gone.`,
+            },
+      );
       setDeleteTemplatePending(null);
       await loadTemplates();
     } catch (err: any) {
