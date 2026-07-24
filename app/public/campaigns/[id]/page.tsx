@@ -1132,6 +1132,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           // Renders as a new "Profile" column on the KOL Dashboard.
           .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, profile_note, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type, profile_picture_url, style_summary)`)
           .eq('campaign_id', actualCampaignId)
+          // [2026-07-24] Exclude soft-deleted roster rows — the internal view
+          // filters these via CampaignKOLService.getCampaignKOLs but this
+          // query only checked `hidden`, so removed KOLs kept showing on the
+          // client-facing tracker (Umia Korea leaked 14 removed KOLs).
+          .is('deleted_at', null)
           .or('hidden.is.null,hidden.eq.false')
           .order('created_at', { ascending: false });
         
