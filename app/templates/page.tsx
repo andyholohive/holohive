@@ -28,6 +28,7 @@ import { MessageSquare, Sparkles, FileText, Settings, AlertTriangle } from 'luci
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import MessagesTab from './_tabs/MessagesTab';
 import TaskTemplatesTab from './_tabs/TaskTemplatesTab';
 import DeliverableTemplatesTab from './_tabs/DeliverableTemplatesTab';
@@ -46,12 +47,17 @@ export default function TemplatesPage() {
 
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
   const isGuest = userProfile?.role === 'guest';
+  // [2026-07-24 per Andy] Members can be granted the Tasks + Deliverables
+  // editors per-user (set on /team → Extra Access, page key '/templates').
+  const { hasMemberGrant } = useGuestPermissions();
+  const canEditTemplates = isAdmin || hasMemberGrant('/templates');
 
   // Hide tabs the user can't access. Messages is gated only on
-  // non-guest; Tasks + Deliverables are admin/super_admin only.
+  // non-guest; Tasks + Deliverables are admin/super_admin or a
+  // member with an explicit grant.
   const allowedTabs: Tab[] = [
     ...(!isGuest ? (['messages'] as Tab[]) : []),
-    ...(isAdmin ? (['tasks', 'deliverables'] as Tab[]) : []),
+    ...(canEditTemplates ? (['tasks', 'deliverables'] as Tab[]) : []),
   ];
 
   const [activeTab, setActiveTab] = useState<Tab>(DEFAULT_TAB);

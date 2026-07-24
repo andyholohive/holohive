@@ -30,7 +30,7 @@ export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userProfile, signOut, loading: authLoading } = useAuth();
-  const { isGuest, canView, loading: guestLoading } = useGuestPermissions();
+  const { isGuest, canView, loading: guestLoading, hasMemberGrant } = useGuestPermissions();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebarCollapsed');
@@ -696,6 +696,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   isGuest: isGuestUser,
                   role: userProfile?.role,
                   canView,
+                  hasMemberGrant,
                 };
                 const visible = bookmarkedHrefs
                   .map(href => NAV_BY_HREF[href])
@@ -784,7 +785,9 @@ export default function Sidebar({ children }: SidebarProps) {
               {!guestHideAlways && (
                 <CollapsibleSection id="resources" icon={BookOpen}>
                   <NavItem href="/templates" icon={MessageSquare} label="Templates" />
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                  {/* [2026-07-24 per Andy] SOPs also visible to members with an
+                      explicit per-member grant (set on /team → Extra Access). */}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || hasMemberGrant('/sops')) && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
                   <NavItem href="/initiatives" icon={Target} label="Initiatives" />
                   {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
                   {/* [Expenses v1, 2026-05-29] Super-admin only. Reimbursable
@@ -954,7 +957,7 @@ export default function Sidebar({ children }: SidebarProps) {
         onToggleBookmark={toggleBookmark}
         onToggleHidden={toggleHidden}
         onReset={resetCustomization}
-        ctx={{ isGuest: isGuestUser, role: userProfile?.role, canView }}
+        ctx={{ isGuest: isGuestUser, role: userProfile?.role, canView, hasMemberGrant }}
       />
 
       {/* Changelog History Dialog */}

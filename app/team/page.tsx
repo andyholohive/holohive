@@ -150,6 +150,15 @@ export default function TeamPage() {
     { key: '/tasks', label: 'Tasks', group: 'Core' },
   ];
 
+  // [2026-07-24 per Andy] Extra pages a MEMBER can be granted beyond the
+  // role's defaults (rows in the same guest_permissions table, read as
+  // ADDITIVE grants for members). Keep in sync with MEMBER_GRANT_PAGES in
+  // hooks/useGuestPermissions.ts.
+  const MEMBER_GRANT_PAGES = [
+    { key: '/sops', label: 'SOPs', group: 'Extra' },
+    { key: '/templates', label: 'Templates — Tasks & Deliverables editors', group: 'Extra' },
+  ];
+
   useEffect(() => {
     fetchTeamMembers();
     fetchTgChats();
@@ -1072,8 +1081,12 @@ export default function TeamPage() {
                         </div>
                       )}
 
-                      {/* Guest Permissions */}
-                      {member.role === 'guest' && isAdmin && (
+                      {/* Guest Permissions / Member Extra Access.
+                          [2026-07-24 per Andy] Members can now hold ADDITIVE
+                          grants (SOPs / Templates editors) via the same
+                          guest_permissions table — same editor, reduced page
+                          list, View toggle only. */}
+                      {(member.role === 'guest' || member.role === 'member') && isAdmin && (
                         <Collapsible
                           open={guestPermsOpen === member.id}
                           onOpenChange={(open) => {
@@ -1092,19 +1105,24 @@ export default function TeamPage() {
                               size="sm"
                               className="flex items-center justify-between w-full text-sm font-medium text-ink-warm-700 py-1 h-auto px-0 hover:bg-transparent"
                             >
-                              <span>Page Permissions</span>
+                              <span>{member.role === 'member' ? 'Extra Access' : 'Page Permissions'}</span>
                               {guestPermsOpen === member.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="mt-2 space-y-1">
+                              {member.role === 'member' && (
+                                <p className="text-[11px] text-ink-warm-500 pb-1">
+                                  Members already have the core app. These grants unlock the admin-gated surfaces below for this member only.
+                                </p>
+                              )}
                               <div className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 text-[11px] text-ink-warm-500 uppercase tracking-wider pb-1 border-b border-cream-100">
                                 <span>Page</span>
-                                <span className="w-12 text-center">View</span>
-                                <span className="w-12 text-center">Edit</span>
-                                <span className="w-12 text-center">Delete</span>
+                                <span className="w-12 text-center">{member.role === 'member' ? 'Access' : 'View'}</span>
+                                {member.role !== 'member' && <span className="w-12 text-center">Edit</span>}
+                                {member.role !== 'member' && <span className="w-12 text-center">Delete</span>}
                               </div>
-                              {GUEST_PAGES.map(page => {
+                              {(member.role === 'member' ? MEMBER_GRANT_PAGES : GUEST_PAGES).map(page => {
                                 const perms = guestPerms[member.id]?.[page.key] || { can_view: false, can_edit: false, can_delete: false };
                                 return (
                                   <div key={page.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 items-center py-0.5">
@@ -1112,12 +1130,16 @@ export default function TeamPage() {
                                     <div className="w-12 flex justify-center">
                                       <Checkbox checked={perms.can_view} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_view')} />
                                     </div>
-                                    <div className="w-12 flex justify-center">
-                                      <Checkbox checked={perms.can_edit} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_edit')} />
-                                    </div>
-                                    <div className="w-12 flex justify-center">
-                                      <Checkbox checked={perms.can_delete} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_delete')} />
-                                    </div>
+                                    {member.role !== 'member' && (
+                                      <div className="w-12 flex justify-center">
+                                        <Checkbox checked={perms.can_edit} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_edit')} />
+                                      </div>
+                                    )}
+                                    {member.role !== 'member' && (
+                                      <div className="w-12 flex justify-center">
+                                        <Checkbox checked={perms.can_delete} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_delete')} />
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}

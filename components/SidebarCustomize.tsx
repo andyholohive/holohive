@@ -132,6 +132,9 @@ export type AvailabilityCtx = {
   role: string | undefined;
   /** From useGuestPermissions().canView. Returns true when guest can see. */
   canView: (pageKey: string) => boolean;
+  /** From useGuestPermissions().hasMemberGrant — per-member extra-access
+   *  grants (e.g. /sops). Optional so older callers stay valid. */
+  hasMemberGrant?: (pageKey: string) => boolean;
 };
 
 /**
@@ -143,7 +146,7 @@ export type AvailabilityCtx = {
  * navigate to (or vice versa). */
 export function isItemAvailable(item: NavItemDef, ctx: AvailabilityCtx): boolean {
   if (item.notForGuest && ctx.isGuest) return false;
-  if (item.requiredRole === 'admin' && !(ctx.role === 'admin' || ctx.role === 'super_admin')) return false;
+  if (item.requiredRole === 'admin' && !(ctx.role === 'admin' || ctx.role === 'super_admin' || ctx.hasMemberGrant?.(item.href))) return false;
   if (item.requiredRole === 'super_admin' && ctx.role !== 'super_admin') return false;
   // pageKey + isGuest: only block if guest user explicitly lacks access.
   // Non-guests aren't subject to canView; they see everything role-allowed.

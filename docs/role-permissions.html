@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoloHive Portal — Team Role Permissions</title>
+<style>
+  :root {
+    /* neutrals biased slightly cool toward the brand teal */
+    --bg: #f6f8f8;
+    --surface: #ffffff;
+    --surface-2: #eef2f2;
+    --border: #d9e0e0;
+    --border-strong: #c2cccc;
+    --ink: #1a2626;
+    --ink-2: #47585a;
+    --ink-3: #6b7c7d;
+    --brand: #3e8692;
+    --brand-deep: #2d6570;
+    --brand-tint: #e6f0f1;
+    /* role hues */
+    --sa: #b4436b;      /* super admin — rose/magenta */
+    --sa-tint: #f7e4ea;
+    --admin: #c07a1e;   /* admin — amber */
+    --admin-tint: #f7ecd8;
+    --member: #3f7bb0;  /* member — sky */
+    --member-tint: #e3eef7;
+    --guest: #6b7c7d;   /* guest — slate */
+    --guest-tint: #e9eded;
+    /* semantic */
+    --yes: #2f855a;
+    --yes-bg: #e4f2ea;
+    --no: #9aa6a6;
+    --cond: #b5731a;
+    --cond-bg: #f7ecd8;
+    --shadow: 0 1px 2px rgba(20,40,40,.04), 0 6px 20px rgba(20,40,40,.06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1516;
+      --surface: #16201f;
+      --surface-2: #1d2928;
+      --border: #2a3736;
+      --border-strong: #384846;
+      --ink: #e7eeed;
+      --ink-2: #a9b8b7;
+      --ink-3: #7f908f;
+      --brand: #5fb0bd;
+      --brand-deep: #7cc4cf;
+      --brand-tint: #17302f;
+      --sa: #e58caf; --sa-tint: #2c1a22;
+      --admin: #e0a94e; --admin-tint: #2c2415;
+      --member: #7cb0dc; --member-tint: #16232e;
+      --guest: #94a3a3; --guest-tint: #1f2b2a;
+      --yes: #6cc79a; --yes-bg: #14271f;
+      --no: #64716f;
+      --cond: #e0a94e; --cond-bg: #2c2415;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8f8; --surface: #ffffff; --surface-2: #eef2f2; --border: #d9e0e0; --border-strong: #c2cccc;
+    --ink: #1a2626; --ink-2: #47585a; --ink-3: #6b7c7d; --brand: #3e8692; --brand-deep: #2d6570; --brand-tint: #e6f0f1;
+    --sa:#b4436b;--sa-tint:#f7e4ea;--admin:#c07a1e;--admin-tint:#f7ecd8;--member:#3f7bb0;--member-tint:#e3eef7;--guest:#6b7c7d;--guest-tint:#e9eded;
+    --yes:#2f855a;--yes-bg:#e4f2ea;--no:#9aa6a6;--cond:#b5731a;--cond-bg:#f7ecd8;
+    --shadow: 0 1px 2px rgba(20,40,40,.04), 0 6px 20px rgba(20,40,40,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0e1516;--surface:#16201f;--surface-2:#1d2928;--border:#2a3736;--border-strong:#384846;
+    --ink:#e7eeed;--ink-2:#a9b8b7;--ink-3:#7f908f;--brand:#5fb0bd;--brand-deep:#7cc4cf;--brand-tint:#17302f;
+    --sa:#e58caf;--sa-tint:#2c1a22;--admin:#e0a94e;--admin-tint:#2c2415;--member:#7cb0dc;--member-tint:#16232e;--guest:#94a3a3;--guest-tint:#1f2b2a;
+    --yes:#6cc79a;--yes-bg:#14271f;--no:#64716f;--cond:#e0a94e;--cond-bg:#2c2415;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 26px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: clamp(24px, 5vw, 64px) clamp(16px, 4vw, 40px) 72px; }
+
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--brand); margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 4.5vw, 42px); line-height: 1.08; margin: 0 0 12px; font-weight: 700;
+    letter-spacing: -0.02em; text-wrap: balance; color: var(--ink);
+  }
+  .lede { font-size: 16px; color: var(--ink-2); max-width: 62ch; margin: 0 0 4px; }
+  .meta { font-size: 13px; color: var(--ink-3); margin-top: 10px; }
+  .meta code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; }
+
+  h2 {
+    font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-3); margin: 48px 0 16px; display: flex; align-items: center; gap: 10px;
+  }
+  h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  /* role legend cards */
+  .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 28px; }
+  .role {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .role::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--rc); }
+  .role .rk { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .role .name { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .role .count { font-size: 12px; font-weight: 600; color: var(--rc); background: var(--rt); padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+  .role .key { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--ink-3); margin: 4px 0 8px; }
+  .role .desc { font-size: 13px; color: var(--ink-2); margin: 0; }
+  .role.sa    { --rc: var(--sa); --rt: var(--sa-tint); }
+  .role.admin { --rc: var(--admin); --rt: var(--admin-tint); }
+  .role.member{ --rc: var(--member); --rt: var(--member-tint); }
+  .role.guest { --rc: var(--guest); --rt: var(--guest-tint); }
+
+  /* matrix */
+  .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; }
+  thead th { position: sticky; top: 0; }
+  th, td { text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--border); }
+  thead th {
+    font-size: 12px; font-weight: 700; letter-spacing: .04em; background: var(--surface-2); color: var(--ink);
+    border-bottom: 2px solid var(--border-strong); white-space: nowrap;
+  }
+  thead th.cap { text-transform: uppercase; letter-spacing: .1em; font-size: 11px; color: var(--ink-3); }
+  thead th.rolecol { text-align: center; }
+  thead th .chip { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+  th.sa .chip     { color: var(--sa); background: var(--sa-tint); }
+  th.admin .chip  { color: var(--admin); background: var(--admin-tint); }
+  th.member .chip { color: var(--member); background: var(--member-tint); }
+  th.guest .chip  { color: var(--guest); background: var(--guest-tint); }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface-2); }
+  td.cap { font-weight: 600; color: var(--ink); font-size: 14px; }
+  td.cap small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+  td.cell { text-align: center; }
+
+  .group td {
+    background: var(--brand-tint); color: var(--brand-deep); font-weight: 700;
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 9px 16px;
+  }
+
+  .mark { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; font-size: 14px; font-weight: 700; }
+  .yes { color: var(--yes); background: var(--yes-bg); }
+  .no  { color: var(--no); background: transparent; font-size: 15px; }
+  .cond {
+    color: var(--cond); background: var(--cond-bg); font-size: 11px; font-weight: 700;
+    width: auto; padding: 3px 9px; border-radius: 20px; letter-spacing: .02em; white-space: nowrap;
+  }
+
+  /* legend + notes */
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-size: 13px; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px; }
+  .note {
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--brand);
+    border-radius: 10px; padding: 15px 18px; box-shadow: var(--shadow);
+  }
+  .note h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--ink); }
+  .note p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+  .note code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; color: var(--brand-deep); }
+
+  footer { margin-top: 40px; font-size: 12.5px; color: var(--ink-3); border-top: 1px solid var(--border); padding-top: 16px; }
+  footer code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">HoloHive Portal &middot; Access Control</p>
+  <h1>Team Role Permissions</h1>
+  <p class="lede">Four role tiers govern what each teammate can see and do. Three are a strict hierarchy &mdash; each inherits everything below it &mdash; while <strong>Guest</strong> is a separate, allowlist-only model.</p>
+  <p class="meta">Source of truth: <code>users.role</code> &middot; enforced in <code>ProtectedRoute</code>, <code>Sidebar</code>, and API <code>requireRole()</code> guards. Live headcount as of 07/24/2026.</p>
+
+  <div class="roles">
+    <div class="role sa">
+      <div class="rk"><span class="name">Super Admin</span><span class="count">4 users</span></div>
+      <div class="key">super_admin</div>
+      <p class="desc">Full access. Everything Admin can do, plus billing, Telegram admin, and the ability to change roles.</p>
+    </div>
+    <div class="role admin">
+      <div class="rk"><span class="name">Admin</span><span class="count">3 users</span></div>
+      <div class="key">admin</div>
+      <p class="desc">Runs day-to-day ops: templates, forms, SOPs, team approvals. No billing or role management.</p>
+    </div>
+    <div class="role member">
+      <div class="rk"><span class="name">Member</span><span class="count">3 users</span></div>
+      <div class="key">member</div>
+      <p class="desc">Standard teammate. Full use of the core app; none of the admin-only sections.</p>
+    </div>
+    <div class="role guest">
+      <div class="rk"><span class="name">Guest</span><span class="count">0 users</span></div>
+      <div class="key">guest</div>
+      <p class="desc">Scoped external access. Sees only pages explicitly granted, with per-page view/edit/delete.</p>
+    </div>
+  </div>
+
+  <h2>Capability matrix</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="cap">Surface / Capability</th>
+          <th class="rolecol sa"><span class="chip">Super Admin</span></th>
+          <th class="rolecol admin"><span class="chip">Admin</span></th>
+          <th class="rolecol member"><span class="chip">Member</span></th>
+          <th class="rolecol guest"><span class="chip">Guest</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="group"><td colspan="4">Core app</td></tr>
+        <tr>
+          <td class="cap">Dashboard, Clients, Campaigns<small>KOLs, Lists, Analytics</small></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="cond">Per page</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Messages<small>team chat</small></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+
+        <tr class="group"><td colspan="4">Admin operations</td></tr>
+        <tr>
+          <td class="cap">SOPs</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Forms</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Templates &rarr; Tasks &amp; Deliverables tabs</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Edit clients from task detail</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Approve pending team members</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Manage a guest's page permissions</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+
+        <tr class="group"><td colspan="4">Super Admin only</td></tr>
+        <tr>
+          <td class="cap">Expenses</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">TG Chats<small>/crm/telegram</small></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Changelog</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Change user roles<small>incl. granting Super Admin</small></td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+        <tr>
+          <td class="cap">Telegram-linked admin actions</td>
+          <td class="cell"><span class="mark yes">&check;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+          <td class="cell"><span class="mark no">&times;</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="legend">
+    <span><span class="mark yes">&check;</span> Full access</span>
+    <span><span class="mark no">&times;</span> No access / hidden</span>
+    <span><span class="cond">Per page</span> Governed by the guest allowlist</span>
+  </div>
+
+  <h2>How enforcement works</h2>
+  <div class="notes">
+    <div class="note">
+      <h3>Tiered roles</h3>
+      <p>Super Admin &sup; Admin &sup; Member. Each tier inherits everything below it. Pages check <code>requiredRoles.includes(role)</code>; APIs use <code>requireRole([...])</code>.</p>
+    </div>
+    <div class="note">
+      <h3>Guest allowlist</h3>
+      <p>Guests inherit nothing &mdash; deny by default. Access comes from rows in <code>guest_permissions</code> (one per page, with <code>can_view</code> / <code>can_edit</code> / <code>can_delete</code>).</p>
+    </div>
+    <div class="note">
+      <h3>Guest redirects</h3>
+      <p>A guest hitting a page not on their allowlist is redirected to their first permitted page. The sidebar hides everything they can't view.</p>
+    </div>
+    <div class="note">
+      <h3>Who assigns roles</h3>
+      <p>Only Super Admins change roles or grant Super Admin. Admins can approve join requests and configure each guest's per-page permissions.</p>
+    </div>
+  </div>
+
+  <footer>
+    Reference generated from the live codebase &amp; database &mdash; <code>lib/requireSuperAdmin.ts</code>, <code>components/Sidebar.tsx</code>, <code>hooks/useGuestPermissions.ts</code>, <code>guest_permissions</code>. If gating changes in code, update this doc.
+  </footer>
+</div>
+</body>
+</html>

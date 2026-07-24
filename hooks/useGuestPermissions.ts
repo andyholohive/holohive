@@ -11,6 +11,16 @@ type Permission = {
   can_delete: boolean;
 };
 
+// [2026-07-24 per Andy] Pages a MEMBER can be granted beyond the role's
+// defaults. Members get the whole core app from their role; these are the
+// two admin-gated surfaces that can be opened per-member via the same
+// guest_permissions table (rows are ADDITIVE grants for members, unlike
+// guests where the rows are the entire allowlist).
+export const MEMBER_GRANT_PAGES = [
+  { key: '/sops', label: 'SOPs' },
+  { key: '/templates', label: 'Templates — Tasks & Deliverables editors' },
+] as const;
+
 // All pages a guest could potentially access
 export const GUEST_PAGES = [
   { key: '/crm/sales-pipeline', label: 'Sales Pipeline', group: 'CRM' },
@@ -33,14 +43,18 @@ export function useGuestPermissions() {
   const [loading, setLoading] = useState(true);
 
   const isGuest = userProfile?.role === 'guest';
+  // [2026-07-24] Members can hold ADDITIVE grants (SOPs / Templates
+  // editors) in the same table, so fetch for them too. Admins and
+  // super_admins never need rows — their role already covers everything.
+  const isMember = userProfile?.role === 'member';
 
   useEffect(() => {
-    if (!user?.id || !isGuest) {
+    if (!user?.id || (!isGuest && !isMember)) {
       setLoading(false);
       return;
     }
     loadPermissions();
-  }, [user?.id, isGuest]);
+  }, [user?.id, isGuest, isMember]);
 
   const loadPermissions = async () => {
     if (!user?.id) return;
@@ -78,6 +92,17 @@ export function useGuestPermissions() {
     return perm?.can_delete ?? false;
   }, [isGuest, permissions]);
 
+  // [2026-07-24] Member grant check — true only for a member with an
+  // explicit can_view row (see MEMBER_GRANT_PAGES). Deliberately returns
+  // false for admins/super_admins: callers OR this with their existing
+  // role check (`isAdmin || hasMemberGrant('/sops')`), so admin access
+  // never depends on grant rows existing.
+  const hasMemberGrant = useCallback((pageKey: string): boolean => {
+    if (!isMember) return false;
+    const perm = permissions.find(p => p.page_key === pageKey);
+    return perm?.can_view ?? false;
+  }, [isMember, permissions]);
+
   // Pages all users (including guests) can always access
   const ALWAYS_ALLOWED = ['/settings', '/auth'];
 
@@ -93,5 +118,5 @@ export function useGuestPermissions() {
     ? (permissions.find(p => p.can_view)?.page_key || null)
     : null;
 
-  return { isGuest, permissions, loading, canView, canEdit, canDelete, canAccessPath, firstAllowedPath };
+  return { isGuest, permissions, loading, canView, canEdit, canDelete, canAccessPath, firstAllowedPath, hasMemberGrant };
 }
