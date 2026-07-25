@@ -105,7 +105,8 @@ export function EditPaymentDialog({ open, onOpenChange, payment }: EditPaymentDi
         .update({
           campaign_kol_id: form.campaign_kol_id,
           amount: newAmount,
-          payment_date: form.payment_date,
+          // Empty date = unpaid; '' would fail the date column outright.
+          payment_date: form.payment_date || null,
           payment_method: form.payment_method,
           content_id: (() => {
             if (Array.isArray(form.content_id)) {
@@ -120,26 +121,32 @@ export function EditPaymentDialog({ open, onOpenChange, payment }: EditPaymentDi
 
       if (error) throw error;
 
-      // Update the affected KOL's paid total.
-      const currentKol = campaignKOLs.find(kol => kol.id === form.campaign_kol_id);
-      const currentPaid = currentKol?.paid || 0;
-      const newPaid = currentPaid - oldAmount + newAmount;
+      // Update the affected KOL's paid total. Only payments WITH a
+      // payment_date count as paid — an unpaid row contributes 0, and
+      // setting/clearing the date here moves the amount in/out.
+      if (form.campaign_kol_id) {
+        const currentKol = campaignKOLs.find(kol => kol.id === form.campaign_kol_id);
+        const currentPaid = currentKol?.paid || 0;
+        const oldContribution = payment.payment_date ? oldAmount : 0;
+        const newContribution = form.payment_date ? newAmount : 0;
+        const newPaid = Math.max(0, currentPaid - oldContribution + newContribution);
 
-      await supabase
-        .from('campaign_kols')
-        .update({ paid: newPaid } as any)
-        .eq('id', form.campaign_kol_id);
+        await supabase
+          .from('campaign_kols')
+          .update({ paid: newPaid } as any)
+          .eq('id', form.campaign_kol_id);
 
-      setCampaignKOLs(prev => prev.map(kol =>
-        kol.id === form.campaign_kol_id ? { ...kol, paid: newPaid } : kol,
-      ));
+        setCampaignKOLs(prev => prev.map(kol =>
+          kol.id === form.campaign_kol_id ? { ...kol, paid: newPaid } : kol,
+        ));
+      }
 
       setPayments(prev => prev.map(p =>
         p.id === payment.id ? {
           ...p,
           campaign_kol_id: form.campaign_kol_id,
           amount: newAmount,
-          payment_date: form.payment_date,
+          payment_date: form.payment_date || null,
           payment_method: form.payment_method,
           content_id: form.content_id === 'none' ? null : form.content_id,
           transaction_id: form.transaction_id || null,

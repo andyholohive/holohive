@@ -273,7 +273,9 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
           campaign_id: campaign?.id,
           campaign_kol_id: kolId,
           amount: payment.amount,
-          payment_date: payment.payment_date || new Date().toISOString().split('T')[0],
+          // No payment date = not paid yet. Defaulting to today here used to
+          // silently mark unpaid rows as Paid.
+          payment_date: payment.payment_date || null,
           payment_method: payment.payment_method || 'Token',
           content_id: (() => {
             if (Array.isArray(payment.content_id)) {
@@ -300,7 +302,10 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
 
         const currentKol = campaignKOLs.find(kol => kol.id === kolId);
         const currentPaid = currentKol?.paid || 0;
-        const totalAmount = kolData.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        // Only dated payments count as paid — unpaid rows (no payment_date)
+        // join the total when the date is set later.
+        const totalAmount = kolData.payments.reduce(
+          (sum, p) => sum + (p.payment_date ? (p.amount || 0) : 0), 0);
         const newPaid = currentPaid + totalAmount;
 
         await supabase
@@ -345,7 +350,7 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
           recipient_name: nonKOLPayment.recipient_name.trim(),
           payment_category: nonKOLPayment.payment_category,
           amount: nonKOLPayment.amount,
-          payment_date: nonKOLPayment.payment_date || new Date().toISOString().split('T')[0],
+          payment_date: nonKOLPayment.payment_date || null,
           payment_method: nonKOLPayment.payment_method || 'Token',
           transaction_id: nonKOLPayment.transaction_id || null,
           wallet: nonKOLPayment.wallet || null,

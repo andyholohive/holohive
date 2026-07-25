@@ -3,7 +3,7 @@
 /**
  * BudgetTableView — the Table view of the Budget tab. Renders the
  * payments table with per-cell inline editing, per-column filter
- * dropdowns, bulk-action toolbar, the Overdue quick filter, CSV
+ * dropdowns, bulk-action toolbar, the Unpaid quick filter, CSV
  * export, and the bulk-delete + single-delete confirmation dialogs.
  *
  * Extracted from `app/campaigns/[id]/page.tsx` on 2026-06-02 — the
@@ -159,7 +159,7 @@ export function BudgetTableView() {
       </span>
     );
   };
-  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
   const [paymentSort, setPaymentSort] = useState<{ field: PaymentSortField; direction: 'asc' | 'desc' }>({ field: null, direction: 'asc' });
   const [paymentFilters, setPaymentFilters] = useState({
     kol_ids: [] as string[],
@@ -195,24 +195,13 @@ export function BudgetTableView() {
 
   // ── Derived ────────────────────────────────────────────────────
 
-  /** Payment classification used by the Overdue quick filter +
-   *  the per-row indicator badge. Mirrors the payment_reminder
-   *  rule's intent (paid = date set; overdue = unpaid + content
-   *  posted; pending = unpaid + content not yet live). */
-  const getPaymentStatus = (payment: any): 'paid' | 'overdue' | 'pending' => {
-    if (payment.payment_date) return 'paid';
-    const contentIds: string[] = Array.isArray(payment.content_id)
-      ? payment.content_id
-      : (payment.content_id ? [payment.content_id] : []);
-    if (contentIds.length === 0) return 'pending';
-    const hasPostedLinkedContent = contentIds.some(cid => {
-      const c = contents.find((co: any) => co.id === cid);
-      return c && typeof c.status === 'string' && c.status.toLowerCase() === 'posted';
-    });
-    return hasPostedLinkedContent ? 'overdue' : 'pending';
-  };
+  /** Payment classification used by the Unpaid quick filter +
+   *  the per-row indicator badge: paid = payment_date set,
+   *  unpaid = no payment_date. */
+  const getPaymentStatus = (payment: any): 'paid' | 'unpaid' =>
+    payment.payment_date ? 'paid' : 'unpaid';
 
-  const overdueCount = payments.filter(p => getPaymentStatus(p) === 'overdue').length;
+  const unpaidCount = payments.filter(p => getPaymentStatus(p) === 'unpaid').length;
 
   // ── Sort + filter handlers ─────────────────────────────────────
 
@@ -273,8 +262,8 @@ export function BudgetTableView() {
           if (payment.amount !== v) return false;
         }
       }
-      // Overdue
-      if (showOverdueOnly && getPaymentStatus(payment) !== 'overdue') return false;
+      // Unpaid
+      if (showUnpaidOnly && getPaymentStatus(payment) !== 'unpaid') return false;
       return true;
     });
 
@@ -376,6 +365,19 @@ export function BudgetTableView() {
 
       setEditingPaymentCell(null);
       setEditingPaymentValue(null);
+
+      // Unpaid ⇄ paid transition: only dated payments count toward the
+      // KOL's paid total, so setting a date on an undated row adds the
+      // amount (and clearing a date removes it).
+      if (field === 'payment_date' && payment.campaign_kol_id && !!payment.payment_date !== !!newValue) {
+        const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+        if (kol) {
+          const delta = (newValue ? 1 : -1) * (Number(payment.amount) || 0);
+          const newPaid = Math.max(0, (kol.paid || 0) + delta);
+          await supabase.from('campaign_kols').update({ paid: newPaid } as any).eq('id', kol.id);
+          setCampaignKOLs(prev => prev.map(k => k.id === kol.id ? { ...k, paid: newPaid } : k));
+        }
+      }
 
       // Telegram notification trigger when setting payment_date.
       if (field === 'payment_date' && newValue) {
@@ -647,18 +649,18 @@ export function BudgetTableView() {
                         <Download className="h-3.5 w-3.5 mr-1.5" />
                         Export CSV
                       </Button>
-                      {/* Overdue quick filter — content is posted but payment isn't recorded */}
+                      {/* Unpaid quick filter — rows with no payment date */}
                       <Button
-                        variant={showOverdueOnly ? 'destructive' : 'outline'}
+                        variant={showUnpaidOnly ? 'destructive' : 'outline'}
                         size="sm"
-                        onClick={() => setShowOverdueOnly(v => !v)}
-                        className={showOverdueOnly ? '' : 'text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700'}
-                        title={showOverdueOnly ? 'Showing overdue only — click to clear' : 'Show only payments where content is posted but payment is missing'}
+                        onClick={() => setShowUnpaidOnly(v => !v)}
+                        className={showUnpaidOnly ? '' : 'text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700'}
+                        title={showUnpaidOnly ? 'Showing unpaid only — click to clear' : 'Show only payments without a payment date'}
                       >
                         <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
-                        {showOverdueOnly ? 'Overdue only' : 'Overdue'}
-                        <span className={`ml-1.5 text-[10px] font-bold ${showOverdueOnly ? 'opacity-90' : ''}`}>
-                          {overdueCount}
+                        {showUnpaidOnly ? 'Unpaid only' : 'Unpaid'}
+                        <span className={`ml-1.5 text-[10px] font-bold ${showUnpaidOnly ? 'opacity-90' : ''}`}>
+                          {unpaidCount}
                         </span>
                       </Button>
                     </div>
@@ -1173,25 +1175,22 @@ export function BudgetTableView() {
                                     )}
                                     {(() => {
                                       const status = getPaymentStatus(payment);
-                                      if (status === 'overdue') {
+                                      if (status === 'unpaid') {
                                         return (
                                           <span
                                             className="inline-flex items-center gap-1 text-[10px] font-semibold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded pointer-events-none"
-                                            title="Content is posted but payment hasn't been recorded"
+                                            title="No payment date recorded yet"
                                           >
                                             <AlertTriangle className="h-2.5 w-2.5" />
-                                            Overdue
+                                            Unpaid
                                           </span>
                                         );
                                       }
-                                      if (status === 'paid') {
-                                        return (
-                                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded pointer-events-none">
-                                            Paid
-                                          </span>
-                                        );
-                                      }
-                                      return null;
+                                      return (
+                                        <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded pointer-events-none">
+                                          Paid
+                                        </span>
+                                      );
                                     })()}
                                   </div>
                                 </TableCell>
