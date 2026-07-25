@@ -219,6 +219,32 @@ export async function GET(request: Request) {
  * Returns one verdict per input tg_comment_id — any row Claude drops
  * gets no update (stays unscored, retried on the next run).
  */
+/**
+ * Extract the verdict array from the model's raw text, tolerating truncation.
+ * Strict path: first bracketed array that parses. Salvage path: if the output
+ * was cut off mid-array (the 07/19–07/25 failure mode), keep every COMPLETE
+ * object up to the last closing brace and close the array — partial rows are
+ * dropped, scored rows land, and the unscored remainder is retried next run.
+ */
+function parseVerdictArray(raw: string): any[] | null {
+  const match = raw.match(/\[[\s\S]*\]/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[0]);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* fall through to salvage */ }
+  }
+  const start = raw.indexOf('[');
+  const lastBrace = raw.lastIndexOf('}');
+  if (start === -1 || lastBrace <= start) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(start, lastBrace + 1) + ']');
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 async function scorePost(
   anthropic: Anthropic,
   model: string,
@@ -268,7 +294,11 @@ async function scorePost(
 
   const msg = await anthropic.messages.create({
     model,
-    max_tokens: Math.max(1024, comments.length * 140),
+    // [2026-07-25] Was max(1024, n*140) — with adaptive thinking the thinking
+    // budget SHARES max_tokens, so long KR glosses got truncated mid-array and
+    // the same posts failed parsing every day from 07/19 onward (agent_runs).
+    // 400/comment + a 8192 floor leaves room for thinking + full output.
+    max_tokens: Math.max(8192, comments.length * 400),
     system,
     messages: [{ role: 'user', content: user }],
     thinking: { type: 'adaptive' },
@@ -276,11 +306,10 @@ async function scorePost(
 
   const textBlock = msg.content.find(b => b.type === 'text') as any;
   const raw = textBlock?.text || '';
-  const jsonMatch = raw.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
+  const parsed = parseVerdictArray(raw);
+  if (!parsed) {
     throw new Error(`No JSON array in response: ${raw.slice(0, 200)}`);
   }
-  const parsed = JSON.parse(jsonMatch[0]);
   if (!Array.isArray(parsed)) throw new Error('Response is not an array');
 
   const verdicts: Verdict[] = [];

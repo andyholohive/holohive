@@ -60,6 +60,10 @@ interface Link {
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
+  /** Set by /api/links/reconcile when the Drive file behind this link was
+   *  missing from the latest inventory (deleted/moved out of the Shared
+   *  Drive). Cleared automatically if the file reappears. */
+  dead_at?: string | null;
 }
 
 type ClientOption = {
@@ -891,6 +895,16 @@ export default function LinksPage() {
                         {group.links.map(link => (
                           <TableRow key={link.id} className="border-cream-100 hover:bg-cream-50">
                             <TableCell className="py-3.5 px-5 font-medium">
+                              {/* Drive reconcile flagged the underlying file as
+                                  gone — surface it so the row gets fixed or
+                                  removed instead of silently 404ing. */}
+                              {link.dead_at && (
+                                <span title={`File missing since ${link.dead_at.slice(0, 10)}`}>
+                                  <StatusBadge tone="danger" size="sm" className="mr-1.5 cursor-default">
+                                    File missing
+                                  </StatusBadge>
+                                </span>
+                              )}
                               {link.description ? (
                                 <HoverCard>
                                   <HoverCardTrigger asChild>

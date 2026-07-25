@@ -87,9 +87,34 @@ export interface DisplayScores {
   lowConfidence: boolean;
 }
 
+/**
+ * Organic coverage breadth (TG Intelligence Layer — "KOL scoring reads
+ * tg_channel_posts"). Second reader of the coverage-scan post store, no
+ * new pull: when a coverage sweep attributes a public-channel post to a
+ * roster KOL (`tg_channel_posts.kol_id`), that post counts here.
+ *
+ * SIGNAL-ONLY for now: NOT blended into the Channel composite. The
+ * Round 2 model (Jdot 2026-07-10) locks Channel Score at 4 dims /
+ * fixed weights — adding a 5th weighted dim needs Jdot sign-off. Until
+ * then breadth rides alongside the two scores the same way
+ * `lowConfidence` does. null = no attributed posts in the window
+ * (renders "—", same convention as Activation).
+ */
+export interface OrganicCoverageBreakdown {
+  /** Distinct subjects (prospects/clients/projects) this KOL organically covered in the window. */
+  subjectsCovered: number;
+  /** Attributed posts in the window. */
+  posts: number;
+  /** Rank of subjectsCovered across KOLs with ≥1 attributed post (0–100). */
+  breadth: number;
+  windowDays: number;
+}
+
 export interface ScoreResult {
   channel: ChannelScoreBreakdown;
   activation: ActivationScoreBreakdown | null;
+  /** null until coverage scans attribute ≥1 post to this KOL — renders "—". */
+  organicCoverage: OrganicCoverageBreakdown | null;
   scores: DisplayScores;
 }
 
@@ -115,6 +140,20 @@ export interface DeliverableInput {
   forwards: number | null;
   activation_participants: number | null;
 }
+
+/** One tg_channel_posts row attributed to a roster KOL (kol_id set by
+ *  the coverage ingest when the scanned channel matches a roster KOL). */
+export interface OrganicPostInput {
+  kol_id: string;
+  subject_type: string | null;
+  subject_id: string | null;
+  posted_at: string;
+}
+
+/** Trailing window for organic coverage breadth. 90d — coverage scans
+ *  are per-prospect sweeps, not a monthly cadence, so a month is too
+ *  noisy and all-time never decays. */
+export const ORGANIC_COVERAGE_WINDOW_DAYS = 90;
 
 // ─── Dimension weights ────────────────────────────────────────────────
 
@@ -287,6 +326,13 @@ export interface ComputeInputs {
   campaignAvgParticipants: Map<string, number>;
   /** The roster — every KOL we want a score for. */
   kolIds: string[];
+  /** tg_channel_posts rows attributed to roster KOLs (trailing window),
+   *  grouped by KOL. OPTIONAL — callers without coverage data (fixture
+   *  preview route) omit it and every KOL's organicCoverage is null. */
+  organicPostsByKol?: Map<string, OrganicPostInput[]>;
+  /** Window the organic posts were fetched over — echoed into the
+   *  breakdown so the UI can caption it. */
+  organicWindowDays?: number;
 }
 
 export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult> {
@@ -324,6 +370,20 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
     big: bandPop('big'),
   };
   const avgViewsPop = kolIds.map(id => channelRawByKol.get(id)?.averageViewsRaw);
+
+  // Organic coverage breadth (tg_channel_posts, second reader): distinct
+  // subjects covered per KOL, ranked across the KOLs that have ≥1
+  // attributed post. Signal-only — never enters the Channel blend.
+  const organicByKol = inputs.organicPostsByKol ?? new Map<string, OrganicPostInput[]>();
+  const organicWindowDays = inputs.organicWindowDays ?? ORGANIC_COVERAGE_WINDOW_DAYS;
+  const organicRawByKol = new Map<string, { subjects: number; posts: number }>();
+  for (const kolId of kolIds) {
+    const posts = organicByKol.get(kolId) ?? [];
+    if (posts.length === 0) continue;
+    const subjects = new Set(posts.map(p => `${p.subject_type ?? ''}:${p.subject_id ?? ''}`)).size;
+    organicRawByKol.set(kolId, { subjects, posts: posts.length });
+  }
+  const organicPop = [...organicRawByKol.values()].map(o => o.subjects);
 
   // Activation pools: every KOL's participant total WITHIN each campaign.
   const campaignPools = new Map<string, number[]>();
@@ -399,6 +459,16 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
         }
       : null;
 
+    const organicRaw = organicRawByKol.get(kolId);
+    const organicCoverage: OrganicCoverageBreakdown | null = organicRaw
+      ? {
+          subjectsCovered: organicRaw.subjects,
+          posts: organicRaw.posts,
+          breadth: rankNormalize(organicRaw.subjects, organicPop),
+          windowDays: organicWindowDays,
+        }
+      : null;
+
     const scores: DisplayScores = {
       channel: channelFinal,
       activation: activationBreakdown?.composite ?? null,
@@ -407,7 +477,7 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
       lowConfidence: snap?.low_organic_volume_flag ?? false,
     };
 
-    results.set(kolId, { channel: channelBreakdown, activation: activationBreakdown, scores });
+    results.set(kolId, { channel: channelBreakdown, activation: activationBreakdown, organicCoverage, scores });
   }
   return results;
 }
@@ -421,10 +491,21 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
  * under the row limit and is cheap to call on every read.
  */
 export async function assembleScoreInputs(supabase: SupabaseClient<Database>): Promise<ComputeInputs> {
-  const [{ data: kols }, { data: snapshots }, { data: deliverables }] = await Promise.all([
+  const organicSince = new Date(Date.now() - ORGANIC_COVERAGE_WINDOW_DAYS * 86_400_000).toISOString();
+  const [{ data: kols }, { data: snapshots }, { data: deliverables }, { data: organicPosts }] = await Promise.all([
     supabase.from('master_kols').select('id').is('archived_at', null),
     supabase.from('kol_channel_snapshots').select('*').order('snapshot_date', { ascending: false }),
     supabase.from('kol_deliverables').select('*'),
+    // Second reader of the TG Intelligence coverage store — only rows the
+    // ingest attributed to a roster KOL. Table not in database.types yet
+    // (created via MCP migration), hence the `as any`. Errors are treated
+    // as "no coverage data" so scoring never breaks if the layer is off.
+    (supabase as any)
+      .from('tg_channel_posts')
+      .select('kol_id, subject_type, subject_id, posted_at')
+      .not('kol_id', 'is', null)
+      .gte('posted_at', organicSince)
+      .limit(10_000) as Promise<{ data: OrganicPostInput[] | null }>,
   ]);
 
   const kolIds = (kols ?? []).map(k => k.id);
@@ -459,7 +540,19 @@ export async function assembleScoreInputs(supabase: SupabaseClient<Database>): P
     if (slot.n > 0) campaignAvgParticipants.set(cid, slot.sum / slot.n);
   }
 
-  return { latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol, campaignAvgParticipants, kolIds };
+  // Group attributed coverage posts by KOL.
+  const organicPostsByKol = new Map<string, OrganicPostInput[]>();
+  for (const p of organicPosts ?? []) {
+    if (!p.kol_id) continue;
+    const list = organicPostsByKol.get(p.kol_id) ?? [];
+    list.push(p);
+    organicPostsByKol.set(p.kol_id, list);
+  }
+
+  return {
+    latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol, campaignAvgParticipants, kolIds,
+    organicPostsByKol, organicWindowDays: ORGANIC_COVERAGE_WINDOW_DAYS,
+  };
 }
 
 /** Helper for the per-KOL route: assemble + compute + pick. */

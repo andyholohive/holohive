@@ -81,6 +81,11 @@ function isPublicMidPath(pathname: string): boolean {
   // for the server-to-server plugin + weekly reconcile writes.
   if (/^\/api\/links\/?$/.test(pathname)) return true;
 
+  // Link Log Automation §3: weekly Drive reconcile intake. The Apps Script
+  // on the Shared Drive POSTs the full file inventory here; the handler
+  // validates its own LINKS_WRITE_TOKEN / CRON_SECRET bearer.
+  if (/^\/api\/links\/reconcile\/?$/.test(pathname)) return true;
+
   // Document Portal access-event sink: EXACT /api/documents/log only. Fired by
   // both the team preview (cookie) and the unauthenticated client-portal viewer's
   // sendBeacon. The handler validates event_type + document_id and DERIVES

@@ -131,7 +131,7 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0, platform }: Props) {
   if (error) return <div className="text-sm text-rose-600">{error}</div>;
   if (!data) return <div className="text-sm text-ink-warm-500">No score data.</div>;
 
-  const { scores, channel, activation } = data;
+  const { scores, channel, activation, organicCoverage } = data;
 
   return (
     <div className="space-y-4 text-sm">
@@ -223,6 +223,36 @@ export function ScoreBreakdownTab({ kolId, refreshKey = 0, platform }: Props) {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500 mb-1">Activation Score</h3>
           <p className="text-xs text-ink-warm-500">
             — · Strong channel, never tested. Appears once activation participants are logged on this KOL&apos;s deliverables.
+          </p>
+        </Card>
+      )}
+
+      {/* Organic Coverage — TG Intelligence Layer second reader
+          (tg_channel_posts). Signal-only: NOT blended into either score
+          (Round 2 locks the Channel model at 4 dims), so it renders as
+          context, not a weighted dim. "—" until coverage scans attribute
+          posts to this KOL — same convention as Activation. */}
+      {organicCoverage ? (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500">
+              Organic Coverage
+              <span className="ml-2 text-ink-warm-400 normal-case font-normal">
+                · {organicCoverage.subjectsCovered} subject{organicCoverage.subjectsCovered === 1 ? '' : 's'} · {organicCoverage.posts} post{organicCoverage.posts === 1 ? '' : 's'} · trailing {organicCoverage.windowDays}d
+              </span>
+            </h3>
+            <span className="text-sm font-semibold text-ink-warm-900 tabular-nums">{Math.round(organicCoverage.breadth)}</span>
+          </div>
+          <DimBar label="Coverage Breadth" weight="signal only" value={organicCoverage.breadth} />
+          <p className="text-[11px] text-ink-warm-400">
+            Distinct prospects/clients this KOL covered organically in coverage sweeps, ranked across covered KOLs. Not blended into either score.
+          </p>
+        </Card>
+      ) : (
+        <Card className="p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500 mb-1">Organic Coverage</h3>
+          <p className="text-xs text-ink-warm-500">
+            — · No coverage-scan posts attributed yet. Fills in automatically once TG Intelligence coverage sweeps run against the roster.
           </p>
         </Card>
       )}

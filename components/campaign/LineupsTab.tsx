@@ -8,6 +8,13 @@
  * → Completed). Self-contained component so the campaign admin page
  * doesn't grow.
  *
+ * [2026-07-25] KOL Brief Delivery lifecycle extension: on confirmed
+ * weeks the status badge + week selector show the derived brief stage
+ * (Brief Preview → Approved · Links Minted → Delivered) computed from
+ * kol_brief_tokens via deriveLineupLifecycleStage. Display-only — the
+ * stored status, Propose/Confirm gate, ops-group post, and activity
+ * log are unchanged.
+ *
  * Feature inventory after Day 5 polish:
  *   • Week selector with status badges + current-week preselect
  *   • Roster panel (left): full campaign roster + performance data,
@@ -66,7 +73,10 @@ import BriefDeliveryPanel from '@/components/campaign/BriefDeliveryPanel';
 import { formatDateTime } from '@/lib/dateFormat';
 import {
   LineupManagerService,
+  deriveLineupLifecycleStage,
   type LineupStatus,
+  type LineupLifecycleStage,
+  type LineupBriefStats,
   type LineupFull,
   type CampaignLineup,
   type LineupActivityLogRow,
@@ -74,6 +84,7 @@ import {
   mondayOfCampaignWeek,
   currentWeekNumber,
 } from '@/lib/lineupManagerService';
+import { KolBriefService } from '@/lib/kolBriefService';
 import { getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
 
 // ─── Types specific to this UI ─────────────────────────────────────
@@ -101,18 +112,28 @@ type RosterKol = {
   last_active_week: number | null;
 };
 
-const STATUS_TONE: Record<LineupStatus, BadgeTone> = {
-  draft:     'neutral',
-  proposed:  'warning',
-  confirmed: 'success',
-  completed: 'info',
+// Extended lifecycle (KOL Brief Delivery spec): the three brief-delivery
+// stages are display sub-states of `confirmed`, derived from the token
+// store via deriveLineupLifecycleStage — the stored lineup_status enum and
+// every status-gated action below still run on the four base statuses.
+const STATUS_TONE: Record<LineupLifecycleStage, BadgeTone> = {
+  draft:         'neutral',
+  proposed:      'warning',
+  confirmed:     'success',
+  brief_preview: 'info',
+  approved:      'brand',
+  delivered:     'success',
+  completed:     'info',
 };
 
-const STATUS_LABEL: Record<LineupStatus, string> = {
-  draft:     'Draft',
-  proposed:  'Proposed',
-  confirmed: 'Confirmed',
-  completed: 'Completed',
+const STATUS_LABEL: Record<LineupLifecycleStage, string> = {
+  draft:         'Draft',
+  proposed:      'Proposed',
+  confirmed:     'Confirmed',
+  brief_preview: 'Brief Preview',
+  approved:      'Approved · Links Minted',
+  delivered:     'Delivered',
+  completed:     'Completed',
 };
 
 const ACTION_LABEL: Record<LineupActivityAction, string> = {
@@ -158,9 +179,14 @@ export default function LineupsTab({
 }) {
   const { toast } = useToast();
   const service = useMemo(() => new LineupManagerService(supabase as any), []);
+  const briefService = useMemo(() => new KolBriefService(supabase as any), []);
 
   // ─── State ────────────────────────────────────────────────────────
   const [allLineups, setAllLineups] = useState<CampaignLineup[]>([]);
+  // Brief-token mint/sent counts per lineup id — drives the extended
+  // lifecycle stages (Brief preview / Approved / Delivered) on confirmed
+  // weeks. Missing entry = no links minted yet.
+  const [briefStats, setBriefStats] = useState<Map<string, LineupBriefStats>>(new Map());
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [lineup, setLineup] = useState<LineupFull | null>(null);
   const [roster, setRoster] = useState<RosterKol[]>([]);
@@ -288,6 +314,7 @@ export default function LineupsTab({
         ]);
         setAllLineups(lineups);
         setRoster(rosterRows);
+        void loadBriefStats(lineups);
         const curr = currentWeekNumber(campaignStartDateRef.current) || 1;
         const week = Math.max(1, Math.min(curr, totalWeeks));
         setSelectedWeek(week);
@@ -347,6 +374,25 @@ export default function LineupsTab({
 
   // ─── Helpers ─────────────────────────────────────────────────────
 
+  /**
+   * Fetch brief-token stats for the confirmed weeks so the header badge +
+   * week selector can show the extended lifecycle stage. Best-effort — on
+   * failure the chips just degrade to the base "Confirmed" status.
+   */
+  async function loadBriefStats(lineups: CampaignLineup[]) {
+    try {
+      const confirmedIds = lineups.filter(l => l.status === 'confirmed').map(l => l.id);
+      setBriefStats(await briefService.getTokenStatsByLineup(confirmedIds));
+    } catch {
+      /* non-fatal — extended stages are cosmetic */
+    }
+  }
+
+  /** Extended lifecycle stage for one lineup (display only). */
+  function lifecycleStage(l: Pick<CampaignLineup, 'id' | 'status'>): LineupLifecycleStage {
+    return deriveLineupLifecycleStage(l.status, briefStats.get(l.id) ?? null);
+  }
+
   async function refreshLineup() {
     if (!lineup) return;
     const fresh = await service.getLineupFull(lineup.id);
@@ -356,6 +402,7 @@ export default function LineupsTab({
   async function refreshAll() {
     const list = await service.listForCampaign(campaignId);
     setAllLineups(list);
+    void loadBriefStats(list);
     if (lineup) {
       const fresh = await service.getLineupFull(lineup.id);
       setLineup(fresh);
@@ -816,8 +863,8 @@ export default function LineupsTab({
                 Week {selectedWeek}
               </h2>
               {lineup && (
-                <StatusBadge tone={STATUS_TONE[lineup.status]}>
-                  {STATUS_LABEL[lineup.status]}
+                <StatusBadge tone={STATUS_TONE[lifecycleStage(lineup)]}>
+                  {STATUS_LABEL[lifecycleStage(lineup)]}
                 </StatusBadge>
               )}
               {lineup?.confirmed_at && (
@@ -843,7 +890,7 @@ export default function LineupsTab({
                       Week {n}
                       {existing && (
                         <span className="ml-2 text-[10px] text-ink-warm-500">
-                          · {STATUS_LABEL[existing.status]}
+                          · {STATUS_LABEL[lifecycleStage(existing)]}
                         </span>
                       )}
                     </SelectItem>
@@ -925,6 +972,13 @@ export default function LineupsTab({
                 lineupId={lineup.id}
                 campaignId={campaignId}
                 currentUserId={currentUserId}
+                onDeliveryChange={(lineupId, stats) =>
+                  setBriefStats(prev => {
+                    const next = new Map(prev);
+                    next.set(lineupId, stats);
+                    return next;
+                  })
+                }
               />
             )}
           </>

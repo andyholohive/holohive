@@ -37,7 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
-import { Radar, Play, RefreshCw, Download, Layers } from 'lucide-react';
+import { Radar, Play, RefreshCw, Download, Layers, ArrowRightLeft, Eye } from 'lucide-react';
 
 type Contract = {
   query: string | null;
@@ -53,6 +53,42 @@ type Contract = {
   topic_split: null;
 };
 
+// One summarized run from /api/intelligence/coverage/snapshot.
+type SnapshotRun = {
+  id: string;
+  generated_at: string;
+  window_days: number | null;
+  channels_scanned: number | null;
+  channels_readable: number | null;
+  channels_covered: number;
+  posts_total: number;
+  pct_of_tracked_network: number | null;
+  channels_repeat: number;
+  avg_views_per_post: number | null;
+};
+
+type SnapshotPayload = {
+  runs: number;
+  baseline: SnapshotRun | null;
+  wrap: SnapshotRun | null;
+  delta: {
+    channels_covered: number;
+    posts_total: number;
+    pct_of_tracked_network: number | null;
+    channels_repeat: number;
+    avg_views_per_post: number | null;
+    frame_drift: number | null;
+  } | null;
+  history: SnapshotRun[];
+};
+
+/** "+12" / "−3" / "±0" caption for a delta vs baseline. */
+function fmtDelta(n: number | null, unit = ''): string {
+  if (n == null) return '—';
+  if (n === 0) return `±0${unit} vs baseline`;
+  return `${n > 0 ? '+' : ''}${n}${unit} vs baseline`;
+}
+
 function CoverageInner() {
   const params = useSearchParams();
   const { toast } = useToast();
@@ -67,6 +103,7 @@ function CoverageInner() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [callprep, setCallprep] = useState('');
   const [savingCallprep, setSavingCallprep] = useState(false);
+  const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null);
 
   const [runQuery, setRunQuery] = useState(queryParam);
   const [runDays, setRunDays] = useState(30);
@@ -77,7 +114,10 @@ function CoverageInner() {
     if (!subjectId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const res = await fetch(`/api/intelligence/coverage?subject_type=${subjectType}&subject_id=${subjectId}`);
+      const [res, snapRes] = await Promise.all([
+        fetch(`/api/intelligence/coverage?subject_type=${subjectType}&subject_id=${subjectId}`),
+        fetch(`/api/intelligence/coverage/snapshot?subject_type=${subjectType}&subject_id=${subjectId}`),
+      ]);
       if (res.ok) {
         const d = await res.json();
         setContractId(d.id);
@@ -88,6 +128,7 @@ function CoverageInner() {
       } else {
         setContract(null);
       }
+      setSnapshot(snapRes.ok ? await snapRes.json() : null);
     } finally {
       setLoading(false);
     }
@@ -123,6 +164,10 @@ function CoverageInner() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Generate failed');
       setContractId(d.id); setContract(d.contract); setGeneratedAt(d.generated_at);
+      // A new stored run may complete a baseline/wrap pair — refresh the delta.
+      fetch(`/api/intelligence/coverage/snapshot?subject_type=${subjectType}&subject_id=${subjectId}`)
+        .then(async (r) => { if (r.ok) setSnapshot(await r.json()); })
+        .catch(() => {});
       toast({ title: 'Contract generated', description: `${d.contract.counts.posts_total} post(s) across ${d.contract.counts.channels_covered} channel(s).` });
     } catch (e: any) {
       toast({ title: 'Generate failed', description: e.message, variant: 'destructive' });
@@ -212,6 +257,7 @@ function CoverageInner() {
           <TabsList>
             <TabsTrigger value="leavebehind">Leave-behind (client-safe)</TabsTrigger>
             <TabsTrigger value="callprep">Call-prep (internal)</TabsTrigger>
+            <TabsTrigger value="snapshot">Engagement Snapshot</TabsTrigger>
           </TabsList>
 
           <TabsContent value="leavebehind" className="space-y-6 mt-4">
@@ -306,6 +352,81 @@ function CoverageInner() {
                 {savingCallprep ? 'Saving…' : 'Save call-prep'}
               </Button>
             </div>
+          </TabsContent>
+
+          {/* Before/after — the delivery-docs Engagement Snapshot delta.
+              Baseline = earliest stored run (generate once at onboarding);
+              wrap = latest run (regenerate at campaign wrap). */}
+          <TabsContent value="snapshot" className="space-y-6 mt-4">
+            {!snapshot || snapshot.runs === 0 ? (
+              <EmptyState icon={ArrowRightLeft} title="No snapshot runs yet"
+                description="Generate a coverage read at onboarding to freeze the baseline, then regenerate at campaign wrap — the before/after delta appears here." />
+            ) : snapshot.runs === 1 || !snapshot.delta || !snapshot.wrap || !snapshot.baseline ? (
+              <EmptyState icon={ArrowRightLeft} title="Baseline captured — wrap pending"
+                description={`Baseline frozen ${snapshot.baseline ? formatDateTime(snapshot.baseline.generated_at) : '—'} (${snapshot.baseline?.posts_total ?? 0} posts across ${snapshot.baseline?.channels_covered ?? 0} channels). Regenerate at campaign wrap to see the delta.`} />
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                  <span>Baseline {formatDateTime(snapshot.baseline.generated_at)}</span>
+                  <ArrowRightLeft className="h-3 w-3" />
+                  <span>Wrap {formatDateTime(snapshot.wrap.generated_at)}</span>
+                  <span>·</span>
+                  <span>{snapshot.runs} runs stored</span>
+                  {snapshot.delta.frame_drift != null && snapshot.delta.frame_drift !== 0 && (
+                    <StatusBadge tone="warning" size="sm">
+                      Frame drift: {snapshot.delta.frame_drift > 0 ? '+' : ''}{snapshot.delta.frame_drift} channels scanned
+                    </StatusBadge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <KpiCard icon={Layers} label="Posts referencing" value={snapshot.wrap.posts_total}
+                    accent={snapshot.delta.posts_total > 0 ? 'emerald' : 'gray'} sub={fmtDelta(snapshot.delta.posts_total)} />
+                  <KpiCard icon={Radar} label="Channels covered" value={snapshot.wrap.channels_covered}
+                    accent={snapshot.delta.channels_covered > 0 ? 'emerald' : 'gray'} sub={fmtDelta(snapshot.delta.channels_covered)} />
+                  <KpiCard icon={Radar} label="% of tracked network"
+                    value={snapshot.wrap.pct_of_tracked_network != null ? `${snapshot.wrap.pct_of_tracked_network}%` : '—'}
+                    accent="brand" sub={fmtDelta(snapshot.delta.pct_of_tracked_network, 'pp')} />
+                  <KpiCard icon={Eye} label="Avg views / post"
+                    value={snapshot.wrap.avg_views_per_post != null ? snapshot.wrap.avg_views_per_post.toLocaleString('en-US') : '—'}
+                    accent="sky" sub={fmtDelta(snapshot.delta.avg_views_per_post)} />
+                </div>
+
+                <Card className="border-gray-200 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 text-sm font-semibold text-gray-700">
+                    Snapshot runs <span className="font-normal text-gray-400">— first run is the baseline, latest is the wrap</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Run</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Generated</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Channels covered</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Posts</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">% network</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Avg views / post</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {snapshot.history.map((r, i) => (
+                        <TableRow key={r.id} className="border-gray-100">
+                          <TableCell className="py-3">
+                            {i === 0 ? <StatusBadge tone="brand" size="sm">Baseline</StatusBadge>
+                              : i === snapshot.history.length - 1 ? <StatusBadge tone="success" size="sm">Wrap</StatusBadge>
+                              : <StatusBadge tone="neutral" size="sm">Mid-flight</StatusBadge>}
+                          </TableCell>
+                          <TableCell className="py-3">{formatDateTime(r.generated_at)}</TableCell>
+                          <TableCell className="py-3 tabular-nums">{r.channels_covered}</TableCell>
+                          <TableCell className="py-3 tabular-nums">{r.posts_total}</TableCell>
+                          <TableCell className="py-3 tabular-nums">{r.pct_of_tracked_network != null ? `${r.pct_of_tracked_network}%` : '—'}</TableCell>
+                          <TableCell className="py-3 tabular-nums">{r.avg_views_per_post != null ? r.avg_views_per_post.toLocaleString('en-US') : '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       )}

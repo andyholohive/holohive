@@ -11,9 +11,10 @@
  * chips + header counts read from the token store.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { KolBriefService, type BriefConsole } from '@/lib/kolBriefService';
+import type { LineupBriefStats } from '@/lib/lineupManagerService';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,13 +36,24 @@ export default function BriefDeliveryPanel({
   lineupId,
   campaignId,
   currentUserId,
+  onDeliveryChange,
 }: {
   lineupId: string;
   campaignId: string;
   currentUserId: string | null;
+  /**
+   * Fired after every console load with the lineup's mint/sent counts so the
+   * parent Lineups tab can advance the extended lifecycle badge (Brief
+   * preview → Approved → Delivered) live, without refetching.
+   */
+  onDeliveryChange?: (lineupId: string, stats: LineupBriefStats) => void;
 }) {
   const { toast } = useToast();
   const service = useMemo(() => new KolBriefService(supabase as any), []);
+  // Ref'd so the load callback doesn't re-create (and re-fire the initial
+  // fetch) when the parent passes a fresh closure each render.
+  const onDeliveryChangeRef = useRef(onDeliveryChange);
+  onDeliveryChangeRef.current = onDeliveryChange;
   const [data, setData] = useState<BriefConsole | null>(null);
   const [loading, setLoading] = useState(true);
   const [minting, setMinting] = useState(false);
@@ -58,6 +70,12 @@ export default function BriefDeliveryPanel({
       const console = await service.getConsoleData(lineupId);
       setData(console);
       setMsgDraft(Object.fromEntries(console.angles.map(a => [a.angle_no, a.message])));
+      // Report mint/sent counts up so the lifecycle badge advances live.
+      const kolRows = console.angles.flatMap(a => a.kols);
+      onDeliveryChangeRef.current?.(lineupId, {
+        minted: kolRows.filter(k => k.token).length,
+        sent: kolRows.filter(k => k.sent_at).length,
+      });
     } catch (err) {
       toast({ title: 'Failed to load briefs', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     } finally {

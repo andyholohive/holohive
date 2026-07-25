@@ -25,6 +25,45 @@ import {
 // ─── Types ──────────────────────────────────────────────────────────
 
 export type LineupStatus = 'draft' | 'proposed' | 'confirmed' | 'completed';
+
+/**
+ * Extended weekly lifecycle (KOL Brief Delivery spec, 2026-07):
+ * Proposed → Confirmed → Brief preview → Approved (links minted) → Delivered.
+ *
+ * The three brief-delivery stages are DISPLAY sub-states of `confirmed`,
+ * derived live from `kol_brief_tokens` — they are never written to
+ * `campaign_lineups.status` (the `lineup_status` enum is untouched, so the
+ * Propose/Confirm gate, ops-group post, and activity log all keep working
+ * on the four stored statuses).
+ *
+ *   brief_preview — confirmed, links not yet minted. The Briefs & Delivery
+ *                   console is showing the QC/preview gate.
+ *   approved      — per-KOL links minted (QC approved), not all sent yet.
+ *   delivered     — every minted link has been copied/sent to its KOL.
+ */
+export type LineupLifecycleStage =
+  | LineupStatus
+  | 'brief_preview'
+  | 'approved'
+  | 'delivered';
+
+/** Token mint/sent counts for one lineup — see KolBriefService.getTokenStatsByLineup. */
+export type LineupBriefStats = { minted: number; sent: number };
+
+/**
+ * Derive the extended lifecycle stage for a lineup. Pure — pass the stored
+ * status plus that lineup's brief-token stats (null/undefined when no tokens
+ * were fetched or none exist).
+ */
+export function deriveLineupLifecycleStage(
+  status: LineupStatus,
+  brief: LineupBriefStats | null | undefined,
+): LineupLifecycleStage {
+  if (status !== 'confirmed') return status;
+  if (!brief || brief.minted === 0) return 'brief_preview';
+  return brief.sent >= brief.minted ? 'delivered' : 'approved';
+}
+
 export type LineupSlotStatus = 'pending' | 'posted' | 'missed';
 export type LineupActivityAction =
   | 'draft_saved' | 'proposed' | 'confirmed' | 'completed' | 'unlocked'

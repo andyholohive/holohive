@@ -15,6 +15,12 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  deriveLineupLifecycleStage,
+  type LineupBriefStats,
+  type LineupLifecycleStage,
+  type LineupStatus,
+} from '@/lib/lineupManagerService';
 
 export interface BriefToken {
   id: string;
@@ -59,6 +65,12 @@ export interface BriefConsole {
   week_number: number | null;
   week_of: string | null;
   status: string;
+  /**
+   * Extended lifecycle stage (brief_preview / approved / delivered when
+   * confirmed) — derived from the token store, never persisted. See
+   * `deriveLineupLifecycleStage` in lib/lineupManagerService.ts.
+   */
+  stage: LineupLifecycleStage;
   angles: BriefConsoleAngle[];
   sentCount: number;
   openedCount: number;
@@ -241,12 +253,21 @@ export class KolBriefService {
       });
     }
 
+    // Stage math runs on the token rows (not slots) so it matches
+    // getTokenStatsByLineup — minted = tokens, delivered = all tokens sent.
+    const tokenRows = (tokens ?? []) as BriefToken[];
+    const briefStats: LineupBriefStats = {
+      minted: tokenRows.length,
+      sent: tokenRows.filter(t => t.sent_at).length,
+    };
+
     return {
       lineup_id: lineup.id,
       campaign_id: lineup.campaign_id,
       week_number: lineup.week_number,
       week_of: lineup.week_of,
       status: lineup.status,
+      stage: deriveLineupLifecycleStage(lineup.status as LineupStatus, briefStats),
       angles: anglesOut,
       sentCount,
       openedCount,
@@ -300,6 +321,29 @@ export class KolBriefService {
       .update({ opened_at: tok.opened_at ?? new Date().toISOString(), open_count: (tok.open_count ?? 0) + 1 })
       .eq('id', tok.id);
     return tok;
+  }
+
+  /**
+   * Batch token stats per lineup — one query for the whole week selector.
+   * Feeds `deriveLineupLifecycleStage` so the Lineups tab can show the
+   * extended stages (Brief preview / Approved / Delivered) on confirmed
+   * weeks. Lineups with no tokens simply have no entry in the map.
+   */
+  async getTokenStatsByLineup(lineupIds: string[]): Promise<Map<string, LineupBriefStats>> {
+    const map = new Map<string, LineupBriefStats>();
+    if (lineupIds.length === 0) return map;
+    const { data } = await (this.supabase as any)
+      .from('kol_brief_tokens')
+      .select('lineup_id, sent_at')
+      .in('lineup_id', lineupIds);
+    for (const r of (data ?? []) as Array<{ lineup_id: string | null; sent_at: string | null }>) {
+      if (!r.lineup_id) continue;
+      const s = map.get(r.lineup_id) ?? { minted: 0, sent: 0 };
+      s.minted += 1;
+      if (r.sent_at) s.sent += 1;
+      map.set(r.lineup_id, s);
+    }
+    return map;
   }
 
   /** Un-opened, already-sent KOLs for a week — feeds the Friday APAC nudge (Phase 4). */
