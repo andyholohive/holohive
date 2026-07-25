@@ -94,23 +94,62 @@ export function getTotalCampaignWeeks(
   return Math.max(1, Math.ceil((diffMs + MS_PER_DAY) / MS_PER_WEEK));
 }
 
+/** Lifecycle of a campaign's week window. `ended` freezes the counter. */
+export type CampaignWeekLifecycle = 'not_started' | 'active' | 'ended';
+
+export interface CampaignWeekState {
+  /** 1-indexed, clamped to totalWeeks when the engagement has ended. */
+  weekNumber: number;
+  /** Null when the client has no engagement terms recorded yet — render
+   *  "Week N" with no "of M" rather than inventing a denominator. */
+  totalWeeks: number | null;
+  lifecycle: CampaignWeekLifecycle;
+}
+
 /**
- * Total weeks derived from a client's covered_through instead of the
- * campaign's own end_date. Enables the "Week 8 of 24" client-facing
- * framing where M reflects how much time is left in the client's
- * engagement, not just this one campaign.
+ * Canonical "Week N of M" for a campaign. [2026-07-25]
  *
- * Falls back to getTotalCampaignWeeks(start, endFallback) when
- * covered_through is null — e.g. brand-new client without stint yet.
+ * M comes ONLY from the engagement (stint terms), surfaced by the
+ * `campaign_week_window` view as `term_end`. campaigns.end_date is
+ * deliberately not consulted: it is hand-typed at create time and never
+ * maintained, so it drifted stale in both directions —
+ *   • Altura  end_date 08-15 vs real engagement end 06-14 (too long: the
+ *     counter kept climbing weeks after the client had churned), and
+ *   • Venice  end_date 07-06 vs real coverage 08-07 (too short: a renewal
+ *     extended the engagement but nobody edited the campaign).
+ * Sourcing M from the engagement makes renewals extend it and endings
+ * freeze it with no manual upkeep.
+ *
+ * N is clamped to M so an ended engagement stops advancing.
  */
-export function getTotalCampaignWeeksFromCoverage(
+export function getCampaignWeekState(
   startDateIso: string | null | undefined,
-  coveredThroughIso: string | null | undefined,
-  endDateFallbackIso?: string | null | undefined,
-): number {
-  const covered = parseLocalIsoDate(coveredThroughIso ?? '');
-  if (covered) return getTotalCampaignWeeks(startDateIso, coveredThroughIso ?? null);
-  return getTotalCampaignWeeks(startDateIso, endDateFallbackIso ?? null);
+  termEndIso: string | null | undefined,
+  reference: Date = new Date(),
+): CampaignWeekState | null {
+  const week = getCampaignWeek(startDateIso, reference);
+  if (!week) return null;
+
+  const termEnd = parseLocalIsoDate(termEndIso ?? '');
+  if (!termEnd) {
+    // No engagement terms on file — honest partial answer.
+    return { weekNumber: week.weekNumber, totalWeeks: null, lifecycle: 'active' };
+  }
+
+  const totalWeeks = getTotalCampaignWeeks(startDateIso, termEndIso ?? null);
+  const ref = startOfDay(reference);
+  const start = parseLocalIsoDate(startDateIso ?? '');
+
+  const lifecycle: CampaignWeekLifecycle =
+    start && ref < start ? 'not_started'
+    : ref > termEnd ? 'ended'
+    : 'active';
+
+  return {
+    weekNumber: Math.min(totalWeeks, week.weekNumber),
+    totalWeeks,
+    lifecycle,
+  };
 }
 
 /**

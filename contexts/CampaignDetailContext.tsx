@@ -109,7 +109,10 @@ interface CampaignDetailContextType {
   setPayments: React.Dispatch<React.SetStateAction<any[]>>;
 
   // ─── Async fetchers (refetch from supabase) ────────────────────
-  fetchCampaignKOLs: () => Promise<void>;
+  /** Resolves with the freshly-fetched roster, so a caller that just inserted
+   *  a KOL can pass it straight to `openPaymentTermsForKol` instead of racing
+   *  the state update. [2026-07-25] */
+  fetchCampaignKOLs: () => Promise<CampaignKOLWithDetails[]>;
   fetchAvailableKOLs: () => Promise<void>;
   fetchPayments: () => Promise<void>;
 

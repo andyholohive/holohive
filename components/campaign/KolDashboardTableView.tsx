@@ -163,7 +163,9 @@ function getStatusColor(status: string): string {
     case 'Curated':    return 'bg-sky-100 text-sky-800';
     case 'Contacted':  return 'bg-purple-100 text-purple-800';
     case 'Interested': return 'bg-amber-100 text-amber-800';
-    case 'Onboarded':  return 'bg-amber-100 text-amber-800';
+    // [2026-07-25 per Andy] Green once onboarded — matches the cards view's
+    // KOL_STATUS_TONES 'success' (emerald-100/800).
+    case 'Onboarded':  return 'bg-emerald-100 text-emerald-800';
     case 'Concluded':  return 'bg-emerald-100 text-emerald-800';
     default:           return 'bg-cream-100 text-ink-warm-700';
   }

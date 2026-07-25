@@ -238,7 +238,7 @@ export async function GET() {
     // The 30d / 90d windows are chosen to balance signal vs. recency.
     const SCORE_LOOKBACK_30D_ISO = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const SCORE_LOOKBACK_90D_ISO = new Date(Date.now() - 90 * 86_400_000).toISOString();
-    const [stintsRes, completedInitiativesRes, liveBugsRes] = await Promise.all([
+    const [stintsRes, completedInitiativesRes, liveBugsRes, renewalClientsRes] = await Promise.all([
       (sb as any)
         .from('client_stints')
         .select('client_id, start_date, end_date, status')
@@ -257,6 +257,17 @@ export async function GET() {
         .eq('type', 'bug')
         .not('live_at', 'is', null)
         .gte('live_at', SCORE_LOOKBACK_30D_ISO),
+      // Renewal denominator (Bolt scorecard): real clients regardless of
+      // is_active. A churned client gets flipped inactive, so gating on
+      // the active-only standardClients set removed exactly the rows the
+      // renewal metric measures — the denominator was always 0 and the
+      // card rendered "—" forever.
+      (sb as any)
+        .from('clients')
+        .select('id')
+        .eq('is_ad_hoc', false)
+        .is('archived_at', null)
+        .not('name', 'ilike', '%test%'),
     ]);
 
     // ─── Week-over-week deltas for Layer 1 KPI trend arrows ──────
@@ -464,16 +475,17 @@ export async function GET() {
     // that end? Same client can only be eligible once per window —
     // we anchor on their most recent ended stint in the window.
     //
-    // [2026-07-02] Filter to the standardClients allowlist (active,
-    // non-ad-hoc, non-archived) — otherwise the denominator picks up
-    // archived brands, test clients, and churned accounts that shouldn't
-    // count toward Bolt's renewal KPI.
-    const standardClientIdSet = new Set(standardClients.map(c => c.id));
+    // [2026-07-25] Denominator = real clients regardless of is_active
+    // (renewalClientsRes above). The old standardClients allowlist
+    // required is_active=true, but churn flips clients inactive — every
+    // non-renewal was excluded and the denominator was permanently 0.
+    const renewalClientIdSet = new Set(
+      ((renewalClientsRes.data ?? []) as Array<{ id: string }>).map(c => c.id));
     const NINETY_DAYS_AGO_DATE = new Date(Date.now() - 90 * 86_400_000);
     const stintsByClient = new Map<string, Array<{ start: Date; end: Date | null }>>();
     for (const s of ((stintsRes.data ?? []) as any[])) {
       if (!s.client_id || !s.start_date) continue;
-      if (!standardClientIdSet.has(s.client_id)) continue;
+      if (!renewalClientIdSet.has(s.client_id)) continue;
       const arr = stintsByClient.get(s.client_id) ?? [];
       arr.push({
         start: new Date(s.start_date),
@@ -504,7 +516,7 @@ export async function GET() {
     // monthly target of 5 of each — anything above scores 100%.
     const ANDY_TARGET = 5;
     const initShippedAndy = scoreUserAndy
-      ? ((completedInitiativesRes.data ?? []) as any[]).filter(i => i.owner_user_id === scoreUserAndy.id).length
+      ? ((completedInitiativesRes.data ?? []) as any[]).filter(i => i.owner_id === scoreUserAndy.id).length
       : 0;
     const bugsShippedAndy = scoreUserAndy
       ? ((liveBugsRes.data ?? []) as any[]).filter(b => b.assignee_id === scoreUserAndy.id).length

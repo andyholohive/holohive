@@ -34,6 +34,7 @@ import {
 } from './SkeletonHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { PreShipGateModal, logPreShipGate, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
@@ -70,19 +71,69 @@ export default function MyWorkTab() {
   // status (and edit anything else) from here. Previously rows were
   // read-only — no way to mark a task done without leaving the page.
   const [openTask, setOpenTask] = useState<Task | null>(null);
+  const [gateTarget, setGateTarget] = useState<{ taskId: string; taskName: string } | null>(null);
+  const [gateSubmitting, setGateSubmitting] = useState(false);
 
   // [2026-06-30] Per Andy: clicking the status circle (ClickUp-style)
   // opens an inline picker instead of opening the full modal. Updates
   // optimistically so the row re-buckets immediately; server failure
   // surfaces via console + reverts via the loadData refetch chain.
+  // [2026-07-25] Pre-Ship Gate intercept, matching /tasks saveSelectField and
+  // TaskDetailModal. This status circle wrote straight to the DB, so any
+  // client-linked task closed from here skipped the gate entirely. It read as
+  // "super_admins don't get the gate" because the team-wide Ready-for-Feedback
+  // queue above is super_admin-only (see isRffReviewer) — that's the surface
+  // where other people's client tasks get signed off from a status circle.
+  // Same rule as everywhere else: client_id set AND entering complete.
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    const current = tasks.find(t => t.id === taskId);
+    if (newStatus === 'complete' && current?.client_id && current.status !== 'complete') {
+      setGateTarget({ taskId, taskName: current.task_name || 'this task' });
+      return;
+    }
+    await applyStatus(taskId, newStatus);
+  };
+
+  const applyStatus = async (taskId: string, newStatus: string) => {
     const prev = tasks;
     setTasks(t => t.map(x => x.id === taskId ? { ...x, status: newStatus } : x));
     try {
-      await TaskService.updateTask(taskId, { status: newStatus });
+      await TaskService.updateTask(taskId, {
+        status: newStatus,
+        // Same completed_at stamping the /tasks page does, so a task closed
+        // here shows a finish date rather than a blank one.
+        ...(newStatus === 'complete' ? { completed_at: new Date().toISOString() } : {}),
+      } as any);
     } catch (err) {
       console.error('Failed to update task status', err);
       setTasks(prev);
+    }
+  };
+
+  /**
+   * Gate confirm. Log first, write second — if the append-only log fails we
+   * leave the task open rather than flip status with no audit row (the same
+   * ordering /tasks handleGateConfirm uses).
+   */
+  const handleGateConfirm = async (state: PreShipGateState) => {
+    if (!gateTarget) return;
+    setGateSubmitting(true);
+    try {
+      const logged = await logPreShipGate(supabase, {
+        taskId: gateTarget.taskId,
+        state,
+        completedBy: user?.id || null,
+        completedByName: userProfile?.name || userProfile?.email || null,
+        viaSource: 'hq',
+      });
+      if (!logged) {
+        console.error('[PSG] gate log failed — task left open');
+        return;
+      }
+      await applyStatus(gateTarget.taskId, 'complete');
+      setGateTarget(null);
+    } finally {
+      setGateSubmitting(false);
     }
   };
 
@@ -367,6 +418,16 @@ export default function MyWorkTab() {
         teamMembers={teamMembers}
         clients={clients}
         onSaved={() => { setOpenTask(null); loadData(); }}
+      />
+
+      {/* [2026-07-25] Pre-Ship Gate for the status-circle path — the modal
+          route above already had one; this one covers the inline picker. */}
+      <PreShipGateModal
+        open={!!gateTarget}
+        taskName={gateTarget?.taskName ?? null}
+        onConfirm={handleGateConfirm}
+        onCancel={() => setGateTarget(null)}
+        submitting={gateSubmitting}
       />
     </div>
   );

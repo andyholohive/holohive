@@ -18,6 +18,12 @@ export interface CampaignWithDetails extends Omit<Campaign, 'share_creator_type'
   // (via client_coverage view). Drives the auto-derived Paused bucket on the
   // /campaigns tab strip: client engagement lapsed while is_active still true.
   client_covered_through?: string | null;
+  // [2026-07-25] Per-campaign engagement end from the `campaign_week_window`
+  // view (campaign's own stint → else the client's most recent stint; no
+  // status filter). This — never campaigns.end_date — is the M in
+  // "Week N of M". Distinct from client_covered_through above, which is
+  // active-stints-only and exists to derive the Paused bucket.
+  week_term_end?: string | null;
   // [2026-07-09] Sum of the client's engagement-term amounts (via the
   // client_engagement_total view). The /campaigns card + table show this so
   // the budget number matches the client portal + public campaign tracker,
@@ -76,6 +82,21 @@ export class CampaignService {
         }
       }
 
+      // [2026-07-25] Join in the per-campaign engagement end so the card's
+      // "Week N of M" matches the campaign hero and the client portal. Keyed
+      // by campaign (not client) because a campaign pins its own stint.
+      const campaignIds = (campaigns || []).map((c: any) => c.id);
+      const weekTermEndByCampaign: Record<string, string | null> = {};
+      if (campaignIds.length > 0) {
+        const { data: windowRows } = await client
+          .from('campaign_week_window')
+          .select('campaign_id, term_end')
+          .in('campaign_id', campaignIds);
+        for (const row of (windowRows || []) as Array<{ campaign_id: string; term_end: string | null }>) {
+          weekTermEndByCampaign[row.campaign_id] = row.term_end ?? null;
+        }
+      }
+
       // [2026-07-09] Join in the engagement-terms total per client so the card
       // + table budget matches the client portal + public campaign tracker
       // (both show this, not the campaign's own total_budget).
@@ -98,6 +119,7 @@ export class CampaignService {
         client_is_active: (campaign.clients as any)?.is_active ?? null,
         client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
         client_covered_through: coveredThroughByClient[campaign.client_id] ?? null,
+        week_term_end: weekTermEndByCampaign[campaign.id] ?? null,
         client_budget_total: budgetTotalByClient[campaign.client_id] ?? null,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeekState } from '@/lib/campaignWeekHelpers';
 import { createClient } from '@supabase/supabase-js';
 import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink, Signal, Zap, Eye, MessageSquare, Repeat2, Heart, Activity, Bookmark } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,17 +25,15 @@ import {
   computeImpressionsByDateCumulative,
   computeImpressionsByPlatform,
 } from '@/lib/contentMetrics';
-
-/** Public KOL Dashboard Cards view tone map. Mirrors the internal
- *  KolDashboardCardsView's KOL_STATUS_TONES so the StatusBadge color
- *  per hh_status reads the same across both surfaces. */
-const KOL_STATUS_TONES: Record<string, BadgeTone> = {
-  Curated:    'info',
-  Contacted:  'purple',
-  Interested: 'warning',
-  Onboarded:  'warning',
-  Concluded:  'success',
-};
+// [2026-07-25] Status order + colors come from the one shared vocabulary.
+// This page used to keep its own copy of both, which is how `Onboarded`
+// ended up amber here and purple on the portal.
+import {
+  KOL_STATUS_ORDER,
+  KOL_STATUS_TONES,
+  statusOrderIndex,
+  kolStatusClassName,
+} from '@/lib/kolStatus';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -75,9 +73,10 @@ type Campaign = {
   showcase_enabled?: boolean;
   showcase_token?: string | null;
   showcase_config?: ShowcaseConfig | null;
-  // [Stint-scoped Week N of M] Client's max covered_through — Week N of
-  // M's "M" derives from this. Falls back to end_date when null.
-  client_covered_through?: string | null;
+  // [2026-07-25] Engagement term end from the `campaign_week_window` view.
+  // The ONLY source of "M" in Week N of M and of the displayed end date —
+  // campaigns.end_date is hand-typed and stale in both directions.
+  week_term_end?: string | null;
   // [2026-07-09] Sum of the client's engagement-term amounts. Shown as the
   // budget instead of total_budget. Null → fall back to total_budget.
   client_budget_total?: number | null;
@@ -232,16 +231,9 @@ type ContentItem = {
 
 const formatDate = (dateString: string) => fmtDate(dateString);
 
-// KOL workflow stages, in journey order — used by the default Status
-// sort so rows appear Curated → Contacted → Interested → Onboarded →
-// Concluded (natural pipeline order). Mirrors the admin tracker at
-// app/campaigns/[id]/page.tsx; keep both in sync.
-const KOL_STATUS_ORDER = ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'] as const;
-const KOL_STATUS_ORDER_INDEX = (s: string | null | undefined): number => {
-  if (!s) return KOL_STATUS_ORDER.length; // unknown → end of list
-  const idx = KOL_STATUS_ORDER.indexOf(s as any);
-  return idx === -1 ? KOL_STATUS_ORDER.length : idx;
-};
+// KOL workflow order + colors now come from the shared vocabulary in
+// @/lib/kolStatus (imported at the top of this file), so the public tracker,
+// the internal table, the internal cards, and the portal can't drift apart.
 
 const formatCurrency = (amount: number | null | undefined) => {
   if (!amount) return '$0';
@@ -349,22 +341,12 @@ const getContentTypeColor = (type: string) => {
 // [2026-07-06] Palette kept in lockstep with the internal KOL Dashboard
 // table (components/campaign/KolDashboardTableView.tsx getStatusColor) so
 // the status pill reads the same colour on both surfaces.
+/** Case-insensitive shim over the shared `kolStatusClassName` — a couple of
+ *  call sites on this page pass a lowercased status. */
 const getStatusColor = (status: string) => {
   const s = (status || '').toLowerCase();
-  switch (s) {
-    case 'curated':
-      return 'bg-sky-100 text-sky-800';
-    case 'contacted':
-      return 'bg-purple-100 text-purple-800';
-    case 'interested':
-      return 'bg-amber-100 text-amber-800';
-    case 'onboarded':
-      return 'bg-amber-100 text-amber-800';
-    case 'concluded':
-      return 'bg-emerald-100 text-emerald-800';
-    default:
-      return 'bg-cream-100 text-ink-warm-700';
-  }
+  const canonical = KOL_STATUS_ORDER.find((v) => v.toLowerCase() === s);
+  return kolStatusClassName(canonical);
 };
 
 const getStatusBadge = (status: string) => {
@@ -634,7 +616,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         case 'creator_type': return (row.master_kol?.creator_type || []).join(', ');
         // Sort by workflow stage (KOL_STATUS_ORDER), not alphabetically.
         // Mirrors the admin /campaigns/[id]/page.tsx behavior.
-        case 'hh_status':    return KOL_STATUS_ORDER_INDEX(row.hh_status);
+        case 'hh_status':    return statusOrderIndex(row.hh_status);
         case 'content_count': return contentCountByKolId.get(row.id) || 0;
         default:             return '';
       }
@@ -1073,26 +1055,24 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         showcase_enabled: (campaignData as any).showcase_enabled || false,
         showcase_token: (campaignData as any).showcase_token || null,
         showcase_config: (campaignData as any).showcase_config || null,
-        client_covered_through: null,
+        week_term_end: null,
         client_budget_total: null,
       };
 
-      // [Stint-scoped Week N of M] Best-effort fetch. If RLS blocks
-      // client_coverage for anon (older setups), we silently fall back
-      // to campaign.end_date via getTotalCampaignWeeksFromCoverage.
+      // [2026-07-25] Engagement window for Week N of M. Anon has SELECT on
+      // `campaign_week_window`; if it ever fails we leave this null and the
+      // page renders "Week N" with no denominator rather than inventing one
+      // from the stale campaigns.end_date.
       try {
-        const { data: covData } = await supabasePublic
-          .from('client_coverage')
-          .select('covered_through')
-          .eq('client_id', campaignData.client_id);
-        const max = ((covData as Array<{ covered_through: string | null }> | null) ?? [])
-          .map(r => r.covered_through)
-          .filter((d): d is string => !!d)
-          .sort()
-          .pop() ?? null;
-        normalizedCampaign.client_covered_through = max;
+        const { data: windowData } = await supabasePublic
+          .from('campaign_week_window')
+          .select('term_end')
+          .eq('campaign_id', campaignData.id)
+          .maybeSingle();
+        normalizedCampaign.week_term_end =
+          (windowData as { term_end: string | null } | null)?.term_end ?? null;
       } catch {
-        // silent — fallback to end_date
+        // silent — render without a denominator
       }
 
       // [2026-07-09] Total budget = sum of the client's engagement TERMS
@@ -1485,21 +1465,17 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           // term end as the "Week N of M" label below — previously the label
           // counted to covered_through while the bar filled to the campaign's
           // own end_date, so the bar could sit at 100% mid-engagement.
-          const termEndIso = campaign.client_covered_through ?? campaign.end_date;
+          const termEndIso = campaign.week_term_end ?? null;
           const endMs = termEndIso ? new Date(`${termEndIso}T00:00:00`).getTime() : null;
           const todayMs = Date.now();
           let weekN = 0, weekOf = 0, progressPct = 0;
           if (startMs && endMs && endMs > startMs) {
-            const week = getCampaignWeek(campaign.start_date);
-            // [Stint-scoped M — 2026-07-02] Prefer client covered_through
-            // so the client sees weeks-until-engagement-end instead of
-            // weeks-until-this-campaign-ends. F1.1 alignment.
-            weekOf = getTotalCampaignWeeksFromCoverage(
-              campaign.start_date,
-              campaign.client_covered_through,
-              campaign.end_date,
-            );
-            weekN = week ? Math.min(weekOf, week.weekNumber) : 0;
+            // [2026-07-25] M = the engagement term end only, so the client
+            // sees weeks-until-engagement-end and the bar can't sit at 100%
+            // mid-engagement (or keep climbing after the engagement ended).
+            const state = getCampaignWeekState(campaign.start_date, termEndIso);
+            weekOf = state?.totalWeeks ?? 0;
+            weekN = state?.weekNumber ?? 0;
             progressPct = Math.max(0, Math.min(1, (todayMs - startMs) / (endMs - startMs)));
           }
           const initial = (campaign.client_name || campaign.name || 'C').trim().charAt(0).toUpperCase();
@@ -1545,12 +1521,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     isn't sensitive). When budget is hidden and we
                     still have dates, just show dates without a pipe. */}
                 <div className="text-sm text-ink-warm-700 font-medium shrink-0 whitespace-nowrap">
-                  {/* [2026-07-09] Budget = engagement-term total; end date =
-                      the engagement term end (covered_through), not the
-                      stored campaign end_date. Both fall back when null. */}
+                  {/* [2026-07-25] Budget = engagement-term total; end date =
+                      the engagement term end. No campaigns.end_date fallback. */}
                   {!mask.budget && formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}
                   {(() => {
-                    const termEnd = campaign.client_covered_through ?? campaign.end_date;
+                    const termEnd = campaign.week_term_end ?? null;
                     return campaign.start_date && termEnd ? (
                       <>
                         {!mask.budget && <span className="text-ink-warm-300 mx-2">|</span>}
@@ -2333,8 +2308,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     masked. */}
                 {kolViewMode === 'cards' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {kols.map((item, index) => {
+                    {/* [2026-07-25] Cards render `sortedKOLs`, the same array
+                        the table uses, so both views share one status order
+                        (KOL_STATUS_ORDER) and the same search/filter state.
+                        They previously mapped raw `kols`, bypassing both. */}
+                    {sortedKOLs.map((item) => {
                       const masked = mask.kolHandles;
+                      // Anonymized "#N" is keyed off the unsorted roster so the
+                      // label for a given KOL stays put when the sort changes.
+                      const index = kols.indexOf(item);
                       const initials = masked
                         ? `#${index + 1}`
                         : (item.master_kol.name || '?').split(' ').map((w: string) => w.charAt(0).toUpperCase()).join('').slice(0, 2);
@@ -2440,7 +2422,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </Card>
                       );
                     })}
-                    {kols.length === 0 && (
+                    {sortedKOLs.length === 0 && (
                       <div className="col-span-full text-center py-8 text-ink-warm-500">
                         No KOLs in this campaign.
                       </div>

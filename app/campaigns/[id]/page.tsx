@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getCampaignWeek, getTotalCampaignWeeks, getTotalCampaignWeeksFromCoverage } from "@/lib/campaignWeekHelpers";
+import { getCampaignWeekState } from "@/lib/campaignWeekHelpers";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -461,23 +461,24 @@ const CampaignDetailsPage = () => {
     fetchCampaign();
   }, [id]);
 
-  // [Stint-scoped Week N of M] Fetch max covered_through for this campaign's
-  // client so the hero pill's "of M" reflects engagement end, not campaign end.
+  // [2026-07-25] Week N of M sources M from the engagement via
+  // `campaign_week_window` (campaign's own stint, else the client's latest).
+  // Previously this read `client_coverage`, which filters to ACTIVE stints —
+  // so the moment an engagement ended the value went null and the hero fell
+  // back to the hand-typed campaigns.end_date, leaving the counter climbing
+  // for weeks after the client had churned (Altura showed "Week 10 of 13"
+  // six weeks after its 06-14 end).
   useEffect(() => {
-    if (!campaign?.client_id) return;
+    if (!campaign?.id) return;
     (async () => {
       const { data } = await (supabase as any)
-        .from('client_coverage')
-        .select('covered_through')
-        .eq('client_id', campaign.client_id);
-      const max = ((data as Array<{ covered_through: string | null }> | null) ?? [])
-        .map(r => r.covered_through)
-        .filter((d): d is string => !!d)
-        .sort()
-        .pop() ?? null;
-      setClientCoveredThrough(max);
+        .from('campaign_week_window')
+        .select('term_end')
+        .eq('campaign_id', campaign.id)
+        .maybeSingle();
+      setClientCoveredThrough((data as { term_end: string | null } | null)?.term_end ?? null);
     })();
-  }, [campaign?.client_id]);
+  }, [campaign?.id]);
 
   useEffect(() => {
     UserService.getActiveUsers().then(setAllUsers);
@@ -868,8 +869,12 @@ const CampaignDetailsPage = () => {
     };
   }, [activeTab, kolViewMode, contentsViewMode]); // Re-check when switching tabs or view modes
 
-  const fetchCampaignKOLs = async () => {
-    if (!campaign) return;
+  // Returns the freshly-decorated roster so callers that need to act on a
+  // just-inserted KOL can do so without waiting a render for state to settle
+  // — `openPaymentTermsForKol` takes that list as its second argument.
+  // [2026-07-25] Added for the Add-KOLs payment-terms prompt.
+  const fetchCampaignKOLs = async (): Promise<CampaignKOLWithDetails[]> => {
+    if (!campaign) return [];
     try {
       setLoadingKOLs(true);
       // Two queries in parallel: the active roster (filtered by
@@ -903,12 +908,13 @@ const CampaignDetailsPage = () => {
         return { ...k, activation_active_week: a.active, activation_last_week: a.last };
       };
       // If payments are loaded, map paid from sums; else set directly
-      if (payments && payments.length > 0) {
-        const sums = computePaymentSums(payments);
-        setCampaignKOLs(kols.map(k => decorate({ ...k, paid: sums[k.id] || 0 })));
-      } else {
-        setCampaignKOLs(kols.map(decorate));
-      }
+      const decorated: CampaignKOLWithDetails[] = payments && payments.length > 0
+        ? (() => {
+            const sums = computePaymentSums(payments);
+            return kols.map(k => decorate({ ...k, paid: sums[k.id] || 0 }));
+          })()
+        : kols.map(decorate);
+      setCampaignKOLs(decorated);
       // Build the payment-name lookup. Each campaign_kol id maps to
       // { name, removed } so the Budget table can render
       // "Alice" or "Alice (removed)" as appropriate.
@@ -919,8 +925,10 @@ const CampaignDetailsPage = () => {
         lookup.set(k.id, { name, removed });
       }
       setPaymentKolNameLookup(lookup);
+      return decorated;
     } catch (error) {
       console.error('Error fetching campaign KOLs:', error);
+      return [];
     } finally {
       setLoadingKOLs(false);
     }
@@ -2279,29 +2287,31 @@ const CampaignDetailsPage = () => {
                         <span className="text-ink-warm-700">{campaign?.current_phase}</span>
                       </>
                     )}
-                    {campaign.start_date && (campaign.end_date || clientCoveredThrough) && (() => {
+                    {campaign.start_date && (() => {
                       // Week 1 anchored to the first Monday on/after start_date
                       // per lib/campaignWeekHelpers.ts — single source of truth
                       // across hero, public portal, dashboard, Lineup Manager.
-                      // [Stint-scoped M — 2026-07-02] Total weeks prefers the
-                      // client's covered_through (engagement end) over the
-                      // campaign's own end_date. F1.1 goal: campaign end derives
-                      // from stint coverage, not stored per-campaign.
-                      const week = getCampaignWeek(campaign.start_date);
-                      const totalWeeks = getTotalCampaignWeeksFromCoverage(
-                        campaign.start_date,
-                        clientCoveredThrough,
-                        campaign.end_date,
-                      );
-                      const currentWeek = week ? Math.min(totalWeeks, week.weekNumber) : 1;
+                      // [2026-07-25] M comes from the engagement only (term_end
+                      // via campaign_week_window); campaigns.end_date is no
+                      // longer consulted. An ended engagement freezes the
+                      // counter and labels itself rather than ticking on.
+                      const state = getCampaignWeekState(campaign.start_date, clientCoveredThrough);
+                      if (!state) return null;
                       return (
                         <>
                           <span className="text-ink-warm-300">·</span>
                           <span className="text-ink-warm-700">
-                            Week <span className="mono tabular-nums font-medium text-ink-warm-900">{currentWeek}</span>
-                            {' of '}
-                            <span className="mono tabular-nums">{totalWeeks}</span>
+                            Week <span className="mono tabular-nums font-medium text-ink-warm-900">{state.weekNumber}</span>
+                            {state.totalWeeks !== null && (
+                              <>
+                                {' of '}
+                                <span className="mono tabular-nums">{state.totalWeeks}</span>
+                              </>
+                            )}
                           </span>
+                          {state.lifecycle === 'ended' && (
+                            <StatusBadge tone="neutral" size="sm">Engagement ended</StatusBadge>
+                          )}
                         </>
                       );
                     })()}
@@ -2783,7 +2793,22 @@ const CampaignDetailsPage = () => {
                     `components/campaign/ContentDashboardOverview.tsx`
                     on 2026-06-02 (read-only KPIs + Avg ER + cumulative
                     impressions line chart). */}
-                {contentsViewMode === 'overview' && <ContentDashboardOverview />}
+                {contentsViewMode === 'overview' && (
+                  <>
+                    <ContentDashboardOverview />
+                    {/* [2026-07-25] Sentiment moved here from the hidden
+                        Overview ("information") tab — that trigger was
+                        gated off 2026-07-02, which left the module
+                        unreachable in day-to-day navigation. Metrics are
+                        always bot-written, so this sits with the rest of
+                        the content performance read-outs. */}
+                    {campaign && (
+                      <div className="mt-6">
+                        <SentimentModule campaignId={campaign.id} />
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {/* Table view extracted to
                     `components/campaign/ContentDashboardTableView.tsx`
@@ -2824,7 +2849,6 @@ const CampaignDetailsPage = () => {
               <LineupsTab
                 campaignId={campaign.id}
                 campaignStartDate={campaign.start_date as any}
-                campaignEndDate={campaign.end_date as any}
                 campaignCoveredThrough={clientCoveredThrough}
                 campaignName={campaign.name}
                 currentUserId={(userProfile as any)?.id ?? null}

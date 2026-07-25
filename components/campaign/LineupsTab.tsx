@@ -85,7 +85,7 @@ import {
   currentWeekNumber,
 } from '@/lib/lineupManagerService';
 import { KolBriefService } from '@/lib/kolBriefService';
-import { getTotalCampaignWeeksFromCoverage } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeekState } from '@/lib/campaignWeekHelpers';
 
 // ─── Types specific to this UI ─────────────────────────────────────
 
@@ -111,6 +111,31 @@ type RosterKol = {
   // lineup, or null if never.
   last_active_week: number | null;
 };
+
+/**
+ * Which week the selector opens on. [2026-07-25 per Andy]
+ *
+ * Prefers the MOST RECENT lineup — the week ops actually worked on last —
+ * over the calendar week. These diverge constantly: lineups are built a week
+ * ahead, so on a Monday the calendar said Week 6 while the newest lineup was
+ * Week 7, and the tab opened on an empty week. `listForCampaign` already
+ * orders by week_number desc, so the max is the head of the list.
+ *
+ * Falls back to the current campaign week when a campaign has no lineups yet
+ * (nothing to be "most recent"), and to Week 1 when even the start date
+ * hasn't resolved. Never returns above `totalWeeks`.
+ */
+function defaultWeekFor(
+  lineups: ReadonlyArray<{ week_number: number }>,
+  campaignStartDate: string,
+  totalWeeks: number,
+): number {
+  const latest = lineups.length
+    ? Math.max(...lineups.map(l => l.week_number))
+    : null;
+  const target = latest ?? currentWeekNumber(campaignStartDate) ?? 1;
+  return Math.max(1, Math.min(target, Math.max(1, totalWeeks)));
+}
 
 // Extended lifecycle (KOL Brief Delivery spec): the three brief-delivery
 // stages are display sub-states of `confirmed`, derived from the token
@@ -163,7 +188,6 @@ function shortNum(n: number | null | undefined): string {
 export default function LineupsTab({
   campaignId,
   campaignStartDate,
-  campaignEndDate,
   campaignCoveredThrough,
   currentUserId,
   currentUserName,
@@ -171,7 +195,7 @@ export default function LineupsTab({
 }: {
   campaignId: string;
   campaignStartDate: string;
-  campaignEndDate: string;
+  /** Engagement term end from `campaign_week_window` — the ONLY source of M. */
   campaignCoveredThrough?: string | null;
   currentUserId: string | null;
   currentUserName: string;
@@ -225,14 +249,18 @@ export default function LineupsTab({
 
   // ─── Derived ──────────────────────────────────────────────────────
 
-  // [2026-07-10] Week count spans the client's ENGAGEMENT (stint covered_through),
-  // not the campaign's own end_date — matches the campaign hero's "Week N of M".
-  // Falls back to end_date when coverage is null. Was capping at end_date (e.g.
-  // Venice showed 9 weeks to Jul 6 instead of 13 to the Aug 7 engagement end).
-  const totalWeeks = useMemo(
-    () => Math.max(1, getTotalCampaignWeeksFromCoverage(campaignStartDate, campaignCoveredThrough ?? null, campaignEndDate)),
-    [campaignStartDate, campaignCoveredThrough, campaignEndDate],
-  );
+  // [2026-07-25] Week count spans the client's ENGAGEMENT (stint term_end via
+  // `campaign_week_window`), never the campaign's own end_date — matches the
+  // campaign hero's "Week N of M". campaigns.end_date is hand-typed and goes
+  // stale in both directions (Altura ran 9 weeks past its real engagement end;
+  // Venice showed 9 weeks to Jul 6 instead of 13 to the Aug 7 renewal).
+  // With no terms on file we let the selector run out to the current week so
+  // ops can still build a lineup for today.
+  const totalWeeks = useMemo(() => {
+    const state = getCampaignWeekState(campaignStartDate, campaignCoveredThrough ?? null);
+    if (!state) return 1;
+    return Math.max(1, state.totalWeeks ?? state.weekNumber);
+  }, [campaignStartDate, campaignCoveredThrough]);
 
   const lineupByWeek = useMemo(() => {
     const m = new Map<number, CampaignLineup>();
@@ -315,8 +343,7 @@ export default function LineupsTab({
         setAllLineups(lineups);
         setRoster(rosterRows);
         void loadBriefStats(lineups);
-        const curr = currentWeekNumber(campaignStartDateRef.current) || 1;
-        const week = Math.max(1, Math.min(curr, totalWeeks));
+        const week = defaultWeekFor(lineups, campaignStartDateRef.current, totalWeeks);
         setSelectedWeek(week);
         // Fetch the selected week's full lineup right here so loading
         // stays true until both phases finish.
@@ -356,21 +383,20 @@ export default function LineupsTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedWeek, allLineups]);
 
-  // Default the week selector to the *current* campaign week — and keep
-  // re-deriving it as the inputs resolve. The [campaignId] load effect
-  // above runs once on mount, where `totalWeeks` can still be 1 (covered_
-  // through / end_date not loaded yet), which clamps the default down to
-  // Week 1 and never recovers. This effect recomputes whenever the start
-  // date or total-week count changes, until the user picks a week
-  // themselves [Andy 2026-07-16].
+  // Keep re-deriving the default as the inputs resolve. The [campaignId] load
+  // effect above runs once on mount, where `totalWeeks` can still be 1
+  // (term_end not loaded yet), which clamps the default down to Week 1 and
+  // never recovers. This effect recomputes whenever the start date, the
+  // total-week count, or the lineup list changes — until the user picks a
+  // week themselves [Andy 2026-07-16]. `allLineups` is in the deps because
+  // the default now depends on it [2026-07-25].
   useEffect(() => {
     if (userPickedWeekRef.current) return;
-    const curr = currentWeekNumber(campaignStartDate);
-    if (curr == null) return; // start date not ready yet
-    const week = Math.max(1, Math.min(curr, totalWeeks));
+    if (!allLineups.length && currentWeekNumber(campaignStartDate) == null) return;
+    const week = defaultWeekFor(allLineups, campaignStartDate, totalWeeks);
     setSelectedWeek(prev => (prev === week ? prev : week));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignStartDate, totalWeeks, campaignId]);
+  }, [campaignStartDate, totalWeeks, campaignId, allLineups]);
 
   // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -1067,10 +1093,11 @@ export default function LineupsTab({
                     className="py-8"
                   />
                 )}
-                {lineup.angles.map(angle => (
+                {lineup.angles.map((angle, angleIndex) => (
                   <AngleCard
                     key={angle.id}
                     angle={angle}
+                    angleIndex={angleIndex}
                     rosterById={rosterById}
                     isEditable={isEditable}
                     onRename={handleRenameAngle}
@@ -1430,17 +1457,20 @@ function RosterRow({
             2026-06-11. */}
         {isEditable && !alreadyIn && angles.length > 0 && (
           <div className="flex flex-col gap-1 shrink-0">
-            {angles.map(angle => (
-              <button
-                key={angle.id}
-                type="button"
-                onClick={() => onAddToAngle(angle.id, kol.id)}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors whitespace-nowrap"
-                title={`Add to ${angle.angle_name}`}
-              >
-                + {angle.angle_name.replace(/^Angle /, '')}
-              </button>
-            ))}
+            {angles.map((angle, angleIndex) => {
+              const { number, label } = angleParts(angleIndex, angle.angle_name);
+              return (
+                <button
+                  key={angle.id}
+                  type="button"
+                  onClick={() => onAddToAngle(angle.id, kol.id)}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors whitespace-nowrap"
+                  title={label ? `Add to angle ${number} — ${label}` : `Add to angle ${number}`}
+                >
+                  + {number}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1448,10 +1478,31 @@ function RosterRow({
   );
 }
 
+/**
+ * Display parts for an angle. [2026-07-25]
+ *
+ * The number is derived from the angle's POSITION, never parsed out of
+ * `angle_name`. Angles were seeded as the literal string "Angle 1"/"Angle 2"
+ * (and, before 2026-06-18, "Angle A"/"Angle B"), so the number lived only
+ * inside free text: renaming an angle to "Meme angle" permanently destroyed
+ * it, and a lineup duplicated from an older week still carried letters. Now
+ * the number always renders, and whatever the user typed shows beside it.
+ *
+ * `angles` comes back ordered by `sort_order` from getLineupFull, so index
+ * order is the authoring order.
+ */
+function angleParts(index: number, name: string): { number: number; label: string | null } {
+  // Strip a leading "Angle 1 —"/"Angle A:" so a still-default name doesn't
+  // render as "Angle 1 · Angle 1".
+  const label = (name || '').trim().replace(/^Angle\s*[0-9A-Za-z]*\s*[-–—:·]?\s*/i, '').trim();
+  return { number: index + 1, label: label || null };
+}
+
 function AngleCard({
-  angle, rosterById, isEditable, onRename, onRemove, onRemoveSlot,
+  angle, angleIndex, rosterById, isEditable, onRename, onRemove, onRemoveSlot,
 }: {
   angle: LineupFull['angles'][number];
+  angleIndex: number;
   rosterById: Map<string, RosterKol>;
   isEditable: boolean;
   onRename: (angleId: string, current: string) => void;
@@ -1470,8 +1521,13 @@ function AngleCard({
       className={`border rounded-md overflow-hidden transition-colors ${isOver ? 'border-brand bg-brand/5' : 'border-cream-200'}`}
     >
       <div className="px-3 py-2 border-b border-cream-100 bg-cream-50/40 flex items-center gap-2">
-        <p className="text-sm font-medium text-ink-warm-900">{angle.angle_name}</p>
-        <span className="text-[10px] text-ink-warm-500 tabular-nums">
+        <span className="shrink-0 inline-flex items-center justify-center h-5 min-w-5 px-1 rounded bg-brand/10 text-brand text-[11px] font-semibold tabular-nums">
+          {angleParts(angleIndex, angle.angle_name).number}
+        </span>
+        <p className="text-sm font-medium text-ink-warm-900 truncate">
+          {angleParts(angleIndex, angle.angle_name).label ?? 'Angle'}
+        </p>
+        <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
           {angle.slots.length} KOL{angle.slots.length === 1 ? '' : 's'}
         </span>
         {isEditable && (
@@ -1606,13 +1662,16 @@ function SummaryView({
       </div>
 
       <div className="space-y-3">
-        {lineup.angles.map(angle => (
+        {lineup.angles.map((angle, angleIndex) => (
           <div key={angle.id} className="border border-cream-200 rounded-md overflow-hidden">
             <div className="px-3 py-2 border-b border-cream-200 flex items-center gap-2">
-              <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-700">
-                {angle.angle_name}
+              <span className="shrink-0 inline-flex items-center justify-center h-5 min-w-5 px-1 rounded bg-brand/10 text-brand text-[11px] font-semibold tabular-nums">
+                {angleParts(angleIndex, angle.angle_name).number}
+              </span>
+              <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-700 truncate">
+                {angleParts(angleIndex, angle.angle_name).label ?? 'Angle'}
               </p>
-              <span className="text-[10px] text-ink-warm-500 tabular-nums">
+              <span className="text-[10px] text-ink-warm-500 tabular-nums shrink-0">
                 {angle.slots.length} KOL{angle.slots.length === 1 ? '' : 's'}
               </span>
             </div>

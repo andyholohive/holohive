@@ -35,16 +35,10 @@ import { KOLService } from '@/lib/kolService';
 import { getRegionIcon, getPlatformIcon } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
 import { MultiSelect } from '@/components/campaign/MultiSelect';
+import { KOL_STATUS_TONES, statusOrderIndex } from '@/lib/kolStatus';
 
-/** Local KV tone map — same as the page-level one. Kept inline so
- *  the cards view is self-contained. */
-const KOL_STATUS_TONES: Record<string, BadgeTone> = {
-  Curated:    'info',
-  Contacted:  'purple',
-  Interested: 'warning',
-  Onboarded:  'warning',
-  Concluded:  'success',
-};
+// [2026-07-25] Tone map moved to @/lib/kolStatus — see the import above.
+// The local copy here was one of five that had drifted apart.
 
 export type KolFilters = {
   platform: string[];
@@ -305,9 +299,14 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
         )}
       </div>
 
-      {/* Cards grid */}
+      {/* Cards grid — [2026-07-25] ordered by workflow stage, matching the
+          table view's default Status sort. Cards previously rendered the raw
+          filtered array, so the same roster read in a different order
+          depending on which view you were in. */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredKOLs.map((campaignKOL) => {
+        {[...filteredKOLs]
+          .sort((a: any, b: any) => statusOrderIndex(a.hh_status) - statusOrderIndex(b.hh_status))
+          .map((campaignKOL) => {
           const initials = (campaignKOL.master_kol.name || '?')
             .split(' ')
             .map((w: string) => w.charAt(0).toUpperCase())

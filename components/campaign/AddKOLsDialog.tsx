@@ -58,6 +58,7 @@ import {
   getNewContentTypeColor,
 } from '@/lib/campaignHelpers';
 import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
+import type { KolStatus } from '@/lib/kolStatus';
 
 interface AddKOLsDialogProps {
   open: boolean;
@@ -66,7 +67,7 @@ interface AddKOLsDialogProps {
 
 const DEFAULT_FORM = {
   selectedKOLs: [] as string[],
-  hh_status: 'Curated' as const,
+  hh_status: 'Curated' as KolStatus,
   notes: '',
   createPayment: false,
   payment_amount: 0,
@@ -80,6 +81,8 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
     availableKOLs,
     fetchCampaignKOLs,
     fetchAvailableKOLs,
+    openPaymentTermsForKol,
+    setPaymentTermsQueue,
     toast,
   } = useCampaignDetail();
 
@@ -121,8 +124,27 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
       setNewKOLData(DEFAULT_FORM);
       setKolSearchTerm('');
       onOpenChange(false);
-      fetchCampaignKOLs();
+      const refreshed = await fetchCampaignKOLs();
       fetchAvailableKOLs();
+
+      // [2026-07-25 per Andy] Adding a KOL straight in as Onboarded now
+      // prompts for payment terms, same as flipping the status to Onboarded
+      // from the KOL table. Previously only the table path fired the prompt,
+      // so anyone who onboarded via this dialog (the Lineup Manager's "Add
+      // KOL" button opens it) had to set the status back and re-onboard to
+      // get asked. Awaiting the refresh matters: openPaymentTermsForKol looks
+      // the row up by id and no-ops if it isn't in the list yet.
+      if (newKOLData.hh_status === 'Onboarded') {
+        const addedIds = addedKOLs.map((k: any) => k?.id).filter(Boolean) as string[];
+        const needsTerms = addedIds.filter(id =>
+          (refreshed.find(k => k.id === id)?.agreed_rate ?? null) === null,
+        );
+        if (needsTerms.length > 0) {
+          const [first, ...rest] = needsTerms;
+          setPaymentTermsQueue(rest);
+          openPaymentTermsForKol(first, refreshed);
+        }
+      }
     } catch (error) {
       console.error('Error adding KOLs:', error);
     } finally {

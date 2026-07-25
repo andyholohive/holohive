@@ -23,7 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
-import { getCampaignWeek, getTotalCampaignWeeksFromCoverage } from "@/lib/campaignWeekHelpers";
+import { getCampaignWeekState } from "@/lib/campaignWeekHelpers";
 import { CampaignTemplateService, CampaignTemplateWithDetails } from "@/lib/campaignTemplateService";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1211,18 +1211,16 @@ export default function CampaignsPage() {
             // card and the client-facing "Week N of M" bar always agree.
             // Previously this bar showed posted/total content %, which read
             // differently from what the client sees. [Andy 2026-07-20]
-            const termEndIso = campaign.client_covered_through ?? campaign.end_date;
+            // [2026-07-25] M is the engagement end (week_term_end), never
+            // campaigns.end_date — see lib/campaignWeekHelpers.ts.
+            const termEndIso = campaign.week_term_end ?? null;
             const startMs = campaign.start_date ? new Date(`${campaign.start_date}T00:00:00`).getTime() : null;
             const endMs = termEndIso ? new Date(`${termEndIso}T00:00:00`).getTime() : null;
             let weekN = 0, weekOf = 0, weekPct = 0;
             if (startMs && endMs && endMs > startMs) {
-              const week = getCampaignWeek(campaign.start_date);
-              weekOf = getTotalCampaignWeeksFromCoverage(
-                campaign.start_date,
-                campaign.client_covered_through,
-                campaign.end_date,
-              );
-              weekN = week ? Math.min(weekOf, week.weekNumber) : 0;
+              const state = getCampaignWeekState(campaign.start_date, termEndIso);
+              weekOf = state?.totalWeeks ?? 0;
+              weekN = state?.weekNumber ?? 0;
               weekPct = Math.round(Math.max(0, Math.min(1, (Date.now() - startMs) / (endMs - startMs))) * 100);
             }
             return (
@@ -1296,13 +1294,12 @@ export default function CampaignsPage() {
                     </div>
                     <div className="flex items-center text-sm text-ink-warm-700">
                       <CalendarIcon className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
-                      {/* [2026-07-10] End = client's engagement TERM end (stint
-                          covered_through), falling back to campaign end_date —
-                          matches the table view. Start is already stint-filled. */}
-                      <span className="tabular-nums">{formatDate(campaign.start_date)}{(() => {
-                        const termEnd = campaign.client_covered_through ?? campaign.end_date;
-                        return termEnd ? ` – ${formatDate(termEnd)}` : ' – TBD';
-                      })()}</span>
+                      {/* [2026-07-25] End = the engagement TERM end only. No
+                          campaign.end_date fallback — it's hand-typed and goes
+                          stale both ways. Matches the table + hero. */}
+                      <span className="tabular-nums">{formatDate(campaign.start_date)}{
+                        campaign.week_term_end ? ` – ${formatDate(campaign.week_term_end)}` : ' – TBD'
+                      }</span>
                     </div>
                   </div>
                 </CardHeader>
@@ -1436,13 +1433,9 @@ export default function CampaignsPage() {
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</TableCell>
                     <TableCell className="py-3.5 px-5 text-ink-warm-700 text-sm tabular-nums">
-                      {/* [2026-07-09] End = engagement TERM end (client
-                          covered_through), falling back to campaign end_date. */}
+                      {/* [2026-07-25] End = engagement TERM end only. */}
                       {formatDate(campaign.start_date)}
-                      {(() => {
-                        const termEnd = campaign.client_covered_through ?? campaign.end_date;
-                        return termEnd ? ` – ${formatDate(termEnd)}` : '';
-                      })()}
+                      {campaign.week_term_end ? ` – ${formatDate(campaign.week_term_end)}` : ''}
                     </TableCell>
                     {/* [Phase hidden everywhere] Inline Phase cell gated
                         off — must stay in lockstep with the header above
@@ -1564,11 +1557,10 @@ export default function CampaignsPage() {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
-                  {/* [2026-07-10] Same coverage-first term end as the card + table. */}
-                  <span>{sharingCampaign ? fmtDate(sharingCampaign.start_date) : ''}{(() => {
-                    const termEnd = sharingCampaign?.client_covered_through ?? sharingCampaign?.end_date;
-                    return termEnd ? ` - ${fmtDate(termEnd)}` : ' - TBD';
-                  })()}</span>
+                  {/* [2026-07-25] Same engagement-only term end as the card + table. */}
+                  <span>{sharingCampaign ? fmtDate(sharingCampaign.start_date) : ''}{
+                    sharingCampaign?.week_term_end ? ` - ${fmtDate(sharingCampaign.week_term_end)}` : ' - TBD'
+                  }</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>
