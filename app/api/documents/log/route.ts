@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
 import { verifyLogToken } from '@/lib/portalLogToken';
+import { isClientViewer } from '@/lib/documentPortalService';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +23,12 @@ export const dynamic = 'force-dynamic';
  */
 const EVENTS = new Set(['doc_opened', 'page_view', 'doc_closed', 'download']);
 
-function isExternal(email: string | null | undefined): boolean {
-  return !!email && !email.toLowerCase().endsWith('@holohive.io');
-}
+/**
+ * Alias of the analytics rule [2026-07-26]. Alerts and the Opens/Readers
+ * rollup must agree on who counts as a client — if they drift, Telegram says
+ * "opened" while the dashboard shows zero (or the reverse).
+ */
+const isExternal = isClientViewer;
 
 function fmtMs(ms: number): string {
   const s = Math.round(ms / 1000);

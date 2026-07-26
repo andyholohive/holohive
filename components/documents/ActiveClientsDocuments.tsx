@@ -40,10 +40,17 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown } from 'lucide-react';
+import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw } from 'lucide-react';
 import { formatDate, formatDateTime, toIsoDate } from '@/lib/dateFormat';
 
 const STATUS_TONE: Record<string, BadgeTone> = { draft: 'neutral', published: 'success', revoked: 'danger' };
+
+/**
+ * Display labels for the stored lowercase statuses. "Draft" here means the row
+ * exists but no PDF is attached yet — it is derived, never chosen by a user
+ * (attaching a version publishes it). Client visibility is the Shared toggle.
+ */
+const STATUS_LABEL: Record<string, string> = { draft: 'Draft', published: 'Published', revoked: 'Revoked' };
 
 interface ClientOpt { id: string; name: string }
 type DocWithClient = DocumentRow & { client_name?: string };
@@ -110,7 +117,10 @@ export default function ActiveClientsDocuments() {
       let pageCount: number | null = null;
       try {
         const { pdfjs } = await import('react-pdf');
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+        // Same-origin worker — a CDN URL throws SecurityError (see
+        // scripts/copy-pdf-worker.mjs). Cross-origin worker scripts are banned
+        // outright, so page_count would silently fall back to null.
+        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         const buf = await form.file.arrayBuffer();
         const pdf = await pdfjs.getDocument({ data: buf }).promise;
         pageCount = pdf.numPages;
@@ -174,6 +184,13 @@ export default function ActiveClientsDocuments() {
     try { await service.revoke(d.id); toast({ title: 'Access revoked' }); await load(); }
     catch (e) { toast({ title: 'Update failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }); }
   };
+  const restore = async (d: DocumentRow) => {
+    try {
+      await service.restore(d.id);
+      toast({ title: 'Document restored', description: 'Still hidden from the client — flip Shared on when ready.' });
+      await load();
+    } catch (e) { toast({ title: 'Restore failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }); }
+  };
   const setExpiry = async (d: DocumentRow, expiresAt: string | null) => {
     try { await service.setExpiry(d.id, expiresAt); toast({ title: expiresAt ? 'Expiry set' : 'Expiry cleared' }); await load(); }
     catch (e) { toast({ title: 'Update failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }); }
@@ -224,7 +241,7 @@ export default function ActiveClientsDocuments() {
                   <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
                     <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Title</TableHead>
                     <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Reads</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Engagement</TableHead>
                     <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Shared</TableHead>
                     <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Download</TableHead>
                     <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Expires</TableHead>
@@ -238,13 +255,15 @@ export default function ActiveClientsDocuments() {
                     return (
                       <TableRow key={d.id} className="border-gray-100">
                         <TableCell className="py-3 font-medium">{d.title}</TableCell>
-                        <TableCell className="py-3"><StatusBadge tone={STATUS_TONE[d.status] ?? 'neutral'} size="sm">{d.status}</StatusBadge></TableCell>
+                        <TableCell className="py-3"><StatusBadge tone={STATUS_TONE[d.status] ?? 'neutral'} size="sm">{STATUS_LABEL[d.status] ?? d.status}</StatusBadge></TableCell>
                         <TableCell className="py-3">
                           {r && r.opens > 0 ? (
                             <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                              <span className="tabular-nums">{r.opens} open{r.opens === 1 ? '' : 's'}</span>
+                              <span className="tabular-nums">{r.opens} Open{r.opens === 1 ? '' : 's'}</span>
                               <span className="text-gray-300">·</span>
-                              <span className="tabular-nums">{r.recipients} ppl</span>
+                              <span className="tabular-nums">
+                                {r.recipients} {r.recipients === 1 ? 'Reader' : 'Readers'}
+                              </span>
                               {r.hotCount > 0 && <Flame className="h-3.5 w-3.5 text-amber-500" />}
                             </span>
                           ) : <span className="text-xs text-gray-400">—</span>}
@@ -256,7 +275,9 @@ export default function ActiveClientsDocuments() {
                             <PopoverTrigger asChild>
                               <Button variant="ghost" size="sm" className="h-7 px-2 font-normal text-xs focus-brand" disabled={d.status === 'revoked'}>
                                 <CalendarClock className="h-3.5 w-3.5 mr-1" />
-                                {d.expires_at ? <span className={expired ? 'text-rose-600' : ''}>{formatDate(d.expires_at)}</span> : <span className="text-gray-400">Set</span>}
+                                {d.expires_at
+                                  ? <span className={expired ? 'text-rose-600' : ''}>{formatDate(d.expires_at)}</span>
+                                  : <span className="text-gray-400">Never</span>}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
@@ -287,7 +308,12 @@ export default function ActiveClientsDocuments() {
                             <Button variant="outline" size="sm" className="h-7" onClick={() => openAnalytics(d)}>
                               <BarChart3 className="h-3.5 w-3.5 mr-1" />Analytics
                             </Button>
-                            {d.status !== 'revoked' && (
+                            {d.status === 'revoked' ? (
+                              /* Revoke is reversible — nothing is destroyed by it. */
+                              <Button variant="outline" size="sm" className="h-7" onClick={() => restore(d)}>
+                                <RotateCcw className="h-3.5 w-3.5 mr-1" />Restore
+                              </Button>
+                            ) : (
                               <Button variant="outline" size="sm" className="h-7 border-rose-300 text-rose-600 hover:bg-rose-50" onClick={() => revoke(d)}>
                                 <Ban className="h-3.5 w-3.5 mr-1" />Revoke
                               </Button>

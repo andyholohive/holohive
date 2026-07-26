@@ -57,6 +57,15 @@ export const maxDuration = 300;
  * Auth: `Authorization: Bearer {CRON_SECRET}` or `?secret={CRON_SECRET}`
  */
 
+/**
+ * Sentiment v3 go-live cutoff (Jdot Q3). Posts activated BEFORE this
+ * date keep whatever numbers ops typed in by hand; only posts activated
+ * on/after it are eligible for auto-fill. 2026-07-10 is the date the
+ * pulled-metrics workflow went live — before it, the tracker numbers are
+ * the human record and the scraper has no business touching them.
+ */
+const METRICS_AUTOFILL_CUTOFF = '2026-07-10';
+
 const TG_URL_REGEX = /t\.me\/([A-Za-z0-9_]+)\/(\d+)/i;
 const FETCH_THROTTLE_MS = 200;        // politeness between Telegram fetches
 const FETCH_TIMEOUT_MS = 8000;        // per-request timeout
@@ -222,9 +231,22 @@ export async function GET(request: Request) {
     //   - content_link ILIKE '%t.me/%'       → Telegram URLs only
     //   - campaign_id IN (active campaigns)  → active clients only
     //   - created_at <= now - 48h            → give post time to ramp
+    //   - activation_date >= go-live cutoff  → never touch manual numbers
     //
     // We don't trust the platform column (audit: 3 of 274 rows
     // mismatch the URL). URL parse is the source of truth.
+    //
+    // [2026-07-25] GO-LIVE CUTOFF — Sentiment v3, Jdot Q3.
+    // The rule is: auto-fill ONLY for posts activated on/after the
+    // cutoff; numbers typed in by hand before that stay untouched.
+    // The cutoff was never implemented — the chain had only the 48h
+    // freshness gate, so every daily run was eligible to overwrite
+    // hand-entered impressions/likes on 293 pre-cutoff posts (the
+    // monotonic new>stored guard was the only thing limiting the
+    // damage, and it doesn't help when the pulled number is simply
+    // higher than what ops recorded). Rows with a null
+    // activation_date are excluded by .gte, which is the behaviour we
+    // want: if we can't prove a post is post-cutoff, don't touch it.
     const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     const { data: rows, error: loadErr } = await (supabase as any)
       .from('contents')
@@ -232,7 +254,8 @@ export async function GET(request: Request) {
       .eq('status', 'posted')
       .ilike('content_link', '%t.me/%')
       .in('campaign_id', activeCampaignIds)
-      .lte('created_at', cutoff48h);
+      .lte('created_at', cutoff48h)
+      .gte('activation_date', METRICS_AUTOFILL_CUTOFF);
 
     if (loadErr) {
       await finishRun('failed', { error: loadErr.message }, loadErr.message);
@@ -300,6 +323,9 @@ export async function GET(request: Request) {
       first_failures: firstFailures,
       active_client_campaigns: activeCampaignIds.length,
       cutoff_48h: cutoff48h,
+      // Surfaced so a run's audit row proves which rule was in force —
+      // the go-live cutoff was missing entirely until 2026-07-25.
+      metrics_autofill_cutoff: METRICS_AUTOFILL_CUTOFF,
     };
 
     // Treat as failed if MORE than half the fetches failed — likely a

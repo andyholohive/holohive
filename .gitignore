@@ -41,3 +41,8 @@ next-env.d.ts
 # Claude session working files — flow-test plans, scratch notes, etc.
 .flow-tests*
 .scratch*
+
+# pdf.js worker — build artifact, copied from node_modules by
+# scripts/copy-pdf-worker.mjs on predev/prebuild so it can never drift
+# from the installed pdfjs-dist version.
+/public/pdf.worker.min.mjs

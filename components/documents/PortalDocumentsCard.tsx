@@ -17,6 +17,7 @@ import dynamic from 'next/dynamic';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileText, Eye, Download } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
@@ -89,8 +90,16 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
   if (!loading && docs.length === 0) return null;
 
   return (
-    <div className="mt-4">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Delivery Documents</p>
+    <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden">
+      <CardHeader className="bg-white border-b border-gray-100 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
+            <FileText className="h-5 w-5 text-white" />
+          </div>
+          <CardTitle className="text-lg font-bold text-gray-900">Delivery Documents</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6">
       {loading ? (
         <Skeleton className="h-16 rounded-lg" />
       ) : (
@@ -149,10 +158,15 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
         </DialogContent>
       </Dialog>
 
-      {/* Confidentiality footer for client-delivery documents. */}
-      <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
-        본 문서는 대외비입니다. 무단 재배포를 금합니다. · Confidential — do not redistribute.
+      {/* Confidentiality footer for client-delivery documents. English only:
+          this portal is read by the CLIENT (an international project buying
+          Korean reach), not by Korean creators. The Korean-language equivalent
+          on app/public/brief/[token] is correct there because that page is
+          creator-facing — don't copy it back here. */}
+      <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
+        Confidential — do not redistribute.
       </p>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

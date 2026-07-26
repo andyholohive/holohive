@@ -85,6 +85,23 @@ export interface DocumentRollup {
 /** Team-tunable "hot" thresholds (spec §5 — a tunable rule, not stored). */
 const HOT = { minSessions: 2, minFocusedMs: 3 * 60_000, minCompletion: 0.8 };
 
+/**
+ * Is this access-log row a real CLIENT read?
+ *
+ * [2026-07-26] Two kinds of row are NOT: a null viewer_email (an internal
+ * preview opened from /links, which never passes through the gate) and any
+ * @holohive.io address (a teammate who passed the gate via the client's
+ * approved_domains). Both used to inflate the headline Opens number, so a doc
+ * nobody outside the company had touched could read "4 Opens".
+ *
+ * Deliberately the same rule the Telegram alert uses in
+ * app/api/documents/log/route.ts — analytics and alerts must agree on who
+ * counts as a client, or one says "opened" while the other says zero.
+ */
+export function isClientViewer(email: string | null | undefined): email is string {
+  return !!email && !email.toLowerCase().endsWith('@holohive.io');
+}
+
 export class DocumentPortalService {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -195,6 +212,26 @@ export class DocumentPortalService {
   }
   async revoke(documentId: string): Promise<void> {
     await this.patch(documentId, { status: 'revoked' });
+  }
+  /**
+   * Undo a revoke [2026-07-26]. Revoke used to be a one-way door — a misclick
+   * permanently killed a document with no way back except editing the row by
+   * hand. Nothing about revoking destroys data (the PDF, its versions and the
+   * whole AccessLog survive), so it should be reversible.
+   *
+   * Restores to 'published' when a version is attached, else back to 'draft' —
+   * mirroring the derivation in addVersion rather than assuming 'published'.
+   * Sharing is NOT re-enabled here: coming back from revoked should surface the
+   * document to the team first, and let a human decide to re-share.
+   */
+  async restore(documentId: string): Promise<void> {
+    const { data: doc } = await (this.supabase as any)
+      .from('documents').select('current_version_id').eq('id', documentId).maybeSingle();
+    if (!doc) throw new Error('Document not found');
+    await this.patch(documentId, {
+      status: (doc as any).current_version_id ? 'published' : 'draft',
+      shared: false,
+    });
   }
   private async patch(documentId: string, fields: Record<string, any>): Promise<void> {
     const { error } = await (this.supabase as any)
@@ -327,9 +364,13 @@ export class DocumentPortalService {
     }
 
     for (const id of documentIds) {
-      const evs = byDoc.get(id) ?? [];
+      // Client rows only — internal previews and @holohive.io readers are
+      // excluded from every L1 figure so "Opens" means "the client opened it".
+      // Internal activity is still logged and still visible per-recipient in
+      // the L2 drill-down under "Internal preview".
+      const evs = (byDoc.get(id) ?? []).filter(e => isClientViewer(e.viewer_email));
       const openSessions = new Set(evs.filter(e => e.event_type === 'doc_opened').map(e => e.session_id));
-      const recipients = new Set(evs.map(e => e.viewer_email).filter((e): e is string => !!e));
+      const recipients = new Set(evs.map(e => e.viewer_email).filter(isClientViewer));
       let hotCount = 0;
       for (const email of recipients) {
         const rev = evs.filter(e => e.viewer_email === email);

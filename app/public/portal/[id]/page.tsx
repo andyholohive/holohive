@@ -3231,14 +3231,22 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       </div>
                     </div>
                   )}
-                  {/* Document Portal — shared hosted PDFs with tracked in-portal
-                      viewing. Self-contained; renders nothing when there are none. */}
-                  <PortalDocumentsCard portalId={idOrSlug} email={email} />
                 </CardContent>
               </Card>
             )}
           </div>
         )}
+
+        {/* Document Portal — shared hosted PDFs with tracked in-portal viewing.
+            [2026-07-26] Deliberately a top-level sibling, NOT nested in the
+            Resources card. It used to live inside it, which meant a shared
+            document was invisible unless the client ALSO had context links /
+            client links / form attachments AND had submitted the onboarding
+            form (`showAdvancedSections`). Neither has anything to do with
+            documents, so a published+shared PDF silently never rendered.
+            The component self-hides when there are none, so it needs no gate
+            of its own. */}
+        <PortalDocumentsCard portalId={idOrSlug} email={email} />
 
         {/* Form Submission Detail Dialog */}
         {/* [Portal v1] Form Submission popup — restyled to match the

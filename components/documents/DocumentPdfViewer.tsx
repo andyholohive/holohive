@@ -18,7 +18,12 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Same-origin worker only. A CDN URL here throws SecurityError in every browser
+// ("Failed to construct 'Worker': Script at '<cdn>' cannot be accessed from
+// origin '<app>'") — cross-origin worker scripts are forbidden regardless of
+// CORS headers, so the viewer would hang on "Loading document…" forever.
+// scripts/copy-pdf-worker.mjs copies the matching worker into /public.
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 const IDLE_MS = 60_000;      // 60s no input pauses the dwell timer
 const BACKSTOP_MS = 30_000;  // periodic flush guards against hard tab kills

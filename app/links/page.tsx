@@ -728,7 +728,7 @@ export default function LinksPage() {
               className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm px-4 py-2"
             >
               <FileText className="h-4 w-4" />
-              Active Clients
+              Documents
             </TabsTrigger>
           </TabsList>
         </Tabs>
