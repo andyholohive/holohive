@@ -28,6 +28,7 @@ import {
   Sparkles, Download, History,
 } from 'lucide-react';
 import { downloadCsv, todayStamp } from '@/lib/csvExport';
+import { OrphanedOwnerDialog } from '@/components/crm/OrphanedOwnerDialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -3155,6 +3156,12 @@ export default function SalesPipelinePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* [2026-07-25] Self-opening reconcile prompt for opportunities whose
+          owner account no longer exists — an offboarding leaves them invisible
+          in every owner-scoped view. Renders nothing unless there are orphans
+          and the viewer is super_admin. */}
+      <OrphanedOwnerDialog />
     </div>
     </SalesPipelineProvider>
   );

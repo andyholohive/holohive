@@ -43,7 +43,7 @@ import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
-import { getCampaignWeek, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
+import { getCampaignWeekState, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import { EngagementTab } from '@/components/clients/EngagementTab';
 import dynamic from 'next/dynamic';
@@ -4691,10 +4691,21 @@ export default function ClientsPage() {
                       const active = milestones.find(m => m.status === 'active');
                       const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-                      // [2026-07-09] Week-N via the canonical Monday-anchored
-                      // helper (getCampaignWeek) so the clients card, the
-                      // client portal, and the campaign tracker all agree.
-                      const weekN = getCampaignWeek(ctx?.start_date)?.weekNumber ?? null;
+                      // [2026-07-25] Week N OF M, matching the portal and the
+                      // campaign tracker. Two things were off before: the card
+                      // rendered a bare "Week N" (it only ever called
+                      // getCampaignWeek, so there was no denominator), and it
+                      // anchored N to client_context.start_date while the date
+                      // range immediately below anchors to the earliest stint
+                      // start — which differ for some clients (Fogo 03-02 vs
+                      // 03-04), putting the card a few days off the portal.
+                      // Both now use the same start + end the date range uses,
+                      // so the week and the dates beside it can't disagree.
+                      const weekStartRaw = earliestStintStartByClient[client.id] || ctx?.start_date || null;
+                      const weekEndRaw = client.id in coveredThroughByClient
+                        ? coveredThroughByClient[client.id]
+                        : latestStintEndByClient[client.id];
+                      const weekState = getCampaignWeekState(weekStartRaw, weekEndRaw ?? null);
 
                       const pendingClientTaskItems = (clientActionItems[client.id] || []).filter(
                         i => i.court === 'yours' && !i.is_done && !i.is_hidden,
@@ -4730,7 +4741,9 @@ export default function ClientsPage() {
                           ) : (
                             <div className="flex items-baseline justify-between text-sm">
                               <span className="font-semibold text-ink-warm-700">
-                                {weekN != null ? `Week ${weekN}` : 'Engagement live'}
+                                {weekState
+                                  ? `Week ${weekState.weekNumber}${weekState.totalWeeks != null ? ` of ${weekState.totalWeeks}` : ''}`
+                                  : 'Engagement live'}
                               </span>
                               {/* Date range.
                                   [F1 2026-07-02] Sourced entirely from stint
