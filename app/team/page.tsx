@@ -13,9 +13,10 @@ import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp, Link2, X, AlertTriangle, Download, Users } from 'lucide-react';
+import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp, Link2, X, AlertTriangle, Download, Users, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
+import { useViewAs } from '@/contexts/ViewAsContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/lib/userService';
@@ -119,8 +120,13 @@ export default function TeamPage() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const { startViewAs } = useViewAs();
   const [guestPermsOpen, setGuestPermsOpen] = useState<string | null>(null);
   const [guestPerms, setGuestPerms] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }>>>({});
+  // [2026-07-28] Optimistic mirror of users.page_access_restricted, keyed
+  // by user id. Seeded lazily from the member row on first render so the
+  // toggle reflects saved state without another fetch.
+  const [restrictedMap, setRestrictedMap] = useState<Record<string, boolean>>({});
 
   // Available private DM chats (chat_type='private') with last-seen
   // timestamp. Used by the super-admin Telegram linking popover on each
@@ -157,6 +163,44 @@ export default function TeamPage() {
   const MEMBER_GRANT_PAGES = [
     { key: '/sops', label: 'SOPs', group: 'Extra' },
     { key: '/templates', label: 'Templates — Tasks & Deliverables editors', group: 'Extra' },
+  ];
+
+  // [2026-07-28] Pages an ADMIN can be restricted to. When a member has
+  // users.page_access_restricted set, these checkboxes become an allowlist
+  // and everything unchecked disappears from their sidebar.
+  //
+  // Deliberately mirrors the sidebar's own entries — the point is "which
+  // nav items does this person see", so the list has to be recognisable as
+  // the sidebar rather than a parallel taxonomy. Super-admin-only surfaces
+  // (Expenses, TG Chats, Changelog) are omitted: a restricted admin can't
+  // reach them either way, so offering the checkbox would be a lie.
+  const ADMIN_RESTRICT_PAGES = [
+    { key: '/dashboard', label: 'Dashboard', group: 'Pinned' },
+    { key: '/tasks', label: 'HQ', group: 'Pinned' },
+    { key: '/clients', label: 'Clients', group: 'Clients' },
+    { key: '/campaigns', label: 'Campaigns', group: 'Clients' },
+    { key: '/campaigns/overview', label: 'Campaign Overview', group: 'Clients' },
+    { key: '/delivery-logs', label: 'Delivery Logs', group: 'Clients' },
+    { key: '/kols', label: 'KOLs', group: 'KOLs' },
+    { key: '/lists', label: 'Lists', group: 'KOLs' },
+    { key: '/crm/sales-pipeline', label: 'Sales', group: 'Sales / CRM' },
+    { key: '/crm/network', label: 'Network', group: 'Sales / CRM' },
+    { key: '/crm/contacts', label: 'Contacts', group: 'Sales / CRM' },
+    { key: '/intelligence', label: 'Intelligence', group: 'Sales / CRM' },
+    { key: '/analytics', label: 'Analytics', group: 'Sales / CRM' },
+    { key: '/templates', label: 'Templates', group: 'Resources' },
+    { key: '/sops', label: 'SOPs', group: 'Resources' },
+    { key: '/initiatives', label: 'Initiatives', group: 'Resources' },
+    { key: '/team', label: 'Team', group: 'Resources' },
+    { key: '/links', label: 'Links', group: 'Resources' },
+    { key: '/mindshare', label: 'Mindshare', group: 'Measurement' },
+    { key: '/wallets', label: 'Wallet Analytics', group: 'Measurement' },
+    { key: '/reminders', label: 'Reminders', group: 'Logistics' },
+    { key: '/crm/submissions', label: 'Submissions', group: 'Logistics' },
+    { key: '/crm/meetings', label: 'Meetings', group: 'Logistics' },
+    { key: '/forms', label: 'Forms', group: 'Logistics' },
+    { key: '/admin', label: 'Admin Tools', group: 'Admin' },
+    { key: '/archive', label: 'Archive', group: 'Admin' },
   ];
 
   useEffect(() => {
@@ -457,6 +501,45 @@ export default function TeamPage() {
       perms[p.page_key] = { can_view: p.can_view as boolean, can_edit: p.can_edit as boolean, can_delete: p.can_delete as boolean };
     }
     setGuestPerms(prev => ({ ...prev, [userId]: perms }));
+  };
+
+  /**
+   * Turn the page allowlist on or off for one member.
+   *
+   * OFF (default) → the role decides everything, rows are ignored.
+   * ON  → only checked pages appear in their sidebar.
+   *
+   * Refuses on super_admin. That is the lockout guard: the flag is
+   * meaningless for them in the hook too, but blocking it here means the
+   * checkbox never appears to work and then silently doesn't.
+   */
+  const toggleRestricted = async (member: TeamMember, next: boolean) => {
+    if (member.role === 'super_admin') {
+      toast({
+        title: 'Super admins cannot be restricted',
+        description: 'Change the role first if you need to limit this account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setRestrictedMap(prev => ({ ...prev, [member.id]: next }));
+    const { error } = await (supabase as any)
+      .from('users')
+      .update({ page_access_restricted: next })
+      .eq('id', member.id);
+    if (error) {
+      setRestrictedMap(prev => ({ ...prev, [member.id]: !next })); // roll back
+      toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
+      return;
+    }
+    // Load the rows so the list isn't blank the moment it starts mattering.
+    if (next && !guestPerms[member.id]) loadGuestPerms(member.id);
+    toast({
+      title: next ? 'Page access restricted' : 'Full access restored',
+      description: next
+        ? 'Only the checked pages will show in their sidebar.'
+        : 'Their role now decides what they can see.',
+    });
   };
 
   const toggleGuestPerm = async (userId: string, pageKey: string, field: 'can_view' | 'can_edit' | 'can_delete') => {
@@ -1086,7 +1169,7 @@ export default function TeamPage() {
                           grants (SOPs / Templates editors) via the same
                           guest_permissions table — same editor, reduced page
                           list, View toggle only. */}
-                      {(member.role === 'guest' || member.role === 'member') && isAdmin && (
+                      {(member.role === 'guest' || member.role === 'member' || member.role === 'admin') && isAdmin && (
                         <Collapsible
                           open={guestPermsOpen === member.id}
                           onOpenChange={(open) => {
@@ -1105,24 +1188,74 @@ export default function TeamPage() {
                               size="sm"
                               className="flex items-center justify-between w-full text-sm font-medium text-ink-warm-700 py-1 h-auto px-0 hover:bg-transparent"
                             >
-                              <span>{member.role === 'member' ? 'Extra Access' : 'Page Permissions'}</span>
+                              {/* [2026-07-28 per Andy] One label for every
+                                  role — "Extra Access" / "Page Permissions"
+                                  described the same control two ways. */}
+                              <span>Permission</span>
                               {guestPermsOpen === member.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="mt-2 space-y-1">
+                              {/* [2026-07-28] Preview entry point. Lives here
+                                  rather than in the card's action row so it
+                                  reads as "and here's what that looks like"
+                                  right under the checkboxes that cause it. */}
+                              {member.id !== userProfile?.id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full h-7 mb-2 text-xs"
+                                  onClick={() => startViewAs(member.id)}
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                  View sidebar as {member.name?.split(' ')[0] || 'them'}
+                                </Button>
+                              )}
                               {member.role === 'member' && (
                                 <p className="text-[11px] text-ink-warm-500 pb-1">
                                   Members already have the core app. These grants unlock the admin-gated surfaces below for this member only.
                                 </p>
                               )}
+                              {/* Admin restriction toggle. Admins hold every
+                                  page by default, so their rows only mean
+                                  anything once this is on — hence a switch
+                                  rather than inferring intent from checkboxes. */}
+                              {member.role === 'admin' && (() => {
+                                const restricted = restrictedMap[member.id]
+                                  ?? Boolean((member as any).page_access_restricted);
+                                return (
+                                  <div className="pb-2 mb-1 border-b border-cream-100 space-y-1.5">
+                                    <label className="flex items-start gap-2 cursor-pointer">
+                                      <Checkbox
+                                        checked={restricted}
+                                        onCheckedChange={(v) => toggleRestricted(member, Boolean(v))}
+                                        className="mt-0.5"
+                                      />
+                                      <span className="text-xs text-ink-warm-700 leading-snug">
+                                        Restrict to selected pages
+                                        <span className="block text-[11px] text-ink-warm-500">
+                                          Off — full admin access. On — only the checked pages show in their sidebar.
+                                        </span>
+                                      </span>
+                                    </label>
+                                    {restricted && (
+                                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                        Hides nav items only. This person still holds admin rights on the data itself.
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               <div className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 text-[11px] text-ink-warm-500 uppercase tracking-wider pb-1 border-b border-cream-100">
                                 <span>Page</span>
-                                <span className="w-12 text-center">{member.role === 'member' ? 'Access' : 'View'}</span>
-                                {member.role !== 'member' && <span className="w-12 text-center">Edit</span>}
-                                {member.role !== 'member' && <span className="w-12 text-center">Delete</span>}
+                                <span className="w-12 text-center">{member.role === 'guest' ? 'View' : 'Access'}</span>
+                                {member.role === 'guest' && <span className="w-12 text-center">Edit</span>}
+                                {member.role === 'guest' && <span className="w-12 text-center">Delete</span>}
                               </div>
-                              {(member.role === 'member' ? MEMBER_GRANT_PAGES : GUEST_PAGES).map(page => {
+                              {(member.role === 'member' ? MEMBER_GRANT_PAGES
+                                : member.role === 'admin' ? ADMIN_RESTRICT_PAGES
+                                : GUEST_PAGES).map(page => {
                                 const perms = guestPerms[member.id]?.[page.key] || { can_view: false, can_edit: false, can_delete: false };
                                 return (
                                   <div key={page.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 items-center py-0.5">
@@ -1130,12 +1263,12 @@ export default function TeamPage() {
                                     <div className="w-12 flex justify-center">
                                       <Checkbox checked={perms.can_view} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_view')} />
                                     </div>
-                                    {member.role !== 'member' && (
+                                    {member.role === 'guest' && (
                                       <div className="w-12 flex justify-center">
                                         <Checkbox checked={perms.can_edit} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_edit')} />
                                       </div>
                                     )}
-                                    {member.role !== 'member' && (
+                                    {member.role === 'guest' && (
                                       <div className="w-12 flex justify-center">
                                         <Checkbox checked={perms.can_delete} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_delete')} />
                                       </div>

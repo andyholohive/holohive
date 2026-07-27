@@ -30,7 +30,7 @@ export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userProfile, signOut, loading: authLoading } = useAuth();
-  const { isGuest, canView, loading: guestLoading, hasMemberGrant } = useGuestPermissions();
+  const { isGuest, canView, loading: guestLoading, hasMemberGrant, canSeePage } = useGuestPermissions();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebarCollapsed');
@@ -223,11 +223,24 @@ export default function Sidebar({ children }: SidebarProps) {
   const isGuestUser = userProfile?.role === 'guest';
   const guestStillLoading = isGuestUser && guestLoading;
 
-  // Helper: hide nav items guests can't access (or still loading)
-  const guestHide = (pageKey: string) => guestStillLoading || (isGuestUser && !canView(pageKey));
+  // Helper: hide nav items guests can't access (or still loading).
+  //
+  // [2026-07-28] Also honours the per-user page allowlist. A RESTRICTED
+  // user (users.page_access_restricted — see useGuestPermissions) is an
+  // admin whose nav is trimmed to the pages they were granted, so an
+  // account can hold admin rights on its own clients without carrying the
+  // whole app in the sidebar. canSeePage returns true for everyone else,
+  // so this is a no-op for every existing user.
+  const guestHide = (pageKey: string) =>
+    guestStillLoading || (isGuestUser && !canView(pageKey)) || !canSeePage(pageKey);
 
-  // Helper: hide entire sections when guest has no access to any item in it
-  const guestHideSection = (pageKeys: string[]) => guestStillLoading || (isGuestUser && pageKeys.every(k => !canView(k)));
+  // Helper: hide entire sections when the user has no access to any item.
+  // A restricted user whose whole section is filtered out shouldn't see an
+  // empty collapsible header sitting there.
+  const guestHideSection = (pageKeys: string[]) =>
+    guestStillLoading
+    || (isGuestUser && pageKeys.every(k => !canView(k)))
+    || pageKeys.every(k => !canSeePage(k));
 
   // Helper: hide items that guests should never see
   const guestHideAlways = guestStillLoading || isGuestUser;
@@ -681,7 +694,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   un-commenting; the !guestHideAlways guard is still correct. */}
               {/* {!guestHideAlways && (
                 <div className="space-y-2">
-                  <NavItem href="/chat" icon={Sparkles} label="Holo GPT" />
+                  {canSeePage("/chat") && <NavItem href="/chat" icon={Sparkles} label="Holo GPT" />}
                 </div>
               )} */}
 
@@ -725,7 +738,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   HQ child route. */}
               {!guestHideAlways && (
                 <CollapsibleSection id="pinned" icon={Star}>
-                  <NavItem href="/tasks" icon={ListTodo} label="HQ" />
+                  {canSeePage("/tasks") && <NavItem href="/tasks" icon={ListTodo} label="HQ" />}
                   {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
                     <div className="pl-6 space-y-0.5">
                       <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
@@ -735,7 +748,7 @@ export default function Sidebar({ children }: SidebarProps) {
                       )}
                     </div>
                   )}
-                  <NavItem href="/dashboard" icon={Compass} label="Dashboard" />
+                  {canSeePage("/dashboard") && <NavItem href="/dashboard" icon={Compass} label="Dashboard" />}
                 </CollapsibleSection>
               )}
 
@@ -784,12 +797,12 @@ export default function Sidebar({ children }: SidebarProps) {
                   they get top-level entries here for direct access. */}
               {!guestHideAlways && (
                 <CollapsibleSection id="resources" icon={BookOpen}>
-                  <NavItem href="/templates" icon={MessageSquare} label="Templates" />
+                  {canSeePage("/templates") && <NavItem href="/templates" icon={MessageSquare} label="Templates" />}
                   {/* [2026-07-24 per Andy] SOPs also visible to members with an
                       explicit per-member grant (set on /team → Extra Access). */}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || hasMemberGrant('/sops')) && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
-                  <NavItem href="/initiatives" icon={Target} label="Initiatives" />
-                  {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || hasMemberGrant('/sops')) && canSeePage("/sops") && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                  {canSeePage("/initiatives") && <NavItem href="/initiatives" icon={Target} label="Initiatives" />}
+                  {!isGuest && canSeePage("/team") && <NavItem href="/team" icon={Shield} label="Team" />}
                   {/* [Expenses v1, 2026-05-29] Super-admin only. Reimbursable
                       spend tracking with recurrence (daily/weekly/monthly
                       instance generation via cron) + per-instance paid
@@ -803,11 +816,11 @@ export default function Sidebar({ children }: SidebarProps) {
                   Admin-only audience-insight tools. */}
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                 <CollapsibleSection id="measurement" icon={TrendingUp}>
-                  <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />
+                  {canSeePage("/mindshare") && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
                   {/* [Wallet Analytics v1, May 2026] Admin-only campaign-
                       participant intelligence — imported from the
                       Data Bank xlsx (1,197 wallets). */}
-                  <NavItem href="/wallets" icon={Wallet} label="Wallet Analytics" />
+                  {canSeePage("/wallets") && <NavItem href="/wallets" icon={Wallet} label="Wallet Analytics" />}
                 </CollapsibleSection>
               )}
 
@@ -817,11 +830,11 @@ export default function Sidebar({ children }: SidebarProps) {
                   the 2026-06-19 reorg. */}
               {!guestHideSection(['/reminders', '/crm/submissions', '/crm/meetings']) && (
                 <CollapsibleSection id="logistics" icon={Bell}>
-                  <NavItem href="/reminders" icon={Bell} label="Reminders" />
+                  {canSeePage("/reminders") && <NavItem href="/reminders" icon={Bell} label="Reminders" />}
                   {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
                   {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
                   {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" dot={unassignedTgCount > 0} />}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && canSeePage("/forms") && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                 </CollapsibleSection>
               )}
 
@@ -841,9 +854,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       the last item in the lowest section also matches
                       the "rarely used, easy to find when needed"
                       mental model for archived content. */}
-                  <NavItem href="/admin" icon={Sliders} label="Admin Tools" />
+                  {canSeePage("/admin") && <NavItem href="/admin" icon={Sliders} label="Admin Tools" />}
                   {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
-                  <NavItem href="/archive" icon={Archive} label="Archive" />
+                  {canSeePage("/archive") && <NavItem href="/archive" icon={Archive} label="Archive" />}
                 </CollapsibleSection>
               )}
 

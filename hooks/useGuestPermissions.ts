@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useViewAs } from '@/contexts/ViewAsContext';
 
 type Permission = {
   page_key: string;
@@ -44,17 +45,42 @@ export function useGuestPermissions() {
 
   const isGuest = userProfile?.role === 'guest';
   // [2026-07-24] Members can hold ADDITIVE grants (SOPs / Templates
-  // editors) in the same table, so fetch for them too. Admins and
-  // super_admins never need rows — their role already covers everything.
+  // editors) in the same table, so fetch for them too.
   const isMember = userProfile?.role === 'member';
 
+  // [2026-07-28] Third reading of the same rows: a RESTRICTED admin.
+  //
+  // guest → rows are the whole allowlist
+  // member → rows are additive grants on top of the role
+  // restricted admin → rows are an allowlist that SUBTRACTS from the role
+  //
+  // Driven by users.page_access_restricted, never by the mere presence of
+  // rows — one stray row must not silently lock an admin out of the app.
+  //
+  // super_admin is excluded unconditionally. That is the lockout guard:
+  // whatever the flag says in the DB, the owner account keeps full access,
+  // so a bad save can always be undone from the UI.
+  const isSuperAdmin = userProfile?.role === 'super_admin';
+  const ownRestricted = !isSuperAdmin && Boolean((userProfile as any)?.page_access_restricted);
+
+  // [2026-07-28] "View as" preview. When active every gate below answers
+  // for the TARGET rather than the signed-in user, which is what makes the
+  // sidebar render as they see it. Scoped to nav only — see ViewAsContext
+  // for why that's the honest boundary.
+  const { target: viewAs } = useViewAs();
+  const previewing = Boolean(viewAs);
+  const isRestricted = previewing
+    ? (viewAs!.role !== 'super_admin' && viewAs!.restricted)
+    : ownRestricted;
+
   useEffect(() => {
-    if (!user?.id || (!isGuest && !isMember)) {
+    if (previewing) return;               // rows come from the preview target
+    if (!user?.id || (!isGuest && !isMember && !isRestricted)) {
       setLoading(false);
       return;
     }
     loadPermissions();
-  }, [user?.id, isGuest, isMember]);
+  }, [user?.id, isGuest, isMember, isRestricted, previewing]);
 
   const loadPermissions = async () => {
     if (!user?.id) return;
@@ -74,23 +100,28 @@ export function useGuestPermissions() {
     }
   };
 
+  // The rows every gate below reads: the preview target's when
+  // previewing, otherwise the signed-in user's own.
+  const effectivePermissions = previewing ? viewAs!.permissions : permissions;
+  const effectiveIsGuest = previewing ? viewAs!.role === 'guest' : isGuest;
+
   const canView = useCallback((pageKey: string): boolean => {
-    if (!isGuest) return true; // non-guests have full access
-    const perm = permissions.find(p => p.page_key === pageKey);
+    if (!effectiveIsGuest) return true; // non-guests have full access
+    const perm = effectivePermissions.find(p => p.page_key === pageKey);
     return perm?.can_view ?? false;
-  }, [isGuest, permissions]);
+  }, [effectiveIsGuest, effectivePermissions]);
 
   const canEdit = useCallback((pageKey: string): boolean => {
-    if (!isGuest) return true;
-    const perm = permissions.find(p => p.page_key === pageKey);
+    if (!effectiveIsGuest) return true;
+    const perm = effectivePermissions.find(p => p.page_key === pageKey);
     return perm?.can_edit ?? false;
-  }, [isGuest, permissions]);
+  }, [effectiveIsGuest, effectivePermissions]);
 
   const canDelete = useCallback((pageKey: string): boolean => {
-    if (!isGuest) return true;
-    const perm = permissions.find(p => p.page_key === pageKey);
+    if (!effectiveIsGuest) return true;
+    const perm = effectivePermissions.find(p => p.page_key === pageKey);
     return perm?.can_delete ?? false;
-  }, [isGuest, permissions]);
+  }, [effectiveIsGuest, effectivePermissions]);
 
   // [2026-07-24] Member grant check — true only for a member with an
   // explicit can_view row (see MEMBER_GRANT_PAGES). Deliberately returns
@@ -99,24 +130,50 @@ export function useGuestPermissions() {
   // never depends on grant rows existing.
   const hasMemberGrant = useCallback((pageKey: string): boolean => {
     if (!isMember) return false;
-    const perm = permissions.find(p => p.page_key === pageKey);
+    const perm = effectivePermissions.find(p => p.page_key === pageKey);
     return perm?.can_view ?? false;
-  }, [isMember, permissions]);
+  }, [isMember, effectivePermissions]);
 
   // Pages all users (including guests) can always access
   const ALWAYS_ALLOWED = ['/settings', '/auth'];
 
-  // Check if a path matches any permitted page
+  // Check if a path matches any permitted page.
+  //
+  // Guests and restricted users share the same allowlist semantics here —
+  // the difference is only in who gets rows, not how they're read.
   const canAccessPath = useCallback((path: string): boolean => {
-    if (!isGuest) return true;
+    if (!effectiveIsGuest && !isRestricted) return true;
     if (ALWAYS_ALLOWED.some(p => path.startsWith(p))) return true;
-    return permissions.some(p => p.can_view && path.startsWith(p.page_key));
-  }, [isGuest, permissions]);
+    return effectivePermissions.some(p => p.can_view && path.startsWith(p.page_key));
+  }, [effectiveIsGuest, isRestricted, effectivePermissions]);
 
-  // First page the guest has access to (for redirect)
-  const firstAllowedPath = isGuest
-    ? (permissions.find(p => p.can_view)?.page_key || null)
+  /**
+   * Should this nav item / page be shown?
+   *
+   * The one call the Sidebar needs. Unrestricted users always get true, so
+   * adding a new page to the app never requires touching permission rows —
+   * only a RESTRICTED user is filtered, and only against their own list.
+   *
+   * Fails OPEN while `loading` is true: a restricted user would otherwise
+   * see the sidebar flash empty on every navigation before rows arrive.
+   * The gate that matters is the page's own data access, not the nav item.
+   */
+  const canSeePage = useCallback((pageKey: string): boolean => {
+    if (!isRestricted) return true;
+    if (loading && !previewing) return true;
+    if (ALWAYS_ALLOWED.some(p => pageKey.startsWith(p))) return true;
+    return effectivePermissions.some(p => p.can_view && p.page_key === pageKey);
+  }, [isRestricted, loading, previewing, effectivePermissions]);
+
+  // First page the user has access to (for redirect). Restricted users need
+  // this too — landing them on a page they can't see is a dead end.
+  const firstAllowedPath = (effectiveIsGuest || isRestricted)
+    ? (effectivePermissions.find(p => p.can_view)?.page_key || null)
     : null;
 
-  return { isGuest, permissions, loading, canView, canEdit, canDelete, canAccessPath, firstAllowedPath, hasMemberGrant };
+  return {
+    isGuest, isRestricted, permissions, loading,
+    canView, canEdit, canDelete, canAccessPath, canSeePage,
+    firstAllowedPath, hasMemberGrant,
+  };
 }

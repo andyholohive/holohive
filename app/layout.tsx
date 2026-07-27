@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ChangelogProvider } from '@/contexts/ChangelogContext';
+import { ViewAsProvider } from '@/contexts/ViewAsContext';
+import ViewAsBanner from '@/components/ViewAsBanner';
 import { Toaster } from '@/components/ui/toaster';
 import ChangelogModal from '@/components/changelog/ChangelogModal';
 import { ChunkErrorHandler } from '@/components/ChunkErrorHandler';
@@ -51,10 +53,17 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-cream-50 text-ink-warm-900">
         <ChunkErrorHandler />
         <AuthProvider>
-          <ChangelogProvider>
-            {children}
-            <ChangelogModal />
-          </ChangelogProvider>
+          {/* ViewAsProvider sits inside AuthProvider (it reads the real
+              user's role to decide who may preview) and outside everything
+              that renders nav, so the sidebar re-renders when preview
+              starts or stops. [2026-07-28] */}
+          <ViewAsProvider>
+            <ChangelogProvider>
+              <ViewAsBanner />
+              {children}
+              <ChangelogModal />
+            </ChangelogProvider>
+          </ViewAsProvider>
         </AuthProvider>
         <Toaster />
       </body>
