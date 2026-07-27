@@ -375,12 +375,36 @@ async function handleCommand(chatId: string, command: string, args: string[], me
   const replyThreadId: number | undefined = message.message_thread_id || undefined;
 
   // Built-in /test command - sends chat ID and thread ID to Andy Lee
+  //
+  // [2026-07-28] Team gate added. `telegram_commands` has carried
+  // test → team_only = true since the row was seeded, but that flag is
+  // only read in the DB-backed branch further down, and this hardcoded
+  // block returns long before execution gets there — so the flag was
+  // dead config and the command was open to anyone in any chat the bot
+  // sits in. It DMs a hardcoded personal chat, which made it an
+  // unauthenticated "message Andy" primitive: harmless in an all-team
+  // group, a spam vector the moment the bot joins a chat with outsiders.
+  //
+  // The other five hardcoded commands (/done, /task, /tasks, /bulk,
+  // /bug+/req) bypass the same DB check but gate themselves internally;
+  // /test was the only one that did not. Gating here rather than
+  // rerouting through the DB branch keeps it consistent with its five
+  // siblings — and the DB row's team_only now describes reality.
   if (cmd === 'test') {
+    const teamMember = await resolveTeamMember(message);
+    if (!teamMember) {
+      console.log('[Telegram Webhook] /test rejected: not a team member', message.from?.id);
+      await sendTelegramMessage(chatId, '⚠️ /test is only available to team members.', 'HTML', replyThreadId);
+      return;
+    }
+
     const ANDY_LEE_TELEGRAM_ID = '6281931733';
     const threadId = message.message_thread_id || null;
     const chatType = message.chat?.type || 'unknown';
     const chatTitle = message.chat?.title || 'Private Chat';
-    const fromUser = message.from?.first_name || message.from?.username || 'Unknown';
+    // Now that the caller is resolved, report the HHP name rather than the
+    // Telegram display name — it identifies the person unambiguously.
+    const fromUser = teamMember.name || message.from?.first_name || message.from?.username || 'Unknown';
 
     const response = `<b>🔧 /test Command Triggered</b>\n\n` +
       `<b>Chat ID:</b> <code>${chatId}</code>\n` +
