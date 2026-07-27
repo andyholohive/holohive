@@ -32,6 +32,8 @@ interface TelegramMessage {
   chat_id: string;
   text: string | null;
   message_date: string;
+  /** Ingestion time — what the scan watermark advances on. */
+  pulled_at: string;
 }
 
 interface ScanResult {
@@ -92,13 +94,29 @@ export async function runMindshareScan(
   // 4. Pull messages newer than the watermark. Cap at 5000 per run to
   //    keep Vercel function under timeout. If we have a backlog it'll
   //    drain over multiple runs.
+  // [2026-07-27] Reads tg_channel_posts, not telegram_messages — the crawler
+  // now writes there so mindshare, coverage and KOL scoring share one raw
+  // store. Columns are aliased back to the old names so everything downstream
+  // (hit matching, dedupe, daily rollup, the watermark) is untouched.
+  //
+  // subject_type IS NULL restricts this to raw channel pulls. Coverage rows in
+  // the same table carry a subject and a query — they were pulled to answer
+  // "who covered Robinhood", and counting them as organic mindshare would
+  // inflate a project's mention count with our own prospect research.
+  // The watermark tracks pulled_at (ingestion time), not posted_at. It used
+  // to track posted_at, which quietly dropped any post that arrived out of
+  // chronological order — exactly what a historical backfill produces, since
+  // those rows land today carrying last month's timestamps and so sort behind
+  // a watermark that has already moved past them. pulled_at is monotonic with
+  // arrival, so "everything ingested since I last ran" is the honest question.
   let msgQuery = (supabase as any)
-    .from('telegram_messages')
-    .select('id, chat_id, text, message_date')
-    .order('message_date', { ascending: true })
+    .from('tg_channel_posts')
+    .select('id, chat_id:channel_tg_id, text, message_date:posted_at, pulled_at')
+    .is('subject_type', null)
+    .order('pulled_at', { ascending: true })
     .limit(5000);
   if (watermark) {
-    msgQuery = msgQuery.gt('message_date', watermark);
+    msgQuery = msgQuery.gt('pulled_at', watermark);
   }
   const { data: messageRows } = await msgQuery;
   const messages: TelegramMessage[] = (messageRows || []) as TelegramMessage[];
@@ -239,7 +257,13 @@ export async function runMindshareScan(
 
   let dailyRowsUpserted = 0;
   if (touchedDays.size > 0) {
-    const dayList = Array.from(touchedDays);
+    // Sorted, because the range filter below reads the first and last entries
+    // as min and max. A Set iterates in insertion order, so this used to work
+    // only by accident: rows arrived ordered by message_date, which made the
+    // insertion order chronological. Ordering by pulled_at removed that
+    // coincidence and produced an inverted `gte min .. lte max` range, which
+    // matches no rows — the daily rollup silently upserted nothing.
+    const dayList = Array.from(touchedDays).sort();
     // Recount from tg_mentions for each touched day, all projects.
     const { data: rollupRows } = await (supabase as any)
       .from('tg_mentions')
@@ -280,8 +304,11 @@ export async function runMindshareScan(
     }
   }
 
-  // 9. Advance watermark to the latest message we processed.
-  const newWatermark = messages[messages.length - 1].message_date;
+  // 9. Advance watermark to the last row we processed. Rows come back ordered
+  //    by pulled_at, so the tail is the highest ingestion time — matching the
+  //    .gt('pulled_at', watermark) filter above. Must stay pulled_at: taking
+  //    message_date here would reintroduce the skip this change removes.
+  const newWatermark = messages[messages.length - 1].pulled_at;
   await (supabase as any)
     .from('mindshare_scan_state')
     .update({

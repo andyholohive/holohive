@@ -9,8 +9,8 @@ export const maxDuration = 60;
  *
  * Ingest endpoint for the Telethon userbot mindshare scraper. Called
  * per-channel by scripts/scrape_mindshare.py after `tg_scrape_channel(...)`
- * pulls a page of messages. Upserts into telegram_messages on the
- * (chat_id, message_id) unique key so re-runs are cheap.
+ * pulls a page of messages. Upserts into tg_channel_posts on the
+ * (channel_tg_id, tg_message_id) unique key so re-runs are cheap.
  *
  * Also backfills tg_monitored_channels.channel_tg_id on the first
  * successful scrape — the userbot resolves the entity, so we can
@@ -22,6 +22,8 @@ export const maxDuration = 60;
  *   - monitored_channel_id: uuid — the tg_monitored_channels row this
  *     scrape came from. Used for the channel_tg_id backfill.
  *   - chat_id: string — Telegram numeric ID as returned by Telethon.
+ *   - chat_title / chat_username: string | null — channel identity, on the
+ *     envelope because it's per-scrape, not per-message.
  *   - messages: Array<{
  *       tg_message_id: string,
  *       date: ISO timestamp,
@@ -29,7 +31,14 @@ export const maxDuration = 60;
  *       from_user_id: string | null,
  *       from_username: string | null,
  *       from_user_name: string | null,
+ *       views / forwards / replies: number | null,
+ *       reactions_json: Array<{emoji, count}> | null,
+ *       is_forward: boolean,
  *     }>
+ *
+ * from_user_* are accepted but not stored — tg_channel_posts is a channel
+ * post store and the author is the channel. They're left in the contract so
+ * an older scraper build doesn't 400.
  *
  * Auth: Bearer CRON_SECRET (server-to-server only). Same pattern as
  * kol-snapshot/upsert.
@@ -46,6 +55,11 @@ export async function POST(request: Request) {
   const monitoredChannelId = body.monitored_channel_id;
   const chatId = body.chat_id;
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  // Channel identity is on the scrape envelope, not per-message — the
+  // scraper resolves the entity once and every message in the batch is
+  // from it. Older senders may not send these; they're display-only.
+  const channelHandle = typeof body.chat_username === 'string' ? body.chat_username : null;
+  const channelTitle = typeof body.chat_title === 'string' ? body.chat_title : null;
   if (!monitoredChannelId || typeof monitoredChannelId !== 'string') {
     return NextResponse.json({ error: 'monitored_channel_id is required' }, { status: 400 });
   }
@@ -79,8 +93,20 @@ export async function POST(request: Request) {
     // Non-fatal — messages still ingest, just without the tg-id link.
   }
 
-  // Upsert messages. Skip empty text (scanner won't match) and drop
-  // anything already present by (chat_id, message_id).
+  // [2026-07-27] Writes to tg_channel_posts, not telegram_messages.
+  //
+  // telegram_messages is bot-webhook shaped — it has from_user_id and
+  // message_thread_id and NO views/forwards/reactions columns, because a bot
+  // never sees those for a channel post. 95% of its rows are team, client and
+  // KOL group chats read by the CRM and the sales pipeline; scraped channel
+  // content was the odd one out, and every engagement figure the scraper
+  // collected was being dropped on the floor at this line.
+  //
+  // tg_channel_posts is the shape this data actually is, and is what coverage
+  // and KOL scoring already read. subject_type/subject_id stay NULL: a
+  // mindshare pull grabs everything a channel posted, and the keyword match
+  // against projects happens later in mindshareScanner, where one post can
+  // match many projects or none.
   let ok = 0;
   let skipped = 0;
   let latestDate: string | null = null;
@@ -89,14 +115,25 @@ export async function POST(request: Request) {
     .map((m: any) => {
       const messageDate: string = m.date;
       if (!latestDate || messageDate > latestDate) latestDate = messageDate;
+      const reactions = Array.isArray(m.reactions_json) ? m.reactions_json : null;
       return {
-        chat_id: chatId,
-        message_id: String(m.tg_message_id),
+        subject_type: null,
+        subject_id: null,
+        channel_tg_id: chatId,
+        channel_handle: channelHandle,
+        channel_title: channelTitle,
+        tg_message_id: Number(m.tg_message_id),
+        posted_at: messageDate,
         text: String(m.text).slice(0, 4000),
-        message_date: messageDate,
-        from_user_id: m.from_user_id ?? null,
-        from_username: m.from_username ?? null,
-        from_user_name: m.from_user_name ?? null,
+        views: Number.isFinite(m.views) ? m.views : null,
+        forwards: Number.isFinite(m.forwards) ? m.forwards : null,
+        replies: Number.isFinite(m.replies) ? m.replies : null,
+        reactions_json: reactions,
+        reaction_total: reactions
+          ? reactions.reduce((s: number, r: any) => s + (Number(r?.count) || 0), 0)
+          : null,
+        is_forward: Boolean(m.is_forward),
+        pulled_at: new Date().toISOString(),
       };
     });
 
@@ -107,9 +144,11 @@ export async function POST(request: Request) {
     const CHUNK = 500;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
+      // uq_tg_channel_posts_raw_msg is the partial unique index covering the
+      // subject-less half of the table.
       const { error, data } = await (supabase as any)
-        .from('telegram_messages')
-        .upsert(slice, { onConflict: 'chat_id,message_id', ignoreDuplicates: true })
+        .from('tg_channel_posts')
+        .upsert(slice, { onConflict: 'channel_tg_id,tg_message_id', ignoreDuplicates: true })
         .select('id');
       if (error) {
         console.error('[mindshare-ingest] upsert error', error);
