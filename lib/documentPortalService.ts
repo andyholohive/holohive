@@ -86,6 +86,21 @@ export interface DocumentRollup {
 const HOT = { minSessions: 2, minFocusedMs: 3 * 60_000, minCompletion: 0.8 };
 
 /**
+ * The single definition of "hot" [2026-07-27].
+ *
+ * L1 and L2 each had their own copy and they had drifted: L1 omitted the
+ * completion clause, so someone who read a document end-to-end in one sitting
+ * showed a flame in the drill-down but was absent from the count on the row
+ * above it. Two views of the same recipient disagreeing is worse than either
+ * threshold being slightly wrong, so both now call this.
+ */
+function isHot(m: { sessions: number; focusedMs: number; completion: number }): boolean {
+  return m.sessions >= HOT.minSessions
+    || m.focusedMs >= HOT.minFocusedMs
+    || m.completion >= HOT.minCompletion;
+}
+
+/**
  * Is this access-log row a real CLIENT read?
  *
  * [2026-07-26] Two kinds of row are NOT: a null viewer_email (an internal
@@ -279,22 +294,39 @@ export class DocumentPortalService {
 
   /**
    * Per-recipient analytics for a document — all derived from the AccessLog
-   * (spec §5/§6). Denominator for completion is the current version page_count.
+   * (spec §5/§6). Completion is measured against the CURRENT version only.
+   *
+   * [2026-07-27] page_view rows are filtered to `current_version_id`. Reads of
+   * a superseded version were previously divided by the new version's
+   * page_count, so replacing a 4-page PDF with a 10-page one retroactively
+   * dropped every historic reader from 100% to 40% — a number that was never
+   * true of anything they actually read. Opens/last-opened stay whole-history
+   * (they are version-agnostic facts); only the page-based measures narrow.
    */
   async getDocumentAnalytics(documentId: string): Promise<RecipientAnalytics[]> {
-    const { version } = await this.getDocument(documentId);
+    const { document, version } = await this.getDocument(documentId);
     const pageCount = version?.page_count ?? 0;
+    const currentVersionId = (document as DocumentRow).current_version_id;
 
     // Paginate + surface errors (audit H4). document_access_log is the
     // fastest-growing table here; a plain select silently capped at 1000 rows
     // and every recipient's opens/completion/hot flag under-reported at once.
     const rows = await this.fetchAllAccessRows<{
       event_type: DocAccessEvent; portal_user_id: string | null; viewer_email: string | null;
-      page_no: number | null; dwell_ms: number | null; session_id: string | null; occurred_at: string;
+      page_no: number | null; dwell_ms: number | null; session_id: string | null;
+      occurred_at: string; version_id: string | null;
     }>(() => (this.supabase as any)
       .from('document_access_log')
-      .select('event_type, portal_user_id, viewer_email, page_no, dwell_ms, session_id, occurred_at')
+      .select('event_type, portal_user_id, viewer_email, page_no, dwell_ms, session_id, occurred_at, version_id')
       .eq('document_id', documentId));
+
+    /** A page-based measure only counts if it refers to the version on screen. */
+    const isCurrentVersionPageView = (r: { event_type: DocAccessEvent; page_no: number | null; version_id: string | null }) =>
+      r.event_type === 'page_view'
+      && r.page_no != null
+      // Rows logged before version_id was threaded through carry null — treat
+      // them as belonging to the current version rather than discarding them.
+      && (r.version_id == null || r.version_id === currentVersionId);
 
     // Recipients are keyed by the gate email; team-internal previews (no email)
     // collapse under a single "Internal preview" bucket so they never masquerade
@@ -309,19 +341,26 @@ export class DocumentPortalService {
     const out: RecipientAnalytics[] = [];
     for (const [key, evs] of byRecipient) {
       const openSessions = new Set(evs.filter(e => e.event_type === 'doc_opened').map(e => e.session_id));
-      const pages = new Set(evs.filter(e => e.event_type === 'page_view' && e.page_no != null).map(e => e.page_no));
-      const totalFocusedMs = evs.reduce((s, e) => s + (e.event_type === 'page_view' ? (e.dwell_ms ?? 0) : 0), 0);
+      const currentViews = evs.filter(isCurrentVersionPageView);
+      const pages = new Set(currentViews.map(e => e.page_no));
+      // Focused time is whole-history on purpose, like opens and lastOpened.
+      // Scoping it to the current version looked right until a replace was
+      // actually exercised [2026-07-27]: a reader who spent 1m43s on v1 then
+      // showed "0s focused" the moment v2 landed, which reads as "never opened
+      // it" and is plainly false. Time spent is a fact about the person; only
+      // the page-based measures below are claims about a specific version.
+      const totalFocusedMs = evs.reduce(
+        (s, e) => s + (e.event_type === 'page_view' ? (e.dwell_ms ?? 0) : 0), 0,
+      );
       const lastOpened = evs.reduce<string | null>((m, e) => (!m || e.occurred_at > m ? e.occurred_at : m), null);
       const completion = pageCount > 0 ? pages.size / pageCount : 0;
-      const hot =
-        openSessions.size >= HOT.minSessions ||
-        totalFocusedMs >= HOT.minFocusedMs ||
-        completion >= HOT.minCompletion;
+      const hot = isHot({ sessions: openSessions.size, focusedMs: totalFocusedMs, completion });
+      // Version-scoped too: the L3 bar chart is indexed by page number, and a
+      // superseded 10-page version would otherwise draw bars for pages that
+      // don't exist in the 4-page document the reader is looking at.
       const pageDwell: Record<number, number> = {};
-      for (const e of evs) {
-        if (e.event_type === 'page_view' && e.page_no != null) {
-          pageDwell[e.page_no] = (pageDwell[e.page_no] ?? 0) + (e.dwell_ms ?? 0);
-        }
+      for (const e of currentViews) {
+        pageDwell[e.page_no!] = (pageDwell[e.page_no!] ?? 0) + (e.dwell_ms ?? 0);
       }
       out.push({
         viewer_email: key === ' internal' ? null : key,
@@ -348,6 +387,18 @@ export class DocumentPortalService {
     const result = new Map<string, DocumentRollup>();
     if (documentIds.length === 0) return result;
 
+    // Page counts for the completion clause of the HOT rule. Without these,
+    // L1 could only apply two of the three conditions and disagreed with L2
+    // (see isHot) — a reader who finished the document in one sitting showed
+    // a flame in the drill-down but was missing from the L1 count.
+    const { data: docRows } = await (this.supabase as any)
+      .from('documents')
+      .select('id, document_versions!documents_current_version_fk(page_count)')
+      .in('id', documentIds);
+    const pageCountByDoc = new Map<string, number>(
+      ((docRows ?? []) as any[]).map(d => [d.id, d.document_versions?.page_count ?? 0]),
+    );
+
     // Paginate + surface errors (audit H4) — see getDocumentAnalytics.
     const rows = await this.fetchAllAccessRows<{
       document_id: string; event_type: DocAccessEvent; viewer_email: string | null;
@@ -371,12 +422,18 @@ export class DocumentPortalService {
       const evs = (byDoc.get(id) ?? []).filter(e => isClientViewer(e.viewer_email));
       const openSessions = new Set(evs.filter(e => e.event_type === 'doc_opened').map(e => e.session_id));
       const recipients = new Set(evs.map(e => e.viewer_email).filter(isClientViewer));
+      const pageCount = pageCountByDoc.get(id) ?? 0;
       let hotCount = 0;
       for (const email of recipients) {
         const rev = evs.filter(e => e.viewer_email === email);
         const sessions = new Set(rev.filter(e => e.event_type === 'doc_opened').map(e => e.session_id)).size;
         const focused = rev.reduce((s, e) => s + (e.event_type === 'page_view' ? (e.dwell_ms ?? 0) : 0), 0);
-        if (sessions >= HOT.minSessions || focused >= HOT.minFocusedMs) hotCount += 1;
+        const pages = new Set(
+          rev.filter(e => e.event_type === 'page_view' && e.page_no != null).map(e => e.page_no),
+        ).size;
+        if (isHot({ sessions, focusedMs: focused, completion: pageCount > 0 ? pages / pageCount : 0 })) {
+          hotCount += 1;
+        }
       }
       const lastOpened = evs.reduce<string | null>((m, e) => (!m || e.occurred_at > m ? e.occurred_at : m), null);
       result.set(id, { document_id: id, opens: openSessions.size, recipients: recipients.size, hotCount, lastOpened });

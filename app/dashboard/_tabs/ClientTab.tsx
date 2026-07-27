@@ -407,7 +407,7 @@ export default function ClientTab() {
             icon={ExternalLink}
             label="Ext. Visits"
             value={data.outputSignals.totalExtVisitsLast7d}
-            sub="This week · external portal visits"
+            sub="Last 7 days · external portal visits"
             accent="amber"
             topAccent
           />

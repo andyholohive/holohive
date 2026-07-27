@@ -2483,9 +2483,14 @@ const CampaignDetailsPage = () => {
                   build). Renders nothing until the pipeline has scored
                   comments for this campaign. Mindshare slots beside it
                   when that ships. */}
-              <div className="mb-4">
-                <SentimentModule campaignId={campaign.id} />
-              </div>
+              {/* [2026-07-27] SentimentModule mount removed from here. This
+                  TabsContent is the legacy ?tab=information target whose
+                  trigger is gated off above, so this copy was unreachable in
+                  normal navigation while a second, reachable copy renders
+                  under Content Dashboard → Overview. Two mounts meant two
+                  fetches of the same rollup and a spec-tracker test
+                  instruction that pointed people at the dead one. The
+                  reachable mount is the only one now. */}
               {/* Outer Card wrapper dropped — with underline tabs the
                   content sits directly under the tab strip (mockup
                   pattern). Inner sections (Campaign Overview /

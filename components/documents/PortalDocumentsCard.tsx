@@ -118,7 +118,7 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-gray-900 truncate">{d.title}</span>
                 <span className="block text-xs text-gray-500">
-                  {d.page_count ? `${d.page_count} pages · ` : ''}Added {formatDate(d.created_at)}
+                  {d.page_count ? `${d.page_count} ${d.page_count === 1 ? 'page' : 'pages'} · ` : ''}Added {formatDate(d.created_at)}
                 </span>
               </span>
               <Eye className="h-4 w-4 text-gray-400 flex-shrink-0" />

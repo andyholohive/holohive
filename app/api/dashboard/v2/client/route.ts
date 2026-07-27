@@ -61,6 +61,16 @@ export async function GET(request: Request) {
     const sb = adminSupabase();
     const cfg = await getDashboardConfig();
     const weekStartIso = startOfWeekUtc().toISOString();
+    /**
+     * Ext. Visits is named "last 7 days" and is now measured that way
+     * [2026-07-27]. It previously reused weekStartIso — Monday 00:00 UTC of the
+     * current calendar week — so on a Monday morning the column read ~0 and
+     * every client looked disengaged, then climbed through the week and reset.
+     * A rolling window is what "recent engagement" means and what the field
+     * name promises. Other metrics keep the calendar-week anchor deliberately:
+     * they answer "what happened this week", which is a different question.
+     */
+    const rolling7dIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const [standardClients, adHocClients] = await Promise.all([
       getStandardClients(sb),
@@ -164,24 +174,25 @@ export async function GET(request: Request) {
         .select('client_id')
         .in('client_id', standardClientIds)
         .eq('is_external', true)
-        .gte('visited_at', weekStartIso),
-      // [2026-07-17 Document Portal] External document opens this week feed the
-      // same Ext. Visits column — a client reading a hosted delivery PDF is an
-      // external engagement. Distinct (client, session) doc_opened events from a
-      // non-@holohive.io viewer, deduped below so a multi-open session counts once.
+        .gte('visited_at', rolling7dIso),
+      // [2026-07-17 Document Portal] External document opens in the same window
+      // feed the Ext. Visits column — a client reading a hosted delivery PDF is
+      // an external engagement. Distinct (client, session) doc_opened events
+      // from a non-@holohive.io viewer, deduped below so a multi-open session
+      // counts once.
       (sb as any)
         .from('document_access_log')
         .select('client_id, session_id, viewer_email')
         .eq('event_type', 'doc_opened')
         .in('client_id', standardClientIds)
-        .gte('occurred_at', weekStartIso),
+        .gte('occurred_at', rolling7dIso),
     ]);
 
     const tasks = (tasksRes.data ?? []) as any[];
     const contentsThisWeek = (contentsThisWeekRes.data ?? []) as any[];
     const contentsAllTime = (contentsAllTimeRes.data ?? []) as any[];
     const activeCampaigns = (campaignsRes.data ?? []) as any[];
-    const extVisitsThisWeek = (extVisitsRes.data ?? []) as Array<{ client_id: string }>;
+    const extVisitsLast7d = (extVisitsRes.data ?? []) as Array<{ client_id: string }>;
     const contextRows = (meetingNotesRes.data ?? []) as Array<{
       client_id: string;
       call_notes: Array<{
@@ -239,9 +250,9 @@ export async function GET(request: Request) {
     const contentThisWeekByClient = countDeduped(contentsThisWeek);
     const contentAllTimeByClient = countDeduped(contentsAllTime);
 
-    // Per-client external visit counts this week.
+    // Per-client external visit counts over the rolling 7 days.
     const extVisitsByClient = new Map<string, number>();
-    for (const v of extVisitsThisWeek) {
+    for (const v of extVisitsLast7d) {
       extVisitsByClient.set(v.client_id, (extVisitsByClient.get(v.client_id) ?? 0) + 1);
     }
 
@@ -284,7 +295,7 @@ export async function GET(request: Request) {
       },
       // Ext. visits — portal page visits (portal_visits) + external document
       // opens (document_access_log). Both are real external engagement signals.
-      totalExtVisitsLast7d: extVisitsThisWeek.length + extDocOpensTotal,
+      totalExtVisitsLast7d: extVisitsLast7d.length + extDocOpensTotal,
     };
 
     // [2026-06-15] Flatten client_context.call_notes JSONB into the

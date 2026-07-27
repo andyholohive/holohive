@@ -109,6 +109,44 @@ function CoverageInner() {
   const [runDays, setRunDays] = useState(30);
   const [dispatching, setDispatching] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  /**
+   * Leave-behind → branded A4 PDF. The builder is imported lazily: it pulls in
+   * jspdf + html2canvas, which are heavy and only needed the moment someone
+   * actually exports, so they stay out of the initial page bundle.
+   */
+  const exportPdf = useCallback(async () => {
+    if (!contract) return;
+    setExporting(true);
+    try {
+      const { buildCoverageLeaveBehindPdf } = await import('@/lib/coverageLeaveBehindPdf');
+      const blob = await buildCoverageLeaveBehindPdf({
+        contract: contract as unknown as import('@/lib/coverageAnalysis').CoverageContract,
+        subjectLabel: contract.query || 'Organic coverage',
+        generatedAt,
+        formatDate,
+        formatDateTime,
+      });
+      const slug = (contract.query || 'coverage').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug || 'coverage'}-leave-behind.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({
+        title: 'Export failed',
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [contract, generatedAt, toast]);
 
   const fetchLatest = useCallback(async () => {
     if (!subjectId) { setLoading(false); return; }
@@ -267,8 +305,15 @@ function CoverageInner() {
               <span>Trailing {contract.window_days} days</span>
               <span>·</span>
               <span>{contract.generated_basis.channels_scanned} channels scanned, {contract.generated_basis.channels_readable} readable</span>
-              <Button variant="outline" size="sm" className="ml-auto" disabled title="Branded PDF lands with the coverage-snapshot template pack">
-                <Download className="h-4 w-4 mr-2" />Export PDF (soon)
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                onClick={exportPdf}
+                disabled={exporting}
+                title="Branded A4 PDF of this leave-behind"
+              >
+                <Download className="h-4 w-4 mr-2" />{exporting ? 'Building…' : 'Export PDF'}
               </Button>
             </div>
 

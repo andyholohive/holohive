@@ -94,11 +94,26 @@ export default function DocumentPdfViewer({
 
     const bump = () => { lastActivity.current = Date.now(); };
     const activityEvents: (keyof WindowEventMap)[] = ['scroll', 'mousemove', 'keydown', 'touchstart', 'click'];
-    activityEvents.forEach(e => window.addEventListener(e, bump, { passive: true }));
+    // `capture: true` because the viewer lives inside its own overflow-y
+    // container: scroll does NOT bubble to window, so a listener in the bubble
+    // phase never sees trackpad/keyboard scrolling. Without this, a reader who
+    // scrolls but doesn't move the pointer is marked idle after 60s and their
+    // dwell silently stops accruing.
+    activityEvents.forEach(e => window.addEventListener(e, bump, { passive: true, capture: true }));
+
+    // "Tab focused" per the spec — visibilityState alone does NOT cover a
+    // window that is still visible but behind another app, which would keep
+    // crediting attention to someone who has walked away from the document.
+    let windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true;
+    const onFocus = () => { windowFocused = true; bump(); };
+    const onBlur = () => { windowFocused = false; flush(); };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
 
     // 1s dwell accumulator — credits the most-visible qualifying page.
     const tick = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
+      if (!windowFocused) return;
       if (Date.now() - lastActivity.current > IDLE_MS) return;
       let best = -1, bestRatio = 0;
       for (const [p, r] of Object.entries(visibleRatio.current)) {
@@ -117,7 +132,9 @@ export default function DocumentPdfViewer({
       post({ event_type: 'doc_closed' });
       clearInterval(tick);
       clearInterval(backstop);
-      activityEvents.forEach(e => window.removeEventListener(e, bump));
+      activityEvents.forEach(e => window.removeEventListener(e, bump, { capture: true }));
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
       document.removeEventListener('visibilitychange', onHide);
       window.removeEventListener('pagehide', flush);
     };
@@ -148,15 +165,39 @@ export default function DocumentPdfViewer({
   );
 }
 
-/** One PDF page + an IntersectionObserver reporting its visible ratio upward. */
+/**
+ * One PDF page + an IntersectionObserver reporting how "on screen" it is.
+ *
+ * [2026-07-27] Reports max(pageCoverage, viewportFill) rather than raw
+ * intersectionRatio. intersectionRatio alone is the fraction of the PAGE that
+ * is visible, and an A4 page is ~1.41× as tall as it is wide — inside the
+ * viewer's max-h-[80vh] scroll container the ratio tops out around 0.47–0.56.
+ * On a laptop-height window it never crossed the 0.5 gate, so NO page_view was
+ * ever emitted: focused time, pages read, completion and the per-page bars all
+ * silently read zero while opens kept logging.
+ *
+ * viewportFill (visible slice ÷ container height) fixes the tall-page case: a
+ * page that fills the reader's screen counts as being read even when only 45%
+ * of that page fits. Whichever measure is kinder is the honest one here —
+ * both describe "this is what the reader is looking at".
+ */
 function PageTracked({ pageNumber, width, onRatio }: { pageNumber: number; width: number; onRatio: (ratio: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      (entries) => { for (const e of entries) onRatio(e.intersectionRatio); },
-      { threshold: [0, 0.25, 0.5, 0.75, 1] },
+      (entries) => {
+        for (const e of entries) {
+          const pageCoverage = e.intersectionRatio;
+          const rootH = e.rootBounds?.height ?? 0;
+          const viewportFill = rootH > 0 ? e.intersectionRect.height / rootH : 0;
+          onRatio(Math.max(pageCoverage, viewportFill));
+        }
+      },
+      // Fine-grained thresholds: with a tall page the ratio moves in small
+      // steps, and coarse buckets would leave the value stale mid-scroll.
+      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] },
     );
     obs.observe(el);
     return () => { obs.disconnect(); onRatio(0); };

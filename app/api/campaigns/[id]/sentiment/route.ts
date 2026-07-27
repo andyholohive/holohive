@@ -27,13 +27,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!url || !key) return NextResponse.json({ error: 'Missing Supabase config' }, { status: 500 });
   const sb = createClient(url, key);
 
+  // [2026-07-27] Filter on the LINK, not contents.platform. The metrics cron
+  // already distrusts that column (a handful of rows carry a platform that
+  // disagrees with their URL), and a mislabelled row here silently drops a
+  // post's whole comment thread out of the rollup. A t.me link is what
+  // actually determines whether comments could exist, so key off that and
+  // treat platform as advisory.
   const { data: contents } = await (sb as any)
     .from('contents')
-    .select('id, content_link')
-    .eq('campaign_id', campaignId)
-    .eq('platform', 'Telegram');
-  const contentIds = ((contents ?? []) as any[]).map(c => c.id);
-  const linkById = new Map<string, string>(((contents ?? []) as any[]).map(c => [c.id, c.content_link || '']));
+    .select('id, content_link, platform')
+    .eq('campaign_id', campaignId);
+  const tgContents = ((contents ?? []) as any[]).filter(c =>
+    /(^|\/\/)(t\.me|telegram\.me)\//i.test(c.content_link || '')
+    || (c.platform === 'Telegram' && !c.content_link),
+  );
+  const contentIds = tgContents.map(c => c.id);
+  const linkById = new Map<string, string>(tgContents.map(c => [c.id, c.content_link || '']));
   if (contentIds.length === 0) {
     return NextResponse.json({ hasData: false });
   }

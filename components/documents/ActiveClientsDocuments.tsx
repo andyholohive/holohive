@@ -41,9 +41,27 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw } from 'lucide-react';
-import { formatDate, formatDateTime, toIsoDate } from '@/lib/dateFormat';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 const STATUS_TONE: Record<string, BadgeTone> = { draft: 'neutral', published: 'success', revoked: 'danger' };
+
+/**
+ * Expiry means "readable through the END of the day you picked".
+ *
+ * [2026-07-27] This used to store `toIsoDate(day)` — a bare 'YYYY-MM-DD'. Every
+ * reader then did `new Date('YYYY-MM-DD')`, which JS parses as UTC midnight,
+ * i.e. 09:00 KST. So picking today killed the document immediately, and picking
+ * a future date killed it at the START of that day rather than the end. It also
+ * rendered as the previous day for any viewer west of UTC.
+ *
+ * Storing an absolute instant at 23:59:59.999 local time fixes the enforcement
+ * AND the display in one move: the stored value is a real timestamptz, so
+ * formatDate and the Calendar's `selected` both resolve to the intended day.
+ */
+function endOfLocalDayIso(day: Date): string {
+  const d = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
+  return d.toISOString();
+}
 
 /**
  * Display labels for the stored lowercase statuses. "Draft" here means the row
@@ -78,6 +96,7 @@ export default function ActiveClientsDocuments() {
   const [analyticsDoc, setAnalyticsDoc] = useState<DocWithClient | null>(null);
   const [recipients, setRecipients] = useState<RecipientAnalytics[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [replacingId, setReplacingId] = useState<string | null>(null);
   const [expandedRecipient, setExpandedRecipient] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -184,6 +203,51 @@ export default function ActiveClientsDocuments() {
     try { await service.revoke(d.id); toast({ title: 'Access revoked' }); await load(); }
     catch (e) { toast({ title: 'Update failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }); }
   };
+  /**
+   * Replace the PDF with a new version [2026-07-27]. addVersion() always
+   * supported this — version_no increments, current_version_id repoints, and
+   * the old version's access-log rows survive — but nothing in the UI ever
+   * called it except first upload, so a document could never be corrected
+   * after the fact.
+   */
+  const replaceVersion = async (d: DocumentRow, file: File) => {
+    if (file.type !== 'application/pdf') {
+      toast({ title: 'Please choose a PDF', variant: 'destructive' });
+      return;
+    }
+    setReplacingId(d.id);
+    try {
+      let pageCount: number | null = null;
+      try {
+        const { pdfjs } = await import('react-pdf');
+        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+        const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+        pageCount = pdf.numPages;
+      } catch { /* page_count stays null; not fatal */ }
+
+      const path = `${d.client_id}/${(globalThis.crypto?.randomUUID?.() ?? Date.now())}.pdf`;
+      const { error: upErr } = await (supabase as any).storage
+        .from('client-documents').upload(path, file, { contentType: 'application/pdf', upsert: false });
+      if (upErr) throw upErr;
+      try {
+        await service.addVersion(d.id, { storage_ref: path, page_count: pageCount, uploaded_by: user?.id ?? null });
+      } catch (inner) {
+        // Same compensation as first upload — never strand the object.
+        try { await (supabase as any).storage.from('client-documents').remove([path]); } catch { /* ignore */ }
+        throw inner;
+      }
+      toast({
+        title: 'New version published',
+        description: 'Earlier reads stay in the log, attributed to the version they read.',
+      });
+      await load();
+    } catch (e) {
+      toast({ title: 'Replace failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setReplacingId(null);
+    }
+  };
+
   const restore = async (d: DocumentRow) => {
     try {
       await service.restore(d.id);
@@ -284,7 +348,7 @@ export default function ActiveClientsDocuments() {
                               <Calendar
                                 mode="single"
                                 selected={d.expires_at ? new Date(d.expires_at) : undefined}
-                                onSelect={(day) => { if (day) void setExpiry(d, toIsoDate(day)); }}
+                                onSelect={(day) => { if (day) void setExpiry(d, endOfLocalDayIso(day)); }}
                                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
                                 modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
                               />
@@ -308,6 +372,30 @@ export default function ActiveClientsDocuments() {
                             <Button variant="outline" size="sm" className="h-7" onClick={() => openAnalytics(d)}>
                               <BarChart3 className="h-3.5 w-3.5 mr-1" />Analytics
                             </Button>
+                            {d.status !== 'revoked' && (
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-7 cursor-pointer"
+                                disabled={replacingId === d.id}
+                              >
+                                <label>
+                                  <Upload className="h-3.5 w-3.5 mr-1" />
+                                  {replacingId === d.id ? 'Uploading…' : 'Replace'}
+                                  <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      e.target.value = '';   // allow re-picking the same file
+                                      if (f) void replaceVersion(d, f);
+                                    }}
+                                  />
+                                </label>
+                              </Button>
+                            )}
                             {d.status === 'revoked' ? (
                               /* Revoke is reversible — nothing is destroyed by it. */
                               <Button variant="outline" size="sm" className="h-7" onClick={() => restore(d)}>
