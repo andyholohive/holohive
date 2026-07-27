@@ -6,9 +6,16 @@
  * Renders under the Lineups tab on a CONFIRMED week, one scroll below the
  * lineup summary. QC gate: before approval it shows a generate-links prompt;
  * on approval it mints per-KOL tokens and reveals the delivery rows. Per angle,
- * the manager writes one {{handle}}/{{link}} message; per KOL, Copy fills it +
- * the per-KOL link, copies to clipboard, and marks the KOL sent. Sent/opened
+ * the manager sets the published brief page and writes one
+ * {{handle}}/{{link}} message; per KOL, Copy fills it +
+ * the per-KOL link, copies to clipboard, and stamps sent_at. Copied/opened
  * chips + header counts read from the token store.
+ *
+ * The chips say "Copied", not "Sent": the stamp fires on the copy click,
+ * before the manager has pasted anything, and HHP never messages a KOL itself
+ * (spec §5/§11 — copy-to-clipboard for v1, the bot never messages KOLs). The
+ * column keeps the name sent_at so the Friday un-opened nudge and the lineup
+ * lifecycle stage are untouched.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,11 +24,12 @@ import { KolBriefService, type BriefConsole } from '@/lib/kolBriefService';
 import type { LineupBriefStats } from '@/lib/lineupManagerService';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
-import { Send, Copy, Check, ExternalLink, MailCheck, Eye, Sparkles } from 'lucide-react';
+import { Send, Copy, Check, ExternalLink, Eye, Sparkles } from 'lucide-react';
 
 const DEFAULT_ANGLE_MESSAGE =
   'Hi {{handle}} — here is your brief for this week:\n{{link}}\n\nLet us know if you have any questions before posting.';
@@ -58,6 +66,8 @@ export default function BriefDeliveryPanel({
   const [loading, setLoading] = useState(true);
   const [minting, setMinting] = useState(false);
   const [msgDraft, setMsgDraft] = useState<Record<number, string>>({});
+  const [refDraft, setRefDraft] = useState<Record<number, string>>({});
+  const [savingRef, setSavingRef] = useState<number | null>(null);
   const [copiedKol, setCopiedKol] = useState<string | null>(null);
 
   const briefUrl = useCallback(
@@ -70,6 +80,7 @@ export default function BriefDeliveryPanel({
       const console = await service.getConsoleData(lineupId);
       setData(console);
       setMsgDraft(Object.fromEntries(console.angles.map(a => [a.angle_no, a.message])));
+      setRefDraft(Object.fromEntries(console.angles.map(a => [a.angle_no, a.page_ref ?? ''])));
       // Report mint/sent counts up so the lifecycle badge advances live.
       const kolRows = console.angles.flatMap(a => a.kols);
       onDeliveryChangeRef.current?.(lineupId, {
@@ -90,8 +101,10 @@ export default function BriefDeliveryPanel({
   const handleApprove = async () => {
     setMinting(true);
     try {
-      const { minted } = await service.mintTokensForLineup(lineupId, currentUserId ?? undefined);
-      toast({ title: 'Brief links generated', description: `${minted} per-KOL link${minted === 1 ? '' : 's'} minted.` });
+      const { minted, revived } = await service.mintTokensForLineup(lineupId, currentUserId ?? undefined);
+      const parts = [`${minted} per-KOL link${minted === 1 ? '' : 's'} minted`];
+      if (revived > 0) parts.push(`${revived} expired link${revived === 1 ? '' : 's'} given a fresh expiry`);
+      toast({ title: 'Brief links generated', description: `${parts.join(' · ')}.` });
       await load();
     } catch (err) {
       toast({ title: 'Generate failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
@@ -107,6 +120,35 @@ export default function BriefDeliveryPanel({
       await load();
     } catch (err) {
       toast({ title: 'Save failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    }
+  };
+
+  const handleSavePageRef = async (angleNo: number) => {
+    setSavingRef(angleNo);
+    try {
+      const updated = await service.setAnglePageRef(lineupId, angleNo, refDraft[angleNo] ?? '');
+      if (updated === 0) {
+        // The links have to exist before there is anything to point at.
+        toast({
+          title: 'No links to update',
+          description: `Angle ${angleNo} has no minted tokens yet — approve the week first.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: (refDraft[angleNo] ?? '').trim() ? 'Brief page set' : 'Brief page cleared',
+          description: `${updated} link${updated === 1 ? '' : 's'} on angle ${angleNo}.`,
+        });
+      }
+      await load();
+    } catch (err) {
+      toast({
+        title: 'Could not save the page',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingRef(null);
     }
   };
 
@@ -143,9 +185,33 @@ export default function BriefDeliveryPanel({
         </p>
         {hasTokens && (
           <div className="ml-auto flex items-center gap-2 text-[11px] text-ink-warm-600 tabular-nums">
-            <span className="inline-flex items-center gap-1"><MailCheck className="h-3 w-3" />{data.sentCount}/{data.totalCount} sent</span>
+            <span className="inline-flex items-center gap-1"><Copy className="h-3 w-3" />{data.sentCount}/{data.totalCount} copied</span>
             <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" />{data.openedCount}/{data.totalCount} opened</span>
-            {data.expiresAt && <span>· expires {formatDate(data.expiresAt)}</span>}
+            {data.expiresAt && (
+              // An already-past expiry is the difference between "these links
+              // work" and "every KOL sees an expired page", so it says so
+              // instead of printing a date and leaving you to check the
+              // calendar.
+              new Date(data.expiresAt) < new Date()
+                ? (
+                  <>
+                    <span className="text-rose-600 font-medium">· expired {formatDate(data.expiresAt)}</span>
+                    {/* The Approve action only exists in the pre-mint gate, so
+                        without this an expired week is unrecoverable from the
+                        UI — the very state this button is here to escape. */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[11px] border-rose-300 text-rose-600 hover:bg-rose-50"
+                      disabled={minting}
+                      onClick={handleApprove}
+                    >
+                      {minting ? 'Refreshing…' : 'Refresh expiry'}
+                    </Button>
+                  </>
+                )
+                : <span>· expires {formatDate(data.expiresAt)}</span>
+            )}
           </div>
         )}
       </div>
@@ -157,7 +223,8 @@ export default function BriefDeliveryPanel({
           <p className="text-sm font-medium text-ink-warm-800">Generate per-KOL brief links</p>
           <p className="text-xs text-ink-warm-500 mt-1 max-w-md mx-auto">
             Approve this confirmed week to mint one unguessable link per KOL and reveal the delivery
-            rows. Nothing is sent to a KOL until you copy it below.
+            rows. HHP never messages a KOL — you copy each message and paste it
+            into their chat yourself.
           </p>
           <Button variant="brand" className="mt-3" onClick={handleApprove} disabled={minting}>
             <Sparkles className="h-4 w-4 mr-2" />
@@ -172,6 +239,40 @@ export default function BriefDeliveryPanel({
                 Angle {angle.angle_no}
                 {angle.angle_name ? <span className="text-ink-warm-400 font-normal"> · {angle.angle_name}</span> : null}
               </p>
+
+              {/* Published brief page for the angle. Sits above the message
+                  box because a link is worth nothing until it points at a
+                  page — a manager who fills the message first has written a
+                  covering note for an empty envelope. */}
+              <div className="mb-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={refDraft[angle.angle_no] ?? ''}
+                    onChange={(e) => setRefDraft(d => ({ ...d, [angle.angle_no]: e.target.value }))}
+                    placeholder="https://…  brief page for this angle"
+                    className="h-8 focus-brand text-xs flex-1"
+                  />
+                  {angle.page_ref && (
+                    <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0" title="Open the published page">
+                      <a href={angle.page_ref} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={savingRef === angle.angle_no}
+                    onClick={() => handleSavePageRef(angle.angle_no)}
+                  >
+                    {savingRef === angle.angle_no ? 'Saving…' : 'Save page'}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-ink-warm-400 mt-1">
+                  {angle.page_ref
+                    ? 'Live — every KOL on this angle sees this page.'
+                    : 'Not set — these links show "your brief is being prepared". Paste the published page, or leave it for the generator.'}
+                </p>
+              </div>
 
               {/* By-angle message (one shared template, {{handle}} / {{link}}) */}
               <div className="mb-3">
@@ -200,7 +301,12 @@ export default function BriefDeliveryPanel({
                     {kol.handle && <span className="text-[10px] text-ink-warm-400 truncate">@{kol.handle}</span>}
                     <div className="ml-auto flex items-center gap-1.5 shrink-0">
                       <StatusBadge tone={kol.sent_at ? 'brand' : 'neutral'} size="sm">
-                        {kol.sent_at ? 'Sent' : 'Not sent'}
+                        {/* "Copied", not "Sent" — the stamp fires on the copy
+                            click, before anything is pasted. HHP never sends;
+                            the manager does, by hand, in the KOL's chat. The
+                            column stays sent_at so the Friday nudge and the
+                            lifecycle stage keep working unchanged. */}
+                        {kol.sent_at ? 'Copied' : 'Not copied'}
                       </StatusBadge>
                       <StatusBadge tone={kol.opened_at ? 'success' : 'neutral'} size="sm">
                         {kol.opened_at ? `Opened${kol.open_count > 1 ? ` ×${kol.open_count}` : ''}` : 'Not opened'}
