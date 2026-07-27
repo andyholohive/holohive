@@ -24,6 +24,7 @@ const supabaseAdmin = createClient(
 import { acceptedWebhookSecrets } from '@/lib/telegramWebhookSecret';
 import { escapeHtml } from '@/lib/telegramHtml';
 import { getTemplate, renderTemplate } from '@/lib/messageTemplates';
+import { resolveStintId } from '@/lib/stintAnchor';
 
 // Content thread in HH Operations for KOL social links
 const CONTENT_THREAD_CHAT_ID = '-1002636253963';
@@ -2149,10 +2150,16 @@ async function handleBulkCallback(cq: any) {
         continue;
       }
     } else {
+      // [2026-07-27] Anchor to the stint covering this week. The /bulk path
+      // writes Zone A rows unattended from Telegram, so an unanchored insert
+      // here is invisible until a per-stint report comes up short.
+      const weeklyStintId = await resolveStintId(supabaseAdmin, clientId, weekOf);
+
       const { error: insErr } = await (supabaseAdmin as any)
         .from('client_weekly_updates')
         .insert({
           client_id: clientId,
+          stint_id: weeklyStintId,
           week_of: weekOf,
           execution_plan: nextPlan,
           created_by: (clicker as any).id,

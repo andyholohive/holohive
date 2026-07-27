@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
+import { briefRefKind } from '@/lib/briefPageRef';
 import { Send, Copy, Check, ExternalLink, Eye, Sparkles } from 'lucide-react';
 
 const DEFAULT_ANGLE_MESSAGE =
@@ -249,7 +250,7 @@ export default function BriefDeliveryPanel({
                   <Input
                     value={refDraft[angle.angle_no] ?? ''}
                     onChange={(e) => setRefDraft(d => ({ ...d, [angle.angle_no]: e.target.value }))}
-                    placeholder="https://…  brief page for this angle"
+                    placeholder="https://…  Google Doc or published page for this angle"
                     className="h-8 focus-brand text-xs flex-1"
                   />
                   {angle.page_ref && (
@@ -267,10 +268,18 @@ export default function BriefDeliveryPanel({
                     {savingRef === angle.angle_no ? 'Saving…' : 'Save page'}
                   </Button>
                 </div>
+                {/* [2026-07-27] The Google-Doc case needs its own line. A doc a
+                    KOL can open anonymously is shared "anyone with the link",
+                    and HHP can only expire this wrapper — not the document. A
+                    manager who assumes the brief locks itself down on Sunday
+                    would be wrong, so say it here rather than in a spec nobody
+                    reads at 6pm on a Friday. */}
                 <p className="text-[10px] text-ink-warm-400 mt-1">
-                  {angle.page_ref
-                    ? 'Live — every KOL on this angle sees this page.'
-                    : 'Not set — these links show "your brief is being prepared". Paste the published page, or leave it for the generator.'}
+                  {!angle.page_ref
+                    ? 'Not set — these links show "your brief is being prepared". Paste a Google Doc, or leave it for the generator.'
+                    : briefRefKind(angle.page_ref) === 'link'
+                      ? 'Live — opens as a link. Share the doc "anyone with the link", and note the doc itself stays readable after this link expires.'
+                      : 'Live — embeds in the brief page. Every KOL on this angle sees it.'}
                 </p>
               </div>
 

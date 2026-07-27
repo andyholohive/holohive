@@ -27,13 +27,38 @@
  * that angle").
  */
 
-const DEFAULT_ALLOWED_HOSTS = ['.vercel.app', '.holohive.io'];
+import {
+  DEFAULT_ALLOWED_BRIEF_HOSTS,
+  LINK_ONLY_BRIEF_HOSTS,
+} from '@/lib/briefPageRefHosts';
 
 export function allowedBriefHosts(): string[] {
   const raw = process.env.BRIEF_PAGE_REF_ALLOWED_HOSTS;
-  if (!raw) return DEFAULT_ALLOWED_HOSTS;
+  if (!raw) return DEFAULT_ALLOWED_BRIEF_HOSTS;
   const parsed = raw.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
-  return parsed.length > 0 ? parsed : DEFAULT_ALLOWED_HOSTS;
+  return parsed.length > 0 ? parsed : DEFAULT_ALLOWED_BRIEF_HOSTS;
+}
+
+/**
+ * How the public brief page should present this ref.
+ *
+ * 'link'  — render a button that opens the ref in a new tab. Used for hosts
+ *           that refuse to be framed (Google), where an iframe would render an
+ *           unexplained blank box.
+ * 'embed' — render the sandboxed iframe, which is what the generator's creative
+ *           card is designed for.
+ *
+ * Anything unparseable is treated as 'link': a broken ref that shows a visible
+ * button is diagnosable, whereas a broken ref in an iframe just looks empty.
+ */
+export function briefRefKind(url: string | null | undefined): 'link' | 'embed' {
+  if (!url) return 'link';
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return LINK_ONLY_BRIEF_HOSTS.includes(host) ? 'link' : 'embed';
+  } catch {
+    return 'link';
+  }
 }
 
 /**

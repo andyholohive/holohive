@@ -11,6 +11,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { briefRefKind } from '@/lib/briefPageRef';
 
 const CONFIDENTIAL_FOOTER = '본 문서는 대외비이며 크리에이터 전용입니다. 재배포하지 마세요.';
 
@@ -63,6 +66,32 @@ export default function KolBriefPage() {
 
         {state.kind === 'ready' && (
           state.pageRef ? (
+            briefRefKind(state.pageRef) === 'link' ? (
+              /* [2026-07-27] Link-out, not an iframe. Google sends
+                 X-Frame-Options on the ordinary /edit view, so framing a shared
+                 doc renders an unexplained blank rectangle — and expecting the
+                 operator to paste exactly the /preview or published /pub form
+                 is a trap that fails silently. A button works for every URL
+                 shape. The open is still logged, because this page loads first
+                 either way. */
+              <div className="pt-12 text-center">
+                <p className="text-lg font-semibold">Your brief is ready</p>
+                {state.angleName && (
+                  <p className="text-sm text-neutral-500 mt-1">Angle: {state.angleName}</p>
+                )}
+                <div className="mt-6">
+                  <Button asChild variant="brand" size="lg">
+                    <a href={state.pageRef} target="_blank" rel="noopener noreferrer">
+                      Open your brief
+                      <ExternalLink className="h-4 w-4 ml-2" />
+                    </a>
+                  </Button>
+                </div>
+                <p className="text-sm text-neutral-500 mt-6 max-w-md mx-auto">
+                  Opens in a new tab. This link is yours — please don&apos;t share it.
+                </p>
+              </div>
+            ) : (
             /* [2026-07-27] sandboxed. The framed page is published by the
                kr-kol-comms generator, not by us, and it renders inside a page
                carrying the HoloHive name to an external audience. allow-scripts
@@ -81,6 +110,7 @@ export default function KolBriefPage() {
               referrerPolicy="no-referrer"
               className="w-full h-[calc(100vh-120px)] rounded-lg border border-neutral-200 bg-white"
             />
+            )
           ) : (
             <div className="pt-16 text-center">
               <p className="text-lg font-semibold">Your brief is being prepared</p>

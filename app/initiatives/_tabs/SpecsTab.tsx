@@ -91,6 +91,7 @@ const BUILD_STATUS_LABEL: Record<BuildStatus, string> = {
   not_started: 'Not started',
   in_progress: 'In progress',
   built:       'Built',
+  parked:      'Parked',
 };
 
 export default function SpecsTab() {
@@ -532,7 +533,13 @@ function SpecGridCard({ spec, onOpen, initiative, promoting, onTogglePromote }: 
   promoting: boolean;
   onTogglePromote: () => void;
 }) {
-  const builtPct = spec.rollup.total > 0 ? Math.round((spec.rollup.built / spec.rollup.total) * 100) : 0;
+  // [2026-07-27] Denominator excludes parked work. Parked features are things
+  // we have deliberately decided not to build, so counting them against
+  // completion would permanently cap a spec below 100% for reasons that are
+  // not progress — e.g. Campaign Overview has 5 features the spec itself lists
+  // as out of scope for v1.
+  const scopedTotal = spec.rollup.total - spec.rollup.parked;
+  const builtPct = scopedTotal > 0 ? Math.round((spec.rollup.built / scopedTotal) * 100) : 0;
   const worst = worstTestStatus(spec.rollup);
   const worstCfg = TEST_STATUS_CONFIG[worst];
   const isInitiative = !!initiative;
@@ -715,7 +722,9 @@ function SpecDetailView({
   // [2026-06-12] Test-status filter tabs within the detail view. Narrows
   // the feature list to a single status bucket so the validator can focus
   // on just the working / untested / issues / broken slice.
-  const [statusFilter, setStatusFilter] = useState<'all' | TestStatus>('all');
+  // 'parked' is a build_status, not a test_status — it rides along in this
+  // union because the detail view presents both as one row of tabs.
+  const [statusFilter, setStatusFilter] = useState<'all' | TestStatus | 'parked'>('all');
 
   useEffect(() => {
     refresh();
@@ -784,7 +793,10 @@ function SpecDetailView({
   }
 
   const overallTested = spec.rollup.working + spec.rollup.issues + spec.rollup.broken;
-  const testedPct = spec.rollup.total > 0 ? Math.round((overallTested / spec.rollup.total) * 100) : 0;
+  // Parked work is out of scope, so it must not sit in the denominator — see
+  // the matching note on builtPct in the card above.
+  const testedScopedTotal = spec.rollup.total - spec.rollup.parked;
+  const testedPct = testedScopedTotal > 0 ? Math.round((overallTested / testedScopedTotal) * 100) : 0;
 
   return (
     <>
@@ -886,6 +898,9 @@ function SpecDetailView({
               { key: 'untested', label: 'Untested', count: spec.rollup.untested,  color: 'text-ink-warm-600' },
               { key: 'issues',   label: 'Issues',   count: spec.rollup.issues,    color: 'text-amber-700' },
               { key: 'broken',   label: 'Broken',   count: spec.rollup.broken,    color: 'text-rose-700' },
+              // Deliberately deferred work. Kept as its own tab so it stays
+              // findable without sitting in anyone's way.
+              { key: 'parked',   label: 'Parked',   count: spec.rollup.parked,    color: 'text-ink-warm-500' },
             ] as const).map(t => {
               const active = statusFilter === t.key;
               return (
@@ -912,9 +927,15 @@ function SpecDetailView({
           {spec.features.length === 0 ? (
             <p className="p-6 text-center text-xs text-ink-warm-500 italic">No features yet.</p>
           ) : (() => {
-            const visible = statusFilter === 'all'
-              ? spec.features
-              : spec.features.filter(f => f.test_status === statusFilter);
+            // 'parked' is a build_status, every other tab is a test_status —
+            // hence the special case. Parked features are also hidden from the
+            // test-status tabs: they sit at test_status 'untested' forever
+            // (nothing will ever test deferred work), so without this they
+            // would pad the Untested tab with items nobody intends to test.
+            const visible =
+              statusFilter === 'all'    ? spec.features
+              : statusFilter === 'parked' ? spec.features.filter(f => f.build_status === 'parked')
+              : spec.features.filter(f => f.build_status !== 'parked' && f.test_status === statusFilter);
             if (visible.length === 0) {
               return <p className="p-6 text-center text-xs text-ink-warm-500 italic">No features in this status.</p>;
             }

@@ -106,16 +106,26 @@ export async function GET(request: Request) {
       if (!error) silentEndedCount++;
     }
 
-    // Log run complete
+    // Log run complete.
+    //
+    // [2026-07-27] These three columns were previously written as
+    // `finished_at` / `output` / `error` — none of which exist on agent_runs
+    // (it has completed_at / output_summary / error_message). PostgREST
+    // rejected every update, the error was never destructured, and so all 45
+    // runs to date sat at status='running' forever. cron-health-check only
+    // looks for status='failed', so a genuinely broken sweep would have been
+    // invisible indefinitely. Destructure the error here so the same class of
+    // mismatch fails loudly next time instead of silently.
     if (agentRunId) {
-      await (supabase as any)
+      const { error: logErr } = await (supabase as any)
         .from('agent_runs')
         .update({
-          finished_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
           status: 'success',
-          output: { lapsed_stints_ended: endedCount, grace_days: graceDays },
+          output_summary: { lapsed_stints_ended: endedCount, grace_days: graceDays },
         })
         .eq('id', agentRunId);
+      if (logErr) console.error('[stint-lapse-sweep] agent_runs completion write failed:', logErr);
     }
 
     return NextResponse.json({
@@ -126,14 +136,18 @@ export async function GET(request: Request) {
   } catch (err: any) {
     console.error('[stint-lapse-sweep] failed:', err);
     if (agentRunId) {
-      await (supabase as any)
+      const { error: logErr } = await (supabase as any)
         .from('agent_runs')
         .update({
-          finished_at: new Date().toISOString(),
-          status: 'error',
-          error: err?.message ?? String(err),
+          completed_at: new Date().toISOString(),
+          // 'failed' is the value cron-health-check actually queries for.
+          // 'error' would have been ignored by the sweep even once the column
+          // names were right.
+          status: 'failed',
+          error_message: err?.message ?? String(err),
         })
         .eq('id', agentRunId);
+      if (logErr) console.error('[stint-lapse-sweep] agent_runs failure write failed:', logErr);
     }
     return NextResponse.json({ error: err?.message ?? 'Unknown error' }, { status: 500 });
   }

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { TaskService, Task } from './taskService';
+import { resolveStintId } from './stintAnchor';
 
 // ==================== TYPES ====================
 
@@ -185,12 +186,19 @@ export class DeliverableService {
     const targetCompletion = targetDate.toISOString().split('T')[0];
 
     // 3. Insert deliverables record
+    // [2026-07-27] Anchor to the client's stint — this path never set it, so
+    // 20 of 32 deliverables carried no stint_id and dropped out of any
+    // per-stint query. Dated by the deliverable's own start_date so a row
+    // created for a future term anchors to that term, not today's.
+    const deliverableStintId = await resolveStintId(supabase, config.clientId, config.startDate);
+
     const { data: deliverable, error: dErr } = await supabase
       .from('deliverables')
       .insert({
         template_id: config.templateId,
         parent_task_id: parentTask.id,
         client_id: config.clientId || null,
+        stint_id: deliverableStintId,
         title: config.title,
         status: 'active',
         role_assignments: roleAssignmentsFlat,
@@ -323,12 +331,18 @@ export class DeliverableService {
     const targetCompletion = target.toISOString().slice(0, 10);
 
     // 3. Deliverable row
+    // [2026-07-27] Same stint anchoring as the manual path above. This is the
+    // recurring-cron path, so it fires unattended every Monday — leaving it
+    // unanchored is how the gap kept growing without anyone touching the UI.
+    const recurringStintId = await resolveStintId(supabase, opts.clientId, opts.startDate);
+
     const { data: deliverable, error: dErr } = await supabase
       .from('deliverables')
       .insert({
         template_id: opts.templateId,
         parent_task_id: parentTask.id,
         client_id: opts.clientId,
+        stint_id: recurringStintId,
         title: opts.title,
         status: 'active',
         role_assignments: {},

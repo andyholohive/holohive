@@ -103,6 +103,45 @@ async function attachResolvedChats(supabase: SupabaseClient, clients: KrSignalCl
   }
 }
 
+/**
+ * The client this chat BELONGS TO, or null if the chat belongs to no client.
+ *
+ * [2026-07-27] Added for the webhook's cross-client guard. `/weekly` used to
+ * default to a hard-coded client key regardless of who asked or from where, so
+ * a user in one client's group could pull another client's market intelligence.
+ * Binding the command to the calling chat is the fix.
+ *
+ * OWNERSHIP IS telegram_chats.client_id — NOT the kr_signal_clients override.
+ * The first cut matched on resolved_chat_id, which broke testing immediately:
+ * Fogo's telegram_chat_id override currently points at the internal "Signal Bot
+ * Test" group, so that group looked like "Fogo's chat" and `/weekly venice`
+ * inside it was refused. An override is a delivery instruction — "send Fogo's
+ * report here" — and says nothing about who the chat belongs to. The test group
+ * has client_id NULL: it belongs to nobody, so nothing is confidential in it
+ * and any client may be named explicitly.
+ *
+ * The guard that matters is unaffected: a real client GC carries that client's
+ * client_id, binds to them, and refuses every other client.
+ */
+export async function loadClientByChatId(
+  supabase: SupabaseClient,
+  chatId: string | number,
+): Promise<KrSignalClient | null> {
+  const target = String(chatId);
+
+  const { data: chat } = await supabase
+    .from("telegram_chats")
+    .select("client_id")
+    .eq("chat_id", target)
+    .maybeSingle();
+
+  const owningClientId = (chat as { client_id: string | null } | null)?.client_id ?? null;
+  if (!owningClientId) return null; // chat belongs to no client — unbound
+
+  const clients = await loadActiveClients(supabase);
+  return clients.find((c) => c.client_id === owningClientId) ?? null;
+}
+
 /** One client by lookup key (e.g. 'venice'), or null. */
 export async function loadClientByKey(supabase: SupabaseClient, key: string): Promise<KrSignalClient | null> {
   const { data, error } = await supabase

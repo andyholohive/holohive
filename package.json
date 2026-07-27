@@ -71,6 +71,7 @@
     "lucide-react": "^0.446.0",
     "mammoth": "^1.11.0",
     "mcp-handler": "^1.1.0",
+    "mustache": "^4.2.0",
     "nanoid": "^5.1.6",
     "next": "13.5.1",
     "next-themes": "^0.3.0",
@@ -96,6 +97,7 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "@types/mustache": "^4.2.6",
     "tsx": "^4.20.6"
   }
 }

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { Database } from './database.types';
 import { generateUniqueSlug } from './slugUtils';
+import { resolveStintId } from './stintAnchor';
 
 type Campaign = Database['public']['Tables']['campaigns']['Row'];
 type CampaignBudgetAllocation = Database['public']['Tables']['campaign_budget_allocations']['Row'];
@@ -224,6 +225,18 @@ export class CampaignService {
       // Generate slug if not provided
       if (!dataToInsert.slug) {
         dataToInsert.slug = generateUniqueSlug(campaignData.name);
+      }
+
+      // [2026-07-27] Anchor to the client's stint. Campaign creation never set
+      // this, so 18 of 42 campaigns — including live ones for Tria and Umia —
+      // carried no stint_id and were invisible to any per-stint query. Only set
+      // when the caller didn't supply one, so an explicit choice always wins.
+      if (!dataToInsert.stint_id && dataToInsert.client_id) {
+        dataToInsert.stint_id = await resolveStintId(
+          client,
+          dataToInsert.client_id,
+          dataToInsert.start_date ?? null,
+        );
       }
 
       const { data, error } = await client

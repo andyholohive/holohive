@@ -101,8 +101,73 @@ function isPublicApi(pathname: string): boolean {
   );
 }
 
+/**
+ * Edge gate for KOL brief links (spec §4 "hard expiry").
+ *
+ * [2026-07-27] The authoritative expiry check lives in
+ * KolBriefService.recordOpen — an expired token yields no page_ref, so brief
+ * CONTENT was already gated before this existed. This is a fast path in front
+ * of that, not a replacement: it stops an expired or unknown token from
+ * rendering the page shell at all, so the KOL gets a straight answer instead of
+ * a loading state that resolves into "expired".
+ *
+ * Deliberately FAILS OPEN. If the env is missing or Supabase is unreachable we
+ * let the request through to the page, which calls the API, which enforces
+ * expiry properly. Failing closed here would take every brief link down on a
+ * transient database blip in exchange for no security gain — the gate behind
+ * this one already holds.
+ *
+ * Uses PostgREST over plain fetch rather than @supabase/supabase-js: this runs
+ * on the edge runtime for every brief open, and the SDK is a lot of bytes to
+ * boot for a single indexed lookup.
+ *
+ * NOTE what this does NOT do: when page_ref points at a Google Doc, expiry
+ * removes access to HHP's wrapper only. The document itself stays readable to
+ * anyone holding its URL, and nothing on our side can revoke that.
+ */
+const BRIEF_PAGE_PREFIX = '/public/brief/';
+/**
+ * The rewrite target lives under the same prefix, so it would re-enter this
+ * check, fail its own lookup ("expired" is not a token) and rewrite to itself
+ * forever. Excluded explicitly. Real tokens are 32-char random strings, so the
+ * sentinel can never collide with one.
+ */
+const BRIEF_EXPIRED_PATH = '/public/brief/expired';
+
+async function briefTokenIsLive(token: string): Promise<boolean | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null; // unknown → fail open
+
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/kol_brief_tokens?select=expires_at&token=eq.${encodeURIComponent(token)}&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store' },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ expires_at: string }>;
+    if (rows.length === 0) return false; // unknown token — decided, not unknown
+    return new Date(rows[0].expires_at).getTime() >= Date.now();
+  } catch {
+    return null; // network blip → fail open
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith(BRIEF_PAGE_PREFIX) && pathname !== BRIEF_EXPIRED_PATH) {
+    const token = pathname.slice(BRIEF_PAGE_PREFIX.length).split('/')[0];
+    if (token) {
+      const live = await briefTokenIsLive(decodeURIComponent(token));
+      // Only act on a definite "no". null means we could not decide; the page
+      // and API still enforce expiry, so passing through is safe.
+      if (live === false) {
+        return NextResponse.rewrite(new URL(BRIEF_EXPIRED_PATH, request.url));
+      }
+    }
+    return NextResponse.next();
+  }
 
   // Only enforce on /api/*. Pages handle their own auth.
   if (!pathname.startsWith('/api/')) return NextResponse.next();
@@ -182,8 +247,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Run middleware on /api/* only. Everything else (pages, assets, _next/*)
-  // is unaffected. We also skip Next's internal endpoints + the webhook
-  // routes explicitly so the matcher itself stays cheap.
-  matcher: ['/api/:path*'],
+  // Run middleware on /api/* plus the one page route that needs a gate in
+  // front of it. Everything else (pages, assets, _next/*) is unaffected — the
+  // matcher stays deliberately narrow so we don't pay middleware on every
+  // page render just to serve two use cases.
+  //
+  // [2026-07-27] /public/brief/* added for the KOL brief expiry gate. It is
+  // the only page route here; if a second one is ever needed, reconsider
+  // whether a shared page-level pattern is cleaner than a growing list.
+  matcher: ['/api/:path*', '/public/brief/:path*'],
 };

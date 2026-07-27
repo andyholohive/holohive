@@ -16,7 +16,12 @@ const nextConfig = {
   // globally — a site-wide CSP is a much larger change and would need every
   // existing embed (X, Telegram, Vercel analytics) audited first.
   async headers() {
-    const allowed = (process.env.BRIEF_PAGE_REF_ALLOWED_HOSTS || '.vercel.app,.holohive.io')
+    // [2026-07-27] Default list comes from lib/briefPageRefHosts.js so this CSP
+    // and the write-side check in lib/briefPageRef.ts can never disagree. They
+    // used to hold separate copies; a host added to one and not the other fails
+    // silently as a blank iframe.
+    const { DEFAULT_ALLOWED_BRIEF_HOSTS } = require('./lib/briefPageRefHosts');
+    const allowed = (process.env.BRIEF_PAGE_REF_ALLOWED_HOSTS || DEFAULT_ALLOWED_BRIEF_HOSTS.join(','))
       .split(',').map(h => h.trim()).filter(Boolean)
       .map(h => (h.startsWith('.') ? `https://*${h}` : `https://${h}`))
       .join(' ');
@@ -34,6 +39,17 @@ const nextConfig = {
     if (isServer) {
       config.externals = [...(config.externals || []), '@radix-ui/react-progress'];
     }
+    // [2026-07-27] Load lib/templates/*.html as raw strings so the coverage
+    // leave-behind renders the canonical template file itself rather than a
+    // copy pasted into a .ts literal. coverage-rules.md makes HHP a mirror of
+    // that template; keeping it a real .html file is what lets it be diffed
+    // against the source of truth. Scoped to the folder so Next's own HTML
+    // handling is untouched.
+    config.module.rules.push({
+      test: /\.html$/,
+      include: [require('path').resolve(__dirname, 'lib/templates')],
+      type: 'asset/source',
+    });
     return config;
   },
 };

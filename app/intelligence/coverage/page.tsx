@@ -112,31 +112,43 @@ function CoverageInner() {
   const [exporting, setExporting] = useState(false);
 
   /**
-   * Leave-behind → branded A4 PDF. The builder is imported lazily: it pulls in
-   * jspdf + html2canvas, which are heavy and only needed the moment someone
-   * actually exports, so they stay out of the initial page bundle.
+   * Leave-behind → the canonical template, opened in a new tab and handed to
+   * Chromium's print dialog ("Save as PDF"). Not a direct download: the parity
+   * rule in coverage-rules.md requires the same template through the same
+   * engine as the skill, and only a real browser print honours the template's
+   * @page size, print-color-adjust and the @media print rules that drop the
+   * draft banner. See lib/coverageLeaveBehindPdf.ts for the full reasoning.
+   *
+   * Lazily imported so mustache + the template string stay out of the initial
+   * page bundle.
    */
   const exportPdf = useCallback(async () => {
     if (!contract) return;
     setExporting(true);
     try {
-      const { buildCoverageLeaveBehindPdf } = await import('@/lib/coverageLeaveBehindPdf');
-      const blob = await buildCoverageLeaveBehindPdf({
+      const { openLeaveBehindForPrint } = await import('@/lib/coverageLeaveBehindPdf');
+      const { opened, draft } = openLeaveBehindForPrint({
         contract: contract as unknown as import('@/lib/coverageAnalysis').CoverageContract,
         subjectLabel: contract.query || 'Organic coverage',
         generatedAt,
         formatDate,
-        formatDateTime,
       });
-      const slug = (contract.query || 'coverage').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${slug || 'coverage'}-leave-behind.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      if (!opened) {
+        toast({
+          title: 'Allow pop-ups to export',
+          description: 'The leave-behind opens in a new tab so Chrome can print it to PDF.',
+          variant: 'destructive',
+        });
+      } else if (draft) {
+        // The printed PDF keeps the orange placeholders but drops the DRAFT
+        // banner (the template hides .banner on print), so the warning has to
+        // land here rather than on the page itself.
+        toast({
+          title: 'Draft — not for a client',
+          description: 'The written sections are still empty and print as orange placeholders, without the DRAFT banner. Numbers and posts are real.',
+          variant: 'destructive',
+        });
+      }
     } catch (e) {
       toast({
         title: 'Export failed',
@@ -311,9 +323,9 @@ function CoverageInner() {
                 className="ml-auto"
                 onClick={exportPdf}
                 disabled={exporting}
-                title="Branded A4 PDF of this leave-behind"
+                title="Opens the A4 leave-behind in a new tab — print to PDF from there"
               >
-                <Download className="h-4 w-4 mr-2" />{exporting ? 'Building…' : 'Export PDF'}
+                <Download className="h-4 w-4 mr-2" />{exporting ? 'Opening…' : 'Export PDF'}
               </Button>
             </div>
 

@@ -46,6 +46,7 @@ import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateForma
 import { getCampaignWeekState, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import { EngagementTab } from '@/components/clients/EngagementTab';
+import { resolveStintId } from '@/lib/stintAnchor';
 import dynamic from 'next/dynamic';
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
@@ -1307,8 +1308,15 @@ export default function ClientsPage() {
       // snapshot can filter setup churn (milestone_setup) out of the
       // client-facing card. No real-time stream means no need for a
       // separate draft-mode flag.
+      // [2026-07-27] Anchor to the client's current stint. This insert never
+      // set stint_id, so 81 of 160 activity rows were unanchored — the worst
+      // ratio of any stint-bearing table, because this path fires on nearly
+      // every client interaction.
+      const stintId = await resolveStintId(supabase, clientId);
+
       await supabase.from('client_activity_log').insert({
         client_id: clientId,
+        stint_id: stintId,
         activity_type: activityType,
         activity_category: activityCategory ?? 'milestone_setup',
         title,
@@ -1935,8 +1943,12 @@ export default function ClientsPage() {
         // the insert succeeds. current_focus is NOT NULL in the legacy
         // schema; we seed an empty placeholder. Old modal continues
         // to overwrite this when used.
+        // [2026-07-27] Anchor to the stint covering this week, not today —
+        // a weekly update backfilled for an earlier week belongs to whatever
+        // term was running then.
         const insertPayload: Record<string, any> = {
           client_id: clientId,
+          stint_id: await resolveStintId(supabase, clientId, weekStr),
           week_of: weekStr,
           current_focus: '',
           created_by: user?.id || null,

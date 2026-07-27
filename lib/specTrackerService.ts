@@ -12,7 +12,15 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export type SpecStatus = 'planned' | 'in_progress' | 'shipped' | 'paused' | 'cancelled';
-export type BuildStatus = 'not_started' | 'in_progress' | 'built';
+/**
+ * [2026-07-27] `parked` added. `not_started` had been carrying three different
+ * meanings — "queued next", "deliberately deferred to a later version", and
+ * "blocked on a decision nobody has made" — which made the not-started count
+ * read as a backlog when most of it was intentional. `parked` is the
+ * deliberate-deferral bucket: work we have decided NOT to do for now and want
+ * to be able to pick up later without it nagging in the meantime.
+ */
+export type BuildStatus = 'not_started' | 'in_progress' | 'built' | 'parked';
 export type TestStatus = 'untested' | 'working' | 'issues' | 'broken';
 
 export type Spec = {
@@ -80,6 +88,9 @@ export type SpecFull = Spec & {
     issues: number;
     broken: number;
     untested: number;
+    /** Deliberately deferred. Excluded from the test tallies above — see
+     *  computeRollup — so parking work never makes a spec card look unfinished. */
+    parked: number;
   };
 };
 
@@ -92,8 +103,15 @@ export type SpecCard = Spec & {
 
 /** Roll up feature counts to summary numbers shown on a card. */
 function computeRollup(features: SpecFeature[]): SpecFull['rollup'] {
-  const r = { total: features.length, built: 0, working: 0, issues: 0, broken: 0, untested: 0 };
+  const r = { total: features.length, built: 0, working: 0, issues: 0, broken: 0, untested: 0, parked: 0 };
   for (const f of features) {
+    // Parked work is counted on its own and skipped for the test tallies.
+    // Without this `continue`, parking a feature would leave it in `untested`
+    // (its test_status never changes), so a spec whose only outstanding items
+    // were deliberately deferred would still show an untested count and
+    // worstTestStatus() would report 'untested' — exactly the false signal
+    // parking exists to remove.
+    if (f.build_status === 'parked') { r.parked++; continue; }
     if (f.build_status === 'built') r.built++;
     switch (f.test_status) {
       case 'working':  r.working++;  break;

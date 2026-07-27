@@ -162,27 +162,36 @@ export async function GET(request: Request) {
       max_per_run: MAX_DISPATCHES_PER_RUN,
       ...(failures.length ? { failures } : {}),
     };
+    // [2026-07-27] Was writing finished_at / output — neither column exists on
+    // agent_runs (completed_at / output_summary). Every one of the 27 runs to
+    // date was left at status='running', and since cron-health-check only
+    // queries status='failed', a broken drift scan could never have alerted.
+    // Error is destructured now so the next schema drift is loud.
     if (agentRunId) {
-      await (sb as any)
+      const { error: logErr } = await (sb as any)
         .from('agent_runs')
         .update({
-          finished_at: new Date().toISOString(),
-          status: failed > 0 && dispatched === 0 ? 'error' : 'success',
-          output,
+          completed_at: new Date().toISOString(),
+          status: failed > 0 && dispatched === 0 ? 'failed' : 'success',
+          output_summary: output,
         })
         .eq('id', agentRunId);
+      if (logErr) console.error('[kol-niche-drift] agent_runs completion write failed:', logErr);
     }
     return NextResponse.json({ success: true, ...output });
   } catch (err: any) {
     if (agentRunId) {
-      await (sb as any)
+      const { error: logErr } = await (sb as any)
         .from('agent_runs')
         .update({
-          finished_at: new Date().toISOString(),
-          status: 'error',
-          error: err?.message ?? String(err),
+          completed_at: new Date().toISOString(),
+          // 'failed' is what cron-health-check queries; 'error' was invisible
+          // to the sweep even before the column names were wrong.
+          status: 'failed',
+          error_message: err?.message ?? String(err),
         })
         .eq('id', agentRunId);
+      if (logErr) console.error('[kol-niche-drift] agent_runs failure write failed:', logErr);
     }
     return NextResponse.json({ error: err?.message ?? 'Unknown error' }, { status: 500 });
   }
