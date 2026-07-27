@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
+import { isAllowedBriefPageRef, allowedBriefHosts } from '@/lib/briefPageRef';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
   }
 
-  const isUrl = (v: unknown) => { try { new URL(String(v)); return true; } catch { return false; } };
+  // [2026-07-27] Was `new URL()` parses → accepted, which let this endpoint
+  // point a client-facing page at any origin on earth. Now host-allowlisted
+  // (lib/briefPageRef.ts) and https-only. Rejecting at the write boundary
+  // means a bad value never reaches the database, so the render side can trust
+  // what it reads instead of re-validating and silently blanking.
+  const isUrl = (v: unknown) => isAllowedBriefPageRef(String(v));
+  const rejected = (v: unknown) =>
+    NextResponse.json({
+      error: 'page_ref must be an https URL on an allowed host',
+      got: String(v),
+      allowed_hosts: allowedBriefHosts(),
+    }, { status: 400 });
 
   // Normalise both shapes into a list of updates.
   type Update = { angle_no: number; page_ref: string };
@@ -63,15 +75,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'lineup_id (or campaign_id + week_number) is required' }, { status: 400 });
     }
     for (const p of body.pages) {
-      if (!Number.isFinite(p?.angle_no) || !isUrl(p?.page_ref)) {
-        return NextResponse.json({ error: 'each page needs a numeric angle_no and a valid page_ref URL' }, { status: 400 });
+      if (!Number.isFinite(p?.angle_no)) {
+        return NextResponse.json({ error: 'each page needs a numeric angle_no' }, { status: 400 });
       }
+      if (!isUrl(p?.page_ref)) return rejected(p?.page_ref);
       updates.push({ angle_no: Number(p.angle_no), page_ref: String(p.page_ref) });
     }
   } else {
-    if (!Number.isFinite(body.angle_no) || !isUrl(body.page_ref)) {
-      return NextResponse.json({ error: 'angle_no (number) and page_ref (URL) are required' }, { status: 400 });
+    if (!Number.isFinite(body.angle_no)) {
+      return NextResponse.json({ error: 'angle_no (number) is required' }, { status: 400 });
     }
+    if (!isUrl(body.page_ref)) return rejected(body.page_ref);
     lineupId = body.lineup_id ? String(body.lineup_id) : null;
     campaignId = body.campaign_id ? String(body.campaign_id) : null;
     weekNumber = Number.isFinite(body.week_number) ? Number(body.week_number) : null;

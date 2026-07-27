@@ -63,9 +63,22 @@ export default function KolBriefPage() {
 
         {state.kind === 'ready' && (
           state.pageRef ? (
+            /* [2026-07-27] sandboxed. The framed page is published by the
+               kr-kol-comms generator, not by us, and it renders inside a page
+               carrying the HoloHive name to an external audience. allow-scripts
+               is required for the creative card to work at all; allow-popups
+               lets a KOL open a reference link. Deliberately withheld:
+               allow-same-origin (so the frame gets an opaque origin and cannot
+               reach this page's storage or DOM),
+               allow-top-navigation (so it cannot redirect the KOL away),
+               allow-forms and allow-modals (nothing in a brief should collect
+               input). Host allowlist is enforced at the write boundary — see
+               lib/briefPageRef.ts. */
             <iframe
               src={state.pageRef}
               title="Creator brief"
+              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+              referrerPolicy="no-referrer"
               className="w-full h-[calc(100vh-120px)] rounded-lg border border-neutral-200 bg-white"
             />
           ) : (
