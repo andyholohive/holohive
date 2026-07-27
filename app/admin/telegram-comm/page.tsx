@@ -576,7 +576,123 @@ export default function LineupSettingsPage() {
 
       {/* ─── Document Portal Alerts section [2026-07-17] ─── */}
       <DocumentPortalAlertsSection />
+
+      {/* ─── Weekly Strategic Direction section [2026-07-28] ─── */}
+      <WeeklyStrategicDigestSection />
     </div>
+  );
+}
+
+/**
+ * WeeklyStrategicDigestSection — picker for the chat that receives the
+ * Weekly Strategic Direction Summary: every active client's
+ * `strategic_notes` for the current week, rolled into one message.
+ *
+ * Writes weekly_strategic_digest_chat_id + _thread_id. The cron reads a
+ * third key (_last_sent_week) to stay at-most-once per week; that one is
+ * internal state and deliberately not exposed here — editing it by hand
+ * would either double-post or silently suppress a week.
+ */
+function WeeklyStrategicDigestSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_strategic_digest_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'weekly_strategic_digest_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'weekly_strategic_digest_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'weekly_strategic_digest_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Strategic digest destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'The weekly summary will post in this topic.' : 'The weekly summary will post in this chat.'
+          : 'No destination set — the digest will not post until one is chosen.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={Newspaper}
+      title="Weekly Strategic Direction"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm">Not set</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Rolls every active client&apos;s <b>Strategic Direction</b> note for the current week into one summary. Notes are written per client in <b>Client Context → Weekly Update</b>; clients with nothing written are left out.</>
+      )}
+    >
+      <WhenItSends>
+        15:00 UTC Monday. If no notes have been written yet it stays quiet
+        and retries at 15:00 UTC each following day, so a late week still
+        lands. Posts at most once per week.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Strategic summary destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
   );
 }
 

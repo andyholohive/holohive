@@ -72,6 +72,10 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   KR_SIGNAL_WEEKLY: 1,         // weekly (Sunday 12:00 UTC) — KR Signal Weekly Market Report to client GCs
   KR_SIGNAL_BASELINES: 1,      // weekly (Sunday 12:30 UTC) — KR Signal §5 regime baseline refresh
   KR_SIGNAL_LISTINGS: 24,      // hourly — KR Signal listings alert + digest sweep (Feature B)
+  // Fires daily 15:00 UTC but posts at most once a week, so a healthy
+  // week logs exactly ONE run — the skip paths (already sent / no notes
+  // yet) return without logging. See the route's header for why.
+  WEEKLY_STRATEGIC_DIGEST: 1,  // weekly (first day notes exist) — cross-client strategic direction roll-up
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;
