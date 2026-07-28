@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
+import { fireActionBoardRule, isInternalEmail } from '@/lib/actionBoardService';
 
 export const dynamic = 'force-dynamic';
 
@@ -141,6 +142,33 @@ export async function POST(request: Request) {
     if (visitErr) console.error('[portal/log-access] portal_visits insert error:', visitErr);
   } catch (e) {
     console.error('[portal/log-access] portal_visits write failed:', e);
+  }
+
+  // [2026-07-28] Action Board rules — this route is the single instrumentation
+  // point for both client-facing surfaces, so both visit rules fire here:
+  //   portal   → "Workspace access confirmed"  (closes HQ task 2)
+  //   campaign → "Track content via tracker"   (M7, no HQ task)
+  //
+  // Deliberately NOT keyed on the isExternal computed above. That flag tests
+  // only @holohive.io, while /clients treats both @holohive.io and
+  // @holohive.agency as internal — so a teammate on the .agency domain reads
+  // as external there and would tick the client's own board. isInternalEmail
+  // checks both domains.
+  //
+  // fireActionBoardRule is a no-op once the item is done, so the fact that
+  // this route fires on EVERY visit (including cache hits) is harmless — only
+  // the first one moves anything.
+  try {
+    const visitorEmail = String(email).toLowerCase().trim();
+    if (!isInternalEmail(visitorEmail)) {
+      await fireActionBoardRule(
+        supabase,
+        clientId,
+        source === 'campaign' ? 'client_tracker_visit' : 'portal_first_visit',
+      );
+    }
+  } catch (e) {
+    console.error('[portal/log-access] Action Board rule failed:', e);
   }
 
   return NextResponse.json({ ok: true });

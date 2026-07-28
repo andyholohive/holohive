@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
 import { authorizePortalEmail } from '@/lib/portalDocAuth';
+import { fireActionBoardRule } from '@/lib/actionBoardService';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,35 +150,38 @@ export async function POST(request: NextRequest) {
       }
     }
     if (milestoneAuthorized) {
+      // [2026-07-28] The blunt "force M1 complete" block that used to live here
+      // was removed. It set milestone 1 to 'complete' on form submission
+      // WITHOUT looking at that milestone's items — so a client whose M1 was
+      // 2-of-6 done saw "Kickoff & Setup: complete", and then watched it move
+      // BACKWARDS to in-progress the moment the item-level rollup recomputed
+      // it. Two mechanisms owned the same field from different inputs.
+      //
+      // Milestone status and progression are now derived in exactly one place:
+      // trg_action_items_rollup_milestone on client_action_items. All items
+      // done → complete, and the next milestone opens. Any item not done →
+      // back to in_progress. That holds no matter who completed the item.
+      //
+      // The 'upcoming' → 'active' advance this block also did is preserved in
+      // that same trigger — dropping it outright would have stranded every
+      // milestone on "Upcoming", since nothing else ever set 'active'.
+
+      // [2026-07-28] Action Board: "Onboarding form completed".
+      //
+      // Per Jdot's map the form webhook closes HQ task 7 and the board item
+      // flips downstream via trg_tasks_propagate_milestone, so HQ stays the
+      // source of truth. fireActionBoardRule handles that indirection.
+      //
+      // Behind the SAME milestoneAuthorized gate as the block above, and for
+      // the same audit-C2 reason: this route is public and client_id is
+      // caller-supplied, so completing a client's board item is a mutation a
+      // crafted POST must not be able to trigger.
+      //
+      // Best-effort — never block the submission response.
       try {
-        // Find this client's milestones in display_order. Filter to
-        // status != 'complete' so re-submission of the form (rare but
-        // possible if Quazo asks the client to redo it) doesn't bounce
-        // M2 back to active when it's already mid-flight.
-        const { data: milestones } = await (supabaseAdmin as any)
-          .from('client_milestones')
-          .select('id, display_order, status')
-          .eq('client_id', client_id)
-          .order('display_order', { ascending: true });
-
-        const ms1 = (milestones || []).find((m: any) => m.display_order === 0);
-        const ms2 = (milestones || []).find((m: any) => m.display_order === 1);
-
-        if (ms1 && ms1.status !== 'complete') {
-          await (supabaseAdmin as any)
-            .from('client_milestones')
-            .update({ status: 'complete', updated_at: new Date().toISOString() })
-            .eq('id', ms1.id);
-          console.log('[Form Submit] Auto-completed Milestone 1 for client', client_id);
-        }
-        if (ms2 && ms2.status === 'upcoming') {
-          await (supabaseAdmin as any)
-            .from('client_milestones')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
-            .eq('id', ms2.id);
-        }
-      } catch (autoErr) {
-        console.error('[Form Submit] Auto-complete M1 failed:', autoErr);
+        await fireActionBoardRule(supabaseAdmin as any, client_id, 'form_submitted');
+      } catch (abErr) {
+        console.error('[Form Submit] Action Board rule failed:', abErr);
       }
     }
 

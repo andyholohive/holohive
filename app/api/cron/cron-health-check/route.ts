@@ -76,6 +76,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   // week logs exactly ONE run — the skip paths (already sent / no notes
   // yet) return without logging. See the route's header for why.
   WEEKLY_STRATEGIC_DIGEST: 1,  // weekly (first day notes exist) — cross-client strategic direction roll-up
+  ACTION_BOARD_APPROVALS: 1,   // daily 02:00 UTC — logs once per run, including no-op days
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

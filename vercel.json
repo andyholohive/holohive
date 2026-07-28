@@ -135,6 +135,10 @@
     {
       "path": "/api/cron/weekly-strategic-digest",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/action-board-approvals",
+      "schedule": "0 2 * * *"
     }
   ]
 }

@@ -46,6 +46,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate, toIsoDate } from '@/lib/dateFormat';
+import { fireActionBoardRule } from '@/lib/actionBoardService';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -191,6 +192,21 @@ export function CallNotesTab({
           .eq('id', rowId);
         if (error) throw error;
       }
+      // [2026-07-28] Action Board: "Kickoff call attended".
+      //
+      // Jdot's map has this one firing on the first call note logged, with no
+      // HQ task behind it — the only board item completed directly rather than
+      // through a task. fireActionBoardRule is a no-op once the item is done,
+      // so calling it on every save is harmless; there is no INSERT event to
+      // hook because call_notes is a JSONB array on one row per client.
+      //
+      // Best-effort: the note is already saved, and losing the board flip is
+      // strictly better than failing the save the user just made.
+      if (nextNotes.length > 0) {
+        fireActionBoardRule(supabase as any, clientId, 'first_call_note')
+          .catch(e => console.error('[CallNotes] Action Board rule failed:', e));
+      }
+
       const sorted = [...nextNotes].sort((a, b) =>
         (b.meeting_date || '').localeCompare(a.meeting_date || ''),
       );

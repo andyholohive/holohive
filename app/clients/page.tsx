@@ -43,6 +43,7 @@ import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 import { CRMService, CRMOpportunity } from '@/lib/crmService';
 import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
+import { fireActionBoardRule } from '@/lib/actionBoardService';
 import { getCampaignWeekState, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import { EngagementTab } from '@/components/clients/EngagementTab';
@@ -1119,7 +1120,11 @@ export default function ClientsPage() {
     }
   };
 
-  const applyTemplate = async (clientId: string, templateMilestones: { name: string; subtitle: string; items: { text: string; court: string }[] }[]) => {
+  // [2026-07-28] item_key / step_id / auto_rule are carried through from the
+  // template. Without them a newly-seeded board has no mapping at all, and
+  // every Action Board rule silently no-ops for that client — the automation
+  // would only ever work for boards mapped by hand.
+  const applyTemplate = async (clientId: string, templateMilestones: { name: string; subtitle: string; items: { text: string; court: string; item_key?: string; step_id?: string; auto_rule?: string }[] }[]) => {
     try {
       // Clear existing milestones and their action items
       const existingMs = clientMilestones[clientId] || [];
@@ -1147,6 +1152,13 @@ export default function ClientsPage() {
             phase: 'kickoff' as const,
             milestone_id: inserted.id,
             display_order: j,
+            // Mapping fields — see the note on applyTemplate. `?? null` rather
+            // than omitting, so a template item that legitimately has no rule
+            // (task-driven only) writes an explicit null instead of inheriting
+            // anything stale on re-seed.
+            item_key: item.item_key ?? null,
+            template_step_id: item.step_id ?? null,
+            auto_rule: item.auto_rule ?? null,
           }));
           await supabase.from('client_action_items').insert(rows);
         }
@@ -1456,6 +1468,18 @@ export default function ClientsPage() {
       created_by: user?.id,
     });
     if (error) throw error;
+
+    // [2026-07-28] Action Board: "Kickoff call attended".
+    //
+    // Call notes land in EITHER client_context.call_notes (the Weekly Sync
+    // path, see components/clients/CallNotesTab.tsx) or here in
+    // client_meeting_notes, depending on which modal the CM opens. Both are
+    // live, so both fire the rule — hooking only one would miss roughly half
+    // the time. The rule is a no-op once the item is done, so a client whose
+    // notes land in both tables still only completes it once.
+    fireActionBoardRule(supabase as any, clientId, 'first_call_note')
+      .catch(e => console.error('[MeetingNotes] Action Board rule failed:', e));
+
     await refreshMeetingNotes();
   };
 

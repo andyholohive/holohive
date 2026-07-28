@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { TaskService, Task } from './taskService';
 import { resolveStintId } from './stintAnchor';
+import { resolveActionItemsForSteps } from './actionBoardService';
 
 // ==================== TYPES ====================
 
@@ -215,6 +216,19 @@ export class DeliverableService {
     // Update parent task due_date to target completion
     await TaskService.updateTask(parentTask.id, { due_date: targetCompletion });
 
+    // [2026-07-28] Action Board link. Resolve which client-facing board item
+    // (if any) each SOP step drives, so the subtask can carry
+    // client_action_item_id. The live trg_tasks_propagate_milestone then
+    // flips the board item whenever the task completes — from ANY of the nine
+    // paths that mark a task done, including the Telegram handlers that write
+    // with the service role and never touch TaskService.
+    //
+    // Empty map for clients with no mapped board (older board vintages, or no
+    // board at all). A subtask with no link behaves exactly as before.
+    const actionItemByStep = config.clientId
+      ? await resolveActionItemsForSteps(supabase, config.clientId, steps.map(s => s.id))
+      : new Map<string, string>();
+
     // 4. Create subtasks for each step. Due = startDate + step.day_offset, so
     //    offset-0 steps land on the start day and steps can share a day.
     const subtasks: Task[] = [];
@@ -250,6 +264,7 @@ export class DeliverableService {
         due_date: dueDate,
         description: step.description || '',
         sort_order: step.step_order,
+        client_action_item_id: actionItemByStep.get(step.id) || null,
       });
 
       // 5. Add checklist items
