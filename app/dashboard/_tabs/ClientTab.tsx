@@ -71,6 +71,9 @@ type HealthTone = 'green' | 'amber' | 'red';
 type ClientHealthRow = {
   id: string;
   name: string;
+  // [2026-07-28] Newest active campaign for this client, or null when
+  // they have none. Drives the row's destination — see the Link below.
+  campaignId?: string | null;
   slug: string | null;
   logo_url: string | null;
   engagement_start_date: string | null;
@@ -202,8 +205,15 @@ function FragmentRow({
           ) : null}
         </TableCell>
         <TableCell className="py-3.5 px-5">
+          {/* [2026-07-28 per Andy] Clicking a client goes to their
+              campaign page — the thing you actually want when scanning
+              health. Falls back to the client record when they have no
+              active campaign, so the link never dead-ends (the original
+              /clients/{id} links 404'd for exactly that kind of reason). */}
           <Link
-            href={`/clients?clientId=${client.id}`}
+            href={client.campaignId
+              ? `/campaigns/${client.campaignId}`
+              : `/clients?clientId=${client.id}`}
             className="group flex items-center gap-2.5"
             onClick={(e) => e.stopPropagation()}
           >

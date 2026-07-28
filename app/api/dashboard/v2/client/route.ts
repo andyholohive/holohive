@@ -148,7 +148,11 @@ export async function GET(request: Request) {
         .select('id, client_id, status')
         .in('client_id', standardClientIds)
         .eq('status', 'Active')
-        .is('archived_at', null),
+        .is('archived_at', null)
+        // [2026-07-28] Newest first so campaignIdByClient below picks the
+        // most recent when a client runs more than one active campaign.
+        // Ordering matters only for that pick — the KPI count is unaffected.
+        .order('created_at', { ascending: false }),
       // [2026-06-15] Per HHP Team Dashboard Spec § 4.3 — call notes
       // are pulled from the "portal context field," now backed by
       // `client_context.call_notes` JSONB. Replaces the earlier read
@@ -192,6 +196,21 @@ export async function GET(request: Request) {
     const contentsThisWeek = (contentsThisWeekRes.data ?? []) as any[];
     const contentsAllTime = (contentsAllTimeRes.data ?? []) as any[];
     const activeCampaigns = (campaignsRes.data ?? []) as any[];
+
+    // [2026-07-28] One active campaign per client, so the Client Health
+    // table can link a row straight to its campaign page.
+    //
+    // A client can hold more than one active campaign (Venice has two).
+    // First wins, and the query is ordered created_at desc, so that's the
+    // newest — the one someone clicking from a "this week" health table
+    // means. Clients with no active campaign map to null and the UI falls
+    // back rather than linking somewhere that 404s.
+    const campaignIdByClient = new Map<string, string>();
+    for (const c of activeCampaigns) {
+      if (c.client_id && c.id && !campaignIdByClient.has(c.client_id)) {
+        campaignIdByClient.set(c.client_id, c.id);
+      }
+    }
     const extVisitsLast7d = (extVisitsRes.data ?? []) as Array<{ client_id: string }>;
     const contextRows = (meetingNotesRes.data ?? []) as Array<{
       client_id: string;
@@ -477,6 +496,10 @@ export async function GET(request: Request) {
         name: c.name,
         slug: c.slug,
         logo_url: c.logo_url,
+        // [2026-07-28] Newest active campaign, so the Client Health row
+        // can link straight to it. null when the client has none — the
+        // UI falls back to the client record instead of a dead link.
+        campaignId: campaignIdByClient.get(c.id) ?? null,
         // [2026-07-06] Coverage-aware status matching the Clients page so
         // the UI can badge Paused engagements distinctly from Active.
         status: clientStatusOf(c),
