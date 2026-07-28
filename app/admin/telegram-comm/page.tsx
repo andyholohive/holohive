@@ -30,6 +30,7 @@ import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
   CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio, Newspaper, Send,
+  ListChecks,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
@@ -579,7 +580,125 @@ export default function LineupSettingsPage() {
 
       {/* ─── Weekly Strategic Direction section [2026-07-28] ─── */}
       <WeeklyStrategicDigestSection />
+
+      {/* ─── Action Board sweep section [2026-07-28] ─── */}
+      <ActionBoardCronSection />
     </div>
+  );
+}
+
+/**
+ * ActionBoardCronSection — picker for the chat that receives the daily
+ * Action Board sweep report.
+ *
+ * Posts on every run, not only when something completes. The quiet runs
+ * are the point: a cron that silently stops firing is otherwise invisible
+ * until someone notices a client board that never advanced. A one-line
+ * "nothing due" each morning is the cheapest liveness signal there is.
+ *
+ * Leaving this unset is a valid choice — the sweep still runs and still
+ * logs to agent_runs, it just won't announce itself.
+ */
+function ActionBoardCronSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'action_board_cron_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'action_board_cron_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'action_board_cron_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'action_board_cron_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Sweep report destination saved' : 'Channel cleared',
+        description: chatId
+          ? threadId ? 'The daily sweep will report in this topic.' : 'The daily sweep will report in this chat.'
+          : 'No destination set — the sweep still runs, it just won’t post.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={ListChecks}
+      title="Action Board Sweep"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="warning" size="sm">Not set</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Reports what the nightly sweep auto-completed on client <b>Action Boards</b> — the four client-approval items that clear 48h after being shared, plus the campaign signals for <b>First Content Goes Live</b>.</>
+      )}
+    >
+      <WhenItSends>
+        02:00 UTC daily, on every run. Quiet days post a single line so you
+        can tell the sweep is alive; days with completions list each item.
+        Anything it ticks can be un-ticked by hand in Client Context.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Sweep report destination"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
   );
 }
 

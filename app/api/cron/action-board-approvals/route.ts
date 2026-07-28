@@ -32,11 +32,75 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { TelegramService } from '@/lib/telegramService';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const APPROVAL_WINDOW_HOURS = 48;
+
+const SETTING_CHAT_ID = 'action_board_cron_chat_id';
+const SETTING_THREAD_ID = 'action_board_cron_thread_id';
+
+/**
+ * Post a run report to the configured chat.
+ *
+ * Fires on EVERY run, including the quiet ones, so the message doubles as
+ * a liveness signal — a cron that stops firing is otherwise invisible
+ * until someone notices a board that never moved. The quiet case is one
+ * short line; only real completions get itemised.
+ *
+ * No chat configured → silently skipped. Send failures are logged and
+ * swallowed: the sweep's writes have already committed by this point, and
+ * failing the run over an undelivered notification would misreport a
+ * successful sweep as a failure to the health check.
+ */
+async function reportRun(
+  sb: any,
+  summary: { approvalsCompleted: number; approvalsWaiting: number; m7Completed: number; m7Details: any[]; approvalDetails: any[] },
+) {
+  try {
+    const [chat, thread] = await Promise.all([
+      sb.from('app_settings').select('value').eq('key', SETTING_CHAT_ID).maybeSingle(),
+      sb.from('app_settings').select('value').eq('key', SETTING_THREAD_ID).maybeSingle(),
+    ]);
+    const chatId = chat?.data?.value || null;
+    if (!chatId) return;
+    const rawThread = thread?.data?.value;
+    const threadId = rawThread ? Number(rawThread) : undefined;
+
+    const total = summary.approvalsCompleted + summary.m7Completed;
+    const lines: string[] = ['<b>Action Board sweep</b>'];
+
+    if (total === 0) {
+      lines.push(`No items due. ${summary.approvalsWaiting} approval(s) still inside the ${APPROVAL_WINDOW_HOURS}h window.`);
+    } else {
+      lines.push(`${total} item(s) auto-completed.`);
+      if (summary.approvalsCompleted > 0) {
+        lines.push('', `<b>Client approvals (${APPROVAL_WINDOW_HOURS}h elapsed)</b>`);
+        for (const d of summary.approvalDetails) lines.push(`• ${escapeHtml(d.text)}`);
+      }
+      if (summary.m7Completed > 0) {
+        lines.push('', '<b>Campaign signals</b>');
+        for (const d of summary.m7Details) lines.push(`• ${escapeHtml(d.text)}`);
+      }
+      lines.push('', '<i>Any of these can be un-ticked in Client Context if wrong.</i>');
+    }
+
+    await TelegramService.sendToChat(
+      chatId,
+      lines.join('\n'),
+      'HTML',
+      Number.isFinite(threadId as number) ? threadId : undefined,
+    );
+  } catch (err: any) {
+    console.error('[ActionBoardApprovals] run report failed:', err?.message);
+  }
+}
+
+function escapeHtml(s: string) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET) {
@@ -164,15 +228,13 @@ export async function GET(request: Request) {
       });
     }
 
-    if (due.length === 0) {
-      // Not logged as a distinct state: a day where nothing is due is the
-      // normal case, and the health sweep only cares that the cron ran.
-      await log('success', `0 completed, ${waiting.length} still inside the ${APPROVAL_WINDOW_HOURS}h window`);
-      return NextResponse.json({ completed: 0, waiting: waiting.length });
-    }
-
+    // NOTE: no early return when `due` is empty. An earlier version bailed
+    // here, which meant the M7 sweep below only ran on days an approval also
+    // fired — so a client with no pending approvals would never get its M7
+    // signals evaluated at all. The two sweeps are independent; both run
+    // every time.
     const nowIso = new Date().toISOString();
-    let completed = 0;
+    const completedItems: any[] = [];
     for (const item of due) {
       const { error: uErr } = await (sb as any)
         .from('client_action_items')
@@ -187,11 +249,20 @@ export async function GET(request: Request) {
       if (uErr) {
         console.error('[ActionBoardApprovals] update failed', item.id, uErr.message);
       } else {
-        completed++;
+        completedItems.push(item);
       }
     }
+    const completed = completedItems.length;
 
     const m7 = await sweepM7(sb, false);
+
+    await reportRun(sb, {
+      approvalsCompleted: completed,
+      approvalsWaiting: waiting.length,
+      m7Completed: m7.completed,
+      approvalDetails: completedItems,
+      m7Details: m7.details,
+    });
 
     await log('success', `${completed} approval item(s) auto-completed after ${APPROVAL_WINDOW_HOURS}h; ${waiting.length} still waiting; M7: ${m7.completed} completed`);
     return NextResponse.json({ completed, waiting: waiting.length, m7 });
