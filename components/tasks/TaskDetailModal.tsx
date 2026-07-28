@@ -228,6 +228,14 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         .select('id, text, is_done, milestone:client_milestones(name)')
         .eq('client_id', form.client_id)
         .eq('is_hidden', false)
+        // [2026-07-29] Only items that are actually on the board. Unfiled rows
+        // (milestone_id null) render nowhere else in the app, so listing them
+        // here offered a link target that would never be visible afterwards —
+        // for Umia that was 69 ghosts against 22 real items. The two sources of
+        // unfiled rows are fixed in app/clients/page.tsx, but keep the filter:
+        // it also covers legacy 'discovery'/'tracker' phase rows that predate
+        // milestones entirely and have no writer or reader left.
+        .not('milestone_id', 'is', null)
         .order('display_order', { ascending: true });
       if (cancelled) return;
       if (error) { setActionItems([]); return; }

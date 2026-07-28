@@ -1126,14 +1126,38 @@ export default function ClientsPage() {
   // would only ever work for boards mapped by hand.
   const applyTemplate = async (clientId: string, templateMilestones: { name: string; subtitle: string; items: { text: string; court: string; item_key?: string; step_id?: string; auto_rule?: string }[] }[]) => {
     try {
-      // Clear existing milestones and their action items
-      const existingMs = clientMilestones[clientId] || [];
-      for (const ms of existingMs) {
-        await supabase.from('client_action_items').delete().eq('milestone_id', ms.id);
-      }
-      if (existingMs.length > 0) {
+      // Clear existing milestones and their action items.
+      //
+      // [2026-07-29] This used to read the milestone list from page state
+      // (`clientMilestones[clientId]`) and delete items milestone-by-milestone,
+      // then delete ALL milestones for the client with a single client_id
+      // predicate. The two halves disagreed whenever state was stale or
+      // incomplete — seedMilestones fires right after client creation, before
+      // milestones have been fetched — so milestones got deleted while their
+      // items did not. client_action_items.milestone_id is ON DELETE SET NULL,
+      // so those items survived as unfiled rows: invisible on the portal,
+      // skipped by every Action Board rule, but still listed in the "link to
+      // board item" picker on the task modal. 312 rows had accumulated.
+      //
+      // Read the ids from the DB so both deletes cover exactly the same set.
+      const { data: liveMs } = await supabase
+        .from('client_milestones')
+        .select('id')
+        .eq('client_id', clientId);
+      const msIds = (liveMs || []).map((m: any) => m.id as string);
+      if (msIds.length > 0) {
+        await supabase.from('client_action_items').delete().in('milestone_id', msIds);
         await supabase.from('client_milestones').delete().eq('client_id', clientId);
       }
+      // Self-heal: sweep any already-unfiled items for this client. There is no
+      // legitimate way to create one — handleActionItemSubmit requires an
+      // activeMilestoneId, and template seeding always sets milestone_id — so
+      // anything unfiled is debris from the bug above or from deleteMilestone.
+      await supabase
+        .from('client_action_items')
+        .delete()
+        .eq('client_id', clientId)
+        .is('milestone_id', null);
 
       for (let i = 0; i < templateMilestones.length; i++) {
         const ms = templateMilestones[i];
@@ -1385,7 +1409,13 @@ export default function ClientsPage() {
   };
 
   const deleteMilestone = async (id: string) => {
-    await supabase.from('client_action_items').update({ milestone_id: null }).eq('milestone_id', id);
+    // [2026-07-29] Was `update({ milestone_id: null })` — unfiling the items
+    // rather than removing them. The intent was presumably "don't destroy the
+    // user's text", but nothing in the app ever shows an unfiled item, so they
+    // became permanently invisible rows that still cluttered the task modal's
+    // board-item picker. Delete them with the milestone: removing a milestone
+    // is an explicit destructive action on that section of the board.
+    await supabase.from('client_action_items').delete().eq('milestone_id', id);
     await supabase.from('client_milestones').delete().eq('id', id);
     await refreshMilestones();
     await refreshActionItems();
