@@ -349,16 +349,21 @@ export default function ShortLinksPage() {
                       return (
                         <div className="flex items-center gap-1.5">
                           <StatusBadge tone={tone as any} size="sm">{label}</StatusBadge>
-                          {link.dns_status !== 'provisioned' && (
-                            <Button
-                              variant="ghost" size="sm" className="h-6 w-6 p-0"
-                              title={link.dns_error || 'Retry DNS setup'}
-                              disabled={retrying === link.id}
-                              onClick={() => retryDns(link)}
-                            >
-                              <RefreshCw className={`h-3.5 w-3.5 ${retrying === link.id ? 'animate-spin' : ''}`} />
-                            </Button>
-                          )}
+                          {/* Always offered, including on 'Ready'. This button used
+                              to be hidden once a row read 'provisioned', which meant
+                              a WRONG green hid the very control that would correct
+                              it — tria sat on a false 'Ready' (written by the
+                              pre-4c9b743 code) with no way to re-check from the UI.
+                              Re-checking is idempotent and cheap; there is no reason
+                              to gate it on the status being bad. */}
+                          <Button
+                            variant="ghost" size="sm" className="h-6 w-6 p-0"
+                            title={link.dns_error || 'Re-check DNS setup'}
+                            disabled={retrying === link.id}
+                            onClick={() => retryDns(link)}
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${retrying === link.id ? 'animate-spin' : ''}`} />
+                          </Button>
                         </div>
                       );
                     })()}
