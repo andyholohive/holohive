@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { requireRole } from '@/lib/requireSuperAdmin';
 import { RESERVED_SUBDOMAINS } from '@/lib/shortLinkService';
 import {
-  provisionSubdomain, provisioningConfigured, type ProvisionResult,
+  provisionSubdomain, provisioningConfigured, provisioningStatus,
+  type ProvisionResult,
 } from '@/lib/domainProvisioning';
 
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,9 @@ export async function GET(request: Request) {
     // setup, without them it shows the manual CNAME steps. Never leaks the
     // credential values themselves — only whether they exist.
     autoDns: provisioningConfigured(),
+    // Per-variable presence booleans (never values) so a half-configured
+    // setup names its own missing piece instead of failing generically.
+    dnsConfig: provisioningStatus(),
   });
 }
 

@@ -71,6 +71,8 @@ export default function ShortLinksPage() {
   // Whether GoDaddy + Vercel credentials are configured server-side. Decides
   // between "we'll set DNS up for you" and the manual two-step instructions.
   const [autoDns, setAutoDns] = useState(false);
+  // Per-variable presence, so a half-configured setup names its own gap.
+  const [dnsConfig, setDnsConfig] = useState<Record<string, boolean> | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,6 +85,7 @@ export default function ShortLinksPage() {
       if (!res.ok) throw new Error(json.error || 'Failed to load links');
       setLinks(json.links ?? []);
       setAutoDns(Boolean(json.autoDns));
+      setDnsConfig(json.dnsConfig ?? null);
     } catch (err: any) {
       toast({ title: 'Could not load links', description: err.message, variant: 'destructive' });
     } finally {
@@ -237,6 +240,37 @@ export default function ShortLinksPage() {
   return (
     <div className="space-y-6">
       {header}
+
+      {dnsConfig && !dnsConfig.configured && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="space-y-2 min-w-0">
+              <div className="text-sm font-medium text-amber-900">
+                Automatic DNS is off — new subdomains need setting up by hand
+              </div>
+              <ul className="text-xs text-amber-800 space-y-1">
+                {[
+                  ['GODADDY_API_TOKEN', dnsConfig.godaddyToken || dnsConfig.godaddyLegacyPair],
+                  ['VERCEL_API_TOKEN', dnsConfig.vercelToken],
+                  ['VERCEL_PROJECT_ID', dnsConfig.vercelProjectId],
+                ].map(([name, ok]) => (
+                  <li key={String(name)} className="flex items-center gap-2 font-mono">
+                    <span className={ok ? 'text-emerald-700' : 'text-rose-700'}>{ok ? '✓' : '✗'}</span>
+                    <span>{String(name)}</span>
+                    <span className="font-sans">{ok ? 'found' : 'not visible to the server'}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-800">
+                Set the missing one(s) in Vercel → Settings → Environment Variables with{' '}
+                <strong>Production</strong> ticked, then redeploy — env vars only reach a NEW
+                deployment, never the running one.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <KpiCard icon={Link2} label="Links" value={totals.total} accent="brand" />

@@ -57,6 +57,33 @@ export function provisioningConfigured(): boolean {
   );
 }
 
+/**
+ * Per-variable presence, for diagnosing a half-configured setup.
+ *
+ * Booleans only — never the values, and never a prefix of them. "No API
+ * credentials configured" is useless when three variables could each be the
+ * culprit; this turns it into a named one. Worth its keep because the usual
+ * causes (a typo, or ticking Preview instead of Production) are invisible
+ * from the outside otherwise.
+ */
+export function provisioningStatus(): {
+  configured: boolean;
+  godaddyToken: boolean;
+  godaddyLegacyPair: boolean;
+  vercelToken: boolean;
+  vercelProjectId: boolean;
+  vercelTeamId: boolean;
+} {
+  return {
+    configured: provisioningConfigured(),
+    godaddyToken: Boolean(process.env.GODADDY_API_TOKEN),
+    godaddyLegacyPair: Boolean(process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET),
+    vercelToken: Boolean(process.env.VERCEL_API_TOKEN),
+    vercelProjectId: Boolean(process.env.VERCEL_PROJECT_ID),
+    vercelTeamId: Boolean(process.env.VERCEL_TEAM_ID),
+  };
+}
+
 function vercelQuery(): string {
   const team = process.env.VERCEL_TEAM_ID;
   return team ? `?teamId=${encodeURIComponent(team)}` : '';
