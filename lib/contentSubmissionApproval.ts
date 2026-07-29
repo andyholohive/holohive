@@ -15,6 +15,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { markLineupSlotPosted } from './lineupSlotSync';
+import { KOL_RATE_COLUMNS, resolvePaymentAmount } from './kolRate';
 
 export interface ApproveSubmissionInput {
   submissionId: string;
@@ -52,7 +53,7 @@ export async function createApprovedContentsRow(
   // exist in prod today; this is a cheap guard against the edge.
   const { data: campaignKol } = await (admin as any)
     .from('campaign_kols')
-    .select('id, agreed_rate, master_kol:master_kols(id, standard_rate, repost_rate)')
+    .select(`id, agreed_rate, master_kol:master_kols(id, ${KOL_RATE_COLUMNS})`)
     .eq('campaign_id', input.campaignId)
     .eq('master_kol_id', input.kolId)
     .is('deleted_at', null)
@@ -127,24 +128,19 @@ export async function createApprovedContentsRow(
   }
 
   // [2026-07-03] Mirror the manual /campaigns/[id] add-content flow —
-  // auto-create a payment row keyed to this content. Amount priority
-  // (matches KolDashboardTableView):
-  //   1. Repost: master_kol.repost_rate
-  //      → fallback master_kol.standard_rate * 0.5
-  //   2. campaign_kol.agreed_rate (set at onboarding)
-  //   3. master_kol.standard_rate (mastersheet)
-  //   4. 0 (team fills in manually)
-  // Payment insert is best-effort: failures are logged but do NOT roll
-  // back the contents row — team can add a payment manually if this
-  // silently fails.
+  // auto-create a payment row keyed to this content. Amount priority now lives
+  // in lib/kolRate.ts, shared with KolDashboardTableView so the two flows can't
+  // drift again. Payment insert is best-effort: failures are logged but do NOT
+  // roll back the contents row — team can add a payment manually.
   if (contentId) {
-    const masterKol = (campaignKol as any).master_kol as { standard_rate: number | null; repost_rate: number | null } | null;
-    const stdRate = masterKol?.standard_rate != null ? Number(masterKol.standard_rate) : null;
-    const repostRate = masterKol?.repost_rate != null ? Number(masterKol.repost_rate) : null;
-    const agreedRate = (campaignKol as any).agreed_rate != null ? Number((campaignKol as any).agreed_rate) : null;
-    const amount = contentsType === 'Repost'
-      ? (repostRate ?? (stdRate != null ? Math.round(stdRate * 0.5 * 100) / 100 : 0))
-      : (agreedRate ?? stdRate ?? 0);
+    // [2026-07-29] Cascade moved into lib/kolRate.ts. It now reads post_price
+    // (what the UI actually writes — 189 KOLs have it with standard_rate NULL)
+    // and stops treating a stored agreed_rate of 0 as a negotiated rate.
+    const amount = resolvePaymentAmount({
+      contentType: contentsType,
+      agreedRate: (campaignKol as any).agreed_rate,
+      kol: (campaignKol as any).master_kol,
+    });
 
     const { error: paymentErr } = await (admin as any)
       .from('payments')

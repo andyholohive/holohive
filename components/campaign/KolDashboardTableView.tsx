@@ -82,6 +82,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
+import { resolvePaymentAmount } from '@/lib/kolRate';
 import { CampaignService } from '@/lib/campaignService';
 import {
   CampaignKOLService,
@@ -1607,19 +1608,17 @@ export function KolDashboardTableView({
                                                   //   3. master_kol.standard_rate (mastersheet)
                                                   //   4. most recent payment amount for this KOL
                                                   //   5. 0 (user will need to fill in manually)
-                                                  const stdRate = campaignKOL.master_kol?.standard_rate != null
-                                                    ? Number(campaignKOL.master_kol.standard_rate)
-                                                    : null;
-                                                  const repostRate = (campaignKOL.master_kol as any)?.repost_rate != null
-                                                    ? Number((campaignKOL.master_kol as any).repost_rate)
-                                                    : null;
-                                                  const defaultAmount = type === 'Repost'
-                                                    ? (repostRate ?? (stdRate != null ? Math.round(stdRate * 0.5 * 100) / 100 : 0))
-                                                    : (campaignKOL.agreed_rate ?? null) !== null
-                                                      ? Number(campaignKOL.agreed_rate)
-                                                      : stdRate != null
-                                                      ? stdRate
-                                                      : (campaignKOL.master_kol?.id && latestCostMap.get(campaignKOL.master_kol.id)) || 0;
+                                                  // [2026-07-29] Cascade moved to lib/kolRate.ts — shared with
+                                                  // contentSubmissionApproval so the manual and TG flows agree.
+                                                  // It reads post_price (189 KOLs have it with standard_rate
+                                                  // NULL, which is why paid KOLs showed $0) and no longer lets
+                                                  // a stored agreed_rate of 0 beat a real standard rate.
+                                                  const defaultAmount = resolvePaymentAmount({
+                                                    contentType: type,
+                                                    agreedRate: campaignKOL.agreed_rate,
+                                                    kol: campaignKOL.master_kol as any,
+                                                    fallback: (campaignKOL.master_kol?.id && latestCostMap.get(campaignKOL.master_kol.id)) || 0,
+                                                  });
 
                                                   if (data && data.length > 0) {
                                                     const paymentPayloads = data.map((content: any) => ({

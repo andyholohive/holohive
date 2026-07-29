@@ -88,6 +88,7 @@ import LineupsTab from '@/components/campaign/LineupsTab';
 import { AddActivationDialog } from '@/components/campaign/AddActivationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from '@/lib/dateFormat';
+import { hasAgreedRate } from '@/lib/kolRate';
 
 /**
  * Columns the user can sort the KOL Dashboard table by. Adding a new
@@ -1004,7 +1005,11 @@ const CampaignDetailsPage = () => {
     const source = list || campaignKOLs;
     const kol = source.find(k => k.id === kolId);
     if (!kol) return false;
-    if ((kol.agreed_rate ?? null) !== null) return false; // already set
+    // [2026-07-29] hasAgreedRate, not a null check. A stored 0 used to count as
+    // "already set", so the dialog refused to open and the zero could not be
+    // corrected from this screen at all — while the payment cascade happily
+    // used it and wrote a $0 payment. 12 rows are in that state.
+    if (hasAgreedRate(kol.agreed_rate)) return false; // already set
     const masterKolId = kol.master_kol?.id ?? null;
     const latest = masterKolId ? latestCostMap.get(masterKolId) ?? null : null;
     setPaymentTermsDialog({
