@@ -166,24 +166,6 @@ const CURRENT_PHASE_OPTIONS = [
   'Reporting Phase',
 ] as const;
 
-/**
- * v11 tone map for the campaign-level status pill rendered in the
- * editorial hero. Centralizes the four `campaigns.status` enum values
- * onto the shared `<StatusBadge>` palette so the hero and any future
- * surface that needs a campaign-status chip stay in lockstep.
- *
- * - Active → brand teal (the featured / operationally-important state)
- * - Planning → info sky (in-progress / setup)
- * - Paused → warning amber (needs attention)
- * - Completed → success emerald (good news)
- */
-const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
-  Active: 'brand',
-  Planning: 'info',
-  Paused: 'warning',
-  Completed: 'success',
-};
-
 const CampaignDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -1345,10 +1327,10 @@ const CampaignDetailsPage = () => {
   //
   // `getStatusBadge` removed 2026-06-05 — it returned a circle-icon
   // span for the campaign Status Select, but nothing on the page
-  // actually called it. The hero status pill uses `<StatusBadge>`
-  // with `CAMPAIGN_STATUS_TONES` (top of file). The edit-mode status
-  // Select just renders plain "Planning / Active / Paused / Completed"
-  // labels; no helper needed.
+  // actually called it. The hero status pill (and its local
+  // CAMPAIGN_STATUS_TONES map) went the same way on 2026-07-29 — see the
+  // note at the hero metrics row. The edit-mode status Select just renders
+  // plain "Planning / Active / Paused / Completed" labels; no helper needed.
   /**
    * Persist a resources array immediately — used by the view-mode
    * Resources card so users can add/edit/remove resource links
@@ -2270,20 +2252,20 @@ const CampaignDetailsPage = () => {
                     </DialogContent>
                   </Dialog>
                 )}
-                {/* Inline status pill + metrics row.
-                    Uses centralized `<StatusBadge>` with a tone map
-                    (CAMPAIGN_STATUS_TONES near the top of this file)
-                    so the palette stays in lockstep with the rest of
-                    the app. `withDot` gives the colored dot prefix
-                    that the v11 mockup uses for hero status. */}
+                {/* Inline metrics row.
+                    [2026-07-29 per Andy] The campaign-status pill was removed.
+                    It had no reachable control — the Overview tab holding the
+                    only editor was hidden on 2026-07-02 — so it reported a value
+                    nobody could change and which drifted from reality: Umia read
+                    "Planning" for nine days while running a confirmed 5-KOL
+                    lineup. Now that no consumer gates on the field either (see
+                    the note in app/api/telegram/webhook/route.ts), displaying it
+                    only misinformed. Week N of M below is the honest signal —
+                    it derives from the engagement terms, which people do edit.
+                    The local CAMPAIGN_STATUS_TONES map went with it — the
+                    /campaigns cards carry their own, in app/campaigns/page.tsx. */}
                 {campaign && (
                   <div className="flex items-center gap-2.5 mt-4 text-xs flex-wrap">
-                    <StatusBadge
-                      tone={CAMPAIGN_STATUS_TONES[campaign.status] ?? 'neutral'}
-                      withDot
-                    >
-                      {campaign.status}
-                    </StatusBadge>
                     {/* [2026-07-09] Campaign phase hidden per Andy — everywhere
                         internal + public. Gated off (not deleted) for restore. */}
                     {false && campaign?.current_phase && (
@@ -2304,7 +2286,9 @@ const CampaignDetailsPage = () => {
                       if (!state) return null;
                       return (
                         <>
-                          <span className="text-ink-warm-300">·</span>
+                          {/* [2026-07-29] Leading "·" dropped with the status
+                              pill — this block is now first in the row, so the
+                              separator was rendering orphaned against the title. */}
                           <span className="text-ink-warm-700">
                             Week <span className="mono tabular-nums font-medium text-ink-warm-900">{state.weekNumber}</span>
                             {state.totalWeeks !== null && (
