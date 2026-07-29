@@ -29,7 +29,7 @@ export const LINK_ROOT_DOMAIN = 'holohive.io';
 const VERCEL_CNAME_TARGET = 'cname.vercel-dns.com';
 
 export type ProvisionResult = {
-  status: 'provisioned' | 'manual' | 'failed';
+  status: 'provisioned' | 'manual' | 'failed' | 'pending';
   error?: string;
   /** Human-readable trail, surfaced in the UI so failures are debuggable. */
   steps: string[];
@@ -137,8 +137,35 @@ async function godaddyPutCname(subdomain: string): Promise<void> {
   }
 }
 
-/** Attaches `<sub>.holohive.io` to the Vercel project. */
-async function vercelAddDomain(host: string): Promise<void> {
+/** Is this host attached to OUR project, and has Vercel verified it? */
+async function vercelGetDomain(host: string): Promise<{ present: boolean; verified: boolean }> {
+  const res = await fetch(
+    `https://api.vercel.com/v9/projects/${process.env.VERCEL_PROJECT_ID}/domains/${encodeURIComponent(host)}${vercelQuery()}`,
+    { headers: { Authorization: `Bearer ${process.env.VERCEL_API_TOKEN}` } },
+  );
+  if (res.status === 404) return { present: false, verified: false };
+  if (!res.ok) return { present: false, verified: false };
+  const body = await res.json().catch(() => ({} as any));
+  return { present: true, verified: body?.verified !== false };
+}
+
+/**
+ * Attaches `<sub>.holohive.io` to the Vercel project.
+ *
+ * [2026-07-29] Rewritten after it reported success on a domain that was
+ * never actually serving. Two ways the old version lied:
+ *
+ *   • It treated 409 as "already attached, fine". But 409 is ALSO what
+ *     Vercel returns when the host belongs to a DIFFERENT project or team —
+ *     in which case nothing was added and the link 404s at the edge.
+ *   • It ignored `verified` in the response. Vercel accepts a domain in a
+ *     pending-verification state; no cert is issued until it clears, so the
+ *     URL stays dark while the row reads green.
+ *
+ * Now every path ends in a GET against THIS project, so the return value
+ * describes what Vercel actually holds rather than what the POST returned.
+ */
+async function vercelAddDomain(host: string): Promise<{ verified: boolean }> {
   const res = await fetch(
     `https://api.vercel.com/v10/projects/${process.env.VERCEL_PROJECT_ID}/domains${vercelQuery()}`,
     {
@@ -150,12 +177,33 @@ async function vercelAddDomain(host: string): Promise<void> {
       body: JSON.stringify({ name: host }),
     },
   );
-  if (res.ok) return;
+
+  if (res.ok) {
+    const body = await res.json().catch(() => ({} as any));
+    if (body?.verified === false) return { verified: false };
+    return { verified: true };
+  }
+
   const body = await res.json().catch(() => ({} as any));
   const code = body?.error?.code;
-  // Already attached (e.g. a second link on the same subdomain, or a retry)
-  // is success, not failure.
-  if (res.status === 409 || code === 'domain_already_in_use' || code === 'domain_already_exists') return;
+  const conflict = res.status === 409
+    || code === 'domain_already_in_use'
+    || code === 'domain_already_exists';
+
+  if (conflict) {
+    // Confirm it's OURS before calling it done — this is the exact case the
+    // old code got wrong.
+    const owned = await vercelGetDomain(host);
+    if (!owned.present) {
+      throw new Error(
+        `Vercel says ${host} is already in use but it is NOT on this project ` +
+        `(VERCEL_PROJECT_ID). Another Vercel project or team is holding the ` +
+        `domain — remove it there, or point VERCEL_PROJECT_ID at the right project.`,
+      );
+    }
+    return { verified: owned.verified };
+  }
+
   throw new Error(`Vercel ${res.status}: ${body?.error?.message ?? JSON.stringify(body).slice(0, 300)}`);
 }
 
@@ -201,8 +249,21 @@ export async function provisionSubdomain(subdomain: string): Promise<ProvisionRe
       steps.push(`CNAME ${subdomain} → ${VERCEL_CNAME_TARGET} written at GoDaddy.`);
     }
 
-    await vercelAddDomain(host);
-    steps.push(`${host} attached to the Vercel project.`);
+    const { verified } = await vercelAddDomain(host);
+    if (!verified) {
+      // Added but not yet verified: no certificate, so the URL does not serve.
+      // Reporting 'provisioned' here is what made the row lie last time.
+      steps.push(`${host} added to the Vercel project, awaiting verification.`);
+      return {
+        status: 'pending',
+        error:
+          `${host} is on the Vercel project but not verified yet, so no ` +
+          `certificate has been issued and the URL will not resolve. This ` +
+          `usually clears within a few minutes — hit Retry to re-check.`,
+        steps,
+      };
+    }
+    steps.push(`${host} attached to the Vercel project and verified.`);
 
     return { status: 'provisioned', steps };
   } catch (err: any) {
