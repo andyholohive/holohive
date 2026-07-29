@@ -7,10 +7,20 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  *   - Entry point is a multi-select on /kols, so the service takes the
  *     raw kol_ids array and resolves chat_ids server-side. This avoids
  *     the UI having to know how KOL→chat mapping works.
- *   - Message body is Markdown per Andy's pick: auto-linkified URLs +
- *     standard bold / italic markers + [link](url). We send with
- *     parse_mode Markdown so failures on stray asterisk or underscore
- *     characters are caught server-side and reported per-recipient.
+ *   - Message body is sent as PLAIN TEXT — no parse_mode [Andy 2026-07-30].
+ *     It was Markdown, which cost 48 failed sends across three attempts:
+ *     one underscore in "x.com/konnex_world" opened an italic span that
+ *     never closed, and Telegram rejected the whole message with
+ *     "can't parse entities". The same body also carried four `[` brackets
+ *     (문단 headers like [프로젝트]), each a link-opener in Markdown and the
+ *     next failure in line.
+ *
+ *     These messages are prose a human types in Korean — URLs, @handles
+ *     and bracketed section headers occur naturally and none of them are
+ *     meant as markup. Markdown bought formatting nobody used and charged
+ *     for it in silent all-or-nothing failures. Telegram still auto-links
+ *     bare URLs without a parse_mode, which was the only feature actually
+ *     relied on.
  *   - {name} is substituted per KOL from master_kols.name. Any other
  *     brace token is left in-place (Telegram renders {foo} as-is).
  *   - Throttle: 1 send per 1.1s. Telegram bot limit is 30 msg/s global
@@ -123,7 +133,7 @@ export class KolAnnouncementService {
     for (let i = 0; i < targets.length; i++) {
       const t = targets[i];
       const personalized = substituteName(bodyText, t.kolName);
-      const result = await sendMarkdownToChat(t.chatId, personalized);
+      const result = await sendPlainToChat(t.chatId, personalized);
       const sentAt = new Date().toISOString();
       await sb
         .from('kol_announcement_recipients')
@@ -168,12 +178,11 @@ function substituteName(text: string, kolName: string): string {
 }
 
 /**
- * Send with parse_mode=Markdown, returning both the outcome and the
- * server-side error text on failure. Telegram's Markdown mode returns
- * 400s on unescaped * or _ characters so surfacing the error string
- * makes the failure recoverable by the sender.
+ * Send as plain text — deliberately NO parse_mode, so no character in the
+ * body can be misread as markup. What the sender typed is what arrives.
+ * Errors are still surfaced per-recipient (chat blocked, bot removed, etc.).
  */
-async function sendMarkdownToChat(
+async function sendPlainToChat(
   chatId: string,
   text: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -186,7 +195,8 @@ async function sendMarkdownToChat(
         body: JSON.stringify({
           chat_id: chatId,
           text,
-          parse_mode: 'Markdown',
+          // No parse_mode: bare URLs still auto-link, and nothing else is
+          // interpreted. See the header note on the 48 failed sends.
           disable_web_page_preview: false,
         }),
       },

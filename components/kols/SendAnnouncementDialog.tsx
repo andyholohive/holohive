@@ -23,9 +23,15 @@ import { Send, Search, Users, History, ChevronRight, RotateCcw } from 'lucide-re
  * a linked group chat) and renders a searchable picker so the sender
  * can build the recipient set inline.
  *
- * Composer supports Markdown + a {name} placeholder. First-recipient
- * preview renders the substituted body so the sender can eyeball what
- * a real KOL sees before firing.
+ * Composer is PLAIN TEXT + a {name} placeholder [2026-07-30]. Markdown
+ * was dropped after one underscore in "x.com/konnex_world" cost 48 failed
+ * sends — Telegram rejected the entire message with "can't parse entities"
+ * because the italic span it opened never closed.
+ *
+ * Because nothing is parsed any more, the preview is exact: what it shows
+ * is byte-for-byte what Telegram delivers. That is why it is always
+ * visible rather than behind a toggle — a preview you have to opt into
+ * doesn't catch the mistake you didn't know you'd made.
  */
 
 type KolChoice = { id: string; name: string; hasGc: boolean };
@@ -67,7 +73,6 @@ export function SendAnnouncementDialog({
   const { toast } = useToast();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -157,7 +162,6 @@ export function SendAnnouncementDialog({
       setText('');
       setSearch('');
       setSelectedIds(new Set());
-      setShowPreview(false);
       setTab('compose');
       setExpandedId(null);
       setHistoryLoaded(false);
@@ -356,27 +360,26 @@ export function SendAnnouncementDialog({
               ref={textareaRef}
               value={text}
               onChange={e => setText(e.target.value)}
-              placeholder={"Hey {name},\n\nQuick heads-up on next week's content push — brief coming Monday.\n\n[HHP dashboard](https://app.holohive.io)"}
+              placeholder={"Hey {name},\n\nQuick heads-up on next week's content push — brief coming Monday.\n\nhttps://app.holohive.io"}
               rows={8}
               maxLength={4000}
               className="focus-brand font-mono text-sm"
             />
-            <div className="flex items-center justify-between mt-1">
-              <button
-                type="button"
-                onClick={() => setShowPreview(p => !p)}
-                className="text-[11px] text-brand hover:text-brand-dark disabled:text-ink-warm-400"
-                disabled={selectedCount === 0}
-              >
-                {showPreview ? 'Hide preview' : `Preview as ${firstSelectedName}`}
-              </button>
+            <div className="flex items-center justify-end mt-1">
               <span className="text-[11px] text-ink-warm-500 tabular-nums">{text.length} / 4000</span>
             </div>
           </div>
 
-          {showPreview && text.trim() && (
+          {/* Always shown. Sent as plain text with no parse_mode, so this is
+              exactly what arrives — no formatting is applied or stripped. */}
+          {text.trim() && (
             <div className="rounded-md border border-cream-200 bg-cream-50/60 p-3">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-ink-warm-500 mb-1">Preview for {firstSelectedName}</div>
+              <div className="flex items-baseline justify-between mb-1 gap-2">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-ink-warm-500">
+                  Exactly what {selectedCount > 0 ? firstSelectedName : 'each KOL'} receives
+                </div>
+                <div className="text-[10px] text-ink-warm-400">plain text · no formatting</div>
+              </div>
               <pre className="text-sm text-ink-warm-800 whitespace-pre-wrap font-sans">{previewText}</pre>
             </div>
           )}
