@@ -38,7 +38,7 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { formatRelativeShort } from '@/lib/dateFormat';
-import { Link2, Plus, Copy, Trash2, ExternalLink, MousePointerClick, Power, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Link2, Plus, Copy, Trash2, ExternalLink, MousePointerClick, Power, RefreshCw, AlertTriangle, Pencil } from 'lucide-react';
 
 const LINK_DOMAIN = 'holohive.io';
 
@@ -75,6 +75,8 @@ export default function ShortLinksPage() {
   const [dnsConfig, setDnsConfig] = useState<Record<string, boolean> | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Non-null while editing an existing row; the dialog doubles as the editor.
+  const [editing, setEditing] = useState<ShortLinkRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...BLANK });
 
@@ -106,6 +108,31 @@ export default function ShortLinksPage() {
   const publicUrl = (l: { subdomain: string; slug: string }) =>
     `https://${l.subdomain}.${LINK_DOMAIN}${l.slug ? `/${l.slug}` : ''}`;
 
+  /** The `/l/<sub>/<slug>` form — works regardless of the subdomain's DNS. */
+  const directUrl = (l: { subdomain: string; slug: string }) =>
+    `/l/${l.subdomain}${l.slug ? `/${l.slug}` : ''}`;
+
+  /**
+   * What Open should actually load. Before DNS is provisioned the branded
+   * host resolves to nothing, so opening it would show a Vercel 404 and look
+   * like the link is broken when only its DNS is pending. Fall back to the
+   * direct form, which always serves.
+   */
+  const openTarget = (l: ShortLinkRow) =>
+    l.dns_status === 'provisioned' ? publicUrl(l) : directUrl(l);
+
+  const startEdit = (l: ShortLinkRow) => {
+    setEditing(l);
+    setForm({
+      subdomain: l.subdomain,
+      slug: l.slug,
+      destination_url: l.destination_url,
+      label: l.label ?? '',
+      client_id: l.client_id ?? '',
+    });
+    setDialogOpen(true);
+  };
+
   // Subdomains already live somewhere — a second link on one of these needs
   // no DNS work, which is the difference between "works now" and "works
   // after someone edits GoDaddy".
@@ -127,6 +154,27 @@ export default function ShortLinksPage() {
   const create = async () => {
     setSaving(true);
     try {
+      // Edit path: subdomain/slug are immutable (the URL is already in KOL
+      // hands), so only the destination and metadata are sent.
+      if (editing) {
+        const res = await fetch(`/api/short-links/${editing.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            destination_url: form.destination_url.trim(),
+            label: form.label,
+            client_id: form.client_id || null,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to save');
+        toast({ title: 'Link updated', description: 'Existing links keep working — only the destination changed.' });
+        setDialogOpen(false);
+        setEditing(null);
+        setForm({ ...BLANK });
+        load();
+        return;
+      }
       const res = await fetch('/api/short-links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -375,6 +423,22 @@ export default function ShortLinksPage() {
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost" size="sm" className="h-7 w-7 p-0"
+                        title={link.dns_status === 'provisioned'
+                          ? `Open ${publicUrl(link)}`
+                          : `DNS not live yet — opens the direct form (${directUrl(link)})`}
+                        onClick={() => window.open(openTarget(link), '_blank', 'noopener,noreferrer')}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" className="h-7 w-7 p-0"
+                        title="Edit destination"
+                        onClick={() => startEdit(link)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" className="h-7 w-7 p-0"
                         title="Copy link"
                         onClick={() => copy(publicUrl(link))}
                       >
@@ -403,12 +467,17 @@ export default function ShortLinksPage() {
         </Card>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(o) => { setDialogOpen(o); if (!o) { setEditing(null); setForm({ ...BLANK }); } }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>New Short Link</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Short Link' : 'New Short Link'}</DialogTitle>
             <DialogDescription>
-              The link goes live the moment you save — as long as its subdomain already points here.
+              {editing
+                ? 'The subdomain and path are fixed — the URL is already out with KOLs. Changing the destination re-points every copy of it instantly.'
+                : 'The link goes live the moment you save — as long as its subdomain already points here.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -418,7 +487,7 @@ export default function ShortLinksPage() {
                 <Label htmlFor="sub">Subdomain <RequiredAsterisk /></Label>
                 <Input
                   id="sub" className="h-9 focus-brand" placeholder="tria"
-                  value={form.subdomain}
+                  value={form.subdomain} disabled={!!editing}
                   onChange={e => setForm({ ...form, subdomain: e.target.value })}
                 />
               </div>
@@ -426,7 +495,7 @@ export default function ShortLinksPage() {
                 <Label htmlFor="slug">Path</Label>
                 <Input
                   id="slug" className="h-9 focus-brand" placeholder="fitcheck (blank = root)"
-                  value={form.slug}
+                  value={form.slug} disabled={!!editing}
                   onChange={e => setForm({ ...form, slug: e.target.value })}
                 />
               </div>
@@ -483,7 +552,7 @@ export default function ShortLinksPage() {
               </div>
             )}
 
-            {needsDns && autoDns && (
+            {!editing && needsDns && autoDns && (
               <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
                 <div className="text-sm font-medium text-sky-900">
                   DNS for <code>{previewSub}</code> will be set up automatically
@@ -495,7 +564,7 @@ export default function ShortLinksPage() {
               </div>
             )}
 
-            {needsDns && !autoDns && (
+            {!editing && needsDns && !autoDns && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1.5">
                 <div className="text-sm font-medium text-amber-900">
                   One-time DNS step for <code>{previewSub}</code>
@@ -519,7 +588,7 @@ export default function ShortLinksPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button variant="brand" onClick={create} disabled={!canSubmit}>
-              {saving ? 'Creating…' : 'Create Link'}
+              {saving ? (editing ? 'Saving…' : 'Creating…') : (editing ? 'Save Changes' : 'Create Link')}
             </Button>
           </DialogFooter>
         </DialogContent>
