@@ -5,12 +5,13 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sliders, Bot, Settings, Tag as TagIcon, MessageSquare } from 'lucide-react';
+import { Sliders, Bot, Settings, Tag as TagIcon, MessageSquare, Link2 } from 'lucide-react';
 
 import FieldOptionsPage from '@/app/admin/field-options/page';
 import McpPage from '@/app/mcp/page';
 import ContentTagsPage from '@/app/admin/content-tags/page';
 import TelegramCommPage from '@/app/admin/telegram-comm/page';
+import ShortLinksPage from '@/app/admin/short-links/page';
 
 /**
  * /admin — combined admin tools page.
@@ -31,8 +32,8 @@ import TelegramCommPage from '@/app/admin/telegram-comm/page';
  * updates the URL without a full navigation.
  */
 
-type AdminTab = 'field-options' | 'mcp' | 'content-tags' | 'telegram-comm';
-const VALID_TABS: AdminTab[] = ['field-options', 'mcp', 'content-tags', 'telegram-comm'];
+type AdminTab = 'field-options' | 'mcp' | 'content-tags' | 'telegram-comm' | 'short-links';
+const VALID_TABS: AdminTab[] = ['field-options', 'mcp', 'content-tags', 'telegram-comm', 'short-links'];
 
 function AdminPageInner() {
   const searchParams = useSearchParams();
@@ -57,7 +58,7 @@ function AdminPageInner() {
       <PageHeader
         icon={Settings}
         title="Admin Tools"
-        subtitle="Field Options, Claude MCP, Content Tags, and Telegram Comm — combined into one tabbed page."
+        subtitle="Field Options, Claude MCP, Content Tags, Telegram Comm, and Short Links — combined into one tabbed page."
         kicker="Admin · Tools"
         kickerDot="rose"
       />
@@ -95,6 +96,13 @@ function AdminPageInner() {
             <MessageSquare className="h-4 w-4" />
             Telegram Comm
           </TabsTrigger>
+          <TabsTrigger
+            value="short-links"
+            className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t flex items-center gap-1.5"
+          >
+            <Link2 className="h-4 w-4" />
+            Short Links
+          </TabsTrigger>
         </TabsList>
 
         {/* Each TabsContent renders the existing page component. The
@@ -115,6 +123,9 @@ function AdminPageInner() {
         <TabsContent value="telegram-comm" className="mt-4">
           <TelegramCommPage />
         </TabsContent>
+        <TabsContent value="short-links" className="mt-4">
+          <ShortLinksPage />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -129,7 +140,7 @@ function AdminPageSkeleton() {
       <PageHeader
         icon={Settings}
         title="Admin Tools"
-        subtitle="Field Options, Claude MCP, Content Tags, and Telegram Comm — combined into one tabbed page."
+        subtitle="Field Options, Claude MCP, Content Tags, Telegram Comm, and Short Links — combined into one tabbed page."
         kicker="Admin · Tools"
         kickerDot="rose"
       />

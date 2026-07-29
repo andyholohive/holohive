@@ -35,6 +35,37 @@ const nextConfig = {
       },
     ];
   },
+  // [2026-07-29] Branded short links: `tria.holohive.io/fitcheck`.
+  //
+  // DNS can't do this — a path never reaches the resolver, so GoDaddy has
+  // no record type that could route it. This rule is the substitute: any
+  // *.holohive.io host that isn't the app itself has its whole path handed
+  // to app/l/[sub]/[...slug], which resolves (subdomain, slug) in the DB.
+  //
+  // The regex is ANCHORED, and that is load-bearing. Unanchored, the host
+  // pattern matches a *substring* of `app.holohive.io` ("pp.holohive.io"),
+  // which would rewrite every request to the real app into the link handler
+  // and take the whole portal down. The `^`, the `$`, and the leading
+  // negative lookahead are all required — keep RESERVED_SUBDOMAINS in
+  // lib/shortLinkService.ts in step with the lookahead list.
+  //
+  // Optional `(:\d+)?` so a host carrying an explicit port still matches.
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/:slug*',
+          has: [
+            {
+              type: 'host',
+              value: '^(?!app\\.|www\\.|portal\\.|api\\.)(?<sub>[a-z0-9][a-z0-9-]*)\\.holohive\\.io(:\\d+)?$',
+            },
+          ],
+          destination: '/l/:sub/:slug*',
+        },
+      ],
+    };
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = [...(config.externals || []), '@radix-ui/react-progress'];
