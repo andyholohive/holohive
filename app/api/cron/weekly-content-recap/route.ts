@@ -107,7 +107,9 @@ export async function GET(request: Request) {
     for (const l of ((lineups as any[]) ?? [])) {
       const c = l.campaign;
       if (!c || seen.has(c.id)) continue;
-      if (c.status !== 'Active' || c.archived_at) continue;
+      // [2026-07-29 per Andy] 'Planning' is not an exclusion — see the note in
+      // app/api/telegram/webhook/route.ts. Only the deliberate end states gate.
+      if (c.status === 'Completed' || c.status === 'Paused' || c.archived_at) continue;
       if (c.client?.is_active === false) continue;
       if (c.is_test === true) continue;
       seen.add(c.id);

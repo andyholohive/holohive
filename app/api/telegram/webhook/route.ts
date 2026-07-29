@@ -2550,7 +2550,16 @@ async function getSubmittableCampaigns(kolId: string): Promise<Array<{
     .map(a => a.campaign)
     .filter((c): c is NonNullable<typeof c> =>
       !!c
-      && c.status === 'Active'
+      // [2026-07-29 per Andy] 'Planning' no longer excluded. The status field
+      // has no reachable control (the Overview tab that holds it was hidden on
+      // 2026-07-02) and in practice nobody advances it — Umia ran nine days
+      // with a confirmed 5-KOL lineup while still reading 'Planning', so its
+      // KOLs could not see it in /submit at all. Excluding a campaign that has
+      // onboarded KOLs, a start date in the past and live engagement coverage,
+      // purely because a decorative field was never flipped, is wrong.
+      // Completed/Paused still gate — those are deliberate end states.
+      && c.status !== 'Completed'
+      && c.status !== 'Paused'
       && !c.archived_at
       && (!c.start_date || c.start_date <= todayIso)
       && c.client?.is_active === true

@@ -96,7 +96,11 @@ export async function GET(request: Request) {
     const { data: campaigns } = await (supabase as any)
       .from('campaigns')
       .select('id, name, status, archived_at, is_test, client_id, client:clients(is_active, is_ad_hoc)')
-      .eq('status', 'Active')
+      // [2026-07-29 per Andy] 'Planning' included — see the note in
+      // app/api/telegram/webhook/route.ts. Umia's lineup deadlines have been
+      // silently un-nudged since 07/20 because its campaign still read
+      // 'Planning' despite a confirmed lineup.
+      .in('status', ['Active', 'Planning'])
       .is('archived_at', null);
     // [2026-07-21 per Andy] Also exclude PAUSED clients — same derivation
     // as /clients: active + not ad-hoc + engagement coverage lapsed

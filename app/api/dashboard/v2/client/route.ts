@@ -147,7 +147,11 @@ export async function GET(request: Request) {
         .from('campaigns')
         .select('id, client_id, status')
         .in('client_id', standardClientIds)
-        .eq('status', 'Active')
+        // [2026-07-29 per Andy] 'Planning' counts as live — see the note in
+        // app/api/telegram/webhook/route.ts. Nobody advances the status field
+        // and it has no reachable control, so gating on it silently hid Umia
+        // and Tria from this KPI while both were mid-campaign.
+        .in('status', ['Active', 'Planning'])
         .is('archived_at', null)
         // [2026-07-28] Newest first so campaignIdByClient below picks the
         // most recent when a client runs more than one active campaign.
