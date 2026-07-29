@@ -4,6 +4,7 @@ import { AgentToolLogger } from './agentToolLogger';
 import { VectorStore } from './vectorStore';
 import { CampaignService } from './campaignService';
 import { ClientService } from './clientService';
+import { resolveCampaignEndDates } from './campaignEndDate';
 import { supabase } from './supabase';
 
 // Lazy initialization of OpenAI client to ensure env vars are loaded
@@ -274,15 +275,25 @@ export class AgentOrchestrator {
         })
       );
 
+      // Stint-derived end dates for the RAG context — same reason as
+      // lib/agentTools.ts. campaigns.end_date is stale on 6 of 42 campaigns and
+      // is not what any human-facing page renders. See lib/campaignEndDate.ts.
+      const ragCampaigns = campaigns.slice(0, 10);
+      const ragEndDates = await resolveCampaignEndDates(
+        supabase,
+        ragCampaigns.map(c => c.id),
+        Object.fromEntries(ragCampaigns.map(c => [c.id, c.end_date ?? null])),
+      );
+
       this.ragContext = {
-        user_campaigns: campaigns.slice(0, 10).map(c => ({
+        user_campaigns: ragCampaigns.map(c => ({
           id: c.id,
           name: c.name,
           client_name: c.client_name,
           status: c.status,
           total_budget: c.total_budget,
           start_date: c.start_date,
-          end_date: c.end_date,
+          end_date: ragEndDates[c.id] ?? null,
         })),
         user_clients: clients.slice(0, 10).map(c => ({
           id: c.id,

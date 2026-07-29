@@ -85,7 +85,14 @@ export async function getThisWeekKolDelivery(
     .from('campaigns')
     .select('id, name, client_id, start_date, end_date, status')
     .in('client_id', clientIds)
-    .eq('status', 'Active')
+    // [2026-07-29] Was .eq('status','Active'). A campaign can hold a confirmed
+    // lineup while its status is still 'Planning' — nothing forces the two to
+    // agree — and this filter then dropped it silently, so the Client Success
+    // row rendered "Approved —" with no empty state and no warning. Umia (5-KOL
+    // lineup confirmed 07/27) and Tria were both in that hole. Reported as
+    // "lineup approved but no KOL list in the dashboard"; the Lineup Manager
+    // itself was fine, this lookup was the culprit.
+    .in('status', ['Active', 'Planning'])
     .not('start_date', 'is', null);
 
   if (!campaigns || campaigns.length === 0) return out;

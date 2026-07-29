@@ -763,10 +763,13 @@ export default function KOLsPage() {
         // every Native. Empty creator_type → 'General' so the General chip
         // still buckets implicitly-General KOLs.
         (!filters.creator_type.length || filters.creator_type.every(ct => effectiveCreatorTypes(kol.creator_type).includes(ct))) &&
-        // Niche is OR (match any selected tag). Reads canonical niche_tags,
-        // falls back to the deprecated `niche` mirror. This predicate was
-        // missing entirely, so the Niche filter did nothing before.
-        (!filters.niche.length || filters.niche.some(n => (kol.niche_tags?.length ? kol.niche_tags : (kol.niche || [])).includes(n))) &&
+        // Niche is AND, matching Creator Type above. [2026-07-29] Was .some()
+        // — selecting AI + Trading returned "AI OR Trading", which Quazo
+        // flagged three times ("Can't filter for two types at a go"). Creator
+        // Type was fixed to .every() and this line was left behind. Jdot's
+        // ruling on 14 Jul was compound for both.
+        // Reads canonical niche_tags, falls back to the deprecated `niche` mirror.
+        (!filters.niche.length || filters.niche.every(n => (kol.niche_tags?.length ? kol.niche_tags : (kol.niche || [])).includes(n))) &&
         (!filters.content_type.length || filters.content_type.some(ct => kol.content_type?.includes(ct))) &&
         (!filters.deliverables.length || filters.deliverables.some(d => kol.deliverables?.includes(d))) &&
         // Pricing filter dropped 2026-07-01 — schema switched to numeric

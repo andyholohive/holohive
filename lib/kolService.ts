@@ -184,13 +184,21 @@ export class KOLService {
           community_founder: kolData.community_founder || false,
           community_link: kolData.community_link || null,
           deliverables: kolData.deliverables || [],
-          niche_tags: kolData.niche_tags || [],
+          // [2026-07-29] Accept the deprecated `niche` / `creator_type` aliases
+          // as well as the canonical names. CreateKOLData declares both pairs,
+          // but only the canonical half was ever mapped — so a caller passing
+          // the alias had its value silently dropped on the floor. /kols'
+          // "add KOL" form passes `creator_type: ['General']` and `niche: []`,
+          // which is why 182 of 320 live KOLs ended up with empty creator_types
+          // and render blank on the campaign dashboard (/kols hides it behind
+          // the effectiveCreatorTypes coalesce, so nobody saw it there).
+          niche_tags: kolData.niche_tags ?? kolData.niche ?? [],
           post_price: kolData.post_price ?? null,
           share_price: kolData.share_price ?? null,
           pricing_notes: kolData.pricing_notes ?? null,
           group_chat: kolData.group_chat || false,
           notes: kolData.notes || null,
-          creator_types: kolData.creator_types || null,
+          creator_types: kolData.creator_types ?? kolData.creator_type ?? null,
           content_type: kolData.content_type || null,
           in_house: kolData.in_house || null,
           projects_worked_together: kolData.projects_worked_together || [],

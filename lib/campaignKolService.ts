@@ -104,14 +104,22 @@ export class CampaignKOLService {
   }
 
   static async addCampaignKOL(campaignId: string, masterKolId: string, hhStatus: CampaignKOL['hh_status'], notes?: string): Promise<CampaignKOL> {
+    // [2026-07-29] Upsert, not insert. campaign_kols carries a UNIQUE
+    // (campaign_id, master_kol_id) that does NOT exclude soft-deleted rows, so
+    // re-adding a previously removed KOL raised 23505 and surfaced as the
+    // generic "Failed to add campaign KOL". Upserting on that key resurrects
+    // the original row and clears deleted_at, which also preserves its history
+    // (contents and payments still point at the same campaign_kols id) rather
+    // than orphaning it behind a new row.
     const { data, error } = await supabase
       .from('campaign_kols')
-      .insert({
+      .upsert({
         campaign_id: campaignId,
         master_kol_id: masterKolId,
         hh_status: hhStatus,
-        notes: notes || null
-      })
+        notes: notes || null,
+        deleted_at: null,
+      } as any, { onConflict: 'campaign_id,master_kol_id' })
       .select()
       .single();
 
@@ -168,11 +176,19 @@ export class CampaignKOLService {
   }
 
   static async getAvailableKOLs(campaignId: string): Promise<any[]> {
-    // First get the IDs of KOLs already assigned to this campaign
+    // First get the IDs of KOLs already assigned to this campaign.
+    //
+    // [2026-07-29] `.is('deleted_at', null)` added. Without it, soft-deleted
+    // rows kept counting as "assigned", so a KOL removed from a campaign could
+    // never be found in the picker to add back — reported as "deleted KOL
+    // doesn't show up when I search". The matching resurrect path is in
+    // addCampaignKOL below; both halves are needed, since the table has a
+    // UNIQUE (campaign_id, master_kol_id) with no deleted_at predicate.
     const { data: assignedKOLs, error: assignedError } = await supabase
       .from('campaign_kols')
       .select('master_kol_id')
-      .eq('campaign_id', campaignId);
+      .eq('campaign_id', campaignId)
+      .is('deleted_at', null);
 
     if (assignedError) {
       console.error('Error fetching assigned KOLs:', assignedError);

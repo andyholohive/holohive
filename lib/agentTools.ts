@@ -3,6 +3,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { VectorStore } from './vectorStore';
 import { KOLService, MasterKOL } from './kolService';
 import { CampaignService } from './campaignService';
+import { resolveCampaignEndDate, resolveCampaignEndDates } from './campaignEndDate';
 import { ClientService } from './clientService';
 import { MessageTemplateService } from './messageTemplateService';
 import { supabase } from './supabase';
@@ -795,6 +796,10 @@ export const analyzeCampaignPerformanceTool: AgentTool = {
 
       if (kolsError) throw kolsError;
 
+      // Stint-derived end date — resolved once, used in both the structured
+      // payload and the narrative context below.
+      const effectiveEndDate = await resolveCampaignEndDate(client, campaign_id, campaign.end_date ?? null);
+
       // Calculate metrics
       const totalKOLs = campaignKOLs?.length || 0;
       const budgetUtilization = campaign.total_allocated
@@ -841,7 +846,11 @@ export const analyzeCampaignPerformanceTool: AgentTool = {
         },
         timeline: {
           start_date: campaign.start_date,
-          end_date: campaign.end_date,
+          // [2026-07-29] Stint-derived, not the stored column — see
+          // lib/campaignEndDate.ts. The agent used to quote campaigns.end_date,
+          // which for Venice was three weeks in the past while the campaign was
+          // live. No human-facing page shows that number.
+          end_date: effectiveEndDate,
           status: campaign.status,
         }
       };
@@ -864,7 +873,7 @@ ${Object.entries(platformDistribution).map(([p, c]) => `- ${p}: ${c} KOLs`).join
 
 Timeline:
 - Start Date: ${campaign.start_date || 'Not set'}
-- End Date: ${campaign.end_date || 'Not set'}
+- End Date: ${effectiveEndDate || 'Not set'}
 
 Analyze this campaign and provide comprehensive insights in the following format:
 
@@ -1164,14 +1173,21 @@ export const getUserContextTool: AgentTool = {
       // Get campaigns
       if (include_campaigns) {
         const campaigns = await CampaignService.getCampaignsForUser(context.userRole, context.userId, client);
-        userContext.campaigns = campaigns.slice(0, limit).map(c => ({
+        const shown = campaigns.slice(0, limit);
+        // Stint-derived end dates in one round-trip — see lib/campaignEndDate.ts.
+        const endDates = await resolveCampaignEndDates(
+          client,
+          shown.map(c => c.id),
+          Object.fromEntries(shown.map(c => [c.id, c.end_date ?? null])),
+        );
+        userContext.campaigns = shown.map(c => ({
           id: c.id,
           name: c.name,
           client_name: c.client_name,
           status: c.status,
           total_budget: c.total_budget,
           start_date: c.start_date,
-          end_date: c.end_date,
+          end_date: endDates[c.id] ?? null,
         }));
         userContext.total_campaigns = campaigns.length;
       }
