@@ -38,14 +38,18 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { formatRelativeShort } from '@/lib/dateFormat';
-import { Link2, Plus, Copy, Trash2, ExternalLink, MousePointerClick, Power } from 'lucide-react';
+import { Link2, Plus, Copy, Trash2, ExternalLink, MousePointerClick, Power, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const LINK_DOMAIN = 'holohive.io';
+
+type DnsStatus = 'manual' | 'pending' | 'provisioned' | 'failed';
 
 type ShortLinkRow = {
   id: string;
   subdomain: string;
   slug: string;
+  dns_status: DnsStatus;
+  dns_error: string | null;
   destination_url: string;
   label: string | null;
   is_active: boolean;
@@ -64,6 +68,10 @@ export default function ShortLinksPage() {
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<ShortLinkRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
+  // Whether GoDaddy + Vercel credentials are configured server-side. Decides
+  // between "we'll set DNS up for you" and the manual two-step instructions.
+  const [autoDns, setAutoDns] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...BLANK });
@@ -74,6 +82,7 @@ export default function ShortLinksPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load links');
       setLinks(json.links ?? []);
+      setAutoDns(Boolean(json.autoDns));
     } catch (err: any) {
       toast({ title: 'Could not load links', description: err.message, variant: 'destructive' });
     } finally {
@@ -92,7 +101,7 @@ export default function ShortLinksPage() {
   }, []);
 
   const publicUrl = (l: { subdomain: string; slug: string }) =>
-    `https://${l.subdomain}.${LINK_DOMAIN}/${l.slug}`;
+    `https://${l.subdomain}.${LINK_DOMAIN}${l.slug ? `/${l.slug}` : ''}`;
 
   // Subdomains already live somewhere — a second link on one of these needs
   // no DNS work, which is the difference between "works now" and "works
@@ -130,9 +139,14 @@ export default function ShortLinksPage() {
       if (!res.ok) throw new Error(json.error || 'Failed to create link');
       toast({
         title: 'Link created',
-        description: needsDns
-          ? `Add the CNAME for ${previewSub} before sharing it.`
-          : `${previewSub}.${LINK_DOMAIN}/${previewSlug} is live.`,
+        description: !needsDns
+          ? `${publicUrl({ subdomain: previewSub, slug: previewSlug })} is live.`
+          : json.provision?.status === 'provisioned'
+            ? `DNS for ${previewSub} was set up automatically — allow a few minutes to propagate.`
+            : json.provision?.error
+              ? `Link saved, but DNS needs attention: ${json.provision.error}`
+              : `Add the CNAME for ${previewSub} before sharing it.`,
+        variant: needsDns && json.provision?.status === 'failed' ? 'destructive' : undefined,
       });
       setDialogOpen(false);
       setForm({ ...BLANK });
@@ -167,12 +181,33 @@ export default function ShortLinksPage() {
     toast({ title: 'Link deleted', description: 'It will stop redirecting immediately.' });
   };
 
+  const retryDns = async (link: ShortLinkRow) => {
+    setRetrying(link.id);
+    try {
+      const res = await fetch(`/api/short-links/${link.id}/provision`, { method: 'POST' });
+      const json = await res.json();
+      const r = json.result ?? {};
+      toast({
+        title: r.status === 'provisioned' ? 'DNS set up' : 'Still not ready',
+        description: r.status === 'provisioned'
+          ? `${link.subdomain}.${LINK_DOMAIN} is pointed here. DNS can take a few minutes to propagate.`
+          : (r.error || 'No API credentials configured.'),
+        variant: r.status === 'provisioned' ? undefined : 'destructive',
+      });
+      load();
+    } finally {
+      setRetrying(null);
+    }
+  };
+
   const copy = async (url: string) => {
     await navigator.clipboard.writeText(url);
     toast({ title: 'Copied', description: url });
   };
 
-  const canSubmit = previewSub && previewSlug && form.destination_url.trim() && !saving;
+  // No previewSlug requirement — an empty path means the subdomain root,
+  // which is how a migrated GoDaddy forward keeps its old destination.
+  const canSubmit = previewSub && form.destination_url.trim() && !saving;
 
   const header = (
     <PageHeader
@@ -229,6 +264,7 @@ export default function ShortLinksPage() {
                 <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Client</TableHead>
                 <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Clicks</TableHead>
                 <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
+                <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">DNS</TableHead>
                 <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -265,6 +301,36 @@ export default function ShortLinksPage() {
                     <StatusBadge tone={link.is_active ? 'success' : 'neutral'} size="sm">
                       {link.is_active ? 'Active' : 'Off'}
                     </StatusBadge>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    {(() => {
+                      // A link whose DNS isn't done resolves nowhere, so this
+                      // column is the difference between "sendable" and "not".
+                      const tone = link.dns_status === 'provisioned' ? 'success'
+                        : link.dns_status === 'failed' ? 'danger'
+                        : link.dns_status === 'pending' ? 'warning' : 'neutral';
+                      const label = link.dns_status === 'provisioned' ? 'Ready'
+                        : link.dns_status === 'failed' ? 'Needs fix'
+                        : link.dns_status === 'pending' ? 'Setting up' : 'Manual';
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          <StatusBadge tone={tone as any} size="sm">{label}</StatusBadge>
+                          {link.dns_status !== 'provisioned' && (
+                            <Button
+                              variant="ghost" size="sm" className="h-6 w-6 p-0"
+                              title={link.dns_error || 'Retry DNS setup'}
+                              disabled={retrying === link.id}
+                              onClick={() => retryDns(link)}
+                            >
+                              <RefreshCw className={`h-3.5 w-3.5 ${retrying === link.id ? 'animate-spin' : ''}`} />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {link.dns_error && (
+                      <div className="text-xs text-rose-600 mt-1 max-w-[18rem]">{link.dns_error}</div>
+                    )}
                   </TableCell>
                   <TableCell className="py-3">
                     <div className="flex items-center justify-end gap-1">
@@ -318,9 +384,9 @@ export default function ShortLinksPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="slug">Path <RequiredAsterisk /></Label>
+                <Label htmlFor="slug">Path</Label>
                 <Input
-                  id="slug" className="h-9 focus-brand" placeholder="fitcheck"
+                  id="slug" className="h-9 focus-brand" placeholder="fitcheck (blank = root)"
                   value={form.slug}
                   onChange={e => setForm({ ...form, slug: e.target.value })}
                 />
@@ -364,16 +430,33 @@ export default function ShortLinksPage() {
               </div>
             </div>
 
-            {previewSub && previewSlug && (
+            {previewSub && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">KOLs will receive</div>
                 <div className="font-mono text-sm break-all">
-                  https://{previewSub}.{LINK_DOMAIN}/{previewSlug}
+                  https://{previewSub}.{LINK_DOMAIN}{previewSlug ? `/${previewSlug}` : ''}
                 </div>
+                {!previewSlug && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Empty path = the subdomain root itself.
+                  </div>
+                )}
               </div>
             )}
 
-            {needsDns && (
+            {needsDns && autoDns && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                <div className="text-sm font-medium text-sky-900">
+                  DNS for <code>{previewSub}</code> will be set up automatically
+                </div>
+                <p className="text-xs text-sky-800 mt-1">
+                  The CNAME and the Vercel domain are created on save — nothing for you to do.
+                  Propagation usually takes a few minutes.
+                </p>
+              </div>
+            )}
+
+            {needsDns && !autoDns && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1.5">
                 <div className="text-sm font-medium text-amber-900">
                   One-time DNS step for <code>{previewSub}</code>
@@ -386,6 +469,10 @@ export default function ShortLinksPage() {
                   <li>GoDaddy → add CNAME <code>{previewSub}</code> → <code>cname.vercel-dns.com</code></li>
                   <li>Vercel → add <code>{previewSub}.{LINK_DOMAIN}</code> as a domain on this project</li>
                 </ol>
+                <p className="text-xs text-amber-800">
+                  Set <code>GODADDY_API_TOKEN</code>, <code>VERCEL_API_TOKEN</code> and{' '}
+                  <code>VERCEL_PROJECT_ID</code> to have this done for you automatically.
+                </p>
               </div>
             )}
           </div>

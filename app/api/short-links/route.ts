@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireRole } from '@/lib/requireSuperAdmin';
 import { RESERVED_SUBDOMAINS } from '@/lib/shortLinkService';
+import {
+  provisionSubdomain, provisioningConfigured, type ProvisionResult,
+} from '@/lib/domainProvisioning';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +19,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
+// Empty slug === the subdomain root (tria.holohive.io itself).
 const SLUG_RE = /^[a-z0-9][a-z0-9/_-]{0,127}$/;
 
 function admin() {
@@ -60,6 +64,10 @@ export async function GET(request: Request) {
       click_count: counts.get(l.id) ?? 0,
       last_clicked_at: lastClick.get(l.id) ?? null,
     })),
+    // Drives the dialog copy: with credentials set the UI promises automatic
+    // setup, without them it shows the manual CNAME steps. Never leaks the
+    // credential values themselves — only whether they exist.
+    autoDns: provisioningConfigured(),
   });
 }
 
@@ -84,7 +92,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (!SLUG_RE.test(slug)) {
+  if (slug !== '' && !SLUG_RE.test(slug)) {
     return NextResponse.json({ error: 'Path must be lowercase letters, numbers, hyphens or underscores.' }, { status: 400 });
   }
   let destHost: string;
@@ -101,6 +109,17 @@ export async function POST(request: Request) {
   }
 
   const supabase = admin();
+
+  // Is this subdomain already serving links? If so its DNS is already done and
+  // we skip provisioning entirely — the common case after the first link.
+  const { data: sibling } = await (supabase as any)
+    .from('short_links')
+    .select('id, dns_status')
+    .eq('subdomain', subdomain)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
   const { data, error } = await (supabase as any)
     .from('short_links')
     .insert({
@@ -111,6 +130,7 @@ export async function POST(request: Request) {
       client_id: body.client_id || null,
       campaign_id: body.campaign_id || null,
       created_by: guard.user?.id ?? null,
+      dns_status: sibling ? (sibling.dns_status ?? 'manual') : 'pending',
     })
     .select()
     .single();
@@ -124,5 +144,27 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ link: data });
+
+  // New subdomain → create the CNAME and attach the Vercel domain ourselves.
+  // Deliberately after the insert: the link row is the user's work and must
+  // survive a DNS failure, which is then visible as dns_status='failed' with
+  // a Retry button rather than a lost form.
+  let provision: ProvisionResult | null = null;
+  if (!sibling) {
+    provision = await provisionSubdomain(subdomain);
+    await (supabase as any)
+      .from('short_links')
+      .update({
+        dns_status: provision.status,
+        dns_error: provision.error ?? null,
+        dns_checked_at: new Date().toISOString(),
+      })
+      .eq('id', (data as any).id);
+  }
+
+  return NextResponse.json({
+    link: { ...(data as any), dns_status: provision?.status ?? (data as any).dns_status },
+    provision,
+    subdomainWasNew: !sibling,
+  });
 }

@@ -43,11 +43,15 @@ function notFound(): NextResponse {
 
 export async function GET(
   request: Request,
-  { params }: { params: { sub: string; slug: string[] } },
+  { params }: { params: { sub: string; slug?: string[] } },
 ) {
   const sub = (params.sub || '').toLowerCase();
+  // Optional catch-all: `/l/tria` (bare subdomain root) arrives with no slug
+  // segments and resolves against slug = ''. That matters because tria, yano
+  // and jdot are GoDaddy *forwards* today — moving a subdomain here without
+  // being able to own its root would silently kill wherever it used to point.
   const slug = (params.slug || []).join('/').toLowerCase();
-  if (!sub || !slug) return notFound();
+  if (!sub) return notFound();
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
