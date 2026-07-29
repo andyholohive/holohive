@@ -137,16 +137,65 @@ async function godaddyPutCname(subdomain: string): Promise<void> {
   }
 }
 
-/** Is this host attached to OUR project, and has Vercel verified it? */
-async function vercelGetDomain(host: string): Promise<{ present: boolean; verified: boolean }> {
+/** A DNS record Vercel wants in place before it will verify ownership. */
+type VerificationRecord = { type: string; domain: string; value: string };
+
+/** Is this host attached to OUR project, verified, and what does it still need? */
+async function vercelGetDomain(host: string): Promise<{
+  present: boolean;
+  verified: boolean;
+  verification: VerificationRecord[];
+}> {
   const res = await fetch(
     `https://api.vercel.com/v9/projects/${process.env.VERCEL_PROJECT_ID}/domains/${encodeURIComponent(host)}${vercelQuery()}`,
     { headers: { Authorization: `Bearer ${process.env.VERCEL_API_TOKEN}` } },
   );
-  if (res.status === 404) return { present: false, verified: false };
-  if (!res.ok) return { present: false, verified: false };
+  if (!res.ok) return { present: false, verified: false, verification: [] };
   const body = await res.json().catch(() => ({} as any));
-  return { present: true, verified: body?.verified !== false };
+  return {
+    present: true,
+    verified: body?.verified !== false,
+    verification: Array.isArray(body?.verification) ? body.verification : [],
+  };
+}
+
+/** Asks Vercel to re-run its ownership check now that the record exists. */
+async function vercelVerifyDomain(host: string): Promise<boolean> {
+  const res = await fetch(
+    `https://api.vercel.com/v9/projects/${process.env.VERCEL_PROJECT_ID}/domains/${encodeURIComponent(host)}/verify${vercelQuery()}`,
+    { method: 'POST', headers: { Authorization: `Bearer ${process.env.VERCEL_API_TOKEN}` } },
+  );
+  if (!res.ok) return false;
+  const body = await res.json().catch(() => ({} as any));
+  return body?.verified !== false;
+}
+
+/**
+ * Writes a Vercel-issued verification record at GoDaddy.
+ *
+ * Vercel asks for ownership proof when it can't establish the domain from
+ * the CNAME alone — typically a TXT on `_vercel.holohive.io`. The API hands
+ * us the exact name and value, so there is no reason to make a human
+ * transcribe it. `record.domain` is fully-qualified; GoDaddy wants the name
+ * relative to the zone, hence the suffix strip.
+ */
+async function godaddyPutVerification(record: VerificationRecord): Promise<void> {
+  const name = record.domain.endsWith(`.${LINK_ROOT_DOMAIN}`)
+    ? record.domain.slice(0, -(LINK_ROOT_DOMAIN.length + 1))
+    : record.domain === LINK_ROOT_DOMAIN ? '@' : record.domain;
+
+  const res = await fetch(
+    `https://api.godaddy.com/v1/domains/${LINK_ROOT_DOMAIN}/records/${encodeURIComponent(record.type)}/${encodeURIComponent(name)}`,
+    {
+      method: 'PUT',
+      headers: { Authorization: godaddyAuth() as string, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ data: record.value, ttl: 600 }]),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GoDaddy ${res.status} writing ${record.type} ${name}: ${body.slice(0, 200)}`);
+  }
 }
 
 /**
@@ -249,17 +298,40 @@ export async function provisionSubdomain(subdomain: string): Promise<ProvisionRe
       steps.push(`CNAME ${subdomain} → ${VERCEL_CNAME_TARGET} written at GoDaddy.`);
     }
 
-    const { verified } = await vercelAddDomain(host);
+    let { verified } = await vercelAddDomain(host);
+
     if (!verified) {
-      // Added but not yet verified: no certificate, so the URL does not serve.
+      // Vercel wants ownership proof. It tells us exactly which record, so
+      // write it rather than asking a human to copy a challenge string.
+      const info = await vercelGetDomain(host);
+      if (info.verification.length > 0) {
+        for (const rec of info.verification) {
+          await godaddyPutVerification(rec);
+          steps.push(`Wrote ${rec.type} ${rec.domain} for Vercel ownership check.`);
+        }
+        verified = await vercelVerifyDomain(host);
+        steps.push(verified
+          ? 'Vercel verified the domain.'
+          : 'Verification record written; Vercel has not accepted it yet.');
+      }
+    }
+
+    if (!verified) {
+      // Still unverified means no certificate, so the URL does not serve.
       // Reporting 'provisioned' here is what made the row lie last time.
-      steps.push(`${host} added to the Vercel project, awaiting verification.`);
+      const info = await vercelGetDomain(host);
+      const needed = info.verification
+        .map(r => `${r.type} ${r.domain} = ${r.value}`)
+        .join('; ');
       return {
         status: 'pending',
         error:
           `${host} is on the Vercel project but not verified yet, so no ` +
-          `certificate has been issued and the URL will not resolve. This ` +
-          `usually clears within a few minutes — hit Retry to re-check.`,
+          `certificate has been issued and the URL will not resolve. ` +
+          (needed
+            ? `The verification record has been written at GoDaddy (${needed}) — ` +
+              `DNS needs a few minutes to propagate before Vercel will accept it. Hit Retry.`
+            : `Vercel reported no verification record to add; retry shortly.`),
         steps,
       };
     }
