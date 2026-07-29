@@ -29,11 +29,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 import { useToast } from '@/hooks/use-toast';
-import { Radio, Search, X, Plus, ChevronDown, Sliders, Loader2 } from 'lucide-react';
+import { Radio, Search, X, Plus, ChevronDown, Sliders, Loader2, Eye, Send, AlertTriangle } from 'lucide-react';
 
 type ClientLite = { id: string; name: string };
 
 type CoinResult = { id: string; symbol: string; name: string; rank: number | null; thumb: string | null };
+
+type TestResult = {
+  ok: boolean;
+  sent?: boolean;
+  dry_run?: boolean;
+  chat_id?: string | null;
+  source?: 'override' | 'default' | 'none';
+  preview?: string;
+  pending?: string[];
+  message_id?: number | null;
+  error?: string;
+};
 
 type Features = { weekly_market_report: boolean; korea_listings_digest: boolean; client_listing_alert: boolean };
 type Thresholds = { kimchi_hot: number; kimchi_positive: number; kimchi_flat: number; trend_deadband: number };
@@ -90,8 +102,21 @@ export function KrSignalSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [form, setForm] = useState<Form>(emptyForm());
+  // The kr_signal_clients row id — the test endpoint keys off it, and its
+  // absence is also what "never saved" means.
+  const [configId, setConfigId] = useState<string | null>(null);
+  // Snapshot of the last-saved form, so the test can refuse to run against
+  // settings the operator has since edited but not saved.
+  const [savedForm, setSavedForm] = useState<Form | null>(null);
+  const [testing, setTesting] = useState<'preview' | 'send' | null>(null);
+  const [confirmSend, setConfirmSend] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   const selectedClient = useMemo(() => clients.find(c => c.id === clientId) ?? null, [clients, clientId]);
+  const dirty = useMemo(
+    () => !!savedForm && JSON.stringify(savedForm) !== JSON.stringify(form),
+    [savedForm, form],
+  );
 
   // Pick the initial client when the dialog opens.
   useEffect(() => {
@@ -104,6 +129,10 @@ export function KrSignalSettingsDialog({
   useEffect(() => {
     if (!open || !clientId) return;
     let cancelled = false;
+    // A result from the previously-selected client would be misread as this
+    // one's.
+    setTestResult(null);
+    setConfirmSend(false);
     (async () => {
       setLoading(true);
       try {
@@ -113,7 +142,8 @@ export function KrSignalSettingsDialog({
         const cfg = json?.config;
         if (cfg) {
           setConfigured(true);
-          setForm({
+          setConfigId(cfg.id ?? null);
+          const next: Form = {
             is_active: !!cfg.is_active,
             ticker: cfg.ticker ?? '',
             coingecko_id: cfg.coingecko_id ?? '',
@@ -137,13 +167,17 @@ export function KrSignalSettingsDialog({
               kimchi_flat: num(cfg.thresholds?.kimchi_flat, DEFAULT_THRESHOLDS.kimchi_flat),
               trend_deadband: num(cfg.thresholds?.trend_deadband, DEFAULT_THRESHOLDS.trend_deadband),
             },
-          });
+          };
+          setForm(next);
+          setSavedForm(next);
         } else {
           setConfigured(false);
+          setConfigId(null);
           setForm(emptyForm());
+          setSavedForm(null);
         }
       } catch {
-        if (!cancelled) { setConfigured(false); setForm(emptyForm()); }
+        if (!cancelled) { setConfigured(false); setConfigId(null); setForm(emptyForm()); setSavedForm(null); }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -186,11 +220,49 @@ export function KrSignalSettingsDialog({
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Save failed');
       setConfigured(true);
+      if (json?.config?.id) setConfigId(json.config.id);
+      // Re-baseline so the test stops warning about unsaved edits, and drop a
+      // stale result that described the pre-save config.
+      setSavedForm(form);
+      setTestResult(null);
       toast({ title: 'Korea Signal settings saved', description: selectedClient?.name });
     } catch (e: any) {
       toast({ title: 'Save failed', description: String(e?.message || e), variant: 'destructive' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Preview builds the real Sunday report and sends nothing; send posts it to
+   * the client's resolved chat. Both go through the same endpoint the
+   * /admin/telegram-comm row uses, so a pass here is evidence about the actual
+   * cron path — not a separate code path that could drift from it.
+   */
+  const runTest = async (mode: 'preview' | 'send') => {
+    if (!configId) return;
+    setTesting(mode);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/admin/kr-signal-clients/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: configId, dryRun: mode === 'preview' }),
+      });
+      const json = await res.json();
+      if (res.status === 403) {
+        setTestResult({ ok: false, error: 'Test sends are super-admin only.' });
+      } else {
+        setTestResult(json as TestResult);
+      }
+      if (mode === 'send' && json?.ok) {
+        toast({ title: 'Test sent', description: `Posted to ${json.chat_id}` });
+      }
+    } catch (e: any) {
+      setTestResult({ ok: false, error: String(e?.message || e) });
+    } finally {
+      setTesting(null);
+      setConfirmSend(false);
     }
   };
 
@@ -322,6 +394,63 @@ export function KrSignalSettingsDialog({
               />
             </Section>
 
+            {/* ── Test ───────────────────────────────────── */}
+            <Section
+              title="Test this config"
+              help="Builds the real Sunday report with this client's live data. Preview sends nothing; Send test posts it to the chat above, marked as a test."
+            >
+              {!configId ? (
+                <p className="text-xs text-ink-warm-500">Save the settings once before testing.</p>
+              ) : (
+                <>
+                  {dirty && (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-amber-800">
+                        You have unsaved changes. The test runs against the <b>saved</b> settings — save first
+                        so you're testing what you're looking at.
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={() => runTest('preview')}
+                      disabled={!!testing || dirty}
+                    >
+                      {testing === 'preview'
+                        ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Building…</>
+                        : <><Eye className="h-3.5 w-3.5 mr-1.5" />Preview (no send)</>}
+                    </Button>
+
+                    {!confirmSend ? (
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => { setTestResult(null); setConfirmSend(true); }}
+                        disabled={!!testing || dirty}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1.5" />Send test
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-ink-warm-600">Posts to the client's chat —</span>
+                        <Button variant="brand" size="sm" onClick={() => runTest('send')} disabled={!!testing}>
+                          {testing === 'send'
+                            ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Sending…</>
+                            : 'Send it'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setConfirmSend(false)} disabled={!!testing}>
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {testResult && <TestResultPanel result={testResult} />}
+                </>
+              )}
+            </Section>
+
             {/* ── Digest features ────────────────────────── */}
             <Section title="Digest features">
               <FeatureToggle label="Weekly market report" desc="Sunday KR market digest"
@@ -403,6 +532,85 @@ function FeatureToggle({ label, desc, checked, onChange }: { label: string; desc
         <div className="text-xs text-ink-warm-500">{desc}</div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+// ─── Test result ────────────────────────────────────────────────────
+
+/**
+ * The preview arrives as Telegram HTML. It's rendered as TEXT, never as
+ * markup — the string is assembled from CoinGecko names, client-entered
+ * tickers and peer ids, none of which are trusted enough to inject into the
+ * admin's DOM. Formatting is cosmetic here; the numbers are the point.
+ */
+function telegramHtmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function TestResultPanel({ result }: { result: TestResult }) {
+  if (!result.ok) {
+    return (
+      <div className="rounded-md border border-rose-200 bg-rose-50 p-3">
+        <div className="text-xs font-semibold text-rose-800 mb-1">Test failed</div>
+        <p className="text-xs text-rose-700 break-words">{result.error || 'Unknown error'}</p>
+        {result.chat_id && (
+          <p className="text-[11px] text-rose-600 mt-1.5">
+            Destination was <code className="bg-white/60 px-1 rounded">{result.chat_id}</code>.
+            &quot;chat not found&quot; or &quot;bot was kicked&quot; means the KR Signal bot isn&apos;t in that chat.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const destLabel = result.source === 'override' ? 'override chat' : "client's linked chat";
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+        <div className="text-xs font-semibold text-emerald-800">
+          {result.dry_run ? 'Report built — nothing was sent.' : 'Delivered.'}
+        </div>
+        <p className="text-[11px] text-emerald-700 mt-1">
+          {result.chat_id
+            ? <>{result.dry_run ? 'Would post to' : 'Posted to'} <code className="bg-white/60 px-1 rounded">{result.chat_id}</code> ({destLabel}).</>
+            : 'No override and no linked client chat — a real send would have nowhere to go.'}
+        </p>
+      </div>
+
+      {result.pending && result.pending.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+          <div className="text-xs font-semibold text-amber-800 mb-1">
+            {result.pending.length} line{result.pending.length === 1 ? '' : 's'} degraded or hidden
+          </div>
+          <ul className="space-y-1">
+            {result.pending.map((p, i) => (
+              <li key={i} className="text-[11px] text-amber-800 flex gap-1.5">
+                <span className="text-amber-500">•</span><span>{p}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {result.preview && (
+        <div>
+          <div className="text-[11px] text-ink-warm-500 mb-1">
+            What the report says this week — formatting stripped for preview.
+          </div>
+          <pre className="max-h-64 overflow-y-auto rounded-md border border-cream-200 bg-cream-50 p-3 text-[11px] leading-relaxed text-ink-warm-800 whitespace-pre-wrap break-words">
+            {telegramHtmlToText(result.preview)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

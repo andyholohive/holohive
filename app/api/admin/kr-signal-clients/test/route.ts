@@ -9,12 +9,18 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * POST /api/admin/kr-signal-clients/test  — body: { id }
+ * POST /api/admin/kr-signal-clients/test  — body: { id, dryRun? }
  *
  * Sends the ACTUAL Weekly KR Market Report (the same builder the Sunday cron
  * uses) to a KR Signal client's resolved digest chat, via the KR Signal bot's
  * OWN token (KR_SIGNAL_BOT_TOKEN) — so the operator previews the real output
  * AND confirms the bot can post to that chat.
+ *
+ * `dryRun: true` builds the report and resolves the destination but sends
+ * NOTHING, returning the assembled text plus `pending`. That's the safe first
+ * click: the destination here is a live CLIENT group chat, so config mistakes
+ * shouldn't cost the client a stray message. A real send stays one click away
+ * for when the operator actually wants to prove the bot can post.
  *
  * The destination is resolved the same way the crons resolve it:
  *   override (kr_signal_clients.telegram_chat_id) ?? the client's /crm/telegram GC.
@@ -43,6 +49,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const id = body?.id;
+  const dryRun = body?.dryRun === true;
   if (!id) return NextResponse.json({ ok: false, error: 'id required' }, { status: 400 });
 
   const supabase = serviceClient();
@@ -77,7 +84,10 @@ export async function POST(request: Request) {
     if (cands[0]?.chat_id) { chatId = String(cands[0].chat_id); source = 'default'; }
   }
 
-  if (!chatId) {
+  // A dry run still builds the report when there's nowhere to send it — that's
+  // the case where seeing the output matters most (the destination is exactly
+  // what the operator is about to fix).
+  if (!chatId && !dryRun) {
     return NextResponse.json({ ok: false, error: 'No override and no linked client chat — nothing to test.' }, { status: 200 });
   }
 
@@ -86,16 +96,27 @@ export async function POST(request: Request) {
     // own — the cron does the saves separately — so this has no side effects
     // on the WoW history).
     const report = await assembleWeekly(supabase, c as unknown as KrSignalClient);
+    // `pending` is the report's own list of degraded/hidden lines and why —
+    // returned in full, not counted, because each entry names a config gap the
+    // operator can act on ("coingecko_id not set", "content_log_source unset").
+    const pending = report.pending ?? [];
+
+    if (dryRun) {
+      return NextResponse.json({
+        ok: true, sent: false, dry_run: true, chat_id: chatId, source, pending,
+        preview: report.html,
+      });
+    }
+
     // Small marker so recipients don't mistake it for the scheduled Sunday post.
     const html = `🧪 <b>Test send</b> · not the scheduled post\n${report.html}`;
-    const res = await sendMessage(chatId, html, threadId);
+    const res = await sendMessage(chatId!, html, threadId);
     return NextResponse.json({
-      ok: true, sent: true, chat_id: chatId, source,
+      ok: true, sent: true, chat_id: chatId, source, pending,
       message_id: (res as any)?.message_id ?? null,
-      pending: report.pending?.length ?? 0,
     });
   } catch (err: any) {
     // KR sendMessage / assembleWeekly throw with a descriptive message.
-    return NextResponse.json({ ok: false, sent: false, chat_id: chatId, source, error: String(err?.message || err) }, { status: 200 });
+    return NextResponse.json({ ok: false, sent: false, dry_run: dryRun, chat_id: chatId, source, error: String(err?.message || err) }, { status: 200 });
   }
 }
