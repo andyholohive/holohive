@@ -3046,22 +3046,6 @@ async function sendSubmissionProgressAlert(opts: {
     rows: Array<{ id: string; multipost_group_id: string | null }> | null,
   ) => new Set((rows ?? []).map(r => r.multipost_group_id ?? r.id)).size;
 
-  const { data: liveRows } = await (supabaseAdmin as any)
-    .from('contents')
-    .select('id, multipost_group_id')
-    .eq('campaign_id', opts.campaignId)
-    .in('status', ['posted', 'published', 'live'])
-    .gte('activation_date', weekStartDate);
-  const liveCount = dedupeCount(liveRows);
-
-  const { data: todayRows } = await (supabaseAdmin as any)
-    .from('contents')
-    .select('id, multipost_group_id')
-    .eq('campaign_id', opts.campaignId)
-    .in('status', ['posted', 'published', 'live'])
-    .gte('activation_date', todayDate);
-  const todayCount = dedupeCount(todayRows);
-
   // Planned count = KOL slots in THIS week's confirmed lineup.
   // Schema: campaign_lineups → lineup_angles (lineup_id) → lineup_slots
   // (angle_id). Match the confirmed lineup by week_number when we have the
@@ -3070,6 +3054,9 @@ async function sendSubmissionProgressAlert(opts: {
   // [2026-07-09] Was querying non-existent columns (campaign_lineups
   // .week_start_date + lineup_slots.lineup_id), so plannedCount was always
   // 0 and every alert read "No confirmed lineup yet."
+  //
+  // [2026-07-29] Resolved BEFORE the live counts, because the slot roster now
+  // scopes the numerator too — see the note there.
   let lineupQuery = (supabaseAdmin as any)
     .from('campaign_lineups')
     .select('id')
@@ -3084,6 +3071,7 @@ async function sendSubmissionProgressAlert(opts: {
     .maybeSingle();
 
   let plannedCount = 0;
+  const lineupKolIds = new Set<string>();
   if (lineup?.id) {
     const { data: angles } = await (supabaseAdmin as any)
       .from('lineup_angles')
@@ -3093,11 +3081,86 @@ async function sendSubmissionProgressAlert(opts: {
     if (angleIds.length) {
       const { data: slots } = await (supabaseAdmin as any)
         .from('lineup_slots')
-        .select('id')
+        .select('id, kol_id')
         .in('angle_id', angleIds);
       plannedCount = (slots ?? []).length;
+      for (const s of ((slots ?? []) as Array<{ kol_id: string | null }>)) {
+        if (s.kol_id) lineupKolIds.add(s.kol_id);
+      }
     }
   }
+
+  // [2026-07-29 per Andy] Numerator and denominator must describe the SAME
+  // population. They didn't: liveCount counted every posted `contents` row on
+  // the campaign while plannedCount counted lineup slots, so a post from a KOL
+  // who holds no slot inflated the fraction. Umia week 2 read "2 of 5 live"
+  // when only Manbull (1 of the 5) had posted — Degen Guy's manually-logged
+  // post was the phantom second.
+  //
+  // Fix: when a lineup governs the week, only its KOLs count toward the
+  // fraction; anything else is reported separately as "+N off-lineup" so a
+  // real post is still visible rather than silently dropped. With no lineup
+  // (plannedCount 0) every row counts, unchanged — 33 of 42 campaigns never
+  // build lineups.
+  //
+  // The lineup roster is keyed by master_kol_id; `contents` carries
+  // campaign_kols_id, so the join hops through campaign_kols. We deliberately
+  // do NOT count lineup_slots.status='posted' instead: markLineupSlotPosted
+  // only flips slots that already exist, so a KOL who posts before the lineup
+  // is built would never be credited (Mincho on Umia week 2 is exactly that —
+  // posted, slot still 'pending').
+  const contentCols = 'id, multipost_group_id, campaign_kols_id';
+  const [{ data: liveRows }, { data: todayRows }] = await Promise.all([
+    (supabaseAdmin as any)
+      .from('contents')
+      .select(contentCols)
+      .eq('campaign_id', opts.campaignId)
+      .in('status', ['posted', 'published', 'live'])
+      .gte('activation_date', weekStartDate),
+    (supabaseAdmin as any)
+      .from('contents')
+      .select(contentCols)
+      .eq('campaign_id', opts.campaignId)
+      .in('status', ['posted', 'published', 'live'])
+      .gte('activation_date', todayDate),
+  ]);
+
+  type ContentRow = { id: string; multipost_group_id: string | null; campaign_kols_id: string | null };
+  const allRows = [...((liveRows ?? []) as ContentRow[]), ...((todayRows ?? []) as ContentRow[])];
+  const masterKolByCampaignKol = new Map<string, string>();
+  if (lineupKolIds.size > 0) {
+    const ckIds = [...new Set(allRows.map(r => r.campaign_kols_id).filter(Boolean))] as string[];
+    if (ckIds.length > 0) {
+      const { data: cks } = await (supabaseAdmin as any)
+        .from('campaign_kols')
+        .select('id, master_kol_id')
+        .in('id', ckIds);
+      for (const ck of ((cks ?? []) as Array<{ id: string; master_kol_id: string | null }>)) {
+        if (ck.master_kol_id) masterKolByCampaignKol.set(ck.id, ck.master_kol_id);
+      }
+    }
+  }
+  const onLineup = (r: ContentRow) => {
+    if (lineupKolIds.size === 0) return true; // no lineup governs this week
+    const mk = r.campaign_kols_id ? masterKolByCampaignKol.get(r.campaign_kols_id) : undefined;
+    return mk ? lineupKolIds.has(mk) : false;
+  };
+
+  // When a lineup governs the week the denominator is a KOL count — every
+  // lineup in the DB is 1 slot per KOL — so the numerator dedupes by KOL, not
+  // by multipost group. multipost_group_id is only set when someone remembers
+  // to group the rows, and Mincho's two Umia posts (both NULL) would otherwise
+  // read as 2 of 5 for one KOL. Falls back to the multipost dedupe when no
+  // lineup governs the week, which is the pre-existing behaviour.
+  const countRows = (rows: ContentRow[]) => {
+    if (lineupKolIds.size === 0) return dedupeCount(rows);
+    return new Set(
+      rows.map(r => (r.campaign_kols_id ? masterKolByCampaignKol.get(r.campaign_kols_id) : null) ?? r.id),
+    ).size;
+  };
+  const liveCount = countRows(((liveRows ?? []) as ContentRow[]).filter(onLineup));
+  const offLineupCount = countRows(((liveRows ?? []) as ContentRow[]).filter(r => !onLineup(r)));
+  const todayCount = countRows(((todayRows ?? []) as ContentRow[]).filter(onLineup));
 
   // Day-split rule
   const days = plannedCount >= 5 ? 3 : 2;
@@ -3114,6 +3177,12 @@ async function sendSubmissionProgressAlert(opts: {
   if (plannedCount > 0) {
     const pct = Math.round((liveCount / plannedCount) * 100);
     lines.push(`${liveCount} of ${plannedCount} live this week (${pct}%).`);
+    // Posts from KOLs outside the lineup don't move the fraction (the
+    // denominator is the lineup), but they're real work — name the count so
+    // nobody reads the alert as "that post didn't register".
+    if (offLineupCount > 0) {
+      lines.push(`<i>+${offLineupCount} live off-lineup (not counted above).</i>`);
+    }
     lines.push(`Target: ${days}-day split, about ${dailyQuota}/day.`);
     // 100% completion ping. Naturally fires exactly once per week: at
     // the moment liveCount == plannedCount the count is queried live
