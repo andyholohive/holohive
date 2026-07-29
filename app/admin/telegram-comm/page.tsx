@@ -1855,6 +1855,116 @@ type KrEdit = {
   content_log_source: string;
 };
 
+/**
+ * [2026-07-30] Webhook health + one-click re-registration for the KR Signal bot.
+ *
+ * The webhook is the one piece of this bot's setup that does NOT live in Vercel
+ * — Telegram stores it, and its secret_token must match KR_SIGNAL_WEBHOOK_SECRET
+ * exactly. Copying two secrets by hand into two systems is a silent-failure
+ * machine: a mismatch drops every update with a 200, getWebhookInfo still reads
+ * healthy, and the bot simply goes quiet with nothing anywhere saying why. That
+ * is exactly how it broke, and diagnosing it needed the bot token on a laptop.
+ *
+ * The server holds both values already, so it registers itself. Check is
+ * read-only; Re-register is the only button that changes anything, and what it
+ * changes lives at Telegram.
+ */
+type WebhookState = {
+  ok: boolean;
+  error?: string;
+  expected_url?: string;
+  registered_url?: string;
+  url?: string | null;
+  url_matches?: boolean;
+  has_webhook_secret?: boolean;
+  secret_sent?: boolean;
+  pending_update_count?: number;
+  last_error_date?: string | null;
+  last_error_message?: string | null;
+  description?: string;
+};
+
+function KrSignalWebhookPanel() {
+  const { toast } = useToast();
+  const [state, setState] = useState<WebhookState | null>(null);
+  const [busy, setBusy] = useState<'check' | 'register' | null>(null);
+
+  async function call(mode: 'check' | 'register') {
+    setBusy(mode);
+    try {
+      const res = await fetch('/api/admin/kr-signal-webhook', {
+        method: mode === 'check' ? 'GET' : 'POST',
+      });
+      const json = await res.json();
+      setState(res.status === 403 ? { ok: false, error: 'Super-admin only.' } : json);
+      if (mode === 'register' && json?.ok) {
+        toast({ title: 'Webhook registered', description: 'Try /status in the chat.' });
+      }
+    } catch (e: any) {
+      setState({ ok: false, error: String(e?.message || e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const url = state?.url ?? state?.registered_url ?? null;
+
+  return (
+    <Card className="border-cream-200 mb-3">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-sm font-semibold text-ink-warm-900">Webhook</div>
+            <p className="text-[11px] text-ink-warm-500 mt-0.5">
+              Inbound commands (<code className="bg-cream-100 px-1 rounded">/weekly</code>,{' '}
+              <code className="bg-cream-100 px-1 rounded">/status</code>). Registered at Telegram, not in Vercel —
+              so a deploy never fixes it and a redeploy never breaks it.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => call('check')} disabled={!!busy}>
+              {busy === 'check' ? 'Checking…' : 'Check status'}
+            </Button>
+            <Button variant="brand" size="sm" onClick={() => call('register')} disabled={!!busy}>
+              {busy === 'register' ? 'Registering…' : 'Re-register'}
+            </Button>
+          </div>
+        </div>
+
+        {state && (state.ok ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {state.url_matches === false
+                ? <StatusBadge tone="danger" size="sm">Points elsewhere</StatusBadge>
+                : url
+                  ? <StatusBadge tone="success" size="sm">Registered</StatusBadge>
+                  : <StatusBadge tone="danger" size="sm">Not registered</StatusBadge>}
+              {(state.has_webhook_secret || state.secret_sent)
+                ? <StatusBadge tone="brand" size="sm">Secret enforced</StatusBadge>
+                : <StatusBadge tone="warning" size="sm">No secret — open endpoint</StatusBadge>}
+              {typeof state.pending_update_count === 'number' && state.pending_update_count > 0 && (
+                <StatusBadge tone="warning" size="sm">{state.pending_update_count} pending</StatusBadge>
+              )}
+            </div>
+            <div className="text-[11px] text-ink-warm-600 break-all">
+              {url ? <code className="bg-cream-100 px-1 rounded">{url}</code> : 'Telegram has no webhook for this bot.'}
+            </div>
+            {state.last_error_message && (
+              <p className="text-[11px] text-rose-600">
+                Telegram&#39;s last error: {state.last_error_message}
+                {state.last_error_date ? ` (${state.last_error_date})` : ''}
+              </p>
+            )}
+            {state.description && <p className="text-[11px] text-emerald-700">{state.description}</p>}
+          </div>
+        ) : (
+          <p className="text-[11px] text-rose-600">{state.error || 'Unknown error'}</p>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 function KrSignalClientsSection() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -2009,6 +2119,7 @@ function KrSignalClientsSection() {
       <WhenItSends>
         Weekly report posts Sundays 12:00 UTC. Listing alerts + Saturday digest run off the hourly Korea-listings sweep.
       </WhenItSends>
+      <KrSignalWebhookPanel />
       <Card className="border-cream-200">
         <CardContent className="p-4 space-y-4">
           {loading ? (
