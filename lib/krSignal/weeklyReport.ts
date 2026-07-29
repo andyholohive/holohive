@@ -21,7 +21,12 @@ export interface WeeklyReportData {
   byVenue: VenueVol[];
   futuresTotalUsd: number; futuresRegime: Regime; futuresArrow: Arrow;
   krCexVolKrw: number; krCexVolUsd: number; krCexRegime: Regime; krCexArrow: Arrow;
-  kospi: number; kospiWoWPct: number; kospiYtdPct: number; kospiAtAth: boolean;
+  /** kospiArrow is "⟷" when no prior-week snapshot exists. Deriving the arrow
+   *  from the sign of kospiWoWPct alone printed "▲ +0.0%" in that case — a
+   *  confident up-arrow for a week we simply had no baseline for. Not passed
+   *  through calc.trendArrow: its 5% deadband is tuned for crypto volumes and
+   *  would flatten a 2% index move, which for KOSPI is a large week. */
+  kospi: number; kospiWoWPct: number; kospiArrow: Arrow; kospiYtdPct: number; kospiAtAth: boolean;
   fxUsdKrw: number;
   kimchiUsdtPct: number;
   /** SoV line renders only when showSov is true — otherwise a flat "+0%" would
@@ -103,7 +108,7 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   // notional; Upbit+Bithumb KRW spot), same honesty rule as By Venue.
   B.push(`Futures (24h)  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
   B.push(`KR CEX (24h)   ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
-  B.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
+  B.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiArrow} ${sign(d.kospiWoWPct)} WoW`);
   B.push(`               ${sign(d.kospiYtdPct)} YTD${d.kospiAtAth ? " (at ATH)" : ""}`);
   B.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   B.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
@@ -125,7 +130,7 @@ export function buildBackdrop(d: WeeklyReportData): string {
   const L: string[] = [];
   L.push(`Futures (24h)  ~${usdB(d.futuresTotalUsd)}   ${d.futuresArrow} ${d.futuresRegime}`);
   L.push(`KR CEX (24h)   ₩${(d.krCexVolKrw / 1e12).toFixed(1)}T ≈${usdB(d.krCexVolUsd)}  ${d.krCexArrow} ${d.krCexRegime}`);
-  L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiWoWPct >= 0 ? "▲" : "▼"} ${sign(d.kospiWoWPct)} WoW`);
+  L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiArrow} ${sign(d.kospiWoWPct)} WoW`);
   L.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   L.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
   const title = `${logo()} <b>$${esc(d.ticker)} Market Backdrop · ${esc(d.weekLabel)}</b>`;

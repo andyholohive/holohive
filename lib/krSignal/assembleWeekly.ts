@@ -98,9 +98,18 @@ export async function assembleWeekly(
 
   // Trend (vs prior week) + regime (vs stored baseline)
   const db = cfg.thresholds?.trend_deadband ?? 0.05;
-  const [fxPrior, krPrior, krVolPriorRow, fbBase, krBase] = await Promise.all([
+  const [fxPrior, krPrior, kospiPrior, krVolPriorRow, fbBase, krBase] = await Promise.all([
     getGlobalPrior(supabase, "futures_total", weekEnding),
     getGlobalPrior(supabase, "kr_cex_vol", weekEnding),
+    // [2026-07-30] KOSPI WoW now comes from our own weekly snapshots, like
+    // every other trend here. It used to be computed inside the adapter as
+    // `pts[pts.length - 6]` — five TRADING SESSIONS back, a calendar week only
+    // when the week has no holidays. KRX was shut 2026-07-17, so the baseline
+    // fell on Jul 15 instead of Jul 16, and because Jul 15→16 dropped 6.4% the
+    // report printed ▼2.6% for a week that was actually +4.1%. A sign flip, in
+    // a client's chat. No fixed offset can be correct; two snapshots taken a
+    // week apart are right by construction.
+    getGlobalPrior(supabase, "kospi", weekEnding),
     getClientKrVolPrior(supabase, cfg.id, weekEnding),
     getBaseline(supabase, "futures_total"),
     getBaseline(supabase, "kr_cex_vol"),
@@ -114,6 +123,11 @@ export async function assembleWeekly(
     pending.push("trend arrows — no prior-week snapshot yet (flat until the 2nd weekly run persists state)");
   else if (krVolPrior == null)
     pending.push(`KR vol WoW — prior window (${krVolPriorRow.window ?? "unknown"}) ≠ this week (${volWindow}); arrow held flat until two same-window weeks exist`);
+  // Kept out of the if/else chain above — that chain's `else if` narrows
+  // krVolPriorRow to non-null, and slotting a condition into the middle of it
+  // silently breaks that narrowing.
+  if (kospiPrior == null)
+    pending.push("KOSPI WoW — no prior-week snapshot yet (arrow held flat rather than printing a move we can't measure)");
   if (!fbBase || !krBase) pending.push("regime labels — baseline job not run yet (defaulting 'neutral')");
 
   const krVolArrow = krVolPrior != null ? calc.trendArrow(krTok, krVolPrior, db) : "⟷";
@@ -212,7 +226,10 @@ export async function assembleWeekly(
     krCexRegime: krBase ? calc.regimeLabel(krCexUsd, krBase.p33, krBase.p66) : "neutral",
     krCexArrow: krPrior != null ? calc.trendArrow(krCexUsd, krPrior, db) : "⟷",
     kospi: Math.round(kospi.level),
-    kospiWoWPct: +kospi.wowPct.toFixed(1),
+    // 0 on the first run holds the line flat rather than inventing a move; the
+    // pending note above says why, so it never reads as a confident zero.
+    kospiWoWPct: kospiPrior != null ? +(((kospi.level - kospiPrior) / kospiPrior) * 100).toFixed(1) : 0,
+    kospiArrow: kospiPrior == null ? "⟷" : kospi.level >= kospiPrior ? "▲" : "▼",
     kospiYtdPct: Math.round(kospi.ytdPct),
     kospiAtAth: kospi.atAth,
     fxUsdKrw: Math.round(fx),

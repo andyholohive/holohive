@@ -146,9 +146,24 @@ export async function getUsdKrw(): Promise<number> {
 
 // ─── KOSPI ────────────────────────────────────────────────────────────────
 export interface KospiData {
-  level: number; wowPct: number; ytdPct: number; pctFromAth: number; atAth: boolean;
+  level: number; ytdPct: number; pctFromAth: number; atAth: boolean;
 }
-/** KOSPI via Yahoo Finance ^KS11 (§4): level, WoW, YTD, % from ATH. */
+/**
+ * KOSPI via Yahoo Finance ^KS11 (§4): level, YTD, % from ATH.
+ *
+ * [2026-07-30] Deliberately does NOT return a week-over-week. It used to,
+ * computed as `pts[pts.length - 6]` — five *trading sessions* back, which is a
+ * calendar week only when that week has no holidays. KRX was shut on 2026-07-17,
+ * so the baseline landed on Jul 15 (8 days out) instead of Jul 16, and since
+ * Jul 15→16 was a 6.4% drop the report printed ▼2.6% for a week that was
+ * actually +4.1% — a flipped sign, sent to a client. Caught by Quazo.
+ *
+ * The offset can't be corrected, only removed: any fixed N is wrong whenever a
+ * week has an unusual number of sessions. WoW now comes from our own weekly
+ * snapshots via getGlobalPrior, the same mechanism every other trend in the
+ * report already uses — two readings taken a week apart, so holidays are
+ * irrelevant by construction.
+ */
 export async function getKospi(): Promise<KospiData> {
   const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?range=1y&interval=1d";
   const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
@@ -158,16 +173,18 @@ export async function getKospi(): Promise<KospiData> {
   const ts: number[] = res.timestamp;
   const closeArr: (number | null)[] = res.indicators.quote[0].close;
   const pts = ts.map((t, i) => ({ t, c: closeArr[i] })).filter((p) => p.c != null) as { t: number; c: number }[];
-  const level = res.meta.regularMarketPrice ?? pts[pts.length - 1].c;
-  const weekAgo = pts[pts.length - 6]?.c ?? pts[0].c;
-  const wowPct = ((level - weekAgo) / weekAgo) * 100;
+  // Last CLOSE, not res.meta.regularMarketPrice. The live price is whatever the
+  // index is doing right now, which on an on-demand /weekly mid-session reports
+  // today while every other line in the report describes the closed week. On the
+  // Sunday cron the two coincide, which is why this hid.
+  const level = pts[pts.length - 1].c;
   const year = new Date().getUTCFullYear();
   const ytdStart = (pts.find((p) => new Date(p.t * 1000).getUTCFullYear() === year)?.c) ?? pts[0].c;
   const ytdPct = ((level - ytdStart) / ytdStart) * 100;
   const ath = Math.max(level, res.meta.fiftyTwoWeekHigh ?? 0, ...pts.map((p) => p.c));
   const pctFromAth = ((level - ath) / ath) * 100;
   const atAth = level >= ath * 0.999;
-  return { level, wowPct, ytdPct, pctFromAth, atAth };
+  return { level, ytdPct, pctFromAth, atAth };
 }
 
 // ─── Futures (aggregated perps) ──────────────────────────────────────────
