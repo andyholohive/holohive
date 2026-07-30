@@ -2222,10 +2222,33 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           : campaign.status === 'Paused'
                           ? 'border-l-yellow-500'
                           : 'border-l-gray-400';
+                        // [2026-07-31 per Andy] The whole card is the click
+                        // target, not just the View Campaign button. Same
+                        // destination either way, so the URL is derived once
+                        // here and shared — the button below calls openCampaign
+                        // rather than rebuilding the slug/id fallback.
+                        const openCampaign = () => {
+                          window.open(
+                            campaign.slug
+                              ? `/public/campaigns/${campaign.slug}`
+                              : `/public/campaigns/${campaign.id}`,
+                            '_blank'
+                          );
+                        };
                         return (
                           <div
                             key={campaign.id}
-                            className={`group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden border-l-4 ${statusBorderColor}`}
+                            role="link"
+                            tabIndex={0}
+                            aria-label={`View campaign ${campaign.name}`}
+                            onClick={openCampaign}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openCampaign();
+                              }
+                            }}
+                            className={`group cursor-pointer bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden border-l-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${statusBorderColor}`}
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
                             <div className="p-5">
@@ -2268,12 +2291,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                     variant="outline"
                                     size="lg"
                                     className="rounded-lg border-gray-200 hover:border-brand transition-colors h-11 px-6 text-base font-semibold"
-                                    onClick={() => {
-                                      const url = campaign.slug
-                                        ? `/public/campaigns/${campaign.slug}`
-                                        : `/public/campaigns/${campaign.id}`;
-                                      window.open(url, '_blank');
-                                    }}
+                                    onClick={(e) => { e.stopPropagation(); openCampaign(); }}
                                   >
                                     <ExternalLink className="h-5 w-5 mr-2" />
                                     View Campaign
@@ -2281,7 +2299,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                   {campaign.share_report_publicly && (
                                     <Button
                                       size="sm"
-                                      onClick={() => {
+                                      /* stopPropagation: the card itself opens
+                                         the campaign, and the report is a
+                                         DIFFERENT destination — without this,
+                                         clicking Report opens both tabs. */
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         const url = campaign.slug
                                           ? `/public/reports/${campaign.slug}`
                                           : `/public/reports/${campaign.id}`;
@@ -3124,6 +3147,25 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
+        {/* Document Portal — shared hosted PDFs with tracked in-portal viewing.
+            [2026-07-26] Deliberately a top-level sibling, NOT nested in the
+            Resources card. It used to live inside it, which meant a shared
+            document was invisible unless the client ALSO had context links /
+            client links / form attachments AND had submitted the onboarding
+            form (`showAdvancedSections`). Neither has anything to do with
+            documents, so a published+shared PDF silently never rendered.
+            The component self-hides when there are none, so it needs no gate
+            of its own.
+
+            [2026-07-31 per Andy] Moved ABOVE Form Submissions. Delivery
+            documents are the current deliverable; form submissions are the
+            onboarding paper trail, which matters most at the start and
+            recedes after. The mt-8 is passed IN rather than wrapped around,
+            because the component returns null when there are no documents —
+            an outer spacer div would leave a phantom 2rem gap on every
+            portal that has none. */}
+        <PortalDocumentsCard portalId={idOrSlug} email={email} className="mt-8" />
+
         {/* Form Submissions & Resources Row — discovery & tracker only */}
         {showAdvancedSections && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url || clientContext.kol_content_brief_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
@@ -3283,17 +3325,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             )}
           </div>
         )}
-
-        {/* Document Portal — shared hosted PDFs with tracked in-portal viewing.
-            [2026-07-26] Deliberately a top-level sibling, NOT nested in the
-            Resources card. It used to live inside it, which meant a shared
-            document was invisible unless the client ALSO had context links /
-            client links / form attachments AND had submitted the onboarding
-            form (`showAdvancedSections`). Neither has anything to do with
-            documents, so a published+shared PDF silently never rendered.
-            The component self-hides when there are none, so it needs no gate
-            of its own. */}
-        <PortalDocumentsCard portalId={idOrSlug} email={email} />
 
         {/* Form Submission Detail Dialog */}
         {/* [Portal v1] Form Submission popup — restyled to match the

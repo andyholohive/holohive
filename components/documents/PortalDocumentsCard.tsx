@@ -45,7 +45,7 @@ interface ViewMeta {
   log_token?: string | null;
 }
 
-export default function PortalDocumentsCard({ portalId, email }: { portalId: string; email: string }) {
+export default function PortalDocumentsCard({ portalId, email, className }: { portalId: string; email: string; className?: string }) {
   const [docs, setDocs] = useState<PortalDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<ViewMeta | null>(null);
@@ -87,10 +87,24 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
   }, [portalId, trimmedEmail]);
 
   // Nothing to show → render nothing (no empty-state clutter in the portal).
-  if (!loading && docs.length === 0) return null;
+  //
+  // [2026-07-31] Also render nothing WHILE loading. This was
+  // `!loading && docs.length === 0`, which meant every portal without shared
+  // documents drew a full "Delivery Documents" card with a skeleton and then
+  // deleted it the moment the fetch came back empty — a visible flash of a
+  // section that was never going to exist. Most portals have no documents, so
+  // most portals showed the flash.
+  //
+  // The parent deliberately holds the entire page behind one spinner until
+  // portalReady ("the whole portal paints once, instead of reflow → reflow →
+  // reflow"), but this card fetches on its own after mount, so it landed after
+  // that gate had already settled. Gating on `loading` puts it back in line
+  // with that intent: the card has exactly two states now, absent or present,
+  // and never transitions from present back to absent.
+  if (loading || docs.length === 0) return null;
 
   return (
-    <Card className="border border-gray-200 shadow-xl rounded-xl overflow-hidden">
+    <Card className={`border border-gray-200 shadow-xl rounded-xl overflow-hidden${className ? ` ${className}` : ''}`}>
       <CardHeader className="bg-white border-b border-gray-100 pb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
@@ -100,9 +114,9 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
         </div>
       </CardHeader>
       <CardContent className="p-6">
-      {loading ? (
-        <Skeleton className="h-16 rounded-lg" />
-      ) : (
+        {/* No loading branch: the card doesn't mount until docs are in hand,
+            so a skeleton here could only ever appear inside a card that was
+            already guaranteed to have rows. */}
         <div className="space-y-2">
           {docs.map(d => (
             <button
@@ -125,7 +139,6 @@ export default function PortalDocumentsCard({ portalId, email }: { portalId: str
             </button>
           ))}
         </div>
-      )}
 
       <Dialog open={!!active} onOpenChange={(o) => { if (!o) setActive(null); }}>
         <DialogContent className="!bg-white max-w-4xl">
