@@ -102,6 +102,50 @@ type CampaignDNAField = {
   page_number: number;
 };
 
+/**
+ * [2026-07-30] KOL Roster hidden pending a decision on whether it should exist.
+ *
+ * Origin traced and unrecoverable: it shipped 2026-03-13 inside a four-section
+ * portal redesign (commit 2219249) with no spec, no requirement and no recorded
+ * rationale, and the session that produced it predates every transcript on this
+ * machine. Nothing has referenced it since except two bug fixes — one of which
+ * (a `status` vs `hh_status` column-name error, fixed 2026-07-25) had left the
+ * card silently empty for five months without anyone noticing.
+ *
+ * It also runs against the governing spec. "HH Portal: Post-Onboarding Campaign
+ * View" defines this screen and constrains client-facing KOL data to a count —
+ * "KOLs Activated is a flat number. No denominator." — alongside "no budget
+ * metrics visible to client". The roster is the opposite: every KOL by name,
+ * with profile link, status, content links and per-KOL impressions/engagement.
+ *
+ * Flag not deletion, because whether clients should see this is Andy's call and
+ * Jdot hasn't been asked yet. Flip to true to restore; delete the block and
+ * fetchKolRoster if the answer is no.
+ *
+ * NOTE: this hides the CARD only. fetchKolRoster still runs — kolsSecured and
+ * contentLive below depend on it — so the roster data still reaches the
+ * browser. If the concern is disclosure rather than clutter, that fetch has to
+ * go too, and those two counters need another source.
+ */
+const SHOW_KOL_ROSTER = false;
+
+/**
+ * [2026-07-30] "KOLs Secured 8/25" stat card hidden — same review as the roster,
+ * but a more direct spec conflict. The governing spec names this exact case:
+ * "KOLs Activated is a flat number. No denominator." A ratio lets the client
+ * infer how many KOLs are contracted but not yet activated, which is the
+ * inference the constraint exists to prevent.
+ *
+ * Hidden rather than de-denominated because the sibling "Content Live" card
+ * already carries the spec's flat-count treatment; a second bare number beside
+ * it would duplicate rather than inform. Flip to true, or drop the
+ * /{kolRoster.length} span, if the decision goes the other way.
+ *
+ * Wider gate than the roster had — showAdvancedSections is discovery AND
+ * tracker, so more clients saw this than ever saw the roster.
+ */
+const SHOW_KOLS_SECURED_RATIO = false;
+
 type KolRosterEntry = {
   id: string;
   name: string;
@@ -2963,6 +3007,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           {/* Live KOL Status Metrics — shown in discovery/tracker when KOLs exist */}
           {showAdvancedSections && kolRoster.length > 0 && (
             <>
+              {/* "KOLs Secured 8/25" — hidden 2026-07-30, see SHOW_KOLS_SECURED_RATIO. */}
+              {SHOW_KOLS_SECURED_RATIO && (
               <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                 <CardContent className="pt-6 pb-5 relative">
@@ -2977,6 +3023,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               <Card className="group relative hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-gray-200 shadow-lg overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -3573,8 +3620,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </CardContent>
         </Card>}
 
-        {/* KOL Roster — tracker only */}
-        {portalPhase === 'tracker' && onboardingComplete && kolRoster.length > 0 && (
+        {/* KOL Roster — tracker only. Hidden 2026-07-30, see SHOW_KOL_ROSTER. */}
+        {SHOW_KOL_ROSTER && portalPhase === 'tracker' && onboardingComplete && kolRoster.length > 0 && (
           <Card id="section-kol-roster" className="border border-gray-200 shadow-xl rounded-xl overflow-hidden mt-10">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
