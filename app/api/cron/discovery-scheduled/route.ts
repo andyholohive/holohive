@@ -142,12 +142,23 @@ export async function GET(request: Request) {
       .eq('agent_name', 'DISCOVERY')
       .in('status', ['completed', 'failed'])
       .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+    // [2026-07-31] A run whose cost didn't compute used to contribute 0 here,
+    // so an unpriced model made the cap unreachable — it failed open, silently.
+    // Unreadable rows now count as `unpricedRuns` and the cap treats their
+    // presence as a reason to stop, not a reason to keep going.
+    let unpricedRuns = 0;
     const weekSpend = (recent || []).reduce((sum: number, r: any) => {
       const c = Number(r.output_summary?.cost_usd);
-      return Number.isFinite(c) ? sum + c : sum;
+      if (!Number.isFinite(c)) { unpricedRuns++; return sum; }
+      return sum + c;
     }, 0);
 
-    if (weekSpend >= cap) {
+    // Trip on real spend, OR on any run we couldn't price. The second clause
+    // is the important one: the July overspend happened while this cap was
+    // configured and enabled, because the rows it summed reported a fraction
+    // of the true cost. If we can't read a run's cost, we don't know how close
+    // to the cap we are, and the safe assumption is "too close".
+    if (weekSpend >= cap || unpricedRuns > 0) {
       // Disable + record + alert. Order is: disable first (defensive —
       // if the alert dispatch hangs, at least the cron is paused).
       await (supabase as any)
@@ -160,13 +171,16 @@ export async function GET(request: Request) {
       await recordRun(supabase, 'skipped_cap_breached', {
         cap_usd: cap,
         week_spend_usd: Number(weekSpend.toFixed(2)),
+        unpriced_runs: unpricedRuns,
         action: 'auto_disabled',
       });
       try {
         const { fireIntelligenceAlert } = await import('@/lib/intelligenceAlerts');
         await fireIntelligenceAlert('cron_failed', {
           run_type: 'Auto Discovery scan (cost cap)',
-          error_message: `Weekly cost cap of $${cap.toFixed(2)} reached ($${weekSpend.toFixed(2)} spent in last 7 days). Auto-scan paused for safety. Re-enable in the schedule dialog when ready.`,
+          error_message: unpricedRuns > 0
+            ? `Auto-scan paused: ${unpricedRuns} run(s) in the last 7 days could not be priced, so weekly spend is unknown (at least $${weekSpend.toFixed(2)} of a $${cap.toFixed(2)} cap). Usually means a model with no entry in lib/claudeCost.ts MODEL_RATES. Add it, then re-enable.`
+            : `Weekly cost cap of $${cap.toFixed(2)} reached ($${weekSpend.toFixed(2)} spent in last 7 days). Auto-scan paused for safety. Re-enable in the schedule dialog when ready.`,
           triggered_at: new Date().toISOString(),
         });
       } catch (err: any) {

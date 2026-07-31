@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { priceUsage } from './claudeCost';
 
 // ============================================
 // Claude API Client
@@ -57,24 +58,14 @@ export type ClaudeModel =
   | 'claude-opus-4-20250514'    // deprecated, retires 2026-06-15
   | 'claude-haiku-4-5-20251001';
 
-// Approximate pricing per 1M tokens (per platform.claude.com/docs/en/pricing).
-const MODEL_PRICING: Record<ClaudeModel, { input: number; output: number }> = {
-  'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
-  'claude-opus-4-8': { input: 5.0, output: 25.0 },
-  'claude-haiku-4-5': { input: 1.0, output: 5.0 },
-  'claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
-  'claude-opus-4-20250514': { input: 15.0, output: 75.0 },
-  'claude-haiku-4-5-20251001': { input: 1.0, output: 5.0 },
-};
-
-function calculateCost(
-  model: ClaudeModel,
-  inputTokens: number,
-  outputTokens: number
-): number {
-  const pricing = MODEL_PRICING[model];
-  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
-}
+// [2026-07-31] Pricing moved to lib/claudeCost.ts so there is exactly one
+// table. There used to be two — this map, and a private `estimateCost` inside
+// the Discovery scan route — and they disagreed about which models exist. The
+// audit that found the July overspend is documented at the top of that file.
+//
+// The old map also had no entry for `claude-sonnet-4-5`, which is the model
+// Discovery passes and the one the usage dashboard shows as dominant. The
+// lookup returned undefined and the next line read `.input` off it.
 
 // ============================================
 // Simple completion (no tools)
@@ -111,7 +102,10 @@ export async function callClaude(
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
     },
-    cost_usd: calculateCost(model, response.usage.input_tokens, response.usage.output_tokens),
+    // priceUsage reads the whole usage object, so cache reads/writes and any
+    // server-tool requests are counted. The old call passed only the two plain
+    // token counts and silently dropped the rest.
+    cost_usd: priceUsage(model, response.usage).cost_usd,
     stop_reason: response.stop_reason,
   };
 }
@@ -151,6 +145,10 @@ export async function callClaudeWithTools(
   const toolResults: ClaudeToolResult['toolResults'] = [];
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  // Priced per turn and summed. Every turn re-sends the whole accumulated
+  // transcript, so in a long tool loop the later turns dominate the bill —
+  // pricing only the final response understates it badly.
+  let totalCostUsd = 0;
   let finalContent = '';
 
   const messages: Anthropic.MessageParam[] = [
@@ -169,6 +167,7 @@ export async function callClaudeWithTools(
 
     totalInputTokens += response.usage.input_tokens;
     totalOutputTokens += response.usage.output_tokens;
+    totalCostUsd += priceUsage(model, response.usage).cost_usd;
 
     // If no tool use, extract final text and break
     if (response.stop_reason !== 'tool_use') {
@@ -242,6 +241,6 @@ export async function callClaudeWithTools(
       input_tokens: totalInputTokens,
       output_tokens: totalOutputTokens,
     },
-    cost_usd: calculateCost(model, totalInputTokens, totalOutputTokens),
+    cost_usd: totalCostUsd,
   };
 }

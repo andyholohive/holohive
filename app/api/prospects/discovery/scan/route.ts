@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getClaudeClient } from '@/lib/claude';
 import { fireIntelligenceAlert } from '@/lib/intelligenceAlerts';
+import { priceUsage } from '@/lib/claudeCost';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -387,6 +388,14 @@ async function findCandidatesFromSource(
   candidates: CandidateBasics[];
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Priced from the full usage object, so it includes cache reads/writes and
+   * web_search requests. inputTokens/outputTokens above are kept for the run
+   * log but must NOT be used to re-derive cost — with prompt caching on they
+   * exclude the cached portion, which is most of the traffic here.
+   */
+  costUsd: number;
+  webSearches: number;
   source: DiscoverySource;
 }> {
   // Show Claude only the 50 most-recently-scanned names (instead of 200).
@@ -466,10 +475,14 @@ Call submit_candidates when done.`;
   // know which source actually produced this row.
   const candidates = rawCandidates.map(c => ({ ...c, primary_source: c.primary_source ?? source }));
 
+  const priced = priceResponse(model, response);
+
   return {
     candidates,
-    inputTokens: response.usage?.input_tokens ?? 0,
-    outputTokens: response.usage?.output_tokens ?? 0,
+    inputTokens: priced.input_tokens,
+    outputTokens: priced.output_tokens,
+    costUsd: priced.cost_usd,
+    webSearches: priced.web_searches,
     source,
   };
 }
@@ -516,6 +529,9 @@ async function findCandidates(
   candidates: CandidateBasics[];
   inputTokens: number;
   outputTokens: number;
+  // Summed from per-source priced usage — see findCandidatesFromSource.
+  costUsd: number;
+  webSearches: number;
   stopReason: string | null;
   sourceErrors: string[];
   perSourceCounts: Record<string, number>;
@@ -536,6 +552,8 @@ async function findCandidates(
       candidates: result.candidates.slice(0, params.maxCandidates),
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
+      costUsd: result.costUsd,
+      webSearches: result.webSearches,
       stopReason: null,
       sourceErrors: [],
       perSourceCounts: { [result.source]: result.candidates.length },
@@ -555,6 +573,8 @@ async function findCandidates(
   const allCandidates: CandidateBasics[] = [];
   let inputTokens = 0;
   let outputTokens = 0;
+  let costUsd = 0;
+  let webSearches = 0;
   const sourceErrors: string[] = [];
   const perSourceCounts: Record<string, number> = {};
 
@@ -564,6 +584,8 @@ async function findCandidates(
       allCandidates.push(...r.value.candidates);
       inputTokens += r.value.inputTokens;
       outputTokens += r.value.outputTokens;
+      costUsd += r.value.costUsd;
+      webSearches += r.value.webSearches;
       perSourceCounts[sourceName] = r.value.candidates.length;
     } else {
       sourceErrors.push(`${sourceName}: ${r.reason?.message ?? 'unknown error'}`);
@@ -587,6 +609,8 @@ async function findCandidates(
     candidates: deduped.slice(0, params.maxCandidates),
     inputTokens,
     outputTokens,
+    costUsd,
+    webSearches,
     // stopReason isn't meaningful across N parallel calls; preserved
     // in the return shape for backward compat with callers that
     // record it on agent_runs.
@@ -841,6 +865,8 @@ async function enrichBatch(
   projects: DiscoveredProject[];
   inputTokens: number;
   outputTokens: number;
+  costUsd: number;
+  webSearches: number;
   stopReason: string | null;
 }> {
   const candidateList = candidates.map((c, i) => {
@@ -905,10 +931,14 @@ Call submit_enrichments when done.`;
 
   const projects: DiscoveredProject[] = submitBlock?.input?.projects ?? [];
 
+  const pricedStage2 = priceResponse(model, response);
+
   return {
     projects,
-    inputTokens: response.usage?.input_tokens ?? 0,
-    outputTokens: response.usage?.output_tokens ?? 0,
+    inputTokens: pricedStage2.input_tokens,
+    outputTokens: pricedStage2.output_tokens,
+    costUsd: pricedStage2.cost_usd,
+    webSearches: pricedStage2.web_searches,
     stopReason: response.stop_reason ?? null,
   };
 }
@@ -1094,15 +1124,32 @@ async function writeSignals(
 // Cost accounting
 // ────────────────────────────────────────────────────────────────────
 
+/**
+ * [2026-07-31] Now a thin shim over lib/claudeCost so there is one pricing
+ * table instead of two that disagree.
+ *
+ * What this used to miss, and why it mattered: it took only the plain token
+ * counts, so cache reads/writes were free and — the expensive one — the
+ * `web_search` server tool was free. This route runs a 12-search agentic loop
+ * twice a day; July's console showed 1,368 searches (~$13.68) that no counter
+ * here could see. Combined with the missing cache accounting, `agent_runs`
+ * reported $5.86 against a real bill of $79.24.
+ *
+ * Prefer `priceResponse` below for new code — it keeps the whole usage object.
+ * This signature is kept only for the legacy stage-1 call sites that already
+ * carry loose token counts.
+ */
 function estimateCost(
   model: string,
   inputTokens: number,
   outputTokens: number,
 ): number {
-  const isOpus = model.includes('opus');
-  const inPrice = isOpus ? 15 : 3;   // per MTok
-  const outPrice = isOpus ? 75 : 15;
-  return (inputTokens / 1_000_000) * inPrice + (outputTokens / 1_000_000) * outPrice;
+  return priceUsage(model, { input_tokens: inputTokens, output_tokens: outputTokens }).cost_usd;
+}
+
+/** Price a raw SDK response, keeping cache + server-tool usage intact. */
+function priceResponse(model: string, response: any) {
+  return priceUsage(model, response?.usage);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -1494,6 +1541,8 @@ export async function POST(request: Request) {
     const allProjects: DiscoveredProject[] = [];
     let stage2InputTokens = 0;
     let stage2OutputTokens = 0;
+    let stage2CostUsd = 0;
+    let stage2WebSearches = 0;
     const batchErrors: string[] = [];
 
     for (let i = 0; i < batchResults.length; i++) {
@@ -1502,6 +1551,8 @@ export async function POST(request: Request) {
         allProjects.push(...r.value.projects);
         stage2InputTokens += r.value.inputTokens;
         stage2OutputTokens += r.value.outputTokens;
+        stage2CostUsd += r.value.costUsd;
+        stage2WebSearches += r.value.webSearches;
       } else {
         batchErrors.push(`Batch ${i + 1}: ${r.reason?.message ?? 'unknown error'}`);
         console.error(`Enrichment batch ${i + 1} failed:`, r.reason);
@@ -1574,7 +1625,11 @@ export async function POST(request: Request) {
     // ── Cost accounting ──────────────────────────────────────────────
     const totalInputTokens = stage1.inputTokens + stage2InputTokens;
     const totalOutputTokens = stage1.outputTokens + stage2OutputTokens;
-    const costUsd = estimateCost(model, totalInputTokens, totalOutputTokens);
+    // Sum the per-call priced figures rather than re-deriving from the two
+    // token counts. Re-deriving drops cache reads and every web_search
+    // request, which is what made this route report ~1/13th of its real cost.
+    const costUsd = stage1.costUsd + stage2CostUsd;
+    const totalWebSearches = stage1.webSearches + stage2WebSearches;
 
     await finishRun('completed', {
       candidates_found: stage1.candidates.length,
@@ -1594,6 +1649,11 @@ export async function POST(request: Request) {
       signals_added: signalsAdded,
       stage1_input_tokens: stage1.inputTokens,
       stage1_output_tokens: stage1.outputTokens,
+      // Surfaced so a run's bill is legible without re-deriving it. web_searches
+      // is the line that was invisible before — 1,368 of them in July at
+      // $10/1k, which nothing in this repo could see.
+      web_searches: totalWebSearches,
+      web_search_usd: Number((totalWebSearches * 0.01).toFixed(4)),
       stage2_input_tokens: stage2InputTokens,
       stage2_output_tokens: stage2OutputTokens,
       total_input_tokens: totalInputTokens,
