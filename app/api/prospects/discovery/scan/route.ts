@@ -439,9 +439,19 @@ Call submit_candidates when done.`;
   // focused than the multi-source version, plus separately cacheable.
   const systemPromptText = buildCandidatesSystemPrompt([source]);
 
-  // Each source gets a generous independent budget. 12 searches lets
-  // Claude scan the listing page + verify ~5-8 candidates.
-  const searchBudget = 12;
+  // Each source gets an independent search budget.
+  //
+  // [2026-07-31] 12 → 6 after the spend audit. Halving this cuts cost twice
+  // over, and the second effect is the larger one: every search result is
+  // appended to the transcript and the whole accumulated context is re-sent on
+  // the next turn, so tokens grow roughly with the square of the search count,
+  // not linearly. July's console split was 44.9M input against 0.5M output —
+  // an 87:1 ratio that is almost entirely re-sent search results.
+  //
+  // Cost: fewer verified candidates per source per run. If quality drops
+  // noticeably, raise this before touching cadence — a thorough run beats two
+  // shallow ones at the same price.
+  const searchBudget = 6;
 
   const response = await callAnthropicWithRetry(
     anthropic,
