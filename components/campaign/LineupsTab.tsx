@@ -213,6 +213,13 @@ export default function LineupsTab({
   const [briefStats, setBriefStats] = useState<Map<string, LineupBriefStats>>(new Map());
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [lineup, setLineup] = useState<LineupFull | null>(null);
+  // Mirrors selectedWeek for async guards. Every getLineupFull below is a
+  // slow call that can resolve after the user (or the auto-select effect)
+  // has moved to a different week; without this, a late reply overwrites
+  // the right lineup with a stale one. See the header comment on the
+  // week-switch effect.
+  const selectedWeekRef = useRef(selectedWeek);
+  selectedWeekRef.current = selectedWeek;
   const [roster, setRoster] = useState<RosterKol[]>([]);
   const [loading, setLoading] = useState(true);
   const [rosterSearch, setRosterSearch] = useState('');
@@ -350,8 +357,12 @@ export default function LineupsTab({
         const existing = lineups.find(l => l.week_number === week);
         if (existing) {
           const full = await service.getLineupFull(existing.id);
-          setLineup(full);
-        } else {
+          // Only adopt this if the week we fetched is still the selected one.
+          // `week` here can be computed from a stale `totalWeeks` (term_end
+          // often resolves after mount), in which case the re-derive effect
+          // below has already moved us on while this fetch was in flight.
+          if (selectedWeekRef.current === week) setLineup(full);
+        } else if (selectedWeekRef.current === week) {
           setLineup(null);
         }
       } catch (err: any) {
@@ -364,24 +375,50 @@ export default function LineupsTab({
   }, [campaignId]);
 
   // ─── Switch weeks (no spinner — fires when user changes the week) ──
-
+  //
+  // [2026-07-31] `loading` is in the deps, and that is the whole fix for a
+  // bug Jdot hit: opening the tab showed "Week 13" in the header and selector
+  // while rendering Week 12's lineup underneath, and only flipping to 12 and
+  // back corrected it.
+  //
+  // The guard below has always been here, but `loading` was NOT a dependency.
+  // So a week change that happened *during* the initial load hit the early
+  // return and was never retried — the effect had no reason to re-run once
+  // loading went false. And a week change during load is the normal case, not
+  // an edge one: the re-derive effect further down exists precisely because
+  // `totalWeeks` arrives late (term_end resolves after mount), which first
+  // clamps the default down and then corrects it a moment later.
+  //
+  // Concretely: the load effect computed week 12 from a stale totalWeeks and
+  // started a slow getLineupFull(W12); totalWeeks resolved; the re-derive
+  // effect moved to 13; this effect skipped because loading was still true;
+  // the slow W12 fetch then landed. Header 13, body 12, stuck.
+  //
+  // With `loading` in the deps this re-runs the moment the initial load
+  // finishes, and the cancellation guard stops a slow in-flight reply from
+  // overwriting a newer week's data.
   useEffect(() => {
     if (loading) return;
+    let cancelled = false;
+    const week = selectedWeek;
     (async () => {
       try {
-        const existing = lineupByWeek.get(selectedWeek);
+        const existing = lineupByWeek.get(week);
         if (existing) {
           const full = await service.getLineupFull(existing.id);
-          setLineup(full);
-        } else {
+          if (!cancelled && selectedWeekRef.current === week) setLineup(full);
+        } else if (!cancelled && selectedWeekRef.current === week) {
           setLineup(null);
         }
       } catch (err: any) {
-        toast({ title: 'Load failed', description: err?.message, variant: 'destructive' });
+        if (!cancelled) {
+          toast({ title: 'Load failed', description: err?.message, variant: 'destructive' });
+        }
       }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWeek, allLineups]);
+  }, [selectedWeek, allLineups, loading]);
 
   // Keep re-deriving the default as the inputs resolve. The [campaignId] load
   // effect above runs once on mount, where `totalWeeks` can still be 1
