@@ -1600,6 +1600,41 @@ export default function CampaignsPage() {
                   Share Creator Type for KOLs
                 </Label>
               </div>
+              {/* [2026-07-31 per Andy] Share KOL Notes was missing here but
+                  present in <ShareCampaignDialog> on /campaigns/[id], so the
+                  same campaign offered two different sets of share controls
+                  depending on which page you opened it from — and this page
+                  could not turn the flag off at all.
+
+                  Added rather than swapping this whole block for the shared
+                  component: ShareCampaignDialog reads useCampaignDetail(),
+                  a context that only exists on the campaign detail route, so
+                  reusing it here needs it refactored to take the campaign as
+                  a prop. Worth doing — two copies of a control over what a
+                  client sees on a public link is how they drifted in the
+                  first place — but that is a bigger change than closing the
+                  gap Andy actually hit. */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="share-kol-notes"
+                  checked={(sharingCampaign as any)?.share_kol_notes || false}
+                  onCheckedChange={async (checked) => {
+                    if (sharingCampaign?.id) {
+                      try {
+                        await CampaignService.updateCampaign(sharingCampaign.id, {
+                          share_kol_notes: checked as boolean
+                        } as any);
+                        setSharingCampaign({ ...sharingCampaign, share_kol_notes: checked as boolean } as any);
+                      } catch (error) {
+                        console.error('Error updating campaign:', error);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor="share-kol-notes" className="text-sm font-medium cursor-pointer">
+                  Share KOL Notes
+                </Label>
+              </div>
               {/* Per-content-piece notes — gated by campaigns.share_content_notes.
                   Adds a Notes column to the Contents table on the public view.
                   Off by default so editor commentary stays internal unless
