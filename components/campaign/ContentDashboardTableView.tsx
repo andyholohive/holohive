@@ -169,6 +169,9 @@ export function ContentDashboardTableView() {
   // override stays in place until reload.
   const [contentSort, setContentSort] = useState<{ field: ContentSortField; direction: 'asc' | 'desc' }>({ field: 'activation_date', direction: 'desc' });
   const [selectedContents, setSelectedContents] = useState<string[]>([]);
+  // Bumped after regrouping so every ContentTagCell remounts and refetches its
+  // assignments — the cells own their tag state, so nothing else would show it.
+  const [tagRefreshKey, setTagRefreshKey] = useState(0);
   const [bulkContentStatus, setBulkContentStatus] = useState('');
   const [bulkContentPlatform, setBulkContentPlatform] = useState('');
   const [bulkContentType, setBulkContentType] = useState('');
@@ -535,6 +538,72 @@ export function ContentDashboardTableView() {
     }
   };
 
+  // ── Group the selected rows into one numbered multi-post set ─────
+  //
+  // [2026-08-03] Replaces hand-typing "1 / 5" into every row. Both numbers are
+  // now DERIVED from the group: sequence_n is the row's position by posted
+  // date, sequence_of is the member count. That is the whole point — the old
+  // way let the two drift ("Post 3 of 5" next to "Post 4 of 7"), and adding a
+  // 6th post meant re-editing five separate "of" values by hand.
+  //
+  // `multipost_group_id` already existed on content_tag_assignments but was
+  // dead — addTag hardcoded it to null and nothing read it. This is the
+  // consumer it never got.
+  const handleGroupAsMultiPost = async () => {
+    const tag = globalTags.find((t: ContentTag) => t.name === 'Multi-Post');
+    if (!tag) {
+      toast({ title: 'No "Multi-Post" tag', description: 'Create it in the tag manager first.', variant: 'destructive' });
+      return;
+    }
+    if (selectedContents.length < 2) {
+      toast({ title: 'Select at least 2 posts', description: 'A multi-post set needs more than one piece.', variant: 'destructive' });
+      return;
+    }
+    try {
+      // Order by posted date, earliest first. Undated rows sort last rather
+      // than to the front — a missing date shouldn't claim "Post 1".
+      const ordered = selectedContents
+        .map(id => contents.find((c: any) => c.id === id))
+        .filter(Boolean)
+        .sort((a: any, b: any) => {
+          const da = a.activation_date, db = b.activation_date;
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return da < db ? -1 : da > db ? 1 : 0;
+        });
+
+      const groupId = crypto.randomUUID();
+      const total = ordered.length;
+
+      // Reuse an existing Multi-Post assignment on a row if it has one, so
+      // re-grouping doesn't leave a duplicate chip behind.
+      const { data: existing } = await (supabase as any)
+        .from('content_tag_assignments')
+        .select('id, content_id')
+        .eq('tag_id', tag.id)
+        .in('content_id', ordered.map((c: any) => c.id));
+      const existingByContent = new Map<string, string>(
+        (existing ?? []).map((r: any) => [r.content_id, r.id]),
+      );
+
+      await Promise.all(ordered.map((c: any, i: number) => {
+        const fields = { sequence_n: i + 1, sequence_of: total, multipost_group_id: groupId };
+        const priorId = existingByContent.get(c.id);
+        return priorId
+          ? (supabase as any).from('content_tag_assignments').update(fields).eq('id', priorId)
+          : (supabase as any).from('content_tag_assignments').insert({ content_id: c.id, tag_id: tag.id, ...fields });
+      }));
+
+      setSelectedContents([]);
+      toast({ title: `Grouped as Post 1–${total} of ${total}` });
+      setTagRefreshKey(k => k + 1);
+    } catch (err) {
+      console.error('Error grouping multi-post:', err);
+      toast({ title: 'Grouping failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    }
+  };
+
   const handleDeleteContent = async (contentId: string) => {
     try {
       await supabase.from('contents').delete().eq('id', contentId);
@@ -874,6 +943,18 @@ export function ContentDashboardTableView() {
                             onClick={handleBulkStatusChange}
                           >
                             Apply
+                          </Button>
+                        </div>
+                        <div className="flex flex-col items-end justify-end">
+                          <div className="h-5"></div>
+                          {/* Numbers the set automatically — see handleGroupAsMultiPost. */}
+                          <Button
+                            size="sm"
+                            variant="outline" className="whitespace-nowrap"
+                            disabled={selectedContents.length < 2}
+                            onClick={handleGroupAsMultiPost}
+                          >
+                            Group as Multi-Post
                           </Button>
                         </div>
                         <div className="flex flex-col items-end justify-end">
@@ -1803,7 +1884,7 @@ export function ContentDashboardTableView() {
                                   in ContentTagCell so the assignment +
                                   picker logic doesn't bloat this file. */}
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
-                                <ContentTagCell contentId={content.id} tags={globalTags} />
+                                <ContentTagCell key={tagRefreshKey} contentId={content.id} tags={globalTags} />
                               </TableCell>
                               <TableCell
                                 className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'notes')}

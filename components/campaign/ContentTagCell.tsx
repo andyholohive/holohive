@@ -23,7 +23,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -144,23 +143,6 @@ export default function ContentTagCell({
     }
   };
 
-  const updateMultipost = async (
-    assignmentId: string,
-    sequence_n: number | null,
-    sequence_of: number | null,
-  ) => {
-    setAssignments(prev => prev.map(a =>
-      a.id === assignmentId ? { ...a, sequence_n, sequence_of } : a
-    ));
-    const { error } = await (supabase as any)
-      .from('content_tag_assignments')
-      .update({ sequence_n, sequence_of })
-      .eq('id', assignmentId);
-    if (error) {
-      toast({ title: 'Failed to save sequence', description: error.message, variant: 'destructive' });
-    }
-  };
-
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
     return <div className="h-5 w-12 rounded bg-cream-100 animate-pulse" />;
@@ -184,33 +166,16 @@ export default function ContentTagCell({
             title={`${tag.name} · ${tag.visibility === 'client' ? 'Client-facing' : 'Internal'}`}
           >
             {label}
-            {isMultiPost && (
-              <span className="inline-flex items-center gap-0.5">
-                <Input
-                  type="number"
-                  min={1}
-                  value={a.sequence_n ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value ? parseInt(e.target.value, 10) : null;
-                    updateMultipost(a.id, v, a.sequence_of);
-                  }}
-                  className="!w-7 h-4 px-1 text-[10px] text-ink-warm-900 bg-white/90 border-none rounded"
-                  placeholder="N"
-                />
-                <span>/</span>
-                <Input
-                  type="number"
-                  min={1}
-                  value={a.sequence_of ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value ? parseInt(e.target.value, 10) : null;
-                    updateMultipost(a.id, a.sequence_n, v);
-                  }}
-                  className="!w-7 h-4 px-1 text-[10px] text-ink-warm-900 bg-white/90 border-none rounded"
-                  placeholder="M"
-                />
-              </span>
-            )}
+            {/* [2026-08-03] These two numbers used to be editable <Input>s,
+                typed per row with nothing linking them — so "Post 3 of 5"
+                could sit beside "Post 4 of 7", and adding a post meant
+                re-editing every "of" by hand. Both are now DERIVED from the
+                row's multipost group (select rows on the Content Dashboard →
+                "Group as Multi-Post"): position by posted date, total by
+                member count. Read-only on purpose — editing one number in
+                isolation is exactly what caused the drift. The `label` above
+                already renders "Post N of M" when the row is grouped; an
+                ungrouped Multi-Post tag just reads "Multi-Post". */}
             <button
               type="button"
               onClick={() => removeTag(a.id)}
