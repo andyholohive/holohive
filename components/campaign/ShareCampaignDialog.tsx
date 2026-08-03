@@ -76,7 +76,12 @@ export function ShareCampaignDialog({ open, onOpenChange }: ShareCampaignDialogP
               <div className="flex justify-between mb-2">
                 <span className="font-medium">Dates:</span>
                 <span>
-                  {campaign ? formatDate(campaign.start_date) : ''} - {campaign?.end_date ? formatDate(campaign.end_date) : 'TBD'}
+                  {/* [2026-08-03] Engagement term end, matching the /campaigns
+                      copy of this dialog + the card + the table. This read
+                      `campaign.end_date` — the campaign's own column, which is
+                      usually null — so the same campaign said "TBD" here and
+                      showed a real date on /campaigns. */}
+                  {campaign ? formatDate(campaign.start_date) : ''} - {(campaign as any)?.week_term_end ? formatDate((campaign as any).week_term_end) : 'TBD'}
                 </span>
               </div>
               <div className="flex justify-between">

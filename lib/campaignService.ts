@@ -134,6 +134,23 @@ export class CampaignService {
   /**
    * Get a single campaign by ID with budget allocations
    */
+  /**
+   * Engagement term end for one campaign, from `campaign_week_window`.
+   *
+   * [2026-08-03] The list query joins this in for every campaign, but the two
+   * single-campaign fetches never did — so the same campaign showed an end date
+   * on /campaigns and "TBD" on /campaigns/[id]. Kept as a helper so the next
+   * reader can't add a third divergent copy.
+   */
+  private static async fetchWeekTermEnd(client: any, campaignId: string): Promise<string | null> {
+    const { data } = await client
+      .from('campaign_week_window')
+      .select('term_end')
+      .eq('campaign_id', campaignId)
+      .maybeSingle();
+    return (data as { term_end: string | null } | null)?.term_end ?? null;
+  }
+
   static async getCampaignById(campaignId: string, supabaseClient?: any): Promise<CampaignWithDetails | null> {
     try {
       const client = supabaseClient || supabase;
@@ -164,6 +181,7 @@ export class CampaignService {
 
       return {
         ...campaign,
+        week_term_end: await this.fetchWeekTermEnd(client, campaign.id),
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
         client_logo_url: (campaign.clients as any)?.logo_url,
@@ -271,6 +289,19 @@ export class CampaignService {
       if (error) throw error;
       if (!campaign) return null;
 
+      // [2026-08-03] Same two joins getCampaignById does. This path had neither,
+      // so a campaign opened by slug showed a different budget AND a different
+      // end date in the Share dialog than the exact same campaign opened by id.
+      let clientBudgetTotal: number | null = null;
+      if (campaign.client_id) {
+        const { data: engagementRow } = await client
+          .from('client_engagement_total')
+          .select('total_amount')
+          .eq('client_id', campaign.client_id)
+          .maybeSingle();
+        clientBudgetTotal = (engagementRow as { total_amount: number | null } | null)?.total_amount ?? null;
+      }
+
       return {
         ...campaign,
         client_name: (campaign.clients as any)?.name,
@@ -278,6 +309,8 @@ export class CampaignService {
         client_logo_url: (campaign.clients as any)?.logo_url,
         client_is_active: (campaign.clients as any)?.is_active ?? null,
         client_is_ad_hoc: (campaign.clients as any)?.is_ad_hoc ?? null,
+        client_budget_total: clientBudgetTotal,
+        week_term_end: await this.fetchWeekTermEnd(client, campaign.id),
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
       };
