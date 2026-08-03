@@ -505,12 +505,18 @@ const CampaignDetailsPage = () => {
   // Fetch campaign KOLs when campaign changes
   useEffect(() => {
     if (campaign) {
-      fetchCampaignKOLs();
+      // fetchLatestCosts is chained rather than parallel: it needs the roster's
+      // master_kol_ids to scope its query. Everything else stays parallel.
+      fetchCampaignKOLs().then(kols => {
+        const masterKolIds = Array.from(new Set(
+          kols.map(k => k.master_kol?.id).filter(Boolean) as string[],
+        ));
+        void fetchLatestCosts(masterKolIds);
+      });
       fetchAvailableKOLs();
       fetchCampaignUpdates();
       fetchPayments();
       fetchKolTelegramChats();
-      fetchLatestCosts();
     }
   }, [campaign]);
 
@@ -927,8 +933,22 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  // Fetch latest costs for all KOLs (most recent payment amount per master_kol_id)
-  const fetchLatestCosts = async () => {
+  /**
+   * Latest paid amount per master_kol_id, for the KOLs on THIS campaign.
+   *
+   * Deliberately cross-campaign in what it reads — the question is "what did
+   * we last pay this creator anywhere", so a campaign filter on `payments`
+   * would give the wrong answer. But it only needs the creators actually on
+   * this roster, and until 2026-07-31 it had no filter at all: every campaign
+   * page load pulled every paid payment in the system (319 rows today, joined
+   * to campaign_kols, growing every week) to build a map that 35 of them
+   * would be read from.
+   *
+   * Scoped to the passed master_kol_ids instead. Called after
+   * fetchCampaignKOLs resolves, since that's where the ids come from.
+   */
+  const fetchLatestCosts = async (masterKolIds: string[]) => {
+    if (!masterKolIds.length) { setLatestCostMap(new Map()); return; }
     try {
       // Only actually-paid, non-zero payments count as a "latest cost".
       // Without these filters, unpaid placeholder rows (NULL payment_date
@@ -940,6 +960,7 @@ const CampaignDetailsPage = () => {
         .select('amount, payment_date, campaign_kol:campaign_kols!inner(master_kol_id)')
         .not('payment_date', 'is', null)
         .gt('amount', 0)
+        .in('campaign_kol.master_kol_id', masterKolIds)
         .order('payment_date', { ascending: false });
 
       if (!error && data) {
