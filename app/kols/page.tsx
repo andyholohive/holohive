@@ -1801,6 +1801,14 @@ export default function KOLsPage() {
               }}
               className={getInputStyling()}
               style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+              // [2026-07-31 per Andy] autoFocus focuses the input but does
+              // not bring it into view. The table scrolls horizontally, so
+              // after a search narrows the rows the focused cell can sit
+              // outside the visible window — you are typing into a field you
+              // cannot see until Enter re-renders the row. scrollIntoView on
+              // focus fixes it; 'nearest' on both axes so it nudges rather
+              // than recentring the whole table.
+              onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
               autoFocus
             />
           );
