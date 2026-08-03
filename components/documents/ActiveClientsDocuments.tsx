@@ -449,7 +449,27 @@ export default function ActiveClientsDocuments() {
             </div>
             <div>
               <Label htmlFor="doc-file">PDF <RequiredAsterisk /></Label>
-              <Input id="doc-file" type="file" accept="application/pdf" onChange={(e) => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))} className="h-9 focus-brand" />
+              {/* [2026-08-03 per feedback] Picking a file fills Title from the
+                  filename (extension stripped) when Title is still empty, so
+                  the common case is one action instead of two. Typing a Title
+                  first — or editing it after — always wins; this never
+                  overwrites what someone actually entered. */}
+              <Input
+                id="doc-file"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setForm(f => ({
+                    ...f,
+                    file,
+                    title: f.title.trim() === '' && file
+                      ? file.name.replace(/\.[^.]+$/, '')
+                      : f.title,
+                  }));
+                }}
+                className="h-9 focus-brand"
+              />
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="doc-share" className="cursor-pointer">Share with the client</Label>
