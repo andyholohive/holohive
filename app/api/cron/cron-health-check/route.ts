@@ -48,6 +48,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   GOOGLE_MEETING_REMINDERS: 288, // every 5 min
   DISCOVERY: 2,                // daily (sometimes 2x if runs_per_day=2)
   TELEGRAM_METRICS: 1,         // daily
+  X_METRICS: 1,                // daily
   EXPENSE_RECURRENCE: 1,       // daily
   BACKLOG_WEEKLY_SUMMARY: 1,   // weekly (Monday) — Phase 5 of HHP Backlog spec
   LINEUP_COMPLETION: 1,        // daily — HHP Lineup Manager Spec § 4.1 auto-completion

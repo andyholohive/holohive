@@ -65,6 +65,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/refresh-x-metrics",
+      "schedule": "30 6 * * *"
+    },
+    {
       "path": "/api/cron/kol-niche-drift",
       "schedule": "30 4 * * *"
     },
