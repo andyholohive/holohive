@@ -382,7 +382,14 @@ export default function TelegramChatsPage() {
     try {
       const { data, error } = await supabase
         .from('clients')
+        // [2026-08-03 per Andy] Active clients only. This listed every
+        // non-archived client, so the Link Chat picker offered inactive and
+        // churned ones — you could bind a live Telegram chat to a client we
+        // no longer work with, and nothing downstream would flag it.
+        // Matches /sops, /initiatives, /admin/telegram-comm and
+        // /admin/short-links, which all already gate on is_active.
         .select('id, name')
+        .eq('is_active', true)
         .is('archived_at', null)
         .order('name');
       if (error) throw error;
