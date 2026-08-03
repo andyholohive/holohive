@@ -32,6 +32,36 @@ export default function SettingsPage() {
 function SettingsContent() {
   const { user, userProfile, refreshUserProfile } = useAuth();
   const { toast } = useToast();
+
+  // ── X API health check (super-admin only; renders below Telegram) ────────
+  // [2026-08-03] Replaces running a curl by hand. Reports impressions
+  // separately from "connected" on purpose: a token can authenticate fine and
+  // still omit impression_count, which would silently make the planned metrics
+  // cron useless. See app/api/admin/x-api/test/route.ts.
+  const [xApiChecking, setXApiChecking] = useState(false);
+  const [xApiResult, setXApiResult] = useState<any>(null);
+
+  const handleTestXApi = async () => {
+    setXApiChecking(true);
+    setXApiResult(null);
+    try {
+      const res = await fetch('/api/admin/x-api/test', { cache: 'no-store' });
+      const json = await res.json();
+      setXApiResult(json);
+      toast(
+        json.ok
+          ? { title: 'X API working', description: json.message }
+          : { title: 'X API check failed', description: json.message, variant: 'destructive' },
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Request failed';
+      setXApiResult({ ok: false, message });
+      toast({ title: 'X API check failed', description: message, variant: 'destructive' });
+    } finally {
+      setXApiChecking(false);
+    }
+  };
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1175,6 +1205,66 @@ function SettingsContent() {
                       </div>
                     </>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* ── X API ─────────────────────────────────────────────────
+                  Verifies the credential that would power automated X post
+                  metrics. Three independent signals, because two of the three
+                  failure modes look like success from the outside. */}
+              <Card className="border-cream-200">
+                <CardContent className="p-6 space-y-4">
+                  <SectionHeader label="X API" />
+                  <p className="text-sm text-ink-warm-600 -mt-2">
+                    Check the bearer token used for automated post metrics.
+                  </p>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Button variant="brand" onClick={handleTestXApi} disabled={xApiChecking}>
+                      {xApiChecking ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Test connection
+                    </Button>
+                    {xApiResult && (
+                      <StatusBadge tone={xApiResult.ok ? 'success' : 'danger'}>
+                        {xApiResult.ok ? 'Working' : 'Not working'}
+                      </StatusBadge>
+                    )}
+                  </div>
+
+                  {xApiResult && (
+                    <div className="rounded-lg border border-cream-200 bg-cream-50 p-4 space-y-2">
+                      {[
+                        ['Token authenticates', xApiResult.tokenValid],
+                        ['Impressions available', xApiResult.hasImpressions],
+                      ].map(([label, pass]) => (
+                        <div key={String(label)} className="flex items-center gap-2 text-sm">
+                          {pass ? (
+                            <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                          )}
+                          <span className="text-ink-warm-700">{label}</span>
+                        </div>
+                      ))}
+                      <p className="text-xs text-ink-warm-500 pt-1">{xApiResult.message}</p>
+                      {xApiResult.metrics && (
+                        <p className="text-xs text-ink-warm-500 font-mono">
+                          {JSON.stringify(xApiResult.metrics)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-ink-warm-500">
+                    Reads one public post via <span className="font-mono">GET /2/tweets</span> — about
+                    $0.005 per check at pay-per-use. &ldquo;Impressions available&rdquo; is the one that
+                    matters: without <span className="font-mono">impression_count</span>, view counts
+                    can&rsquo;t be automated and only likes/replies would refresh.
+                  </p>
                 </CardContent>
               </Card>
             </>
