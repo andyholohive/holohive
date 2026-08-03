@@ -16,7 +16,7 @@ import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion, Tag, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion, Tag, Zap, MoreHorizontal } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,13 +42,22 @@ import { MultiSelect } from "@/components/campaign/MultiSelect";
 import { RecordPaymentDialog, type RecordPaymentDialogHandle } from "@/components/campaign/RecordPaymentDialog";
 import { KolDashboardOverview } from "@/components/campaign/KolDashboardOverview";
 import { KolDashboardCardsView } from "@/components/campaign/KolDashboardCardsView";
-import { KolDashboardTableView } from "@/components/campaign/KolDashboardTableView";
+const KolDashboardTableView = dynamic(
+  () => import("@/components/campaign/KolDashboardTableView").then(m => m.KolDashboardTableView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
 import { BudgetOverview } from "@/components/campaign/BudgetOverview";
 import { BudgetDashboardV2 } from "@/components/campaign/BudgetDashboardV2";
 import { SentimentModule } from "@/components/campaign/SentimentModule";
-import { BudgetTableView } from "@/components/campaign/BudgetTableView";
+const BudgetTableView = dynamic(
+  () => import("@/components/campaign/BudgetTableView").then(m => m.BudgetTableView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
 import { ContentDashboardOverview } from "@/components/campaign/ContentDashboardOverview";
-import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
+const ContentDashboardTableView = dynamic(
+  () => import("@/components/campaign/ContentDashboardTableView").then(m => m.ContentDashboardTableView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
 import { ContentSubmissionsBanner } from "@/components/campaign/ContentSubmissionsBanner";
 import { MasterKolEditDialog } from "@/components/campaign/MasterKolEditDialog";
 import { EditPaymentDialog } from "@/components/campaign/EditPaymentDialog";
@@ -73,6 +82,30 @@ import SetPaymentTermsDialog from "@/components/campaign/SetPaymentTermsDialog";
 import { ClientService } from "@/lib/clientService";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import dynamic from "next/dynamic";
+// [2026-07-31] The four heaviest tab bodies are code-split.
+//
+// Together they are ~7,200 lines that used to sit in this route's initial
+// bundle whether or not the tab was ever opened — Radix unmounts inactive
+// TabsContent, so they never rendered, but the JS still had to be downloaded,
+// parsed and evaluated before the page could become interactive.
+//
+// ssr:false because all four are client-only table/board views behind a tab
+// the server never renders anyway. The loading skeleton matches the table
+// shape so switching tabs doesn't jump.
+const TabSkeleton = () => (
+  <div className="space-y-3">
+    <Skeleton className="h-9 w-full rounded-md" />
+    {Array.from({ length: 6 }).map((_, i) => (
+      <Skeleton key={i} className="h-12 w-full rounded-md" />
+    ))}
+  </div>
+);
+
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -84,7 +117,7 @@ import ShowcaseSettingsDialog from './_components/ShowcaseSettingsDialog';
 import ContentTagDialog from './_components/ContentTagDialog';
 import ActivationSettingsDialog from './_components/ActivationSettingsDialog';
 import ActivationResultsSection from '@/components/activations/ActivationResultsSection';
-import LineupsTab from '@/components/campaign/LineupsTab';
+const LineupsTab = dynamic(() => import("@/components/campaign/LineupsTab"), { ssr: false, loading: () => <TabSkeleton /> });
 import { AddActivationDialog } from '@/components/campaign/AddActivationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from '@/lib/dateFormat';
@@ -2341,59 +2374,59 @@ const CampaignDetailsPage = () => {
                   {missingFields.length} Warning{missingFields.length !== 1 ? 's' : ''}
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsAddActivationOpen(true)}
-                title="Mid-stint scope addition: extra deliverables + budget delta"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Add Activation
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsShareCampaignOpen(true)}
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share Campaign
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsShowcaseOpen(true)}
-                title="Generate a sales-safe public link with masking"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Showcase
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsContentTagOpen(true)}
-                title="Apply tags to content rows"
-              >
-                <Tag className="h-4 w-4 mr-2" />
-                Tag Content
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsActivationOpen(true)}
-                title="Configure the activation portal API or edit the snapshot manually"
-              >
-                <Activity className="h-4 w-4 mr-2" />
-                Activation
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShowEmailViews}
-                title="View emails that accessed this campaign"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Views
-              </Button>
+              {/* [2026-07-31 per Andy] Six outline buttons collapsed to two.
+                  They were all the same weight, so nothing read as primary and
+                  the row wrapped on anything narrower than a wide desktop.
+                  Grouped by what the user is actually trying to do: hand
+                  something to someone (Share), or configure the campaign
+                  (More). Every action is still one click from open — nothing
+                  moved further than a menu. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                    <ChevronDown className="h-3.5 w-3.5 ml-1.5 text-gray-400" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setIsShareCampaignOpen(true)}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share campaign
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsShowcaseOpen(true)}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Showcase link
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleShowEmailViews}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Who has viewed
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="px-2.5" aria-label="More campaign actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuItem onClick={() => setIsAddActivationOpen(true)}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Add activation
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsActivationOpen(true)}>
+                    <Activity className="h-4 w-4 mr-2" />
+                    Activation settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsContentTagOpen(true)}>
+                    <Tag className="h-4 w-4 mr-2" />
+                    Tag content
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
