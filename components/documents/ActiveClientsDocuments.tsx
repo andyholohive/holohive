@@ -104,7 +104,18 @@ export default function ActiveClientsDocuments() {
     try {
       const [docsRes, clientsRes] = await Promise.all([
         (supabase as any).from('documents').select('*, clients(name)').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('id, name').is('archived_at', null).order('name'),
+        // [2026-07-31 per Andy] Active clients only. `archived_at IS NULL`
+        // alone still listed every inactive-but-unarchived client, so the
+        // upload picker was mostly names nobody is delivering to — and
+        // picking a stale one silently attaches a document to a dead
+        // engagement. is_active is the field /clients and /campaigns already
+        // filter on, so this now matches what those pages call "active".
+        (supabase as any)
+          .from('clients')
+          .select('id, name')
+          .is('archived_at', null)
+          .eq('is_active', true)
+          .order('name'),
       ]);
       const list = ((docsRes.data ?? []) as any[]).map(d => ({ ...d, client_name: d.clients?.name }));
       setDocs(list);

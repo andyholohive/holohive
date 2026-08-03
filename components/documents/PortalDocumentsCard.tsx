@@ -141,7 +141,12 @@ export default function PortalDocumentsCard({ portalId, email, className }: { po
         </div>
 
       <Dialog open={!!active} onOpenChange={(o) => { if (!o) setActive(null); }}>
-        <DialogContent className="!bg-white max-w-4xl">
+        {/* [2026-07-31 per Andy] Wider. max-w-4xl (56rem) left a PDF page
+            rendering small enough that clients were zooming or downloading
+            instead of reading in place, which defeats the tracked viewer.
+            95vw capped at 84rem fills a laptop screen while still reading as
+            a dialog rather than a full-page takeover. */}
+        <DialogContent className="!bg-white w-[95vw] max-w-[84rem]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 pr-8">
               <FileText className="h-5 w-5 text-brand flex-shrink-0" />
