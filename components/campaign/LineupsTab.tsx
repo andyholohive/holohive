@@ -38,6 +38,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import {
@@ -1172,7 +1173,7 @@ export default function LineupsTab({
         open={!!renameTarget}
         onOpenChange={(open) => { if (!open) setRenameTarget(null); }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Rename angle</DialogTitle>
             <DialogDescription>
@@ -1183,17 +1184,25 @@ export default function LineupsTab({
             <Label htmlFor="angle-rename-input">
               Angle name <RequiredAsterisk />
             </Label>
-            <Input
+            {/* [2026-08-03 per Andy] Was a single-line <Input>. Angle names
+                carry the actual messaging brief for the KOLs on that angle, not
+                just a label, so one line meant writing into a slot that showed
+                ~40 characters at a time. Textarea with room for a few lines.
+
+                Enter now inserts a newline instead of submitting — the whole
+                point is multi-line. Cmd/Ctrl+Enter keeps the fast path for
+                anyone used to typing and hitting enter. */}
+            <Textarea
               id="angle-rename-input"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && renameValue.trim()) {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && renameValue.trim()) {
                   e.preventDefault();
                   void confirmRenameAngle();
                 }
               }}
-              className="focus-brand"
+              className="focus-brand min-h-[140px] resize-y"
               autoFocus
               disabled={busy}
             />
