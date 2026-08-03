@@ -1452,7 +1452,12 @@ export default function FormBuilderPage() {
       console.error('Error saving field:', error);
       toast({
         title: 'Save failed',
-        description: error instanceof Error ? error.message : 'Failed to save field',
+        // Supabase rejects throw a PostgrestError — a plain object, not an
+        // Error — so `instanceof Error` was false and every failure showed the
+        // same generic string. An RLS denial in particular looked identical to
+        // a network blip. Read .message off whatever we got.
+        description: (error as any)?.message || (error as any)?.hint
+          || (error instanceof Error ? error.message : 'Failed to save field'),
         variant: 'destructive',
       });
     } finally {
@@ -3040,21 +3045,6 @@ export default function FormBuilderPage() {
                     style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
                   />
                 </div>
-              </div>
-              <div>
-                <Label>Page</Label>
-                <Select value={String(fieldForm.page_number)} onValueChange={(value) => setFieldForm(prev => ({ ...prev, page_number: parseInt(value) }))}>
-                  <SelectTrigger className="focus-brand">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                      <SelectItem key={pageNum} value={String(pageNum)}>
-                        Page {pageNum}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               {/* Page picker — lets the editor move an existing field
                   to another page (or pre-select the destination page for
