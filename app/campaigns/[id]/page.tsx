@@ -3020,7 +3020,12 @@ const CampaignDetailsPage = () => {
 
       {/* Share Campaign Dialog moved into
           `components/campaign/ShareCampaignDialog.tsx` on 2026-06-02. */}
-      <ShareCampaignDialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen} />
+      <ShareCampaignDialog
+        open={isShareCampaignOpen}
+        onOpenChange={setIsShareCampaignOpen}
+        campaign={campaign}
+        onCampaignChange={setCampaign}
+      />
       {campaign && (
         <AddActivationDialog
           open={isAddActivationOpen}

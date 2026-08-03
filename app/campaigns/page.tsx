@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import Link from "next/link";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight, Users, FileText } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight, Users, FileText } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
+import { ShareCampaignDialog } from '@/components/campaign/ShareCampaignDialog';
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { getCampaignWeekState } from "@/lib/campaignWeekHelpers";
 import { CampaignTemplateService, CampaignTemplateWithDetails } from "@/lib/campaignTemplateService";
@@ -1534,174 +1535,16 @@ export default function CampaignsPage() {
       )}
       </div>
 
-      {/* Share Campaign Dialog */}
-      <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share Campaign: {sharingCampaign?.name}</DialogTitle>
-            <DialogDescription>
-              Share this campaign by copying the link below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Campaign Details</Label>
-              <div className="bg-cream-50 rounded-lg p-3 text-sm">
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">Client:</span>
-                  <span>{sharingCampaign?.client_name || 'Unknown'}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">Budget:</span>
-                  <span>{CampaignService.formatCurrency(sharingCampaign?.client_budget_total ?? sharingCampaign?.total_budget ?? 0)}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">Dates:</span>
-                  {/* [2026-07-25] Same engagement-only term end as the card + table. */}
-                  <span>{sharingCampaign ? fmtDate(sharingCampaign.start_date) : ''}{
-                    sharingCampaign?.week_term_end ? ` - ${fmtDate(sharingCampaign.week_term_end)}` : ' - TBD'
-                  }</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Status:</span>
-                  <span>{sharingCampaign?.status}</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="public-password">Password for Public View</Label>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-900">Client Email:</span>
-                  <span className="text-sm font-mono text-blue-700">{sharingCampaign?.client_email || 'N/A'}</span>
-                </div>
-                <p className="text-xs text-brand mt-2">Use the client's email address as the password to access the public campaign view</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="share-creator-type"
-                  checked={sharingCampaign?.share_creator_type || false}
-                  onCheckedChange={async (checked) => {
-                    if (sharingCampaign?.id) {
-                      try {
-                        await CampaignService.updateCampaign(sharingCampaign.id, {
-                          share_creator_type: checked as boolean
-                        } as any);
-                        setSharingCampaign({ ...sharingCampaign, share_creator_type: checked as boolean });
-                      } catch (error) {
-                        console.error('Error updating campaign:', error);
-                      }
-                    }
-                  }}
-                />
-                <Label htmlFor="share-creator-type" className="text-sm font-medium cursor-pointer">
-                  Share Creator Type for KOLs
-                </Label>
-              </div>
-              {/* [2026-07-31 per Andy] Share KOL Notes was missing here but
-                  present in <ShareCampaignDialog> on /campaigns/[id], so the
-                  same campaign offered two different sets of share controls
-                  depending on which page you opened it from — and this page
-                  could not turn the flag off at all.
-
-                  Added rather than swapping this whole block for the shared
-                  component: ShareCampaignDialog reads useCampaignDetail(),
-                  a context that only exists on the campaign detail route, so
-                  reusing it here needs it refactored to take the campaign as
-                  a prop. Worth doing — two copies of a control over what a
-                  client sees on a public link is how they drifted in the
-                  first place — but that is a bigger change than closing the
-                  gap Andy actually hit. */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="share-kol-notes"
-                  checked={(sharingCampaign as any)?.share_kol_notes || false}
-                  onCheckedChange={async (checked) => {
-                    if (sharingCampaign?.id) {
-                      try {
-                        await CampaignService.updateCampaign(sharingCampaign.id, {
-                          share_kol_notes: checked as boolean
-                        } as any);
-                        setSharingCampaign({ ...sharingCampaign, share_kol_notes: checked as boolean } as any);
-                      } catch (error) {
-                        console.error('Error updating campaign:', error);
-                      }
-                    }
-                  }}
-                />
-                <Label htmlFor="share-kol-notes" className="text-sm font-medium cursor-pointer">
-                  Share KOL Notes
-                </Label>
-              </div>
-              {/* Per-content-piece notes — gated by campaigns.share_content_notes.
-                  Adds a Notes column to the Contents table on the public view.
-                  Off by default so editor commentary stays internal unless
-                  explicitly opted in (migration 065). */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="share-content-notes"
-                  checked={(sharingCampaign as any)?.share_content_notes || false}
-                  onCheckedChange={async (checked) => {
-                    if (sharingCampaign?.id) {
-                      try {
-                        await CampaignService.updateCampaign(sharingCampaign.id, {
-                          share_content_notes: checked as boolean,
-                        } as any);
-                        setSharingCampaign({ ...sharingCampaign, share_content_notes: checked as boolean } as any);
-                      } catch (error) {
-                        console.error('Error updating campaign:', error);
-                      }
-                    }
-                  }}
-                />
-                <Label htmlFor="share-content-notes" className="text-sm font-medium cursor-pointer">
-                  Share Notes on Content Pieces
-                </Label>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="share-campaign-link">Share Link</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="share-campaign-link"
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${sharingCampaign?.slug || sharingCampaign?.id}`}
-                  readOnly
-                  className="flex-1 focus-brand"
-                />
-                <Button
-                  variant="outline"
-                  className="h-10"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && sharingCampaign?.id) {
-                      navigator.clipboard.writeText(`${window.location.origin}/public/campaigns/${sharingCampaign.slug || sharingCampaign.id}`);
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-10"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && sharingCampaign?.id) {
-                      window.open(`${window.location.origin}/public/campaigns/${sharingCampaign.slug || sharingCampaign.id}`, '_blank');
-                    }
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-            <Button variant="outline" onClick={() => setIsShareCampaignOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* [2026-08-03] Was a ~165-line inline copy of ShareCampaignDialog.
+          The copy drifted from the original twice — missing the Share KOL
+          Notes toggle, and showing a different end date — so it now renders
+          the shared component, which takes the campaign as a prop. */}
+      <ShareCampaignDialog
+        open={isShareCampaignOpen}
+        onOpenChange={setIsShareCampaignOpen}
+        campaign={sharingCampaign}
+        onCampaignChange={setSharingCampaign}
+      />
 
       {/* Archive Campaign Confirmation Dialog */}
       <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>

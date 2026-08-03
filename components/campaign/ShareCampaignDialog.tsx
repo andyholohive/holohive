@@ -8,8 +8,15 @@
  *
  * Extracted from `app/campaigns/[id]/page.tsx` on 2026-06-02. No
  * internal form state — the checkbox toggles write back to the
- * campaign row immediately. Reads `campaign`, writes via
- * `setCampaign` + `CampaignService.updateCampaign`.
+ * campaign row immediately.
+ *
+ * [2026-08-03] Takes the campaign as a prop instead of reading
+ * `useCampaignDetail()`. That context only exists on the campaign-detail
+ * route, so /campaigns couldn't use this component and carried its own
+ * copy of the same dialog instead. The two then drifted twice — the copy
+ * was missing the Share KOL Notes toggle entirely (a3a0f4a) and showed a
+ * different end date (47473ce). Both pages now render this one component,
+ * so there is nothing left to drift.
  */
 
 import { Copy, ExternalLink } from 'lucide-react';
@@ -21,26 +28,36 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CampaignService } from '@/lib/campaignService';
-import { useCampaignDetail } from '@/contexts/CampaignDetailContext';
+import { CampaignService, type CampaignWithDetails } from '@/lib/campaignService';
+import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
 
 interface ShareCampaignDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  campaign: CampaignWithDetails | null;
+  /** Called with the updated campaign after a share flag is toggled, so the
+   *  caller's copy stays in sync (the checkboxes read from `campaign`). */
+  onCampaignChange: (campaign: CampaignWithDetails) => void;
 }
 
-export function ShareCampaignDialog({ open, onOpenChange }: ShareCampaignDialogProps) {
-  const { campaign, setCampaign, toast } = useCampaignDetail();
+export function ShareCampaignDialog({
+  open,
+  onOpenChange,
+  campaign,
+  onCampaignChange,
+}: ShareCampaignDialogProps) {
+  const { toast } = useToast();
 
   const updateShareFlag = async <K extends string>(field: K, value: boolean) => {
     if (!campaign?.id) return;
     try {
       await CampaignService.updateCampaign(campaign.id, { [field]: value } as any);
-      setCampaign({ ...campaign, [field]: value } as any);
+      onCampaignChange({ ...campaign, [field]: value } as any);
     } catch (error) {
       console.error('Error updating campaign:', error);
     }
@@ -168,6 +185,13 @@ export function ShareCampaignDialog({ open, onOpenChange }: ShareCampaignDialogP
             </div>
           </div>
         </div>
+        {/* Kept from the /campaigns copy this replaced — that dialog had an
+            explicit Close, this one only had the corner X. */}
+        <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
