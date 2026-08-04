@@ -23,18 +23,20 @@ export interface WeeklyReportData {
   krCexVolKrw: number; krCexVolUsd: number; krCexRegime: Regime; krCexArrow: Arrow;
   /** kospiArrow is "⟷" when no prior-week snapshot exists. Deriving the arrow
    *  from the sign of kospiWoWPct alone printed "▲ +0.0%" in that case — a
-   *  confident up-arrow for a week we simply had no baseline for. Not passed
-   *  through calc.trendArrow: its 5% deadband is tuned for crypto volumes and
-   *  would flatten a 2% index move, which for KOSPI is a large week. */
+   *  confident up-arrow for a week we simply had no baseline for.
+   *
+   *  [2026-08-03] Now DOES go through calc.trendArrow, at
+   *  DEADBAND_INDEX_FX (1%) rather than the crypto-volume 5%. This note used
+   *  to say the opposite: KOSPI was excluded from trendArrow because 5% would
+   *  flatten a 2% index move. True, but the workaround used no deadband at
+   *  all, so a +0.01% week printed ▲ and a genuinely flat week could never
+   *  print ⟷. 1% keeps real index moves visible without that. */
   kospi: number; kospiWoWPct: number; kospiArrow: Arrow; kospiYtdPct: number; kospiAtAth: boolean;
   fxUsdKrw: number;
   kimchiUsdtPct: number;
   /** SoV line renders only when showSov is true — otherwise a flat "+0%" would
    *  read as a real (zero) metric. */
   sovArrow: Arrow; sovPct: number; showSov?: boolean;
-  /** null when peer_basket is empty OR the token isn't KR-listed → the
-   *  "#N vs peers" line is suppressed rather than printing a fabricated rank. */
-  peerRank: number | null;
   /** Whether the token trades on a Korean exchange. When false, the Korea
    *  Demand share/vol lines are meaningless (all zero) and get reframed to a
    *  "watching for a KR listing" note [Andy 2026-07-16]. */
@@ -117,7 +119,6 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   // printing a fabricated "#1" / inert "+0%" [Andy 2026-07-15].
   const tail: string[] = [];
   if (d.showSov) tail.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
-  if (d.peerRank != null) tail.push(`vs peers   $${d.ticker} #${d.peerRank} in KR vol share`);
   if (tail.length) { B.push(HR); B.push(...tail); }
 
   const brand = `${logo()} <b>Holo Hive Signal</b>`;

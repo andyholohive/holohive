@@ -97,7 +97,10 @@ export async function assembleWeekly(
   const krCexUsd = krCexKrw / fx;
 
   // Trend (vs prior week) + regime (vs stored baseline)
-  const db = cfg.thresholds?.trend_deadband ?? 0.05;
+  // Crypto venue volumes. Still config-overridable per client.
+  const db = cfg.thresholds?.trend_deadband ?? calc.DEADBAND_CRYPTO_VOL;
+  // Index + FX move in single digits — see calc.DEADBAND_INDEX_FX.
+  const dbIdx = calc.DEADBAND_INDEX_FX;
   const [fxPrior, krPrior, kospiPrior, krVolPriorRow, fbBase, krBase] = await Promise.all([
     getGlobalPrior(supabase, "futures_total", weekEnding),
     getGlobalPrior(supabase, "kr_cex_vol", weekEnding),
@@ -184,30 +187,11 @@ export async function assembleWeekly(
   // null when the basket is empty → the render suppresses the line entirely,
   // rather than printing a fabricated "#1" that looks like a real ranking
   // [Andy 2026-07-15].
-  let peerRank: number | null = null;
-  if (!cfg.kr_listed) {
-    // Ranking a non-KR-listed token by KR vol share is meaningless (it's 0);
-    // suppress the line rather than print a spurious "#N" [Andy 2026-07-16].
-    pending.push("peer rank (#N in KR vol share) — token not KR-listed (line hidden)");
-  } else if (!cfg.peer_basket?.length) {
-    pending.push("peer rank (#N in KR vol share) — peer_basket empty (line hidden)");
-  } else {
-    const peerResults = await Promise.allSettled(
-      cfg.peer_basket.map((id) => adapters.getPerVenueVolume(id))
-    );
-    const peerShares: number[] = [];
-    let failed = 0;
-    for (const r of peerResults) {
-      if (r.status !== "fulfilled") { failed++; continue; }
-      const pv = r.value;
-      const totals = tracked.map((v) => pv[v] || 0);
-      const kr = (pv["upbit"] || 0) + (pv["bithumb"] || 0);
-      const sum = totals.reduce((a, b) => a + b, 0);
-      peerShares.push(sum > 0 ? kr / sum : 0);
-    }
-    peerRank = calc.krVolShareRank(krVolShare, peerShares);
-    if (failed > 0) pending.push(`peer rank — ${failed} peer fetch(es) failed, ranked against the rest`);
-  }
+  // [2026-08-03 per Andy] Peer rank ("vs peers  $VVV #2 in KR vol share")
+  // removed from the report. The whole computation goes with it, not just
+  // the rendered line — it fired one getPerVenueVolume() call per entry in
+  // peer_basket every week, so keeping it would have meant paying for data
+  // nothing displays. calc.krVolShareRank() is left in place for reuse.
 
   const data: WeeklyReportData = {
     ticker: cfg.ticker,
@@ -229,7 +213,11 @@ export async function assembleWeekly(
     // 0 on the first run holds the line flat rather than inventing a move; the
     // pending note above says why, so it never reads as a confident zero.
     kospiWoWPct: kospiPrior != null ? +(((kospi.level - kospiPrior) / kospiPrior) * 100).toFixed(1) : 0,
-    kospiArrow: kospiPrior == null ? "⟷" : kospi.level >= kospiPrior ? "▲" : "▼",
+    // [2026-08-03] Was `level >= prior ? "▲" : "▼"` — no deadband at all,
+    // so a +0.01% week showed a confident up-arrow and a genuinely flat
+    // week could never render ⟷. That was an over-correction away from
+    // the old 5% band (which flattened real index moves). 1% sits between.
+    kospiArrow: kospiPrior == null ? "⟷" : calc.trendArrow(kospi.level, kospiPrior, dbIdx),
     kospiYtdPct: Math.round(kospi.ytdPct),
     kospiAtAth: kospi.atAth,
     fxUsdKrw: Math.round(fx),
@@ -237,7 +225,6 @@ export async function assembleWeekly(
     sovArrow,
     sovPct,
     showSov,
-    peerRank,
     krListed: cfg.kr_listed,
   };
 

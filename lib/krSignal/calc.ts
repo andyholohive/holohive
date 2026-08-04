@@ -8,7 +8,24 @@ export type Arrow = "▲" | "⟷" | "▼";
 export type Regime = "active" | "neutral" | "quiet";
 export type Trend = "rising" | "flat" | "falling";
 
-/** §6.1 Trend arrow — this week vs last week, ±5% deadband. */
+/**
+ * §6.1 deadbands, by metric class.
+ *
+ * [2026-08-03] One 5% band used to cover everything, which reported real
+ * trends as "flat" on the non-crypto metrics. Checked against the four stored
+ * weeks: KOSPI fell 1.91% then 1.42%, and USD/KRW fell 1.70% then 1.74% —
+ * six consecutive weeks of genuine direction across two metrics, every one of
+ * them printed ⟷. Meanwhile crypto venue volumes swung −19%, +36%, +26%,
+ * −12% in the same period, where 5% really is the noise floor.
+ *
+ * So the band is per metric class rather than one number:
+ *   - crypto venue volumes → 5%  (a 3.5% week genuinely is noise here)
+ *   - equity index + FX    → 1%  (a 1.7% week is a large move)
+ */
+export const DEADBAND_CRYPTO_VOL = 0.05;
+export const DEADBAND_INDEX_FX = 0.01;
+
+/** §6.1 Trend arrow — this week vs last week, deadband caller-supplied. */
 export function trendArrow(current: number, prior: number, deadband = 0.05): Arrow {
   if (!isFinite(prior) || prior === 0) return "⟷";
   const delta = (current - prior) / prior;
