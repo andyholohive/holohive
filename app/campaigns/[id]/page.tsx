@@ -314,7 +314,9 @@ const CampaignDetailsPage = () => {
   const paymentScrollableRef = useRef<HTMLElement | null>(null);
   
   // KOLs view toggle state
-  const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'graph'>('overview');
+  // [2026-08-03 per Andy] Table is the default view for both dashboards —
+  // it's the one people actually work from; Overview is the read-only summary.
+  const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'graph'>('table');
 
   // KOL visibility tab state (active vs hidden)
   const [kolVisibilityTab, setKolVisibilityTab] = useState<'active' | 'hidden'>('active');
@@ -327,7 +329,7 @@ const CampaignDetailsPage = () => {
   const [informationViewMode, setInformationViewMode] = useState<'overview' | 'metrics'>('overview');
 
   // Contents tab toggle state
-  const [contentsViewMode, setContentsViewMode] = useState<'overview' | 'table'>('overview');
+  const [contentsViewMode, setContentsViewMode] = useState<'overview' | 'table'>('table');
 
   // Content-list state hoisted here (used to be declared at line ~2573,
   // after the places that call it). `getPaymentStatus` below reads
