@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     }
 
     const help = [
-      '☆ <b>HH Korea Signal Bot</b>',
+      '<b>HH Korea Signal Bot</b>',
       '',
       '/weekly [client] — Weekly KR Market Report',
       '/vl [client] — Market backdrop (volumes, KOSPI, FX, kimchi)',
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
           break;
         case 'status': {
           const clients = await loadActiveClients(supabase);
-          await sendMessage(chatId, `☆ <b>KR Signal Bot</b>\n✅ online · ${clients.length} active client(s)\nTry /weekly or /vl`);
+          await sendMessage(chatId, `<b>KR Signal Bot</b>\n✅ online · ${clients.length} active client(s)\nTry /weekly or /vl`);
           break;
         }
         case 'weekly': {

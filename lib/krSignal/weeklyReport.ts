@@ -62,18 +62,6 @@ function bar(pct: number, cells = 8): string {
 }
 function pad(s: string, n: number): string { return s.length >= n ? s : s + " ".repeat(n - s.length); }
 
-/**
- * HoloHive brand mark — ☆ per Andy 2026-07-10 (replaces the bee; the custom
- * logo emoji can't ship until we own a bot-created emoji pack — Telegram only
- * lets bots send custom emoji from packs the bot itself created). If/when that
- * pack exists, set KR_SIGNAL_LOGO_EMOJI_ID and this wraps ☆ in a tg-emoji
- * entity; sendMessage strips the tag and falls back to ☆ on failure.
- */
-const LOGO_EMOJI_ID = process.env.KR_SIGNAL_LOGO_EMOJI_ID || "";
-function logo(fallback = "☆"): string {
-  return LOGO_EMOJI_ID ? `<tg-emoji emoji-id="${LOGO_EMOJI_ID}">${fallback}</tg-emoji>` : fallback;
-}
-
 export function buildWeeklyReport(d: WeeklyReportData): string {
   const HR = "━━━━━━━━━━━━━";
   // Monospace body (bars need alignment). Brand header + title sit at the
@@ -121,9 +109,8 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   if (d.showSov) tail.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
   if (tail.length) { B.push(HR); B.push(...tail); }
 
-  // [2026-08-03 per Andy] The "☆ Holo Hive Signal" brand line is gone; the
-  // report now opens straight on the ticker + week. logo() is still used by
-  // buildBackdrop below, so the helper and the custom-emoji plumbing stay.
+  // [2026-08-03 per Andy] The brand line is gone; the report opens straight
+  // on the ticker + week.
   const title = `<b>$${esc(d.ticker)} Weekly Report · ${esc(d.weekLabel)}</b>`;
   return `${title}\n<pre>${esc(B.join("\n"))}</pre>`;
 }
@@ -136,6 +123,6 @@ export function buildBackdrop(d: WeeklyReportData): string {
   L.push(`KOSPI          ${d.kospi.toLocaleString()}  ${d.kospiArrow} ${sign(d.kospiWoWPct)} WoW`);
   L.push(`FX $1=₩${d.fxUsdKrw.toLocaleString()}`);
   L.push(`Kimchi prem (USDT)  ${sign(d.kimchiUsdtPct)}`);
-  const title = `${logo()} <b>$${esc(d.ticker)} Market Backdrop · ${esc(d.weekLabel)}</b>`;
+  const title = `<b>$${esc(d.ticker)} Market Backdrop · ${esc(d.weekLabel)}</b>`;
   return `${title}\n<pre>${esc(L.join("\n"))}</pre>`;
 }
