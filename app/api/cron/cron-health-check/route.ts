@@ -170,9 +170,55 @@ export async function GET(request: Request) {
       }
     }
 
+    // ─── 3.5 Stale data feeds ─────────────────────────────────────
+    //
+    // [2026-08-05] Everything above watches whether crons RAN. Nothing watched
+    // whether they PRODUCED anything, and those are different failures.
+    //
+    // The mindshare pipeline sat dead from 07-27 to 08-05 without tripping a
+    // single check here: the GitHub Actions scraper exited 0 on runs that
+    // ingested nothing (its per-channel errors were caught and the exit code
+    // never consulted them), and HHP's own mindshare-scan cron then ran 48×/day
+    // logging `status: success, mentions_added: 0` — because there was nothing
+    // new in tg_channel_posts to scan. Two green checks, one frozen table, nine
+    // days. A pipeline that fails by going quiet needs a watcher that notices
+    // quiet.
+    //
+    // So this checks the OUTPUT tables directly. `max_age_hours` is generous —
+    // several times the feed's own cadence — because the point is catching a
+    // dead pipeline, not a slow afternoon.
+    const FEEDS: Array<{ table: string; column: string; maxAgeHours: number; label: string }> = [
+      // 3-hourly GHA scrape; 24h means ~8 consecutive misses before it fires.
+      { table: 'tg_channel_posts', column: 'pulled_at', maxAgeHours: 24, label: 'Mindshare channel scrape' },
+    ];
+
+    const staleFeeds: Array<{ label: string; ageHours: number; last: string | null }> = [];
+    for (const feed of FEEDS) {
+      try {
+        const { data: newest } = await (supabase as any)
+          .from(feed.table)
+          .select(feed.column)
+          .order(feed.column, { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const lastRaw = newest ? (newest as any)[feed.column] : null;
+        // An empty table is reported as stale too — "never produced anything"
+        // is at least as broken as "stopped producing".
+        const ageHours = lastRaw
+          ? (Date.now() - new Date(lastRaw).getTime()) / 3_600_000
+          : Number.POSITIVE_INFINITY;
+        if (ageHours > feed.maxAgeHours) {
+          staleFeeds.push({ label: feed.label, ageHours, last: lastRaw });
+        }
+      } catch (err) {
+        console.error(`[cron-health-check] freshness probe failed for ${feed.table}`, err);
+        // Don't let a probe error mask the rest of the sweep.
+      }
+    }
+
     // ─── 4. Build message ─────────────────────────────────────────
     const failureCount = (failedRuns?.length || 0) + (scheduleRows?.length || 0);
-    const anomalyCount = runaways.length;
+    const anomalyCount = runaways.length + staleFeeds.length;
 
     if (failureCount === 0 && anomalyCount === 0) {
       // Healthy — log + return without DMing
@@ -231,6 +277,20 @@ export async function GET(request: Request) {
         );
       }
       lines.push('  <i>Likely a stuck loop, retry storm, or misconfigured schedule.</i>');
+      lines.push('');
+    }
+
+    if (staleFeeds.length > 0) {
+      lines.push(`🕸 <b>Stale data feeds (${staleFeeds.length})</b>`);
+      for (const f of staleFeeds) {
+        const age = Number.isFinite(f.ageHours)
+          ? f.ageHours >= 48
+            ? `${Math.floor(f.ageHours / 24)}d`
+            : `${Math.floor(f.ageHours)}h`
+          : 'never';
+        lines.push(`• ${escapeHtml(f.label)}: no new rows in <b>${age}</b>`);
+      }
+      lines.push('  <i>The job may be running green while producing nothing — check its logs, not its status.</i>');
       lines.push('');
     }
 

@@ -140,21 +140,37 @@ export async function POST(request: Request) {
   skipped = messages.length - rows.length;
 
   if (rows.length > 0) {
-    // Chunk so we don't blow parameter limits on a 1000-row backfill page.
+    // [2026-08-05] Goes through the mindshare_ingest_posts RPC, not PostgREST
+    // .upsert(). This endpoint 500'd on EVERY call from the day it shipped.
+    //
+    // .upsert({ onConflict: 'channel_tg_id,tg_message_id' }) emits a bare
+    // `ON CONFLICT (channel_tg_id, tg_message_id)`, but the only index over
+    // those columns — uq_tg_channel_posts_raw_msg — is PARTIAL
+    // (WHERE subject_type IS NULL). Postgres refuses to match a partial index
+    // unless the statement repeats its predicate, and PostgREST's on_conflict
+    // param has no way to attach a WHERE. Result: 42P10, "there is no unique
+    // or exclusion constraint matching the ON CONFLICT specification", every
+    // single request.
+    //
+    // The scraper caught the resulting HTTP 500 per channel and moved on, so
+    // GitHub Actions stayed green while ingesting nothing for 9 days. A local
+    // replay on 2026-08-05 scraped 5,003 messages and inserted 0 — 64 of 74
+    // channels erroring, all with the same 500.
+    //
+    // The index must stay partial (subject-scoped KOL rows may legitimately
+    // repeat a raw row's message id), so the conflict target moves into SQL
+    // where the predicate is expressible.
     const CHUNK = 500;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      // uq_tg_channel_posts_raw_msg is the partial unique index covering the
-      // subject-less half of the table.
-      const { error, data } = await (supabase as any)
-        .from('tg_channel_posts')
-        .upsert(slice, { onConflict: 'channel_tg_id,tg_message_id', ignoreDuplicates: true })
-        .select('id');
+      const { error, data } = await (supabase as any).rpc('mindshare_ingest_posts', {
+        p_rows: slice,
+      });
       if (error) {
-        console.error('[mindshare-ingest] upsert error', error);
-        return NextResponse.json({ error: `upsert failed: ${error.message}` }, { status: 500 });
+        console.error('[mindshare-ingest] ingest rpc error', error);
+        return NextResponse.json({ error: `ingest failed: ${error.message}` }, { status: 500 });
       }
-      ok += Array.isArray(data) ? data.length : 0;
+      ok += Number(data) || 0;
     }
   }
 
