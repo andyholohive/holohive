@@ -121,9 +121,11 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
   if (d.showSov) tail.push(`KR share of voice   ${d.sovArrow} ${sign(d.sovPct)} WoW`);
   if (tail.length) { B.push(HR); B.push(...tail); }
 
-  const brand = `${logo()} <b>Holo Hive Signal</b>`;
+  // [2026-08-03 per Andy] The "☆ Holo Hive Signal" brand line is gone; the
+  // report now opens straight on the ticker + week. logo() is still used by
+  // buildBackdrop below, so the helper and the custom-emoji plumbing stay.
   const title = `<b>$${esc(d.ticker)} Weekly Report · ${esc(d.weekLabel)}</b>`;
-  return `${brand}\n${title}\n<pre>${esc(B.join("\n"))}</pre>`;
+  return `${title}\n<pre>${esc(B.join("\n"))}</pre>`;
 }
 
 /** Market-backdrop-only block — for the /vl command (mirrors @cexdexspikebot). */
