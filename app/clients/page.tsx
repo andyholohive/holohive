@@ -2223,7 +2223,7 @@ export default function ClientsPage() {
    * shouldn't need to scroll further than that to find the post
    * they want to pin.
    */
-  const fetchTopPostCandidates = async (clientId: string) => {
+  const fetchTopPostCandidates = async (clientId: string, week: Date = weeklyV2Week) => {
     setTopPostCandidatesLoading(true);
     try {
       // Two-step fetch: first the client's campaign IDs, then posted
@@ -2242,6 +2242,21 @@ export default function ClientsPage() {
         setTopPostCandidates([]);
         return;
       }
+      // [2026-08-03 per Andy] Week-scoped, matching the portal.
+      //
+      // This used to fetch all-time and cap at the 60 most recent, which was
+      // wrong twice over: the pin is stored on the weekly row (client_id,
+      // week_of), so a week-scoped concept was being fed an all-time list;
+      // and the date-ordered cap meant a genuinely top-performing older post
+      // was cut before the engagement sort ever saw it (Venice has 111 posted
+      // items, Fogo 84 — so 51 and 24 respectively were invisible).
+      //
+      // Bounds are [Monday 00:00, next Monday 00:00) in local time, the same
+      // window week_of denotes.
+      const weekStart = formatLocalYMD(week);
+      const weekEndDate = new Date(week);
+      weekEndDate.setDate(weekEndDate.getDate() + 7);
+      const weekEnd = formatLocalYMD(weekEndDate);
       const { data, error } = await (supabase as any)
         .from('contents')
         .select(`
@@ -2250,8 +2265,9 @@ export default function ClientsPage() {
         `)
         .in('campaign_id', campaignIds)
         .eq('status', 'posted')
-        .order('activation_date', { ascending: false })
-        .limit(60);
+        .gte('activation_date', weekStart)
+        .lt('activation_date', weekEnd)
+        .order('activation_date', { ascending: false });
       if (error) throw error;
       const rows = ((data || []) as any[]).map(r => ({
         id: r.id,

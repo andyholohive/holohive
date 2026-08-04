@@ -1017,8 +1017,31 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // use the default highest-engagement selection. If the pinned id
   // isn't found in the current rows (post archived or wrong campaign),
   // we fall back to the auto-pick silently.
-  async function fetchTopPost(campaignId: string, overrideContentId?: string | null) {
+  //
+  // [2026-08-03 per Andy] Week-scoped. The auto-pick used to be all-time for
+  // the campaign while the pin above it is stored per week, so the same card
+  // meant "this week's feature" when a CM had pinned one and "best ever" when
+  // they hadn't. Both are now the week named by the latest weekly update.
+  //
+  // Consequence worth knowing: a week with no posted content now shows no top
+  // post, where before it fell back to the campaign's best-ever. That is the
+  // point — a stale all-time post presented as this week's highlight is worse
+  // than an honest gap — but it does mean quiet weeks look emptier.
+  async function fetchTopPost(
+    campaignId: string,
+    overrideContentId?: string | null,
+    weekOf?: string | null,
+  ) {
     try {
+      // week_of is the Monday (YYYY-MM-DD). Window is [Mon, next Mon).
+      let weekStart: string | null = null;
+      let weekEnd: string | null = null;
+      if (weekOf) {
+        weekStart = weekOf;
+        const d = new Date(`${weekOf}T00:00:00`);
+        d.setDate(d.getDate() + 7);
+        weekEnd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
       const { data } = await supabasePublic
         .from('contents')
         .select(`
@@ -1043,7 +1066,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         .eq('campaign_id', campaignId)
         .eq('status', 'posted');
 
-      const rows = (data as any[]) || [];
+      // Filtered in JS rather than the query so the stats row above (which
+      // shares this fetch and is campaign-to-date by design) keeps its full
+      // set — only the top-post pick narrows to the week.
+      const allRows = (data as any[]) || [];
+      const rows = weekStart && weekEnd
+        ? allRows.filter(r => r.activation_date && r.activation_date >= weekStart! && r.activation_date < weekEnd!)
+        : allRows;
 
       // Stats Row — counts + sums
       let impressionsSum = 0;
@@ -1588,14 +1617,18 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       // a CM saving an override in the admin tab re-fires this fetch
       // when the user reloads the portal.
       const overrideId = (weeklyUpdates[0] as any)?.top_post_override?.content_id || null;
-      fetchTopPost(activeCampaign.id, overrideId);
+      // [2026-08-03] week_of of the latest weekly update scopes the auto-pick,
+      // so the pin and the fallback both describe the same week. Rows are
+      // ordered week_of desc at fetch, so [0] is the current week.
+      const weekOf = (weeklyUpdates[0] as any)?.week_of || null;
+      fetchTopPost(activeCampaign.id, overrideId, weekOf);
     } else {
       setTopPost(null);
       setActiveStats(null);
       setStatsTrends(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, activeCampaign?.id, (weeklyUpdates[0] as any)?.top_post_override?.content_id]);
+  }, [isAuthenticated, activeCampaign?.id, (weeklyUpdates[0] as any)?.top_post_override?.content_id, (weeklyUpdates[0] as any)?.week_of]);
 
   // [Campaign Live v1] Build the "This Week" feed by merging:
   //   - Auto-derived "done" items from tracker data (posts went live, etc.)
