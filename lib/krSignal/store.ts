@@ -70,6 +70,16 @@ export interface ClientWeekly {
   /** Window kr_token_vol_usd was measured over ("24h" | "Nd" | "7d"). Lets the
    *  WoW math refuse to compare across a window change (e.g. 7d-vs-24h ramp-up). */
   kr_token_vol_window?: string | null;
+  /** [2026-08-03] The exact Telegram HTML that went out this week.
+   *
+   *  Stored because the report CANNOT be reconstructed from the other columns:
+   *  they hold 12 raw metrics, while WeeklyReportData needs ~25 — kospiYtdPct,
+   *  kospiAtAth, peerRank and every arrow/regime/koreaReadLabel are derived at
+   *  send time from live adapter calls and then discarded. Re-rendering later
+   *  would invent the missing half and label it history.
+   *
+   *  Null for the weeks sent before this column existed. */
+  report_html?: string | null;
 }
 
 /** Most recent per-client value for a metric strictly before `beforeWeek`, or null. */

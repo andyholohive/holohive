@@ -63,7 +63,9 @@ export async function GET(request: Request) {
         const m = await sendMessage(c.resolved_chat_id!, res.html, c.resolved_thread_id);
         // Persist AFTER a successful send so history reflects delivered reports.
         await saveGlobalWeekly(supabase, res.weekEnding, res.global);
-        await saveClientWeekly(supabase, c.id, res.weekEnding, res.client);
+        // Keep the delivered message verbatim so /clients can show exactly
+        // what the client received, rather than a lossy re-render.
+        await saveClientWeekly(supabase, c.id, res.weekEnding, { ...res.client, report_html: res.html });
         sent.push({ client: c.name, message_id: m.message_id, pending: res.pending.length });
       } catch (e: any) {
         sent.push({ client: c.name, error: String(e?.message || e) });

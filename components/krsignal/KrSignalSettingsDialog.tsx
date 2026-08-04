@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/lib/dateFormat';
 import { Radio, Search, X, Plus, ChevronDown, Sliders, Loader2, Eye, Send, AlertTriangle } from 'lucide-react';
 
 type ClientLite = { id: string; name: string };
@@ -88,6 +89,22 @@ function emptyForm(): Form {
   };
 }
 
+/** Telegram HTML → readable text. The report body lives in a <pre> block with
+ *  ASCII bars, so unescaping entities and dropping tags preserves the layout
+ *  while keeping stored markup inert (it came from our own renderer, but this
+ *  panel has no reason to execute it). */
+function stripTelegramHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .trim();
+}
+
 export function KrSignalSettingsDialog({
   open, onOpenChange, clients, initialClientId,
 }: {
@@ -113,6 +130,39 @@ export function KrSignalSettingsDialog({
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   const selectedClient = useMemo(() => clients.find(c => c.id === clientId) ?? null, [clients, clientId]);
+
+  // ── Past reports (§ viewer) ───────────────────────────────────────
+  // [2026-08-03] Reads what was actually sent. Nothing here re-renders a past
+  // week — see app/api/kr-signal/clients/[clientId]/reports/route.ts for why a
+  // reconstruction would be fiction rather than history.
+  const [reports, setReports] = useState<any[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsLoaded, setReportsLoaded] = useState(false);
+  const [openWeek, setOpenWeek] = useState<string | null>(null);
+
+  const loadReports = async () => {
+    if (!clientId) return;
+    setReportsLoading(true);
+    try {
+      const res = await fetch(`/api/kr-signal/clients/${clientId}/reports`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to load reports');
+      setReports(json.reports ?? []);
+      setReportsLoaded(true);
+    } catch (e) {
+      toast({
+        title: 'Could not load past reports',
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  // Reset when the client changes — otherwise the previous client's reports
+  // stay on screen under the new client's name.
+  useEffect(() => { setReports([]); setReportsLoaded(false); setOpenWeek(null); }, [clientId]);
   const dirty = useMemo(
     () => !!savedForm && JSON.stringify(savedForm) !== JSON.stringify(form),
     [savedForm, form],
@@ -466,6 +516,69 @@ export function KrSignalSettingsDialog({
 
             {/* ── Advanced thresholds ────────────────────── */}
             <ThresholdsSection value={form.thresholds} onChange={(t) => patch({ thresholds: t })} />
+
+            {/* ── Past reports ───────────────────────────── */}
+            <Section title="Past reports">
+              {!reportsLoaded ? (
+                <Button variant="outline" size="sm" onClick={loadReports} disabled={reportsLoading}>
+                  {reportsLoading
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading…</>
+                    : <><Eye className="h-4 w-4 mr-2" />Load past reports</>}
+                </Button>
+              ) : reports.length === 0 ? (
+                <p className="text-sm text-ink-warm-500">
+                  No weekly reports recorded for this client yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {reports.map((r: any) => {
+                    const isOpen = openWeek === r.week_ending;
+                    return (
+                      <div key={r.week_ending} className="border border-cream-200 rounded-md overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setOpenWeek(isOpen ? null : r.week_ending)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-cream-50 transition-colors"
+                        >
+                          <ChevronDown className={`h-4 w-4 text-ink-warm-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                          <span className="text-sm font-medium text-ink-warm-900">
+                            Week ending {formatDate(r.week_ending)}
+                          </span>
+                          {r.report_html
+                            ? <StatusBadge tone="success" size="sm">Report saved</StatusBadge>
+                            : <StatusBadge tone="neutral" size="sm">Metrics only</StatusBadge>}
+                        </button>
+
+                        {isOpen && (
+                          <div className="px-3 pb-3 border-t border-cream-100 pt-3">
+                            {r.report_html ? (
+                              /* The stored value is the exact Telegram HTML that was
+                                 sent. Rendering it as text preserves the <pre> ASCII
+                                 bars without executing markup we'd then have to trust. */
+                              <pre className="text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono text-ink-warm-800 bg-cream-50 rounded p-3 max-h-[40vh] overflow-y-auto">
+                                {stripTelegramHtml(r.report_html)}
+                              </pre>
+                            ) : (
+                              <>
+                                <p className="text-xs text-ink-warm-500 mb-2">
+                                  This week was sent before reports were archived, so the exact
+                                  message isn&rsquo;t recoverable. These are the metrics stored at
+                                  the time — the report itself is not reconstructed, because the
+                                  snapshot doesn&rsquo;t hold everything the report showed.
+                                </p>
+                                <pre className="text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono text-ink-warm-700 bg-cream-50 rounded p-3 max-h-[40vh] overflow-y-auto">
+                                  {JSON.stringify(r.metrics, null, 2)}
+                                </pre>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Section>
           </div>
         )}
 
