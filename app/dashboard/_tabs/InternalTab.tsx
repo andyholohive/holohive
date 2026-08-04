@@ -5,9 +5,9 @@
  * /api/dashboard/v2/internal. "Are we executing?"
  */
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
+import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -23,9 +23,17 @@ import {
 } from '@/components/ui/table';
 import {
   Users, ListTodo, AlertCircle, CheckCircle2, Flame, Compass, ClipboardCheck,
+  ChevronDown,
 } from 'lucide-react';
 
-type WorkloadRow = { id: string | null; name: string; photo: string | null; open: number; overdue: number; completed: number };
+type CompletedTask = { id: string; title: string; completed_at: string | null; client: string | null };
+type WorkloadRow = {
+  id: string | null; name: string; photo: string | null;
+  open: number; overdue: number; completed: number;
+  /** Rows behind `completed`, newest first. API caps at 20; `completed` is
+   *  the true count, so a capped list is disclosed rather than implied. */
+  completedTasks?: CompletedTask[];
+};
 type QuarterRollup = {
   label: string;
   total: number;
@@ -182,6 +190,10 @@ const initiativeLabel: Record<Initiative['tone'], string> = {
 };
 
 export default function InternalTab() {
+  // [2026-08-03] Which workload row is expanded (id ?? name). Single-open:
+  // this table is a scan-and-drill surface, not a comparison one.
+  const [expandedWorkload, setExpandedWorkload] = useState<string | null>(null);
+
   const [data, setData] = useState<InternalPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -393,18 +405,67 @@ export default function InternalTab() {
                     is already legible from the rose Overdue cell + the
                     dedicated "Attention" card to the right. Open header
                     label updated to "To Do" to match TD §3.2. */}
-                {data.workload.map(w => (
-                  <TableRow key={w.id ?? w.name} className="border-cream-100 row-accent cursor-pointer">
-                    <TableCell className="py-3.5 px-5"><NameWithAvatar name={w.name} photo={w.photo} /></TableCell>
-                    <TableCell className="py-3.5 px-5 text-right tabular-nums">{w.open}</TableCell>
-                    <TableCell className={`py-3 text-right tabular-nums ${w.overdue > 0 ? 'text-rose-600 font-semibold' : 'text-ink-warm-700'}`}>
-                      {w.overdue}
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
-                      {w.completed}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {/* [2026-08-03 per Andy] Rows expand to list the tasks behind
+                    the Completed (7d) number. Only rows with completions are
+                    expandable — a chevron on a zero row would promise content
+                    that isn't there. */}
+                {data.workload.map(w => {
+                  const key = w.id ?? w.name;
+                  const tasks = w.completedTasks ?? [];
+                  const canExpand = tasks.length > 0;
+                  const isOpen = expandedWorkload === key;
+                  return (
+                    <React.Fragment key={key}>
+                      <TableRow
+                        className={`border-cream-100 row-accent ${canExpand ? 'cursor-pointer' : ''}`}
+                        onClick={() => canExpand && setExpandedWorkload(isOpen ? null : key)}
+                      >
+                        <TableCell className="py-3.5 px-5">
+                          <div className="flex items-center gap-2">
+                            {canExpand ? (
+                              <ChevronDown className={`h-3.5 w-3.5 text-ink-warm-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                            ) : (
+                              <span className="w-3.5 flex-shrink-0" aria-hidden />
+                            )}
+                            <NameWithAvatar name={w.name} photo={w.photo} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3.5 px-5 text-right tabular-nums">{w.open}</TableCell>
+                        <TableCell className={`py-3 text-right tabular-nums ${w.overdue > 0 ? 'text-rose-600 font-semibold' : 'text-ink-warm-700'}`}>
+                          {w.overdue}
+                        </TableCell>
+                        <TableCell className="py-3.5 px-5 text-right tabular-nums text-ink-warm-700">
+                          {w.completed}
+                        </TableCell>
+                      </TableRow>
+
+                      {isOpen && (
+                        <TableRow className="border-cream-100 hover:bg-transparent">
+                          <TableCell colSpan={4} className="py-0 px-5 bg-cream-50/60">
+                            <div className="py-3 space-y-1.5">
+                              {tasks.map(t => (
+                                <div key={t.id} className="flex items-baseline gap-3 text-sm">
+                                  <span className="text-ink-warm-800 flex-1 min-w-0 truncate">{t.title}</span>
+                                  {t.client && (
+                                    <span className="text-xs text-ink-warm-500 flex-shrink-0">{t.client}</span>
+                                  )}
+                                  <span className="text-xs text-ink-warm-400 tabular-nums flex-shrink-0 w-20 text-right">
+                                    {t.completed_at ? formatDate(t.completed_at) : '—'}
+                                  </span>
+                                </div>
+                              ))}
+                              {w.completed > tasks.length && (
+                                <p className="text-xs text-ink-warm-500 pt-1">
+                                  Showing {tasks.length} of {w.completed} — older ones omitted.
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

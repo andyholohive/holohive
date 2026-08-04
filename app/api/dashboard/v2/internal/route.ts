@@ -138,6 +138,28 @@ export async function GET() {
     const completedThisWeekRows = ((completedThisWeekRes.data ?? []) as any[]).filter(isRelevantTask);
     const completedThisWeek = completedThisWeekRows.length;
 
+    // [2026-08-03] Rolling last-7-days completions, for the workload table's
+    // "Completed (7d)" column and its new per-person expansion.
+    //
+    // Deliberately a SEPARATE query from completedThisWeekRows above, which is
+    // week-to-date (startOfWeekUtc) and feeds completionRate + the WoW
+    // comparison against completedPrev/openPrev. Those need a week boundary to
+    // stay comparable; the workload column says "7d" and should mean it. On a
+    // Monday the two differ by nearly a full week, so reusing one for both
+    // would make either the label or the trend wrong.
+    //
+    // Carries title + completed_at + client name so the expansion can list the
+    // actual tasks rather than just a number.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const completed7dRes = await (sb as any)
+      .from('tasks')
+      .select('id, title, assigned_to, assigned_to_name, client_id, completed_at, clients(name)')
+      .eq('status', 'complete')
+      .gte('completed_at', sevenDaysAgo)
+      .order('completed_at', { ascending: false });
+
+    const completed7dRows = ((completed7dRes.data ?? []) as any[]).filter(isRelevantTask);
+
     // ─── Quarterly overdue rollup (Andy 2026-07-02) ─────────────────
     // Persistent-history overdue metric. Every task with due_date in the
     // current calendar quarter is a candidate; "was overdue" = the task
@@ -383,7 +405,15 @@ export async function GET() {
     for (const u of (usersRes.data ?? []) as any[]) {
       usersById.set(u.id, { name: u.name, photo: u.profile_photo_url || null });
     }
-    type WorkloadEntry = { id: string | null; name: string; photo: string | null; open: number; overdue: number; completed: number };
+    type CompletedTask = { id: string; title: string; completed_at: string | null; client: string | null };
+    type WorkloadEntry = {
+      id: string | null; name: string; photo: string | null;
+      open: number; overdue: number; completed: number;
+      /** The rows behind `completed`, newest first — rendered by the row's
+       *  expand toggle. Capped at 20 so one prolific week can't bloat the
+       *  dashboard payload; `completed` stays the true count either way. */
+      completedTasks: CompletedTask[];
+    };
     const perUser = new Map<string, WorkloadEntry>();
     for (const t of openTasks) {
       const key = t.assigned_to || t.assigned_to_name || 'unassigned';
@@ -396,6 +426,7 @@ export async function GET() {
         open: 0,
         overdue: 0,
         completed: 0,
+        completedTasks: [] as CompletedTask[],
       };
       cur.open += 1;
       if (overdueToneFor(t.due_date, t.status, cfg.overdue_yellow_days, cfg.overdue_red_days) !== 'none') {
@@ -403,10 +434,14 @@ export async function GET() {
       }
       perUser.set(key, cur);
     }
-    // Roll completed-this-week counts back into the same per-user map.
+    // Roll last-7-days completions back into the same per-user map.
     // Users who only completed (no open) still get a row so their 7d
     // throughput is visible. Keyed identically (id first, then name).
-    for (const t of completedThisWeekRows) {
+    //
+    // [2026-08-03] Now reads completed7dRows rather than the week-to-date set,
+    // so the column matches its "Completed (7d)" label and the expansion below
+    // lists exactly the tasks that number counts.
+    for (const t of completed7dRows) {
       const key = t.assigned_to || t.assigned_to_name || 'unassigned';
       const display = t.assigned_to_name || 'Unassigned';
       const user = t.assigned_to ? usersById.get(t.assigned_to) : null;
@@ -417,8 +452,17 @@ export async function GET() {
         open: 0,
         overdue: 0,
         completed: 0,
+        completedTasks: [] as CompletedTask[],
       };
       cur.completed += 1;
+      if (cur.completedTasks.length < 20) {
+        cur.completedTasks.push({
+          id: t.id,
+          title: t.title || 'Untitled task',
+          completed_at: t.completed_at ?? null,
+          client: (t.clients as any)?.name ?? null,
+        });
+      }
       perUser.set(key, cur);
     }
     const workload = Array.from(perUser.values()).sort((a, b) => b.overdue - a.overdue || b.open - a.open || b.completed - a.completed);
