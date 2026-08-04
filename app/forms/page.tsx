@@ -11,7 +11,7 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2, ClipboardList } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2, ClipboardList, Inbox } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -87,6 +87,16 @@ const FORM_STATUS_TONES: Record<string, BadgeTone> = {
   closed: 'danger',
 };
 
+type RecentSubmission = {
+  id: string;
+  form_id: string;
+  submitted_at: string | null;
+  submitted_by_name: string | null;
+  submitted_by_email: string | null;
+  forms: { name: string | null } | null;
+  clients: { name: string | null } | null;
+};
+
 export default function FormsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -105,6 +115,11 @@ export default function FormsPage() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingPartners, setLoadingPartners] = useState(false);
   const [loadingLinks, setLoadingLinks] = useState(false);
+  // [2026-08-03 per Andy] Recent tab — latest submissions across ALL forms.
+  // The other three tabs are per-source (CRM opportunities, partners, links);
+  // this one is the dynamic-form responses, which had no listing anywhere.
+  const [recent, setRecent] = useState<RecentSubmission[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FormStatus>('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -151,6 +166,32 @@ export default function FormsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRecent = async () => {
+    try {
+      setLoadingRecent(true);
+      // Newest 100 across every form. Deliberately not filtered to active
+      // forms — a submission to a paused or archived form still arrived and
+      // still needs seeing; hiding it would make the feed quietly lie about
+      // what came in.
+      const { data, error } = await supabase
+        .from('form_responses')
+        .select('id, form_id, submitted_at, submitted_by_name, submitted_by_email, forms(name), clients(name)')
+        .order('submitted_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setRecent((data || []) as unknown as RecentSubmission[]);
+    } catch (error) {
+      console.error('Error fetching recent submissions:', error);
+      toast({
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load recent submissions',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingRecent(false);
     }
   };
 
@@ -228,7 +269,9 @@ export default function FormsPage() {
 
   // Fetch data when tab changes
   useEffect(() => {
-    if (activeTab === 'leads' && leads.length === 0) {
+    if (activeTab === 'recent' && recent.length === 0) {
+      fetchRecent();
+    } else if (activeTab === 'leads' && leads.length === 0) {
       fetchLeads();
     } else if (activeTab === 'partners' && partners.length === 0) {
       fetchPartners();
@@ -668,6 +711,18 @@ export default function FormsPage() {
               </span>
             </TabsTrigger>
             <TabsTrigger
+              value="recent"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
+            >
+              <Inbox className="h-4 w-4" />
+              Recent
+              {recent.length > 0 && (
+                <span className="ml-1 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none tabular-nums">
+                  {recent.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
               value="leads"
               className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2 flex items-center gap-2"
             >
@@ -867,6 +922,63 @@ export default function FormsPage() {
           </TabsContent>
 
           {/* Leads Tab */}
+          {/* Recent Tab — latest submissions across all forms */}
+          <TabsContent value="recent" className="space-y-4">
+            <SectionHeader label="Recent submissions" />
+            <Card className="border-cream-200 overflow-hidden">
+              {loadingRecent ? (
+                <div className="p-4 space-y-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 rounded-md" />
+                  ))}
+                </div>
+              ) : recent.length === 0 ? (
+                <div className="p-8">
+                  <EmptyState
+                    icon={Inbox}
+                    title="No submissions yet"
+                    description="Responses to any form will show up here, newest first."
+                  />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">When</TableHead>
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Form</TableHead>
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Submitted by</TableHead>
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Client</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recent.map(r => (
+                      <TableRow
+                        key={r.id}
+                        className="border-gray-100 cursor-pointer"
+                        onClick={() => router.push(`/forms/${r.form_id}`)}
+                      >
+                        <TableCell className="py-3 whitespace-nowrap text-ink-warm-700">
+                          {r.submitted_at ? formatDateTime(r.submitted_at) : '—'}
+                        </TableCell>
+                        <TableCell className="py-3 font-medium">{r.forms?.name || 'Unknown form'}</TableCell>
+                        <TableCell className="py-3">
+                          {/* Name when we have it, else the email — anonymous
+                              submissions are legitimate, so show what exists
+                              rather than a blank cell. */}
+                          <span className="text-ink-warm-800">{r.submitted_by_name || r.submitted_by_email || 'Anonymous'}</span>
+                          {r.submitted_by_name && r.submitted_by_email && (
+                            <span className="block text-xs text-ink-warm-500">{r.submitted_by_email}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3 text-ink-warm-600">{r.clients?.name || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
           <TabsContent value="leads" className="space-y-4">
             <SectionHeader
               label="Leads"
