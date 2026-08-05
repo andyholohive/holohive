@@ -297,6 +297,35 @@ function participantsPerCampaign(deliverables: DeliverableInput[]): Map<string, 
   return m;
 }
 
+/** Fold the synced activation figures over the hand-logged ones.
+ *
+ *  [2026-08-05] Two sources exist for the same metric and only the empty one
+ *  was being read:
+ *    - kol_deliverables.activation_participants — typed in by ops per
+ *      deliverable. One row on the whole table.
+ *    - kol_activation_participation — a view over activation_snapshots, i.e.
+ *      the Bolt activation API sync. 54 rows, 29 KOLs, participants 1–608.
+ *
+ *  Reading only the manual column meant participantsPerCampaign came back
+ *  empty for all but one KOL, the activation half of the two-score model
+ *  returned null, and the whole roster displayed "—" — the proven-performance
+ *  score that distinguishes "big channel" from "actually drives people" has
+ *  never rendered a number.
+ *
+ *  Synced wins per campaign rather than summing: both sources describe the
+ *  same participants, so adding them would double-count any campaign that has
+ *  both. Manual logging is kept as the fallback because it is the only source
+ *  for activations that never went through the Bolt API. */
+function mergeParticipants(
+  manual: Map<string, number>,
+  synced: Map<string, number> | undefined,
+): Map<string, number> {
+  if (!synced || synced.size === 0) return manual;
+  const merged = new Map(manual);
+  for (const [campaignId, total] of synced) merged.set(campaignId, total);
+  return merged;
+}
+
 function avg(xs: number[]): number {
   return xs.reduce((s, x) => s + x, 0) / xs.length;
 }
@@ -324,6 +353,11 @@ export interface ComputeInputs {
   /** Campaign → avg participants across all KOLs on that campaign.
    *  Used as the Activation Impact denominator per Jdot Q5. */
   campaignAvgParticipants: Map<string, number>;
+  /** KOL → campaign → participants, sourced from the activation API sync
+   *  (kol_activation_participation) rather than hand-logged deliverables.
+   *  Overlaid on the manual figures in pass 1. OPTIONAL — callers without
+   *  the view (fixture preview route) omit it and behaviour is unchanged. */
+  syncedParticipantsByKol?: Map<string, Map<string, number>>;
   /** The roster — every KOL we want a score for. */
   kolIds: string[];
   /** tg_channel_posts rows attributed to roster KOLs (trailing window),
@@ -336,14 +370,20 @@ export interface ComputeInputs {
 }
 
 export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult> {
-  const { latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol, campaignAvgParticipants, kolIds } = inputs;
+  const {
+    latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol,
+    campaignAvgParticipants, kolIds, syncedParticipantsByKol,
+  } = inputs;
 
   // Pass 1: raw channel dims per KOL + per-campaign participant sums.
   const channelRawByKol = new Map<string, ChannelRawDims>();
   const participantsByKol = new Map<string, Map<string, number>>();
   for (const kolId of kolIds) {
     channelRawByKol.set(kolId, extractChannelRaw(latestSnapshotByKol.get(kolId)));
-    participantsByKol.set(kolId, participantsPerCampaign(deliverablesByKol.get(kolId) ?? []));
+    participantsByKol.set(kolId, mergeParticipants(
+      participantsPerCampaign(deliverablesByKol.get(kolId) ?? []),
+      syncedParticipantsByKol?.get(kolId),
+    ));
   }
 
   // Pass 2: comparison pools (rank normalization, Jdot Round 2).
@@ -492,10 +532,25 @@ export function computeKolScores(inputs: ComputeInputs): Map<string, ScoreResult
  */
 export async function assembleScoreInputs(supabase: SupabaseClient<Database>): Promise<ComputeInputs> {
   const organicSince = new Date(Date.now() - ORGANIC_COVERAGE_WINDOW_DAYS * 86_400_000).toISOString();
-  const [{ data: kols }, { data: snapshots }, { data: deliverables }, { data: organicPosts }] = await Promise.all([
+  const [
+    { data: kols }, { data: snapshots }, { data: deliverables },
+    { data: syncedActivations }, { data: organicPosts },
+  ] = await Promise.all([
     supabase.from('master_kols').select('id').is('archived_at', null),
     supabase.from('kol_channel_snapshots').select('*').order('snapshot_date', { ascending: false }),
     supabase.from('kol_deliverables').select('*'),
+    // [2026-08-05] The activation API sync, via the kol_activation_participation
+    // view. This is where participant counts actually live — kol_deliverables'
+    // manual column has one row roster-wide. A KOL can appear in several
+    // activations inside one campaign, so rows are summed per campaign below.
+    // View isn't in database.types (created via MCP migration), hence `as any`.
+    // Errors degrade to "no synced data" so scoring falls back to manual
+    // logging rather than breaking.
+    (supabase as any)
+      .from('kol_activation_participation')
+      .select('kol_id, campaign_id, participants') as Promise<{
+        data: Array<{ kol_id: string; campaign_id: string; participants: number | null }> | null;
+      }>,
     // Second reader of the TG Intelligence coverage store — only rows the
     // ingest attributed to a roster KOL. Table not in database.types yet
     // (created via MCP migration), hence the `as any`. Errors are treated
@@ -540,6 +595,17 @@ export async function assembleScoreInputs(supabase: SupabaseClient<Database>): P
     if (slot.n > 0) campaignAvgParticipants.set(cid, slot.sum / slot.n);
   }
 
+  // Synced participants: KOL → campaign → summed participants. One KOL can
+  // appear in multiple activations within a campaign, so rows are summed
+  // before the score percentiles them against that campaign's field.
+  const syncedParticipantsByKol = new Map<string, Map<string, number>>();
+  for (const row of syncedActivations ?? []) {
+    if (!row?.kol_id || !row?.campaign_id || row.participants == null) continue;
+    const perCamp = syncedParticipantsByKol.get(row.kol_id) ?? new Map<string, number>();
+    perCamp.set(row.campaign_id, (perCamp.get(row.campaign_id) ?? 0) + row.participants);
+    syncedParticipantsByKol.set(row.kol_id, perCamp);
+  }
+
   // Group attributed coverage posts by KOL.
   const organicPostsByKol = new Map<string, OrganicPostInput[]>();
   for (const p of organicPosts ?? []) {
@@ -550,7 +616,8 @@ export async function assembleScoreInputs(supabase: SupabaseClient<Database>): P
   }
 
   return {
-    latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol, campaignAvgParticipants, kolIds,
+    latestSnapshotByKol, allSnapshotsByKol, deliverablesByKol, campaignAvgParticipants,
+    syncedParticipantsByKol, kolIds,
     organicPostsByKol, organicWindowDays: ORGANIC_COVERAGE_WINDOW_DAYS,
   };
 }
