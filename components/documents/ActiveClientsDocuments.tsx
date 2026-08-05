@@ -40,7 +40,8 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw } from 'lucide-react';
+import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw, Link2 } from 'lucide-react';
+import ShareLinkDialog from '@/components/documents/ShareLinkDialog';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 const STATUS_TONE: Record<string, BadgeTone> = { draft: 'neutral', published: 'success', revoked: 'danger' };
@@ -97,6 +98,9 @@ export default function ActiveClientsDocuments() {
   const [recipients, setRecipients] = useState<RecipientAnalytics[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [replacingId, setReplacingId] = useState<string | null>(null);
+  // Per-document share links (2026-08-05). Held here rather than inside the
+  // dialog so the row's Share button controls which document it targets.
+  const [shareDoc, setShareDoc] = useState<DocWithClient | null>(null);
   const [expandedRecipient, setExpandedRecipient] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -380,6 +384,15 @@ export default function ActiveClientsDocuments() {
                                 <Link href={`/documents/${d.id}`}><Eye className="h-3.5 w-3.5 mr-1" />View</Link>
                               </Button>
                             )}
+                            {/* Only offer a share link once the document could
+                                actually be opened — Shared off or no PDF means
+                                the link would answer "not available" and look
+                                broken to the client. */}
+                            {d.current_version_id && d.status === 'published' && d.shared && (
+                              <Button variant="outline" size="sm" className="h-7" onClick={() => setShareDoc(d)}>
+                                <Link2 className="h-3.5 w-3.5 mr-1" />Share
+                              </Button>
+                            )}
                             <Button variant="outline" size="sm" className="h-7" onClick={() => openAnalytics(d)}>
                               <BarChart3 className="h-3.5 w-3.5 mr-1" />Analytics
                             </Button>
@@ -560,6 +573,13 @@ export default function ActiveClientsDocuments() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ShareLinkDialog
+        documentId={shareDoc?.id ?? null}
+        documentTitle={shareDoc?.title ?? ''}
+        open={!!shareDoc}
+        onOpenChange={(o) => { if (!o) setShareDoc(null); }}
+      />
     </div>
   );
 }
