@@ -4302,10 +4302,13 @@ export default function ClientsPage() {
                 </DialogContent>
               </Dialog>
               {/* [Templates admin v1] Quick link to the milestone templates
-                  management page. Placed inline with the other top-bar
+                  management surface. Placed inline with the other top-bar
                   actions so admins can hop straight to template CRUD
-                  without going through a client's Action Board. */}
-              <Link href="/clients/templates">
+                  without going through a client's Action Board.
+                  [2026-08-05] Now points at the Action Board tab on
+                  /templates; the old /clients/templates route is a
+                  redirect stub. */}
+              <Link href="/templates?tab=action-board">
                 <Button variant="outline" className="hover:bg-cream-50">
                   <Settings className="h-4 w-4 mr-2" />
                   Templates
@@ -6234,10 +6237,12 @@ export default function ClientsPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               {/* [Templates admin v1] Link to the dedicated
-                                  management page for full CRUD. Opens in
-                                  a new tab so the Context popup stays open. */}
+                                  management surface for full CRUD. Opens in
+                                  a new tab so the Context popup stays open.
+                                  [2026-08-05] Retargeted to the Action Board
+                                  tab on /templates. */}
                               <DropdownMenuItem
-                                onClick={() => window.open('/clients/templates', '_blank')}
+                                onClick={() => window.open('/templates?tab=action-board', '_blank')}
                                 className="text-ink-warm-500"
                               >
                                 <Settings className="h-3.5 w-3.5 mr-2" /> Manage templates…
