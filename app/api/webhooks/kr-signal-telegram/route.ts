@@ -63,6 +63,47 @@ export async function POST(request: Request) {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    /**
+     * [2026-08-05 per Andy] Team-only gate.
+     *
+     * The webhook secret proves the update came from Telegram; it says nothing
+     * about WHO typed. Until now any member of a client group chat could run
+     * /weekly and pull a live market report on demand — the bot is added to
+     * client GCs as the go-live step, so every client contact in those chats
+     * had the same access the team does.
+     *
+     * That matters on three counts: the reports are our analysis and are meant
+     * to arrive on our schedule, not on request; /weekly is an expensive live
+     * data assembly anyone could trigger repeatedly; and a client seeing
+     * commands work invites them to treat the bot as self-serve.
+     *
+     * Identity is users.telegram_id, matching resolveTeamMember in the main
+     * bot's webhook — one notion of "team member" across both bots. Chat
+     * membership is deliberately NOT the check: the whole problem is that
+     * clients share those chats with us.
+     *
+     * The cross-client scoping from 2026-07-27 stays exactly as it was. It
+     * answers "which client's data", and this answers "may you ask at all" —
+     * a team member in Venice's chat still gets Venice, not a free pass.
+     */
+    const fromUserId = msg?.from?.id?.toString();
+    const { data: teamMember } = fromUserId
+      ? await supabase.from('users').select('id, name').eq('telegram_id', fromUserId).maybeSingle()
+      : { data: null };
+
+    if (!teamMember) {
+      // Answer rather than going silent. In a client chat this reads as a
+      // scoped tool, not a broken one — and a team member who simply hasn't
+      // linked their Telegram gets told why instead of being left guessing.
+      await sendMessage(
+        chatId,
+        'This bot is for the HoloHive team.\n\n' +
+        '<i>On the team and seeing this? Your Telegram isn\'t linked to your HoloHive account yet — ask Andy to add it.</i>',
+      ).catch(() => {});
+      console.warn('[kr-signal-webhook] non-team sender rejected', { fromUserId, chatId });
+      return NextResponse.json({ ok: true });
+    }
+
     const parts = text.trim().split(/\s+/);
     const cmd = parts[0].replace(/^\//, '').replace(/@.*/, '').toLowerCase();
     const requestedKey = parts[1] ? parts[1].toLowerCase() : null;
