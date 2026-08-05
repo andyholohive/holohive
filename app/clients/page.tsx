@@ -359,6 +359,17 @@ export default function ClientsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientWithAccess | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  /**
+   * [2026-08-05] Which tab the Add/Edit Client dialog is showing.
+   *
+   * Controlled rather than defaultValue because handleCreateClient hands off
+   * to the Engagement tab the moment a new client exists — see the tail of
+   * that function. The Engagement editor writes stints straight to the DB and
+   * needs a real client_id, so it cannot render before the insert; the modal
+   * therefore stays open on Create and flips into edit mode for the row it
+   * just made, rather than closing and forcing a second trip through the list.
+   */
+  const [clientModalTab, setClientModalTab] = useState<'details' | 'engagement'>('details');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<ClientWithAccess | null>(null);
   const [isStartClientOpen, setIsStartClientOpen] = useState(false);
@@ -2528,6 +2539,10 @@ export default function ClientsPage() {
     setIsNewClientOpen(false);
     setIsEditMode(false);
     setEditingClient(null);
+    // [2026-08-05] Reset the tab — the create handoff leaves it on
+    // 'engagement', and without this the next Add would open there against a
+    // disabled trigger and render nothing.
+    setClientModalTab('details');
     setLogoFile(null);
     setLogoPreview(null);
     setNewClient({
@@ -2727,6 +2742,33 @@ export default function ClientsPage() {
             .insert({ client_id: savedClientId, start_date: startDateStr, updated_at: new Date().toISOString() });
         }
         await refreshClientContexts();
+      }
+
+      // [2026-08-05 per Andy] On Add, don't close — hand straight off to the
+      // Engagement tab for the client we just made.
+      //
+      // The stint is what the app actually runs on: covered_through, renewal
+      // math, Week N of M and the /clients card all read client_stints. Closing
+      // here meant a new client existed with no engagement until someone
+      // remembered to reopen them, and the old Engagement Start Date field
+      // (hidden in the same change) papered over that with a date nothing read.
+      //
+      // Flipping isEditMode with the freshly-created row is what makes
+      // EngagementTab mountable — it needs a real client_id. Edits from here
+      // behave exactly as they would from the list.
+      if (!isEditMode && savedClientId) {
+        const created = await ClientService.getClientByIdOrSlug(savedClientId).catch(() => null);
+        await fetchClients();
+        if (created) {
+          setEditingClient(created as any);
+          setIsEditMode(true);
+          setClientModalTab('engagement');
+          toast({
+            title: 'Client created',
+            description: 'Add the first engagement stint, or close to do it later.',
+          });
+          return;
+        }
       }
 
       handleCloseClientModal();
@@ -4253,16 +4295,28 @@ export default function ClientsPage() {
                         sees Details only (no client id yet); Edit Client
                         gets both. Tabs sit above the scroll body so the
                         DialogFooter Save / Cancel still pin below. */}
-                    <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
+                    <Tabs value={clientModalTab} onValueChange={(v) => setClientModalTab(v as 'details' | 'engagement')} className="flex-1 flex flex-col min-h-0">
                       {/* [2026-07-06] Per Andy: match the standard tab strip
                           used across the app (bg-cream-100 + p-1 + border,
                           white active pill via shadow) instead of the
                           washed-out bg-cream-100/40 variant. */}
                       <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 mt-1 w-fit">
                         <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">Details</TabsTrigger>
-                        {isEditMode && (
-                          <TabsTrigger value="engagement" className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">Engagement</TabsTrigger>
-                        )}
+                        {/* [2026-08-05 per Andy] Visible while adding too, but
+                            inert until the client row exists — the stint editor
+                            writes to client_stints against a real client_id, so
+                            there is nothing for it to attach to before Create.
+                            Showing it disabled tells you the step is coming
+                            instead of having the tab appear from nowhere after
+                            save. Create then lands you on it. */}
+                        <TabsTrigger
+                          value="engagement"
+                          disabled={!isEditMode || !editingClient}
+                          title={!isEditMode ? 'Available once the client is created' : undefined}
+                          className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Engagement
+                        </TabsTrigger>
                       </TabsList>
                       <TabsContent value="details" className="flex-1 flex flex-col min-h-0 mt-0">
                     <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
@@ -4357,8 +4411,28 @@ export default function ClientsPage() {
                           Not referenced anywhere in /portal — all
                           engagement_start_date consumers are internal
                           HQ surfaces (dashboard tabs, /api/dashboard
-                          routes, queries.ts). */}
-                      {!isEditMode && (
+                          routes, queries.ts).
+
+                          [2026-08-05 per Andy] Hidden in Add too, so the
+                          field is now off entirely. It was write-only: the
+                          value went to client_context.start_date, and the
+                          only thing that ever read it back was this form.
+                          Every surface that matters — the /clients card,
+                          renewal math, covered_through — reads the earliest
+                          client_stints row instead. A date typed here bought
+                          a second, divergent start that quietly disagreed
+                          with the stint.
+
+                          The Engagement tab is now reachable straight after
+                          Create (see clientModalTab handoff in
+                          handleCreateClient), so the real stint is set up in
+                          the same sitting rather than approximated here.
+
+                          Gated rather than deleted, and the save path below
+                          is untouched: existing client_context.start_date
+                          values still round-trip on edit instead of being
+                          nulled out. */}
+                      {false && (
                         <div className="grid gap-2">
                           <Label>Engagement Start Date</Label>
                           <Popover>
