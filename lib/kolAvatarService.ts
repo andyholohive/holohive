@@ -19,6 +19,10 @@
  *   - app/api/admin/refresh-all-kol-avatars  — batch over the roster
  */
 import { SupabaseClient } from '@supabase/supabase-js';
+// [2026-08-05] X handle parsing + avatar resolution moved to lib/xAvatar so
+// clients (company logos) and KOLs share one implementation. The local
+// extractXHandle copy was deleted with this change.
+import { resolveXAvatar } from '@/lib/xAvatar';
 
 const BUCKET = 'kol-avatars';
 
@@ -29,19 +33,6 @@ export interface AvatarFetchResult {
   source: AvatarSource;
   url: string | null;
   error?: string;
-}
-
-/** Pull the username from common social URLs. Returns null if no pattern matches. */
-function extractXHandle(link: string | null | undefined): string | null {
-  if (!link) return null;
-  const patterns = [/(?:twitter|x)\.com\/(@?[\w_]+)/i];
-  for (const p of patterns) {
-    const m = link.match(p);
-    if (m) {
-      return m[1].replace('@', '').replace(/\/$/, '');
-    }
-  }
-  return null;
 }
 
 /** Pull a Telegram channel handle from a t.me/handle URL. */
@@ -133,16 +124,23 @@ async function fetchAvatarFromTelegram(
  * avatars break. For ~424 KOLs the dependency seems worth it vs paying for
  * the official Twitter API.
  */
-function fetchAvatarFromX(link: string | null | undefined): AvatarFetchResult {
-  const handle = extractXHandle(link);
-  if (!handle) {
-    return { success: false, source: 'x', url: null, error: 'no X handle in link' };
+async function fetchAvatarFromX(link: string | null | undefined): Promise<AvatarFetchResult> {
+  // [2026-08-05] Now verifies, and asks unavatar for fallback=false.
+  //
+  // This used to hand back `unavatar.io/twitter/{handle}` unchecked, always
+  // reporting success. unavatar answers 200 with a GENERIC PLACEHOLDER for
+  // handles that don't exist — a nonsense handle, a renamed account and a
+  // deleted account all return the same 1506-byte grey image, byte-identical.
+  // So any KOL with a stale or mistyped X link got a stored URL that renders
+  // a generic avatar, indistinguishable from a working one. It looked fine.
+  //
+  // With fallback=false a miss is a real 404, so the caller can fall through
+  // to the next source (telegram_id) instead of settling for a placeholder.
+  const resolved = await resolveXAvatar(link);
+  if (!resolved.ok || !resolved.url) {
+    return { success: false, source: 'x', url: null, error: resolved.error ?? 'no X handle in link' };
   }
-  return {
-    success: true,
-    source: 'x',
-    url: `https://unavatar.io/twitter/${handle}`,
-  };
+  return { success: true, source: 'x', url: resolved.url };
 }
 
 /**
@@ -245,7 +243,7 @@ export async function refreshKolAvatar(
   }
 
   // (2) X via unavatar — covers the rest with an x.com/twitter.com link.
-  const x = fetchAvatarFromX(kol.link);
+  const x = await fetchAvatarFromX(kol.link);
   if (x.success) return x;
 
   // (3) Last resort — try user photo if we have the telegram_id. Privacy

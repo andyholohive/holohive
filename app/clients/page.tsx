@@ -573,6 +573,51 @@ export default function ClientsPage() {
     start_date: undefined as Date | undefined,
   });
   const [domainInput, setDomainInput] = useState('');
+  /**
+   * [2026-08-05] Pull a company logo from the client's X profile.
+   *
+   * Most clients have an X account and no logo file to hand, so onboarding
+   * stalled on chasing an image. Pasting the profile link resolves the avatar
+   * through unavatar and drops the URL straight into logo_url — the same field
+   * the uploader writes, so nothing downstream changes.
+   *
+   * Verified server-side rather than optimistically: unavatar answers 200 with
+   * a generic placeholder for handles that don't exist, so an unchecked fetch
+   * stores a grey circle that looks exactly like a real logo. See lib/xAvatar.
+   */
+  const [xLogoUrl, setXLogoUrl] = useState('');
+  const [xLogoFetching, setXLogoFetching] = useState(false);
+  const [xLogoError, setXLogoError] = useState<string | null>(null);
+
+  const handleFetchLogoFromX = async () => {
+    const link = xLogoUrl.trim();
+    if (!link || xLogoFetching) return;
+    setXLogoFetching(true);
+    setXLogoError(null);
+    try {
+      const res = await fetch('/api/clients/resolve-x-logo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link }),
+      });
+      const json = await res.json();
+      if (!json?.ok || !json?.url) {
+        setXLogoError(json?.error || 'Could not fetch that logo.');
+        return;
+      }
+      // Clear any pending file upload — the two paths both target logo_url and
+      // whichever the user acted on last should win.
+      setLogoFile(null);
+      setLogoPreview(json.url);
+      setNewClient((prev) => ({ ...prev, logo_url: json.url }));
+      toast({ title: `Logo pulled from @${json.handle}` });
+    } catch {
+      setXLogoError('Could not fetch that logo. Check the link and try again.');
+    } finally {
+      setXLogoFetching(false);
+    }
+  };
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -2543,6 +2588,8 @@ export default function ClientsPage() {
     // 'engagement', and without this the next Add would open there against a
     // disabled trigger and render nothing.
     setClientModalTab('details');
+    setXLogoUrl('');
+    setXLogoError(null);
     setLogoFile(null);
     setLogoPreview(null);
     setNewClient({
@@ -4364,6 +4411,42 @@ export default function ClientsPage() {
                             </label>
                             <p className="text-xs text-ink-warm-500 mt-1">PNG, JPG up to 2MB</p>
                           </div>
+                        </div>
+                        {/* [2026-08-05 per Andy] Pull the logo from X instead of
+                            hunting for a file. Paste the profile link, press
+                            Enter or Fetch, and the avatar becomes the logo.
+                            Upload stays for clients with no X account or a
+                            logo that isn't their avatar. */}
+                        <div className="mt-2">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={xLogoUrl}
+                              onChange={(e) => { setXLogoUrl(e.target.value); setXLogoError(null); }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  // The dialog body is a <form> — Enter here
+                                  // would otherwise submit and create the client.
+                                  e.preventDefault();
+                                  handleFetchLogoFromX();
+                                }
+                              }}
+                              placeholder="Or paste their X profile — x.com/company"
+                              className="h-9 focus-brand flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-9"
+                              onClick={handleFetchLogoFromX}
+                              disabled={!xLogoUrl.trim() || xLogoFetching}
+                            >
+                              {xLogoFetching ? 'Fetching…' : 'Fetch'}
+                            </Button>
+                          </div>
+                          {xLogoError && (
+                            <p className="text-xs text-rose-600 mt-1">{xLogoError}</p>
+                          )}
                         </div>
                       </div>
                       <div className="grid gap-2">
