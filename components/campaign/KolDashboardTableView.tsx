@@ -325,7 +325,10 @@ export function KolDashboardTableView({
     }
 
     // Auto-complete the campaign when every KOL is concluded.
-    if (field === 'hh_status' && newValue === 'Concluded' && campaign?.status !== 'Completed') {
+    // [2026-08-05] Skipped once the status has been set by hand, so a manual
+    // correction survives the next concluded KOL.
+    if (field === 'hh_status' && newValue === 'Concluded' && campaign?.status !== 'Completed'
+        && !(campaign as any)?.status_manual_at) {
       const allConcluded = updatedKOLs.every(k => k.hh_status === 'Concluded');
       if (allConcluded && updatedKOLs.length > 0) {
         try {
@@ -475,7 +478,10 @@ export function KolDashboardTableView({
       }
 
       // Auto-complete the campaign when every KOL is concluded.
-      if (status === 'Concluded' && campaign?.status !== 'Completed') {
+      // [2026-08-05] Same manual-override guard as the inline-edit path above;
+      // this is the bulk/dropdown route to the identical transition.
+      if (status === 'Concluded' && campaign?.status !== 'Completed'
+          && !(campaign as any)?.status_manual_at) {
         const allConcluded = updatedKOLs.every(k => k.hh_status === 'Concluded');
         if (allConcluded && updatedKOLs.length > 0) {
           await CampaignService.updateCampaign(campaign!.id, { status: 'Completed' });

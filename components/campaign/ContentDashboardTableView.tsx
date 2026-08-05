@@ -379,7 +379,11 @@ export function ContentDashboardTableView() {
     }
 
     // Auto-update campaign status to Active when content is posted.
-    if (field === 'status' && newValue?.toLowerCase() === 'posted' && campaign?.status === 'Planning') {
+    // [2026-08-05] Skipped once the status has been set by hand — otherwise
+    // the next posted link silently reverts a deliberate correction, which is
+    // the failure the manual override exists to prevent.
+    if (field === 'status' && newValue?.toLowerCase() === 'posted' && campaign?.status === 'Planning'
+        && !(campaign as any)?.status_manual_at) {
       try {
         await CampaignService.updateCampaign(campaign.id, { status: 'Active' });
         setCampaign((prev: any) => prev ? { ...prev, status: 'Active' } : null);

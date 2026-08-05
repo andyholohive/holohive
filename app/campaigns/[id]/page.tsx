@@ -14,7 +14,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
+import { StatusBadge, toneClassName, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark, FileQuestion, Tag, Zap, MoreHorizontal } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -1197,6 +1197,51 @@ const CampaignDetailsPage = () => {
     }
   };
 
+  /** Campaign lifecycle statuses, in the order they normally progress. */
+  const CAMPAIGN_STATUSES = ['Planning', 'Active', 'Paused', 'Completed'] as const;
+  const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
+    Planning: 'info',
+    Active: 'brand',
+    Paused: 'warning',
+    Completed: 'success',
+  };
+
+  /**
+   * [2026-08-05] Manual campaign-status override.
+   *
+   * Stamps status_manual_at, which switches off the two auto-transitions
+   * (first posted content -> Active, all KOLs Concluded -> Completed) for this
+   * campaign. Without that, a correction survives only until the next posted
+   * link — the Umia failure, where automation owned a value nobody could hold.
+   *
+   * Worth knowing: as of today nothing in the app gates behaviour on
+   * campaigns.status. The /campaigns badges come from the client's
+   * is_active/is_ad_hoc, not this field. So this control records intent; it
+   * does not yet change what any other surface does.
+   */
+  const handleStatusChange = async (nextStatus: string) => {
+    if (!campaign || nextStatus === campaign.status) return;
+    const previous = { status: campaign.status, manualAt: (campaign as any).status_manual_at };
+    const stampedAt = new Date().toISOString();
+    // Optimistic — the dropdown should not feel laggy on a one-field write.
+    setCampaign({ ...campaign, status: nextStatus, status_manual_at: stampedAt } as any);
+    try {
+      await CampaignService.updateCampaign(campaign.id, {
+        status: nextStatus,
+        status_manual_at: stampedAt,
+        status_manual_by: (userProfile as any)?.id ?? null,
+      } as any);
+      toast({
+        title: `Status set to ${nextStatus}`,
+        description: 'Automatic status changes are now off for this campaign.',
+        duration: 2500,
+      });
+    } catch (err: any) {
+      setCampaign({ ...campaign, status: previous.status, status_manual_at: previous.manualAt } as any);
+      toast({ title: 'Could not change status', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const handleCancel = () => {
     setEditMode(false);
     setForm(campaign);
@@ -2322,6 +2367,42 @@ const CampaignDetailsPage = () => {
                     /campaigns cards carry their own, in app/campaigns/page.tsx. */}
                 {campaign && (
                   <div className="flex items-center gap-2.5 mt-4 text-xs flex-wrap">
+                    {/* [2026-08-05 per Andy] Status returns to this row — but as
+                        a control, not the badge removed on 2026-07-29. The
+                        objection then was that it displayed a value nobody could
+                        change; a dropdown answers that directly.
+
+                        Setting it by hand stamps status_manual_at, which stops
+                        the posted->Active and Concluded->Completed transitions
+                        from overwriting the choice.
+
+                        Still true and worth repeating: no consumer gates on
+                        campaigns.status. Week N of M beside this remains the
+                        signal that derives from something people edit. Treat
+                        this as bookkeeping until a reader exists. */}
+                    {(userProfile as any)?.role && (userProfile as any).role !== 'guest' && (
+                      <Select value={campaign.status || 'Planning'} onValueChange={handleStatusChange}>
+                        <SelectTrigger
+                          aria-label="Campaign status"
+                          className={`h-6 w-auto gap-1 rounded-full border-0 px-2.5 py-0 text-xs font-medium focus-brand ${toneClassName(CAMPAIGN_STATUS_TONES[campaign.status || 'Planning'] ?? 'neutral')}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CAMPAIGN_STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {(campaign as any).status_manual_at && (
+                      <span
+                        className="text-ink-warm-400"
+                        title={`Set by hand on ${formatDate((campaign as any).status_manual_at)} — automatic status changes are off for this campaign.`}
+                      >
+                        manual
+                      </span>
+                    )}
                     {/* [2026-07-09] Campaign phase hidden per Andy — everywhere
                         internal + public. Gated off (not deleted) for restore. */}
                     {false && campaign?.current_phase && (
