@@ -241,11 +241,56 @@ export class KOLService {
         });
       }
 
+      // "New KOL added" TG alert. See notifyTelegramJoin.
+      this.notifyTelegramJoin((kol as any).id, kolData.platform, kolData.link);
+
       return (kol as unknown) as MasterKOL;
     } catch (error) {
       console.error('Error creating KOL:', error);
       throw error;
     }
+  }
+
+  /**
+   * Fire the "new KOL added" Telegram alert for a KOL that has a Telegram
+   * channel. [2026-08-06]
+   *
+   * Lives here rather than at a call site because it used to be wired into
+   * exactly one place — the /kols inline link-cell edit, gated on "the link
+   * was previously empty". Adding a KOL with the link already filled in (the
+   * campaign Master KOL dialog, an import) sent nothing, and the failure was
+   * invisible: the fetch swallowed errors and the route's skip reasons were
+   * discarded. Every save path goes through create/update, so firing from
+   * here means a new entry point can't silently miss it.
+   *
+   * Safe to call on every save: the route is idempotent (it stamps
+   * master_kols.kol_join_notified_at and skips rows already stamped), so a
+   * repeat edit re-fires the request but never re-sends the message.
+   * Fire-and-forget, but the outcome is logged rather than swallowed.
+   */
+  private static notifyTelegramJoin(
+    kolId: string,
+    platform: unknown,
+    link: unknown,
+  ): void {
+    const platforms = Array.isArray(platform) ? platform : [];
+    const isTg = platforms.some(p =>
+      typeof p === 'string' && ['telegram', 'tg'].includes(p.toLowerCase().trim()),
+    );
+    if (!isTg || !link || typeof link !== 'string' || !link.trim()) return;
+
+    fetch(`/api/kols/${kolId}/notify-join`, { method: 'POST' })
+      .then(async res => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          console.error('[notify-join] failed', res.status, body);
+        } else if (body?.skipped) {
+          // Expected on repeat saves ('already notified'); worth seeing when
+          // it's 'no usable TG handle', which means the link is malformed.
+          console.info('[notify-join] skipped:', body.skipped);
+        }
+      })
+      .catch(err => console.error('[notify-join] request threw', err));
   }
 
   /**
@@ -267,6 +312,13 @@ export class KOLService {
         .single();
 
       if (error) throw error;
+
+      // "New KOL added" TG alert. Read platform + link off the row as it
+      // stands AFTER the write, not off `kolData` — a partial update (e.g.
+      // only the link, from the inline cell editor) doesn't carry platform,
+      // and vice versa. The route de-dupes, so calling on every update is
+      // safe. See notifyTelegramJoin.
+      this.notifyTelegramJoin((kol as any).id, (kol as any).platform, (kol as any).link);
 
       // Auto-reindex the updated KOL for semantic search
       // Only reindex if meaningful fields changed

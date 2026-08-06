@@ -39,7 +39,7 @@ export async function POST(
 
     const { data: kol, error } = await (admin as any)
       .from('master_kols')
-      .select('id, name, link, platform')
+      .select('id, name, link, platform, kol_join_notified_at')
       .eq('id', params.id)
       .maybeSingle();
     if (error) return NextResponse.json({ error: 'Lookup failed', detail: error.message }, { status: 500 });
@@ -51,6 +51,15 @@ export async function POST(
     const handle = _extractHandle(kol.link);
     if (!handle) {
       return NextResponse.json({ ok: false, skipped: 'no usable TG handle' });
+    }
+    // [2026-08-06] Idempotency. This used to fire from exactly one place —
+    // the /kols inline link-cell edit, gated on "link was previously empty" —
+    // so adding a KOL with the link already filled (campaign Master KOL
+    // dialog, import) sent nothing at all. KOLService now calls this after
+    // every save, which means the "only once" guarantee has to live here
+    // rather than in a caller's before/after comparison.
+    if (kol.kol_join_notified_at) {
+      return NextResponse.json({ ok: false, skipped: 'already notified' });
     }
 
     // Destination is configurable in the Telegram Comm admin tab
@@ -77,6 +86,15 @@ export async function POST(
       [[{ text: '✅ Joined — Scan now', callback_data: `kolscan:${kol.id}` }]],
       { chatId: destChatId, threadId: destThreadId },
     );
+
+    // Stamp only on a confirmed send, so a Telegram outage leaves the row
+    // eligible for the next save rather than silently burning the one alert.
+    if (sent) {
+      await (admin as any)
+        .from('master_kols')
+        .update({ kol_join_notified_at: new Date().toISOString() })
+        .eq('id', kol.id);
+    }
 
     return NextResponse.json({ ok: sent, dest: destChatId ? 'configured' : 'fallback' });
   } catch (err: any) {
