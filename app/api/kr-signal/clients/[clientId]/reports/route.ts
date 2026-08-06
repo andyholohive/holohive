@@ -54,11 +54,31 @@ export async function GET(
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
+  // [2026-08-06] `kr_signal_client_weekly.client_id` is NOT an HHP clients.id
+  // — it holds the kr_signal_clients row's own id, because the weekly cron
+  // writes saveClientWeekly(supabase, c.id, …) with the config row. This route
+  // is reached from /clients, so params.clientId IS an HHP clients.id. Querying
+  // one with the other silently returned [] for every client, which read as
+  // "no reports yet" even for Fogo, which had four.
+  //
+  // Resolve the config row first. The column deserves a rename to
+  // kr_signal_client_id, but that touches store.ts's helpers and the upsert
+  // conflict target, so it stays a separate change.
+  const { data: cfg } = await (admin as any)
+    .from('kr_signal_clients')
+    .select('id')
+    .eq('client_id', params.clientId)
+    .maybeSingle();
+
+  // No KR Signal config for this client at all — genuinely nothing to show,
+  // as distinct from "configured but never sent".
+  if (!cfg?.id) return NextResponse.json({ reports: [] });
+
   // Per-client rows carry the report + the client-specific metrics.
   const { data: rows, error } = await (admin as any)
     .from('kr_signal_client_weekly')
     .select('week_ending, report_html, kr_token_vol_usd, kr_vol_share, kr_token_vol_window, sov_pieces_cum, by_venue, created_at')
-    .eq('client_id', params.clientId)
+    .eq('client_id', cfg.id)
     .order('week_ending', { ascending: false })
     .limit(26);
 
