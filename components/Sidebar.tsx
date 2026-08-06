@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -777,9 +777,12 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Sales / CRM Section — pipeline + relationship
                   surfaces only. Submissions / Meetings / TG Chats
                   moved to Logistics per the 2026-06-19 reorg. */}
-              {!guestHideSection(['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
+              {!guestHideSection(['/crm/sales-pipeline', '/crm/outreach', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
                 <CollapsibleSection id="crm" icon={DollarSign}>
                   {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
+                  {/* TG Outreach — cold-prospecting funnel ported from Yano's
+                      Notion. Mockup as of 2026-08-07, no data layer yet. */}
+                  {!guestHide('/crm/outreach') && <NavItem href="/crm/outreach" icon={Send} label="Outreach" />}
                   {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
                   {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
                   {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
