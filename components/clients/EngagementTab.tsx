@@ -53,8 +53,8 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import {
   fetchClientEngagement, createStint, updateStint, deleteStint,
-  createPeriod, updatePeriod, deletePeriod, nextPeriodN,
-  type StintWithPeriods, type ClientStint, type EngagementPeriod,
+  createPeriod, updatePeriod, deletePeriod, nextPeriodN, draftKey,
+  type StintWithPeriods, type DraftStint, type DraftPeriod, type CoverageStatus,
 } from '@/lib/clientEngagementService';
 
 // ─── Status palette ─────────────────────────────────────────────────
@@ -189,24 +189,96 @@ function DateField({
   );
 }
 
+// ─── View model ─────────────────────────────────────────────────────
+//
+// Saved rows and drafted rows render through one shape, so there is a
+// single render tree rather than a forked "add mode" copy of it.
+// StintWithPeriods already satisfies this structurally.
+
+type PeriodView = {
+  id: string;
+  stint_id: string;
+  period_n: number;
+  start_date: string;
+  end_date: string;
+  amount: number;
+  notes: string | null;
+};
+
+type StintView = {
+  id: string;
+  start_date: string;
+  end_date: string | null;
+  status: string;
+  ended_reason: string | null;
+  notes: string | null;
+  periods: PeriodView[];
+  coverage: CoverageStatus | null;
+};
+
+function draftToView(d: DraftStint): StintView {
+  // Mirrors the client_stints_derive_status trigger so a drafted stint
+  // shows the same pill it will show once saved. Coverage stays null —
+  // it comes from the client_coverage_status view, which can't see a row
+  // that doesn't exist yet.
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const ended = !!d.end_date && d.end_date < todayIso;
+  return {
+    id: d.key,
+    start_date: d.start_date,
+    end_date: d.end_date,
+    status: ended ? 'ended' : 'active',
+    ended_reason: null,
+    notes: d.notes,
+    periods: d.periods.map((p) => ({
+      id: p.key,
+      stint_id: d.key,
+      period_n: p.period_n,
+      start_date: p.start_date,
+      end_date: p.end_date,
+      amount: p.amount,
+      notes: p.notes,
+    })),
+    coverage: null,
+  };
+}
+
 // ─── Main component ─────────────────────────────────────────────────
 
-export function EngagementTab({ clientId }: { clientId: string }) {
+/**
+ * `clientId === null` puts the tab in DRAFT mode, used by Add Client:
+ * stints and terms are foreign-keyed to clients.id, so nothing can be
+ * written before the client row exists. The draft lives in the parent
+ * (this tab unmounts when you switch back to Details) and is flushed by
+ * persistDraftEngagement() right after Create.
+ */
+export function EngagementTab({
+  clientId,
+  draft,
+  onDraftChange,
+}: {
+  clientId: string | null;
+  draft?: DraftStint[];
+  onDraftChange?: (next: DraftStint[]) => void;
+}) {
   const { toast } = useToast();
+  const isDraft = clientId === null;
+  const draftStints = draft ?? [];
   const [loading, setLoading] = useState(true);
   const [stints, setStints] = useState<StintWithPeriods[]>([]);
   const [expandedStintIds, setExpandedStintIds] = useState<Set<string>>(new Set());
 
   // Stint dialog state.
   const [stintDialogOpen, setStintDialogOpen] = useState(false);
-  const [editingStint, setEditingStint] = useState<ClientStint | null>(null);
+  const [editingStint, setEditingStint] = useState<StintView | null>(null);
   const [stintForm, setStintForm] = useState<StintForm>(EMPTY_STINT_FORM);
   const [savingStint, setSavingStint] = useState(false);
 
   // Period dialog state.
   const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
   const [periodDialogStintId, setPeriodDialogStintId] = useState<string | null>(null);
-  const [editingPeriod, setEditingPeriod] = useState<EngagementPeriod | null>(null);
+  const [editingPeriod, setEditingPeriod] = useState<PeriodView | null>(null);
   const [periodForm, setPeriodForm] = useState<PeriodForm>(EMPTY_PERIOD_FORM);
   const [savingPeriod, setSavingPeriod] = useState(false);
 
@@ -216,6 +288,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
   >(null);
 
   async function load() {
+    if (!clientId) { setLoading(false); return; }
     setLoading(true);
     try {
       const rows = await fetchClientEngagement(clientId);
@@ -238,6 +311,17 @@ export function EngagementTab({ clientId }: { clientId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
+  // Draft edits are unmount-safe: the tab remounts every time you switch
+  // tabs, so re-expand whatever the draft already has.
+  useEffect(() => {
+    if (isDraft && draftStints.length > 0) {
+      setExpandedStintIds(new Set(draftStints.map((d) => d.key)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDraft]);
+
+  const view: StintView[] = isDraft ? draftStints.map(draftToView) : stints;
+
   // ─── Stint actions ───────────────────────────────────────────────
 
   function openAddStint() {
@@ -246,7 +330,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
     setStintDialogOpen(true);
   }
 
-  function openEditStint(stint: ClientStint) {
+  function openEditStint(stint: StintView) {
     setEditingStint(stint);
     setStintForm({
       start_date: parseIso(stint.start_date),
@@ -263,6 +347,29 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       toast({ title: 'Start date required', variant: 'destructive' });
       return;
     }
+    // Draft mode: same validation, same shape, held in memory instead of
+    // written. persistDraftEngagement() replays these on Create.
+    if (isDraft) {
+      const next: DraftStint = {
+        key: editingStint?.id ?? draftKey(),
+        start_date: toIsoDate(stintForm.start_date)!,
+        end_date: stintForm.end_date ? toIsoDate(stintForm.end_date)! : null,
+        notes: stintForm.notes.trim() || null,
+        periods: editingStint
+          ? (draftStints.find((d) => d.key === editingStint.id)?.periods ?? [])
+          : [],
+      };
+      onDraftChange?.(
+        editingStint
+          ? draftStints.map((d) => (d.key === editingStint.id ? next : d))
+          : [next, ...draftStints],
+      );
+      setExpandedStintIds((prev) => new Set(prev).add(next.key));
+      setStintDialogOpen(false);
+      toast({ title: editingStint ? 'Stint updated' : 'Stint added', description: 'Saves when you create the client.' });
+      return;
+    }
+
     setSavingStint(true);
     try {
       // status + ended_reason are derived: status is auto-set by the
@@ -272,7 +379,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       // omitting `ended_reason` preserves any prior value (e.g.
       // "coverage_lapse" stamped by the cron) on edit.
       const payload = {
-        client_id: clientId,
+        client_id: clientId!,
         start_date: toIsoDate(stintForm.start_date)!,
         end_date: stintForm.end_date ? toIsoDate(stintForm.end_date)! : null,
         notes: stintForm.notes.trim() || null,
@@ -299,6 +406,13 @@ export function EngagementTab({ clientId }: { clientId: string }) {
   async function openAddPeriod(stintId: string) {
     setEditingPeriod(null);
     setPeriodDialogStintId(stintId);
+    if (isDraft) {
+      const existing = draftStints.find((d) => d.key === stintId)?.periods ?? [];
+      const n = existing.reduce((max, p) => Math.max(max, p.period_n), 0) + 1;
+      setPeriodForm({ ...EMPTY_PERIOD_FORM, period_n: n });
+      setPeriodDialogOpen(true);
+      return;
+    }
     try {
       const n = await nextPeriodN(stintId);
       setPeriodForm({ ...EMPTY_PERIOD_FORM, period_n: n });
@@ -308,7 +422,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
     setPeriodDialogOpen(true);
   }
 
-  function openEditPeriod(period: EngagementPeriod) {
+  function openEditPeriod(period: PeriodView) {
     setEditingPeriod(period);
     setPeriodDialogStintId(period.stint_id);
     setPeriodForm({
@@ -337,6 +451,38 @@ export function EngagementTab({ clientId }: { clientId: string }) {
       toast({ title: 'Amount must be a non-negative number', variant: 'destructive' });
       return;
     }
+    if (isDraft) {
+      const stintKey = periodDialogStintId;
+      const next: DraftPeriod = {
+        key: editingPeriod?.id ?? draftKey(),
+        period_n: periodForm.period_n,
+        start_date: toIsoDate(periodForm.start_date)!,
+        end_date: toIsoDate(periodForm.end_date)!,
+        amount: amt,
+        notes: periodForm.notes.trim() || null,
+      };
+      onDraftChange?.(draftStints.map((d) => {
+        if (d.key !== stintKey) return d;
+        const periods = editingPeriod
+          ? d.periods.map((p) => (p.key === editingPeriod.id ? next : p))
+          : [...d.periods, next];
+        periods.sort((a, b) => a.period_n - b.period_n);
+        // Mirror the client_engagement_periods sync trigger so the drafted
+        // stint header shows the same envelope it will have once saved.
+        const starts = periods.map((p) => p.start_date).sort();
+        const ends = periods.map((p) => p.end_date).sort();
+        return {
+          ...d,
+          periods,
+          start_date: starts[0] ?? d.start_date,
+          end_date: ends.length > 0 ? ends[ends.length - 1] : d.end_date,
+        };
+      }));
+      setPeriodDialogOpen(false);
+      toast({ title: editingPeriod ? 'Term updated' : 'Term added', description: 'Saves when you create the client.' });
+      return;
+    }
+
     setSavingPeriod(true);
     try {
       // [2026-06-26] Save bug fix: scope has a CHECK constraint that
@@ -372,6 +518,16 @@ export function EngagementTab({ clientId }: { clientId: string }) {
 
   async function runDelete() {
     if (!confirmDelete) return;
+    if (isDraft) {
+      onDraftChange?.(
+        confirmDelete.kind === 'stint'
+          ? draftStints.filter((d) => d.key !== confirmDelete.id)
+          : draftStints.map((d) => ({ ...d, periods: d.periods.filter((p) => p.key !== confirmDelete.id) })),
+      );
+      setConfirmDelete(null);
+      toast({ title: confirmDelete.kind === 'stint' ? 'Stint removed' : 'Term removed' });
+      return;
+    }
     try {
       if (confirmDelete.kind === 'stint') {
         await deleteStint(confirmDelete.id);
@@ -408,12 +564,20 @@ export function EngagementTab({ clientId }: { clientId: string }) {
         </Button>
       </div>
 
+      {/* Draft-mode notice. Without it, adding a stint here reads as saved —
+          it isn't until Create runs, and the parent form is what runs it. */}
+      {isDraft && (
+        <p className="rounded-md border border-cream-200 bg-cream-50/60 px-3 py-2 text-xs text-ink-warm-600">
+          Set the engagement up now — it saves with the client when you hit Create.
+        </p>
+      )}
+
       {loading ? (
         <div className="space-y-3">
           <Skeleton className="h-32 rounded-lg" />
           <Skeleton className="h-32 rounded-lg" />
         </div>
-      ) : stints.length === 0 ? (
+      ) : view.length === 0 ? (
         <EmptyState
           icon={Handshake}
           title="No stints yet"
@@ -425,7 +589,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
         </EmptyState>
       ) : (
         <div className="space-y-3">
-          {stints.map((stint) => {
+          {view.map((stint) => {
             const isExpanded = expandedStintIds.has(stint.id);
             const coverageTone = stint.coverage?.coverage_tone
               ? (COVERAGE_TONE[stint.coverage.coverage_tone] ?? 'neutral')
@@ -623,7 +787,7 @@ export function EngagementTab({ clientId }: { clientId: string }) {
               // instead of hiding them entirely — the user still needs to
               // see what the current envelope is.
               const stintWithPeriods = editingStint
-                ? stints.find(s => s.id === editingStint.id)
+                ? view.find(s => s.id === editingStint.id)
                 : null;
               const hasPeriods = (stintWithPeriods?.periods?.length ?? 0) > 0;
 
@@ -678,8 +842,8 @@ export function EngagementTab({ clientId }: { clientId: string }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStintDialogOpen(false)}>Cancel</Button>
-            <Button variant="brand" onClick={saveStint} disabled={savingStint}>
+            <Button type="button" variant="outline" onClick={() => setStintDialogOpen(false)}>Cancel</Button>
+            <Button type="button" variant="brand" onClick={saveStint} disabled={savingStint}>
               {savingStint ? 'Saving…' : 'Save Stint'}
             </Button>
           </DialogFooter>
@@ -756,8 +920,8 @@ export function EngagementTab({ clientId }: { clientId: string }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPeriodDialogOpen(false)}>Cancel</Button>
-            <Button variant="brand" onClick={savePeriod} disabled={savingPeriod}>
+            <Button type="button" variant="outline" onClick={() => setPeriodDialogOpen(false)}>Cancel</Button>
+            <Button type="button" variant="brand" onClick={savePeriod} disabled={savingPeriod}>
               {savingPeriod ? 'Saving…' : 'Save Period'}
             </Button>
           </DialogFooter>
@@ -774,8 +938,8 @@ export function EngagementTab({ clientId }: { clientId: string }) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={runDelete}>Delete</Button>
+            <Button type="button" variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={runDelete}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

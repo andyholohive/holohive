@@ -47,6 +47,7 @@ import { fireActionBoardRule } from '@/lib/actionBoardService';
 import { getCampaignWeekState, isOnboardingComplete } from '@/lib/campaignWeekHelpers';
 import { CallNotesTab } from '@/components/clients/CallNotesTab';
 import { EngagementTab } from '@/components/clients/EngagementTab';
+import { persistDraftEngagement, type DraftStint } from '@/lib/clientEngagementService';
 import { resolveStintId } from '@/lib/stintAnchor';
 import dynamic from 'next/dynamic';
 
@@ -370,6 +371,12 @@ export default function ClientsPage() {
    * just made, rather than closing and forcing a second trip through the list.
    */
   const [clientModalTab, setClientModalTab] = useState<'details' | 'engagement'>('details');
+  // [2026-08-06 per Andy] Engagement drafted during Add. Stints are
+  // foreign-keyed to clients.id, so nothing can be written until the client
+  // exists — the tab edits this array and handleCreateClient flushes it via
+  // persistDraftEngagement() right after the row lands. Lives here, not in
+  // the tab: TabsContent unmounts when you switch back to Details.
+  const [draftEngagement, setDraftEngagement] = useState<DraftStint[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<ClientWithAccess | null>(null);
   const [isStartClientOpen, setIsStartClientOpen] = useState(false);
@@ -2585,9 +2592,11 @@ export default function ClientsPage() {
     setIsEditMode(false);
     setEditingClient(null);
     // [2026-08-05] Reset the tab — the create handoff leaves it on
-    // 'engagement', and without this the next Add would open there against a
-    // disabled trigger and render nothing.
+    // 'engagement', and the next Add should start on Details.
     setClientModalTab('details');
+    // Drop any engagement drafted but never created — carrying it into the
+    // next Add would silently attach one client's terms to another.
+    setDraftEngagement([]);
     setXLogoUrl('');
     setXLogoError(null);
     setLogoFile(null);
@@ -2804,16 +2813,41 @@ export default function ClientsPage() {
       // EngagementTab mountable — it needs a real client_id. Edits from here
       // behave exactly as they would from the list.
       if (!isEditMode && savedClientId) {
+        // Flush anything drafted on the Engagement tab. Failures are
+        // surfaced rather than swallowed — the client exists either way, and
+        // we're about to land the user on the tab where they can see exactly
+        // what saved.
+        let drafted: { stints: number; periods: number } | null = null;
+        let draftError: string | null = null;
+        if (draftEngagement.length > 0) {
+          try {
+            drafted = await persistDraftEngagement(savedClientId, draftEngagement);
+          } catch (err) {
+            draftError = err instanceof Error ? err.message : 'Unknown error';
+          }
+          setDraftEngagement([]);
+        }
+
         const created = await ClientService.getClientByIdOrSlug(savedClientId).catch(() => null);
         await fetchClients();
         if (created) {
           setEditingClient(created as any);
           setIsEditMode(true);
           setClientModalTab('engagement');
-          toast({
-            title: 'Client created',
-            description: 'Add the first engagement stint, or close to do it later.',
-          });
+          if (draftError) {
+            toast({
+              title: 'Client created, engagement didn’t save',
+              description: `${draftError} — re-add it below.`,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Client created',
+              description: drafted
+                ? `Engagement saved: ${drafted.stints} stint${drafted.stints === 1 ? '' : 's'}, ${drafted.periods} term${drafted.periods === 1 ? '' : 's'}.`
+                : 'Add the first engagement stint, or close to do it later.',
+            });
+          }
           return;
         }
       }
@@ -4352,18 +4386,15 @@ export default function ClientsPage() {
                           washed-out bg-cream-100/40 variant. */}
                       <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 mt-1 w-fit">
                         <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">Details</TabsTrigger>
-                        {/* [2026-08-05 per Andy] Visible while adding too, but
-                            inert until the client row exists — the stint editor
-                            writes to client_stints against a real client_id, so
-                            there is nothing for it to attach to before Create.
-                            Showing it disabled tells you the step is coming
-                            instead of having the tab appear from nowhere after
-                            save. Create then lands you on it. */}
+                        {/* [2026-08-06 per Andy] Live while adding as well.
+                            The stint editor can't write before the client row
+                            exists, so on Add it edits `draftEngagement` and
+                            handleCreateClient flushes it once there's an id —
+                            you set the engagement up in one pass instead of
+                            creating, then remembering to come back. */}
                         <TabsTrigger
                           value="engagement"
-                          disabled={!isEditMode || !editingClient}
-                          title={!isEditMode ? 'Available once the client is created' : undefined}
-                          className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
                         >
                           Engagement
                         </TabsTrigger>
@@ -4648,13 +4679,17 @@ export default function ClientsPage() {
                       </div>
                     </div>
                       </TabsContent>
-                      {isEditMode && editingClient && (
-                        <TabsContent value="engagement" className="flex-1 flex flex-col min-h-0 mt-0">
-                          <div className="flex-1 overflow-y-auto px-1 pb-4">
-                            <EngagementTab clientId={editingClient.id} />
-                          </div>
-                        </TabsContent>
-                      )}
+                      <TabsContent value="engagement" className="flex-1 flex flex-col min-h-0 mt-0">
+                        <div className="flex-1 overflow-y-auto px-1 pb-4">
+                          {/* null clientId = draft mode: edits land in
+                              draftEngagement and save with the client. */}
+                          <EngagementTab
+                            clientId={isEditMode && editingClient ? editingClient.id : null}
+                            draft={draftEngagement}
+                            onDraftChange={setDraftEngagement}
+                          />
+                        </div>
+                      </TabsContent>
                     </Tabs>
                     <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>

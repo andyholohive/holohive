@@ -130,3 +130,83 @@ export async function deletePeriod(id: string): Promise<void> {
   const { error } = await supabase.from('client_engagement_periods').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ─── Draft engagement (Add Client) ──────────────────────────────────
+//
+// [2026-08-06 per Andy] The Engagement tab is now usable while ADDING a
+// client, before any row exists. Stints and terms are foreign-keyed to
+// clients.id, so nothing can be written until Create runs — the tab
+// therefore edits an in-memory draft, and this module flushes it once we
+// have an id.
+//
+// Draft rows carry a client-side `key` instead of a DB `id`. Everything
+// else matches the insert shape, so the flush below is a straight
+// translation with no re-derivation of user input.
+
+export type DraftPeriod = {
+  key: string;
+  period_n: number;
+  start_date: string;   // ISO yyyy-mm-dd
+  end_date: string;     // ISO yyyy-mm-dd
+  amount: number;
+  notes: string | null;
+};
+
+export type DraftStint = {
+  key: string;
+  start_date: string;        // ISO yyyy-mm-dd
+  end_date: string | null;
+  notes: string | null;
+  periods: DraftPeriod[];
+};
+
+/** Unique enough for React keys + draft identity within one dialog session. */
+export function draftKey(): string {
+  return `draft-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Write a drafted engagement against a freshly-created client.
+ *
+ * Sequential on purpose: each stint's periods need its real id, and the
+ * client_engagement_periods sync trigger rewrites the parent stint's date
+ * envelope on every period write — running those concurrently would have
+ * them race over the same row.
+ *
+ * Partial failure is reported, not swallowed. The client already exists by
+ * this point, so the caller lands the user on the Engagement tab where
+ * whatever did save is visible and the rest can be re-entered.
+ */
+export async function persistDraftEngagement(
+  clientId: string,
+  draft: DraftStint[],
+): Promise<{ stints: number; periods: number }> {
+  let stintCount = 0;
+  let periodCount = 0;
+
+  for (const d of draft) {
+    const stint = await createStint({
+      client_id: clientId,
+      start_date: d.start_date,
+      end_date: d.end_date,
+      notes: d.notes,
+    });
+    stintCount += 1;
+
+    for (const p of d.periods) {
+      // scope + signed_date omitted so the DB defaults apply — same
+      // reasoning as the live Add Term path (scope has a CHECK constraint).
+      await createPeriod({
+        stint_id: stint.id,
+        period_n: p.period_n,
+        start_date: p.start_date,
+        end_date: p.end_date,
+        amount: p.amount,
+        notes: p.notes,
+      });
+      periodCount += 1;
+    }
+  }
+
+  return { stints: stintCount, periods: periodCount };
+}
