@@ -8,7 +8,12 @@
  * Auth: super_admin only — heavier op + multiple third-party hits.
  *
  * Body (optional):
- *   { limit?: number }   default: all active non-archived KOLs
+ *   { scope?: 'missing' | 'all' } default: 'all'
+ *       'missing' → only rows with no profile_picture_url yet. A newly added
+ *       KOL has no avatar until the next 05:00 UTC cron pass, and re-fetching
+ *       all ~424 to pick up three of them takes ~2 minutes of third-party
+ *       calls. [2026-08-06 per Andy]
+ *   { limit?: number }   default: no cap
  *   { delay_ms?: number } default: 250ms between iterations
  */
 import { NextResponse } from 'next/server';
@@ -37,10 +42,12 @@ export async function POST(request: Request) {
   // Parse optional body knobs.
   let limit: number | null = null;
   let delayMs = 250;
+  let scope: 'missing' | 'all' = 'all';
   try {
     const body = await request.json().catch(() => ({}));
     if (typeof body?.limit === 'number') limit = body.limit;
     if (typeof body?.delay_ms === 'number') delayMs = body.delay_ms;
+    if (body?.scope === 'missing') scope = 'missing';
   } catch {
     /* default knobs */
   }
@@ -53,6 +60,9 @@ export async function POST(request: Request) {
     .from('master_kols')
     .select('id, telegram_id, link, name')
     .is('archived_at', null);
+  // 'missing' skips anyone who already has a picture — the cheap pass for
+  // "the ones added since the last cron run".
+  if (scope === 'missing') query = query.is('profile_picture_url', null);
   if (limit) query = query.limit(limit);
 
   const { data: kols, error } = await query;
@@ -89,6 +99,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    scope,
     stats,
   });
 }

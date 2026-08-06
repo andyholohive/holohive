@@ -190,6 +190,55 @@ export default function KOLsPage() {
   const [isSavingNewKOL, setIsSavingNewKOL] = useState(false);
   // Bulk avatar refresh (super_admin only) — sits in the PageHeader actions.
   const [bulkAvatarRunning, setBulkAvatarRunning] = useState(false);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [avatarScope, setAvatarScope] = useState<'missing' | 'all'>('missing');
+  // Mirrors the server's own `scope: 'missing'` filter — getAllKOLs() and the
+  // bulk route both read master_kols WHERE archived_at IS NULL, so this count
+  // is exact rather than an estimate.
+  const missingAvatarCount = useMemo(
+    () => kols.filter(k => !(k as any).profile_picture_url).length,
+    [kols],
+  );
+
+  const runBulkAvatarRefresh = async (scope: 'missing' | 'all') => {
+    const count = scope === 'missing' ? missingAvatarCount : kols.length;
+    setAvatarDialogOpen(false);
+    setBulkAvatarRunning(true);
+    toast({
+      title: 'Refreshing avatars...',
+      description: `${count} KOL${count === 1 ? '' : 's'} — roughly ${Math.max(1, Math.round((count * 0.3) / 60))} min.`,
+    });
+    try {
+      const res = await fetch('/api/admin/refresh-all-kol-avatars', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, delay_ms: 250 }),
+      });
+      const json = await res.json();
+      if (json?.ok && json?.stats) {
+        toast({
+          title: 'Avatars refreshed',
+          description: `${json.stats.telegram} from Telegram + ${json.stats.x} from X. ${json.stats.skipped} skipped.`,
+        });
+        // Reload to pick up new URLs.
+        fetchKOLs();
+      } else {
+        toast({
+          title: 'Bulk refresh failed',
+          description: json?.error || 'Unknown error',
+          variant: 'destructive',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Network error',
+        description: err?.message || 'Could not reach server',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkAvatarRunning(false);
+    }
+  };
   const [bulkXRunning, setBulkXRunning] = useState(false);
 
   // [2026-07-02 ANN.4] Send Announcement — bulk-message the selected
@@ -1032,13 +1081,11 @@ export default function KOLsPage() {
           (editingValue as string).trim() !== (kolToUpdate.link || '').trim()
         ) {
           const prevNiche = JSON.stringify(kolToUpdate.niche_tags || []);
-          // New KOL just got its channel (link went from empty → set) →
-          // DM the ops chat with the link + a "Joined — Scan now" button.
-          // The scanner can only read channels it has joined, so this lets
-          // Andy join first, then tap to trigger the scan. Fire-and-forget.
-          if (!(kolToUpdate.link || '').trim()) {
-            fetch(`/api/kols/${kolId}/notify-join`, { method: 'POST' }).catch(() => {});
-          }
+          // [2026-08-06] The "Joined — Scan now" DM used to fire from here,
+          // gated on the link having been empty before. That made it exclusive
+          // to this one editor — adding a KOL with the link already filled sent
+          // nothing. KOLService.updateKOL now fires it for every save path and
+          // the route de-dupes, so this call site is gone rather than doubled.
           try {
             const res = await fetch(`/api/kols/${kolId}/rescan`, { method: 'POST' });
             const data = await res.json().catch(() => ({}));
@@ -1968,41 +2015,13 @@ export default function KOLsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={async () => {
+                onClick={() => {
                   if (bulkAvatarRunning) return;
-                  if (!confirm('Refresh avatars for all ~424 active KOLs? Takes ~2 minutes.')) return;
-                  setBulkAvatarRunning(true);
-                  toast({ title: 'Refreshing avatars...', description: 'Iterating over the roster — this takes ~2 min.' });
-                  try {
-                    const res = await fetch('/api/admin/refresh-all-kol-avatars', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ delay_ms: 250 }),
-                    });
-                    const json = await res.json();
-                    if (json?.ok && json?.stats) {
-                      toast({
-                        title: 'Avatars refreshed',
-                        description: `${json.stats.telegram} from Telegram + ${json.stats.x} from X. ${json.stats.skipped} skipped.`,
-                      });
-                      // Reload to pick up new URLs.
-                      fetchKOLs();
-                    } else {
-                      toast({
-                        title: 'Bulk refresh failed',
-                        description: json?.error || 'Unknown error',
-                        variant: 'destructive',
-                      });
-                    }
-                  } catch (err: any) {
-                    toast({
-                      title: 'Network error',
-                      description: err?.message || 'Could not reach server',
-                      variant: 'destructive',
-                    });
-                  } finally {
-                    setBulkAvatarRunning(false);
-                  }
+                  // Default to the cheap pass when there's anything to catch up
+                  // on — that's the common case (KOLs added since the 05:00 UTC
+                  // cron run). [2026-08-06 per Andy]
+                  setAvatarScope(missingAvatarCount > 0 ? 'missing' : 'all');
+                  setAvatarDialogOpen(true);
                 }}
                 disabled={bulkAvatarRunning}
               >
@@ -3828,6 +3847,79 @@ export default function KOLsPage() {
         onOpenChange={setAnnounceDialogOpen}
         allKols={kols.map(k => ({ id: k.id, name: k.name || 'KOL', hasGc: k.group_chat === true }))}
       />
+
+      {/* Bulk avatar refresh — scope picker. The all-roster pass costs ~2 min
+          of Telegram + unavatar calls, which is wasteful when the real need is
+          "the handful added since the 05:00 UTC cron". [2026-08-06 per Andy] */}
+      <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Refresh avatars</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            {([
+              {
+                value: 'missing' as const,
+                label: 'Only KOLs with no avatar',
+                count: missingAvatarCount,
+                hint: 'Catches anyone added since the last nightly run.',
+              },
+              {
+                value: 'all' as const,
+                label: 'Every active KOL',
+                count: kols.length,
+                hint: 'Re-fetches the whole roster, including avatars that already look fine.',
+              },
+            ]).map(opt => {
+              const selected = avatarScope === opt.value;
+              const disabled = opt.count === 0;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setAvatarScope(opt.value)}
+                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
+                    disabled
+                      ? 'border-gray-200 opacity-50 cursor-not-allowed'
+                      : selected
+                        ? 'border-brand bg-brand-light'
+                        : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`text-sm font-medium ${selected ? 'text-brand' : 'text-ink-warm-800'}`}>
+                      {opt.label}
+                    </span>
+                    <span className="text-xs tabular-nums text-gray-500">
+                      {opt.count} KOL{opt.count === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">{opt.hint}</p>
+                </button>
+              );
+            })}
+            {missingAvatarCount === 0 && (
+              <p className="text-xs text-gray-500">
+                Every active KOL already has an avatar — nothing to catch up on.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAvatarDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="brand"
+              disabled={bulkAvatarRunning || (avatarScope === 'missing' && missingAvatarCount === 0)}
+              onClick={() => runBulkAvatarRefresh(avatarScope)}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh {avatarScope === 'missing' ? missingAvatarCount : kols.length}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 4. Add Dialog for single delete at the bottom of the component */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
