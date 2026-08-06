@@ -550,7 +550,15 @@ export async function GET() {
       const renewedAfter = stints.some(s => s.start > (recentEnded.end as Date));
       if (renewedAfter) renewalRenewed += 1;
     }
-    const renewalRatePct = renewalEligible > 0
+    // [2026-08-06 per Andy] Minimum denominator. With one eligible client the
+    // rate can only ever be 0 or 100, and it renders next to Jaymz's and
+    // Quazo's on-time rates as if it were the same kind of measurement — so a
+    // single churn reads as "Bolt scored zero" rather than "one client came up
+    // for renewal and didn't take it". Below the floor we show no rate at all,
+    // the same way onTimeRateFor returns null when someone has no tasks due
+    // this quarter. The raw counts still appear in the detail line.
+    const RENEWAL_MIN_ELIGIBLE = 3;
+    const renewalRatePct = renewalEligible >= RENEWAL_MIN_ELIGIBLE
       ? Math.round((renewalRenewed / renewalEligible) * 100)
       : null;
 
@@ -578,9 +586,15 @@ export async function GET() {
         valuePct: renewalRatePct,
         formulaCaption: 'Renewed ÷ Eligible (90d)',
         sourceCaption: 'Source · client_stints end_date + status',
-        detail: renewalRatePct === null
+        detail: renewalEligible === 0
           ? 'No stints ended in the last 90 days.'
-          : `${renewalRenewed} of ${renewalEligible} clients renewed in the last 90 days.`,
+          : renewalRatePct === null
+            // Say the count out loud when we're withholding the rate —
+            // otherwise "—" looks like missing data rather than a
+            // deliberate "too few to rate".
+            ? `${renewalRenewed} of ${renewalEligible} client${renewalEligible === 1 ? '' : 's'} renewed in the last 90 days`
+              + ` — too few eligible to show a rate (needs ${RENEWAL_MIN_ELIGIBLE}).`
+            : `${renewalRenewed} of ${renewalEligible} clients renewed in the last 90 days.`,
       },
       scoreUserJaymz && {
         kind: 'on_time' as const,
