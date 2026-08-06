@@ -16,6 +16,7 @@ import {
   DeliverableService,
   DeliverableTemplate,
   DeliverableTemplateStep,
+  resolveStepOwner,
 } from '@/lib/deliverableService';
 import {
   Calendar as CalendarIcon,
@@ -179,6 +180,23 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
       const data = await DeliverableService.getTemplateWithSteps(selectedTemplateId);
       if (cancelled || !data) return;
       setTemplateSteps(data.steps);
+
+      // [2026-08-06] Pre-fill assignees from the template's defaults, so a
+      // 15-step template opens filled in rather than as 15 empty dropdowns.
+      // Per-step override beats the role map; every row stays editable, so
+      // this is a starting point, not a decision.
+      const roleOwners = await DeliverableService.getRoleOwners().catch(() => ({}));
+      const prefill: Record<string, { userId: string; userName: string }> = {};
+      for (const s of data.steps) {
+        const ownerId = resolveStepOwner(s, roleOwners);
+        if (!ownerId) continue;
+        // Skip anyone no longer on the team — a stale id would render as a
+        // blank dropdown that still submits, silently assigning a ghost.
+        const member = teamMembers.find(m => m.id === ownerId);
+        if (member) prefill[s.id] = { userId: member.id, userName: member.name };
+      }
+      setStepAssignments(prefill);
+
       // Auto-fill title only if it's empty (the "Run this SOP" caller
       // can pass initialTitle to seed it with the SOP name).
       setTitle(prev => prev || data.template?.name || '');

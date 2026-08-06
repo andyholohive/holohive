@@ -35,7 +35,19 @@ export type DeliverableTemplateStep = {
   task_type: string;
   checklist_items: string[];
   is_blocking: boolean;
+  /** Per-step override of the global role owner. NULL = follow
+   *  the role. [2026-08-06] */
+  default_assignee_id: string | null;
 };
+
+/** Who a step lands on before the wizard's run-time picker touches it. */
+export function resolveStepOwner(
+  step: Pick<DeliverableTemplateStep, 'default_role' | 'default_assignee_id'>,
+  roleOwners: Record<string, string> | null | undefined,
+): string | null {
+  return step.default_assignee_id
+    || (step.default_role ? (roleOwners?.[step.default_role] ?? null) : null);
+}
 
 export type Deliverable = {
   id: string;
@@ -108,6 +120,124 @@ export class DeliverableService {
       console.error('Error fetching deliverable templates:', error);
       throw error;
     }
+  }
+
+  /**
+   * The role vocabulary actually in use across every template's steps.
+   *
+   * [2026-08-06 per Andy] Role Key / Role Label were free-text inputs with
+   * nothing but a placeholder to go on, so each new step invented its own
+   * key. That produced 28 blank keys, two capitalized ones that can never
+   * match (`Handoff`, `Message`), and near-duplicate pairs (writer vs
+   * comms_writer, analyst vs data_analyst). Since assignment resolves by
+   * exact key, a near-duplicate silently loses its role default.
+   *
+   * There's no roles table to read from — `users.role` is permissions
+   * (member/admin/super_admin), not job function — so the vocabulary IS the
+   * existing data. Returned usage-first so the four keys that carry the
+   * roster (client_lead, campaign_ops, partner_lead, comms_writer) sit at
+   * the top of the picker.
+   *
+   * `label` is the most-used label for that key, which is what makes the
+   * picker self-correcting: pick `client_lead` and you get "Client Lead",
+   * not the one-off "Client Lead + Dev" that drifted in.
+   */
+  static async getRoleVocabulary(): Promise<Array<{ key: string; label: string; uses: number }>> {
+    const { data, error } = await supabase
+      .from('deliverable_template_steps')
+      .select('default_role, role_label');
+    if (error) throw error;
+
+    // key -> { total uses, label -> count } so the winning label is the
+    // popular one rather than whichever row happened to come back first.
+    const byKey = new Map<string, { uses: number; labels: Map<string, number> }>();
+    for (const row of (data ?? []) as Array<{ default_role: string | null; role_label: string | null }>) {
+      const key = (row.default_role || '').trim();
+      if (!key) continue; // blanks aren't a vocabulary entry — they're the gap
+      const entry = byKey.get(key) ?? { uses: 0, labels: new Map<string, number>() };
+      entry.uses += 1;
+      const label = (row.role_label || '').trim();
+      if (label) entry.labels.set(label, (entry.labels.get(label) ?? 0) + 1);
+      byKey.set(key, entry);
+    }
+
+    return Array.from(byKey.entries())
+      .map(([key, { uses, labels }]) => {
+        const best = Array.from(labels.entries()).sort((a, b) => b[1] - a[1])[0];
+        return { key, label: best?.[0] ?? key, uses };
+      })
+      .sort((a, b) => b.uses - a.uses || a.key.localeCompare(b.key));
+  }
+
+  // ---- Role owners (global) ----
+
+  /** role_key -> user_id, one map for every template. [2026-08-06 per Andy] */
+  static async getRoleOwners(): Promise<Record<string, string>> {
+    // `as any` on the table name: lib/database.types.ts is generated and
+    // predates this table. Same escape hatch the rest of the file uses for
+    // columns newer than the last type regen.
+    const { data, error } = await (supabase as any)
+      .from('deliverable_role_owners')
+      .select('role_key, user_id');
+    if (error) throw error;
+    return Object.fromEntries(
+      ((data ?? []) as Array<{ role_key: string; user_id: string }>)
+        .map((r) => [r.role_key, r.user_id]),
+    ) as Record<string, string>;
+  }
+
+  /**
+   * Replace the whole map.
+   *
+   * Delete-then-insert rather than upsert: the dialog always sends every role
+   * in the vocabulary, so a role the user just cleared has to actually
+   * disappear. An upsert would leave it behind.
+   */
+  static async setRoleOwners(
+    owners: Record<string, string>,
+    updatedBy?: string | null,
+  ): Promise<void> {
+    const rows = Object.entries(owners)
+      .filter(([k, v]) => !!k && !!v)
+      .map(([role_key, user_id]) => ({
+        role_key, user_id, updated_by: updatedBy ?? null, updated_at: new Date().toISOString(),
+      }));
+
+    const { error: delErr } = await (supabase as any)
+      .from('deliverable_role_owners')
+      .delete()
+      .not('role_key', 'is', null);   // unconditional delete needs a filter
+    if (delErr) throw delErr;
+
+    if (rows.length === 0) return;
+    const { error } = await (supabase as any).from('deliverable_role_owners').insert(rows);
+    if (error) throw error;
+  }
+
+  /**
+   * Who has actually been doing each role, from the tasks past runs spawned.
+   *
+   * Powers the "Use history" button — the alternative is asking someone to
+   * recall who normally does `comms_writer` across 77 past tasks. Subtasks are
+   * matched back to their step by (template, sort_order), which is how the
+   * spawner writes them.
+   *
+   * Returns every candidate with counts, not just the winner: `client_lead`
+   * splits 45/27 between two people, and a UI that hid the runner-up would
+   * present a coin-flip as a fact.
+   */
+  static async getRoleAssignmentHistory(): Promise<
+    Record<string, Array<{ userId: string; times: number }>>
+  > {
+    const { data, error } = await supabase.rpc('deliverable_role_history' as any);
+    if (error) throw error;
+
+    const out: Record<string, Array<{ userId: string; times: number }>> = {};
+    for (const row of (data ?? []) as Array<{ role_key: string; user_id: string; times: number }>) {
+      (out[row.role_key] ??= []).push({ userId: row.user_id, times: Number(row.times) });
+    }
+    for (const k of Object.keys(out)) out[k].sort((a, b) => b.times - a.times);
+    return out;
   }
 
   static async getTemplateWithSteps(id: string): Promise<{ template: DeliverableTemplate; steps: DeliverableTemplateStep[] } | null> {

@@ -21,6 +21,9 @@ import { CardHeaderEditorial } from '@/components/ui/card-header-editorial';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/ui/command';
 import { Switch } from '@/components/ui/switch';
 import { CustomColorPicker } from '@/components/ui/custom-color-picker';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,7 +32,10 @@ import {
   DeliverableService,
   DeliverableTemplate,
   DeliverableTemplateStep,
+  resolveStepOwner,
 } from '@/lib/deliverableService';
+import { TASK_TYPES } from '@/lib/taskTypes';
+import { UserService } from '@/lib/userService';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -47,7 +53,15 @@ import {
   Eye,
   BarChart3,
   ClipboardList,
+  Check,
+  ChevronsUpDown,
+  Users,
+  History,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
+
+/** Sentinel for "no one" in a Select — Radix forbids an empty-string value. */
+const NO_ASSIGNEE = '__none__';
 
 // kebab-case slug from a free-text name. Used as a fallback when the
 // user doesn't type a custom slug — see handleSaveTemplate below.
@@ -60,6 +74,134 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, '-')                          // non-alnum → hyphen
     .replace(/^-+|-+$/g, '')                              // trim leading/trailing
     .slice(0, 60);                                        // safety cap
+}
+
+// Role keys are snake_case by convention (`client_lead`, `campaign_ops`).
+// slugify() above produces hyphens, which is right for template slugs and
+// wrong here — `Client Lead` must normalize to the SAME key an earlier step
+// already used, or assignment stops matching. Applied only to keys the user
+// types fresh; picking an existing key never re-slugs it. [2026-08-06]
+function roleKeySlug(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+}
+
+/**
+ * The key a given role label should carry.
+ *
+ * Reusing the label's EXISTING key matters more than generating a tidy one:
+ * assignment resolves by exact key, so re-slugging a known label is how a
+ * role silently forks. "Client Lead + Dev" slugs to `client_lead_dev`, which
+ * would stop matching the `client_lead` its 20 sibling steps use — the exact
+ * drift this change exists to stop. Only genuinely new labels get slugged.
+ */
+function deriveRoleKey(
+  label: string,
+  vocab: Array<{ key: string; label: string }>,
+): string {
+  const trimmed = label.trim();
+  if (!trimmed) return '';
+  const known = vocab.find(r => r.label.toLowerCase() === trimmed.toLowerCase());
+  return known ? known.key : roleKeySlug(trimmed);
+}
+
+/**
+ * Pick-or-type field, modelled on the affiliate picker in
+ * components/crm/sales-pipeline/dialogs/CreateEditOpportunityDialog.tsx —
+ * same Popover + Command shape, same "Add …" row under an empty search.
+ *
+ * Used for both Role Key and Role Label. The options are whatever the
+ * existing templates already use, so the common case is one click and the
+ * typo path takes deliberate effort. Free text still gets through — new
+ * roles are legitimate — it just isn't the default anymore.
+ */
+function RoleCombobox({
+  value, onChange, options, placeholder, emptyHint, transform, renderMeta,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  options: Array<{ value: string; meta?: string }>;
+  placeholder: string;
+  emptyHint: string;
+  /** Normalizer applied to typed-in values only (snake_case for keys). */
+  transform?: (raw: string) => string;
+  renderMeta?: (meta?: string) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const typed = transform ? transform(search) : search.trim();
+  const isNew = !!typed && !options.some(o => o.value.toLowerCase() === typed.toLowerCase());
+
+  const commit = (next: string) => {
+    onChange(next);
+    setSearch('');
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSearch(''); }}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          className="h-9 w-full justify-between font-normal focus-brand"
+        >
+          <span className={value ? 'truncate' : 'truncate text-ink-warm-400'}>
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[260px] p-0 !bg-white border-cream-200 z-[90]" align="start">
+        <Command>
+          <CommandInput placeholder={emptyHint} value={search} onValueChange={setSearch} />
+          <CommandList>
+            {/* CommandEmpty only renders when nothing matches; the same
+                "Add" row is repeated in a CommandGroup below so you can
+                still create a value that happens to be a substring of an
+                existing one (e.g. "writer" while "comms_writer" matches). */}
+            <CommandEmpty className="p-0">
+              {typed ? (
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-cream-50 flex items-center gap-2"
+                  onClick={() => commit(typed)}
+                >
+                  <Plus className="h-3.5 w-3.5 text-brand shrink-0" />
+                  <span>Use &quot;<strong>{typed}</strong>&quot;</span>
+                </button>
+              ) : (
+                <p className="px-3 py-3 text-xs text-ink-warm-400">Type to add a new one.</p>
+              )}
+            </CommandEmpty>
+            <CommandGroup>
+              {options.map(o => (
+                <CommandItem key={o.value} value={o.value} onSelect={() => commit(o.value)}>
+                  <Check className={`mr-2 h-3.5 w-3.5 shrink-0 ${value === o.value ? 'opacity-100' : 'opacity-0'}`} />
+                  <span className="truncate">{o.value}</span>
+                  {renderMeta?.(o.meta)}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {isNew && (
+              <CommandGroup className="border-t border-cream-100">
+                <CommandItem value={`__create__${typed}`} onSelect={() => commit(typed)}>
+                  <Plus className="mr-2 h-3.5 w-3.5 text-brand shrink-0" />
+                  <span>Use &quot;<strong>{typed}</strong>&quot;</span>
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 // v11 preset palette for the Color picker — anchored on the same
@@ -81,7 +223,105 @@ const PRESET_COLORS = [
   '#1F2937', // ink-warm-900-ish
 ];
 
-function SortableStepRow({ step, onEdit, onDelete }: { step: DeliverableTemplateStep; onEdit: () => void; onDelete: () => void }) {
+/**
+ * Cycle grid for a step's day offset. [2026-08-06 per Andy]
+ *
+ * NOT a real calendar — there are no real dates here, because a template has
+ * no start date until it runs. This is a schematic laid out Mon–Sun with
+ * Day 0 pinned to Monday, purely so you can see the shape of the run: which
+ * days cluster, what lands on a weekend, where the gaps are. Labelled as
+ * illustrative in the UI so nobody reads a delivery date off it.
+ *
+ * Clicking a cell sets the offset. The template's other steps are marked so a
+ * new step can be placed relative to them rather than by counting in your head.
+ */
+function CycleDayGrid({ dayOffset, onPick, siblings }: {
+  dayOffset: number;
+  onPick: (offset: number) => void;
+  siblings: Array<{ name: string; dayOffset: number }>;
+}) {
+  const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const siblingDays = new Set(siblings.map(s => s.dayOffset));
+
+  // Render whole weeks: enough to cover the run, plus one spare week so a step
+  // can always be pushed later without the grid running out of room.
+  const furthest = Math.max(dayOffset, ...siblings.map(s => s.dayOffset), 0);
+  const weeks = Math.floor(furthest / 7) + 2;
+  const days = Array.from({ length: weeks * 7 }).map((_, i) => i);
+
+  const label = (n: number) => `${DOW[n % 7]}, week ${Math.floor(n / 7) + 1}`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-9 font-normal focus-brand">
+          <CalendarIcon className="h-3.5 w-3.5 mr-1.5 text-ink-warm-400" />
+          {label(dayOffset)}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+        <div className="px-3 pt-3 pb-2 border-b border-cream-100">
+          <p className="text-xs font-medium text-ink-warm-900">Day {dayOffset} — {label(dayOffset)}</p>
+          <p className="text-[10px] text-ink-warm-400 mt-0.5">
+            Click a day to set the offset. Teal dots are the template&rsquo;s other steps.
+          </p>
+        </div>
+        <div className="p-3">
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {DOW.map(d => (
+              <div key={d} className="text-[10px] text-ink-warm-400 text-center w-9">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {days.map(n => {
+              const isSelected = n === dayOffset;
+              const isSibling = siblingDays.has(n);
+              const isWeekend = n % 7 >= 5;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => onPick(n)}
+                  title={`Day ${n} — ${label(n)}`}
+                  className={[
+                    'h-9 w-9 rounded-md text-xs tabular-nums transition-colors relative',
+                    isSelected
+                      ? 'bg-brand text-white font-semibold'
+                      : isWeekend
+                        ? 'bg-cream-100 text-ink-warm-400 hover:bg-cream-200'
+                        : 'text-ink-warm-700 hover:bg-cream-100',
+                  ].join(' ')}
+                >
+                  {n}
+                  {isSibling && !isSelected && (
+                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-brand" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="px-3 py-2 border-t border-cream-100">
+          <p className="text-[10px] text-ink-warm-400">
+            <span className="text-ink-warm-500 font-medium">Illustrative only.</span> Day 0 is drawn
+            on a Monday so the week shape is readable — the real weekday depends on when the
+            template is actually run.
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SortableStepRow({ step, ownerName, isOverride, onEdit, onDelete }: {
+  step: DeliverableTemplateStep;
+  /** Resolved owner (step override, else the template's role default). */
+  ownerName: string | null;
+  /** True when the step names someone directly, rather than following its role. */
+  isOverride: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: step.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -97,11 +337,32 @@ function SortableStepRow({ step, onEdit, onDelete }: { step: DeliverableTemplate
         </button>
         <span className="text-xs font-medium text-ink-warm-500 w-5">{step.step_order}.</span>
         <span className="text-sm">{step.step_name}</span>
-        <Badge variant="outline" className="text-[10px]">{step.role_label}</Badge>
-        <span className="text-[10px] text-ink-warm-400" title={`Due day ${step.day_offset ?? 0} of the cycle`}>
-          {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][step.day_offset ?? 0]) ?? `+${step.day_offset ?? 0}d`}
+        {/* 28 steps carry no role at all; an empty outline badge just reads
+            as a rendering glitch, so show nothing instead. */}
+        {step.role_label ? <Badge variant="outline" className="text-[10px]">{step.role_label}</Badge> : null}
+        {/* [2026-08-06 per Andy] Was a Mon–Sun weekday name, which only held
+            for the handful of templates that start on a Monday and stay
+            inside one week — 40 of 121 steps run past day 6 (Client
+            Onboarding reaches day 38) and fell through to a bare "+38d".
+            day_offset is days-from-run-start, so say that. */}
+        <span
+          className="text-[10px] text-ink-warm-400"
+          title={`Due ${step.day_offset ?? 0} day${(step.day_offset ?? 0) === 1 ? '' : 's'} after the run starts`}
+        >
+          Day {step.day_offset ?? 0}
         </span>
         {step.is_blocking && <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0 hover:bg-amber-100">Blocking</Badge>}
+        {/* Who this lands on. The dot marks a step-level override so you can
+            see at a glance which steps don't follow their role. */}
+        {ownerName && (
+          <span
+            className="inline-flex items-center gap-1 text-[10px] text-ink-warm-500"
+            title={isOverride ? 'Set on this step, overriding the role' : 'From the role’s default owner'}
+          >
+            {isOverride && <span className="h-1 w-1 rounded-full bg-brand" aria-hidden />}
+            {ownerName}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onEdit} aria-label="Edit step">
@@ -132,6 +393,20 @@ export default function DeliverableTemplatesTab() {
 
   const [templates, setTemplates] = useState<DeliverableTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  // Role keys + labels already in use, usage-first. Feeds both pickers in
+  // the step dialog so the vocabulary stays self-reinforcing rather than
+  // re-invented per step. [2026-08-06]
+  const [roleVocab, setRoleVocab] = useState<Array<{ key: string; label: string; uses: number }>>([]);
+  // Active users only — a picker that lists people who can't log in produces
+  // assignments nobody ever sees.
+  const [team, setTeam] = useState<Array<{ id: string; name: string }>>([]);
+  // Role -> person, global across every template. [2026-08-06 per Andy]
+  const [roleOwners, setRoleOwners] = useState<Record<string, string>>({});
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [roleDraft, setRoleDraft] = useState<Record<string, string>>({});
+  const [savingRoles, setSavingRoles] = useState(false);
+  // Who's actually been doing each role in past runs — the "Use history" source.
+  const [roleHistory, setRoleHistory] = useState<Record<string, Array<{ userId: string; times: number }>>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [steps, setSteps] = useState<Record<string, DeliverableTemplateStep[]>>({});
 
@@ -156,7 +431,7 @@ export default function DeliverableTemplatesTab() {
   const [stepForm, setStepForm] = useState({
     step_name: '', description: '', default_role: '', role_label: '',
     estimated_duration_days: 1, day_offset: 0, task_type: 'Client Delivery', is_blocking: false,
-    checklist_items: '',
+    checklist_items: '', default_assignee_id: '' as string,
   });
   const [stepTemplateId, setStepTemplateId] = useState('');
 
@@ -165,7 +440,126 @@ export default function DeliverableTemplatesTab() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  useEffect(() => { loadTemplates(); }, []);
+  useEffect(() => { loadTemplates(); void loadRoleVocab(); void loadTeam(); void loadRoleOwners(); }, []);
+
+  const loadTeam = async () => {
+    try {
+      const users = await UserService.getActiveUsers();
+      setTeam(users.map((u: any) => ({ id: u.id, name: u.name || u.email })));
+    } catch {
+      setTeam([]);
+    }
+  };
+
+  const nameOf = (userId: string | null | undefined) =>
+    userId ? (team.find(m => m.id === userId)?.name ?? 'Unknown user') : null;
+
+  const loadRoleOwners = async () => {
+    try {
+      setRoleOwners(await DeliverableService.getRoleOwners());
+    } catch {
+      setRoleOwners({});
+    }
+  };
+
+  const openRoleDialog = async () => {
+    setRoleDraft({ ...roleOwners });
+    setRoleDialogOpen(true);
+    // History only matters while the dialog is open, so fetch it here rather
+    // than on every page load.
+    try {
+      setRoleHistory(await DeliverableService.getRoleAssignmentHistory());
+    } catch {
+      setRoleHistory({});
+    }
+  };
+
+  /** Fill blanks from what past runs actually did. Never overwrites a choice
+   *  already made in the dialog — a suggestion shouldn't undo a decision. */
+  const applyHistorySuggestions = () => {
+    setRoleDraft(prev => {
+      const next = { ...prev };
+      let filled = 0;
+      for (const r of roleVocab) {
+        if (next[r.key]) continue;
+        const top = roleHistory[r.key]?.[0];
+        // Only suggest people still on the team; a departed teammate's history
+        // is real but useless as a default.
+        if (top && team.some(m => m.id === top.userId)) { next[r.key] = top.userId; filled += 1; }
+      }
+      toast(filled
+        ? { title: `Filled ${filled} role${filled === 1 ? '' : 's'}`, description: 'From who has done them most often. Review before saving.' }
+        : { title: 'Nothing to fill', description: 'Every role with history is already set.' });
+      return next;
+    });
+  };
+
+  const saveRoleOwners = async () => {
+    setSavingRoles(true);
+    try {
+      const clean = Object.fromEntries(
+        Object.entries(roleDraft).filter(([, v]) => !!v),
+      ) as Record<string, string>;
+      await DeliverableService.setRoleOwners(clean, user?.id ?? null);
+      toast({
+        title: 'Role owners saved',
+        description: 'Every template using these roles now starts pre-assigned.',
+      });
+      setRoleDialogOpen(false);
+      await loadRoleOwners();
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setSavingRoles(false);
+    }
+  };
+
+  // Labels for the picker, deduped and usage-summed. Two keys can share a
+  // label (they don't today, but nothing prevents it), so collapse on the
+  // label and add their counts rather than showing the same name twice.
+  const labelOptions = (() => {
+    const byLabel = new Map<string, number>();
+    for (const r of roleVocab) {
+      if (!r.label) continue;
+      byLabel.set(r.label, (byLabel.get(r.label) ?? 0) + r.uses);
+    }
+    return Array.from(byLabel.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([label, uses]) => ({ value: label, meta: String(uses) }));
+  })();
+
+  // Canonical types, plus any off-list value already in use by a loaded step,
+  // plus whatever this step currently holds. Without the union, a Radix Select
+  // renders blank on an unknown value ('Client SOP', 'Internal') and the next
+  // save would quietly rewrite it. [2026-08-06]
+  const taskTypeOptions = (() => {
+    const seen = new Set<string>(TASK_TYPES);
+    for (const list of Object.values(steps)) {
+      for (const s of list) {
+        const v = (s.task_type || '').trim();
+        if (v) seen.add(v);
+      }
+    }
+    const current = (stepForm.task_type || '').trim();
+    if (current) seen.add(current);
+    return Array.from(seen);
+  })();
+
+  // The other steps in the template being edited, so the calendar can show
+  // where this step sits relative to the rest of the run. [2026-08-06]
+  const stepDialogSiblings = (steps[stepTemplateId] ?? [])
+    .filter(s => s.id !== editingStep?.id)
+    .map(s => ({ name: s.step_name, dayOffset: s.day_offset ?? 0 }));
+
+  const loadRoleVocab = async () => {
+    try {
+      setRoleVocab(await DeliverableService.getRoleVocabulary());
+    } catch {
+      // Non-fatal: the pickers still accept free text, so a failed vocab
+      // fetch degrades to the old behaviour rather than blocking the dialog.
+      setRoleVocab([]);
+    }
+  };
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -303,13 +697,14 @@ export default function DeliverableTemplatesTab() {
         task_type: step.task_type,
         is_blocking: step.is_blocking,
         checklist_items: items.join('\n'),
+        default_assignee_id: step.default_assignee_id ?? '',
       });
     } else {
       setEditingStep(null);
       setStepForm({
         step_name: '', description: '', default_role: '', role_label: '',
         estimated_duration_days: 1, day_offset: 0, task_type: 'Client Delivery', is_blocking: false,
-        checklist_items: '',
+        checklist_items: '', default_assignee_id: '',
       });
     }
     setStepDialogOpen(true);
@@ -324,6 +719,9 @@ export default function DeliverableTemplatesTab() {
     const payload = {
       ...stepForm,
       checklist_items: checklistArr,
+      // '' is the Select's "follow the role" state; the column is a uuid FK,
+      // so it has to go to the DB as NULL or the insert blows up.
+      default_assignee_id: stepForm.default_assignee_id || null,
       template_id: stepTemplateId,
       step_order: editingStep?.step_order ?? ((steps[stepTemplateId]?.length || 0) + 1),
     };
@@ -339,6 +737,9 @@ export default function DeliverableTemplatesTab() {
       setStepDialogOpen(false);
       const data = await DeliverableService.getTemplateWithSteps(stepTemplateId);
       if (data) setSteps(prev => ({ ...prev, [stepTemplateId]: data.steps }));
+      // A role coined here should be offered on the next step, not stay
+      // invisible until reload — that gap is how near-duplicates start.
+      void loadRoleVocab();
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
     }
@@ -377,10 +778,24 @@ export default function DeliverableTemplatesTab() {
       <p className="text-sm text-ink-warm-500">
         Multi-step workflow templates with roles, durations, and blocking dependencies. Drag step rows to reorder.
       </p>
-      <Button variant="brand" onClick={() => openEditTemplate()} disabled={loadingState}>
-        <Plus className="h-4 w-4 mr-2" />
-        New Template
-      </Button>
+      <div className="flex items-center gap-2">
+        {/* [2026-08-06 per Andy] One map for every template — comms_writer is
+            the same person wherever it appears, so it's set once here rather
+            than repeated per template. */}
+        <Button variant="outline" onClick={() => void openRoleDialog()} disabled={loadingState}>
+          <Users className="h-4 w-4 mr-2" />
+          Role Owners
+          {Object.keys(roleOwners).length > 0 && (
+            <span className="ml-1.5 text-xs text-ink-warm-400 tabular-nums">
+              {Object.keys(roleOwners).length}
+            </span>
+          )}
+        </Button>
+        <Button variant="brand" onClick={() => openEditTemplate()} disabled={loadingState}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Template
+        </Button>
+      </div>
     </div>
   );
 
@@ -500,6 +915,8 @@ export default function DeliverableTemplatesTab() {
                                 <SortableStepRow
                                   key={s.id}
                                   step={s}
+                                  ownerName={nameOf(resolveStepOwner(s, roleOwners))}
+                                  isOverride={!!s.default_assignee_id}
                                   onEdit={() => openEditStep(t.id, s)}
                                   onDelete={() => handleDeleteStep(s, t.id)}
                                 />
@@ -694,38 +1111,124 @@ export default function DeliverableTemplatesTab() {
               <Label className="text-xs">Description</Label>
               <Input className="focus-brand" value={stepForm.description} onChange={e => setStepForm(f => ({ ...f, description: e.target.value }))} />
             </div>
+            {/* [2026-08-06 per Andy] One Role field, not two.
+                Role Key was free-text with only a placeholder to go on, so
+                every step invented its own — 28 blank, two capitalized ones
+                that can never match, four near-duplicate pairs. Since the key
+                is derivable from the label there was never a reason to ask
+                for it: pick or type the human name, and the key follows.
+                It's still shown (read-only) because it's what assignment
+                matches on, so a silent value would be worse than a visible
+                one. */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Role Key</Label>
-                <Input className="focus-brand" value={stepForm.default_role} onChange={e => setStepForm(f => ({ ...f, default_role: e.target.value }))} placeholder="e.g. translator" />
+                <Label className="text-xs">Role</Label>
+                <RoleCombobox
+                  value={stepForm.role_label}
+                  onChange={(label) => setStepForm(f => ({
+                    ...f,
+                    role_label: label,
+                    default_role: deriveRoleKey(label, roleVocab),
+                  }))}
+                  options={labelOptions}
+                  placeholder="Select or add a role"
+                  emptyHint="Search or type a new role…"
+                  renderMeta={(uses) => (
+                    <span className="ml-auto pl-2 text-[10px] tabular-nums text-ink-warm-400">
+                      {uses} step{uses === '1' ? '' : 's'}
+                    </span>
+                  )}
+                />
+                <p className="text-[10px] font-mono text-ink-warm-400">
+                  {stepForm.default_role
+                    ? <>Key: {stepForm.default_role}</>
+                    : 'No role — this step spawns unassigned by default.'}
+                </p>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Role Label</Label>
-                <Input className="focus-brand" value={stepForm.role_label} onChange={e => setStepForm(f => ({ ...f, role_label: e.target.value }))} placeholder="e.g. Translator" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Due day</Label>
-                <Select
-                  value={String(stepForm.day_offset)}
-                  onValueChange={(v) => setStepForm(f => ({ ...f, day_offset: parseInt(v) || 0 }))}
-                >
-                  <SelectTrigger className="h-9 focus-brand">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
-                      <SelectItem key={i} value={String(i)}>{d}{i === 0 ? ' (cycle start)' : ''}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-ink-warm-400">Which day of the cycle this task is due. Multiple steps can share a day.</p>
-              </div>
+              {/* [2026-08-06 per Andy] Was a free-text Input, which is how
+                  'Client SOP' and 'Internal' drifted in alongside the eight
+                  canonical types. Dropdown now, but the options union in
+                  whatever this step already holds — picking a type shouldn't
+                  be the thing that silently rewrites a legacy value. */}
               <div className="space-y-1">
                 <Label className="text-xs">Task Type</Label>
-                <Input className="focus-brand" value={stepForm.task_type} onChange={e => setStepForm(f => ({ ...f, task_type: e.target.value }))} />
+                <Select
+                  value={stepForm.task_type}
+                  onValueChange={(v) => setStepForm(f => ({ ...f, task_type: v }))}
+                >
+                  <SelectTrigger className="h-9 focus-brand"><SelectValue placeholder="Select a type" /></SelectTrigger>
+                  <SelectContent>
+                    {taskTypeOptions.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+            {/* [2026-08-06 per Andy] Per-step override. Default is "follow the
+                role", so the common case needs no decision here — you only
+                touch this for the step that doesn't fit the pattern. */}
+            <div className="space-y-1">
+              <Label className="text-xs">Assignee</Label>
+              <Select
+                value={stepForm.default_assignee_id || NO_ASSIGNEE}
+                onValueChange={(v) => setStepForm(f => ({ ...f, default_assignee_id: v === NO_ASSIGNEE ? '' : v }))}
+              >
+                <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_ASSIGNEE}>
+                    {(() => {
+                      // [2026-08-06 per Andy] Show the role's actual owner
+                      // rather than the abstract "Follow the role" — the
+                      // useful fact is WHO this lands on, and the mechanism
+                      // is secondary. Falls back to naming what's missing so
+                      // an empty state still says where to go fix it.
+                      const roleOwner = roleOwners[stepForm.default_role];
+                      const who = nameOf(roleOwner);
+                      if (who) return `${who} — from ${stepForm.role_label || stepForm.default_role}`;
+                      if (stepForm.default_role) {
+                        return `Unassigned — ${stepForm.role_label || stepForm.default_role} has no owner`;
+                      }
+                      return 'Unassigned — this step has no role';
+                    })()}
+                  </SelectItem>
+                  {team.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-ink-warm-400">
+                Leave as-is to follow the role. Set someone to override this step only —
+                role owners live behind <span className="text-ink-warm-500">Assign</span> on the template row.
+              </p>
+            </div>
+            {/* [2026-08-06 per Andy] Offset model. Was a Mon–Sun Select, which
+                could only express days 0–6 — the 40 steps that run past a week
+                (Client Onboarding reaches day 38) rendered blank and couldn't
+                be edited at all. day_offset is days-from-run-start, so the
+                input is a plain day number, and the calendar shows what that
+                lands on for a chosen start date. */}
+            <div className="space-y-1">
+              <Label className="text-xs">Due day</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-ink-warm-500">Day</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="h-9 w-20 focus-brand"
+                    value={String(stepForm.day_offset)}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setStepForm(f => ({ ...f, day_offset: Number.isFinite(n) && n > 0 ? n : 0 }));
+                    }}
+                  />
+                </div>
+                <CycleDayGrid
+                  dayOffset={stepForm.day_offset}
+                  onPick={(offset) => setStepForm(f => ({ ...f, day_offset: offset }))}
+                  siblings={stepDialogSiblings}
+                />
+              </div>
+              <p className="text-[10px] text-ink-warm-400">
+                Days after the run starts. Day 0 is the start day itself; multiple steps can share a day.
+              </p>
             </div>
             {/* v11 Switch (was a raw HTML checkbox). Matches every
                 other toggle in the app — /admin/changelog Publish
@@ -755,6 +1258,97 @@ export default function DeliverableTemplatesTab() {
             <Button variant="outline" size="sm" onClick={() => setStepDialogOpen(false)}>Cancel</Button>
             <Button variant="brand" size="sm" onClick={handleSaveStep}>
               {editingStep ? 'Update' : 'Add'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Role -> person dialog ────────────────────────────────────
+          Lists only the roles this template's steps actually use. A list of
+          every role in the app would make you scan for the four that matter.
+          [2026-08-06 per Andy] */}
+      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Users className="h-4 w-4" />
+              Role Owners
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-600 pt-1">
+              Who normally does each role, across every template. Runs start pre-assigned from
+              this; individual steps can override it, and the wizard can still change any step
+              before it spawns.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center justify-between gap-2 border-b border-cream-100 pb-2">
+            <p className="text-[11px] text-ink-warm-500">
+              {Object.keys(roleHistory).length > 0
+                ? 'Fill blanks from who has actually done each role.'
+                : 'No past runs to learn from yet.'}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={applyHistorySuggestions}
+              disabled={Object.keys(roleHistory).length === 0}
+            >
+              <History className="h-3.5 w-3.5 mr-1.5" />
+              Use history
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-1 py-2 space-y-3">
+            {roleVocab.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No roles yet"
+                description="Give template steps a role first — that's what an owner attaches to."
+                className="py-8"
+              />
+            ) : roleVocab.map(r => {
+              const hist = roleHistory[r.key] ?? [];
+              const top = hist[0];
+              const total = hist.reduce((n, h) => n + h.times, 0);
+              // Show the split, not just the leader: a 54/32 role is a
+              // judgment call and the UI shouldn't hide that it's close.
+              const share = top && total ? Math.round((top.times / total) * 100) : 0;
+              return (
+                <div key={r.key} className="grid grid-cols-[1fr_1.3fr] items-center gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm text-ink-warm-900 truncate">{r.label}</div>
+                    <div className="text-[10px] text-ink-warm-400 truncate">
+                      <span className="font-mono">{r.key}</span>
+                      <span className="mx-1">·</span>
+                      {r.uses} step{r.uses === 1 ? '' : 's'}
+                      {top && (
+                        <> · usually {nameOf(top.userId) ?? 'someone'} ({share}%)</>
+                      )}
+                    </div>
+                  </div>
+                  <Select
+                    value={roleDraft[r.key] || NO_ASSIGNEE}
+                    onValueChange={(v) => setRoleDraft(d => ({ ...d, [r.key]: v === NO_ASSIGNEE ? '' : v }))}
+                  >
+                    <SelectTrigger className="h-9 focus-brand"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_ASSIGNEE}>Unassigned</SelectItem>
+                      {team.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button type="button" variant="outline" size="sm" onClick={() => setRoleDialogOpen(false)} disabled={savingRoles}>
+              Cancel
+            </Button>
+            <Button type="button" variant="brand" size="sm" onClick={saveRoleOwners} disabled={savingRoles}>
+              {savingRoles ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
