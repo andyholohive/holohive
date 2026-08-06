@@ -1012,6 +1012,34 @@ export default function SOPsPage() {
                     </span>
                   </div>
                   <div className="mt-auto flex flex-wrap items-center gap-2">
+                    {/* [2026-08-06] Run affordance on the card, mirroring the
+                        view dialog's footer. Same handlers, same conditions —
+                        they set `viewingSOP` themselves, so running from the
+                        grid doesn't need the dialog open first. Saves the
+                        View → scroll → Run round-trip for the SOPs that are
+                        actually runnable. */}
+                    {(() => {
+                      const seq = sequenceFromSop(sop);
+                      if (seq.length === 0) return null;
+                      const isMulti = seq.length > 1;
+                      const hasRunNext = seq.some(
+                        e => e.trigger_type === 'after_previous' || e.trigger_type === 'manual',
+                      );
+                      return (
+                        <>
+                          <Button variant="brand" size="sm" onClick={() => handleRunAll(sop)}>
+                            <Play className="h-3 w-3 mr-1" />
+                            {isMulti ? 'Run All' : 'Run'}
+                          </Button>
+                          {isMulti && hasRunNext && (
+                            <Button variant="outline" size="sm" onClick={() => handleRunNext(sop)}>
+                              <Play className="h-3 w-3 mr-1" />
+                              Run Next
+                            </Button>
+                          )}
+                        </>
+                      );
+                    })()}
                     <Button variant="outline" size="sm" onClick={() => handleView(sop)}>
                       View
                     </Button>
