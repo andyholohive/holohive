@@ -6,6 +6,7 @@ import { createApprovedContentsRow } from '@/lib/contentSubmissionApproval';
 import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
 import { triggerKolScan } from '@/lib/githubActions';
 import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
+import { isPreShipGateExempt } from '@/lib/preShipGate';
 import { classifyReply, isFridayUTC, pulseDateFor, PULSE_CUTOFF_HOUR_UTC } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
@@ -646,7 +647,7 @@ async function handleDoneCommand(chatId: string, args: string[], message: any) {
 async function closeByShortIdAndReply(
   chatId: string,
   shortId: string,
-  teamMember: { id: string; name: string },
+  teamMember: { id: string; name: string; role?: string | null },
   threadId?: number,
 ) {
   const { data: task, error: taskErr } = await (supabaseAdmin as any)
@@ -685,7 +686,7 @@ async function closeByShortIdAndReply(
 async function closeByDbIdAndReply(
   chatId: string,
   taskDbId: string,
-  teamMember: { id: string; name: string },
+  teamMember: { id: string; name: string; role?: string | null },
   threadId?: number,
 ) {
   // [2026-06-11] Pull client_id too so we can route client-linked tasks
@@ -715,7 +716,9 @@ async function closeByDbIdAndReply(
   // Back inline buttons instead of closing. Internal tasks complete
   // normally (no gate). See sendPreShipGatePrompt for the message
   // shape and callback contract.
-  if (task.client_id) {
+  // [2026-08-06] super_admins are exempt — same rule as the HQ modal
+  // (isPreShipGateExempt in components/tasks/PreShipGateModal.tsx).
+  if (task.client_id && !isPreShipGateExempt(teamMember.role)) {
     await sendPreShipGatePrompt(chatId, task, teamMember, threadId);
     return;
   }
@@ -759,7 +762,7 @@ async function closeByDbIdAndReply(
 async function sendPreShipGatePrompt(
   chatId: string,
   task: { id: string; short_id: string | null; task_name: string },
-  teamMember: { id: string; name: string },
+  teamMember: { id: string; name: string; role?: string | null },
   threadId?: number,
 ) {
   // We need the triggering user's TG ID for the per-user button gate.
@@ -940,16 +943,18 @@ async function handlePsgCallback(cq: any) {
  * Returns null when the sender isn't on the team. Used by every
  * write-capable command (/done, /task, /tasks).
  */
-async function resolveTeamMember(message: any): Promise<{ id: string; name: string } | null> {
+async function resolveTeamMember(message: any): Promise<{ id: string; name: string; role: string | null } | null> {
   const fromUserId = message.from?.id?.toString();
   if (!fromUserId) return null;
   const { data } = await supabaseAdmin
     .from('users')
-    .select('id, name')
+    .select('id, name, role')
     .eq('telegram_id', fromUserId)
     .single();
   if (!data) return null;
-  return { id: (data as any).id, name: (data as any).name };
+  // [2026-08-06] role added so /done can skip the Pre-Ship Gate for
+  // super_admins, matching the HQ intercepts. See isPreShipGateExempt.
+  return { id: (data as any).id, name: (data as any).name, role: (data as any).role ?? null };
 }
 
 /**
@@ -1091,7 +1096,7 @@ async function handleTasksCommand(chatId: string, args: string[], message: any) 
  */
 async function renderTasksList(
   chatId: string,
-  teamMember: { id: string; name: string },
+  teamMember: { id: string; name: string; role?: string | null },
   opts: { teamWide: boolean; overdueOnly: boolean; editMessageId?: number; threadId?: number },
 ) {
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -1602,7 +1607,8 @@ async function handleDoneCallback(cq: any) {
 
   // Client-linked → Pre-Ship Gate. Don't flip the task yet — the gate
   // confirm handler does the close + audit-log write in one transaction.
-  if (task.status !== 'complete' && task.client_id) {
+  // [2026-08-06] super_admins are exempt — see isPreShipGateExempt.
+  if (task.status !== 'complete' && task.client_id && !isPreShipGateExempt(teamMember.role)) {
     await answerCallbackQuery(callbackId, 'Pre-Ship Gate required.');
     const threadId: number | undefined = cq.message?.message_thread_id || undefined;
     await sendPreShipGatePrompt(messageChatId, task, teamMember, threadId);

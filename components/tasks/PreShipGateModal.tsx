@@ -28,6 +28,11 @@ import {
 } from '@/components/ui/dialog';
 import { ShieldCheck } from 'lucide-react';
 
+// Who's exempt lives in lib/ so the TG webhook (a server route) can read it
+// without importing this client component. Re-exported so UI callers can keep
+// importing the gate's pieces from one place.
+export { isPreShipGateExempt } from '@/lib/preShipGate';
+
 // The 5 checkboxes, in order, with the verbatim spec text. Storing them
 // here (not inside the JSX) so the same text can drive the TG /done
 // inline-button flow without diverging.

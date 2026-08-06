@@ -24,7 +24,7 @@ import { ClientService } from '@/lib/clientService';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import { ThisWeekFeedWidget } from '@/components/tasks/ThisWeekFeedWidget';
-import { PreShipGateModal, logPreShipGate, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
+import { PreShipGateModal, logPreShipGate, isPreShipGateExempt, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
 import { RecurringConfigEditor } from '@/components/tasks/RecurringConfig';
 import { InitiativesTaskTab } from '@/components/tasks/InitiativesTaskTab';
 import { DeliverableService } from '@/lib/deliverableService';
@@ -788,7 +788,8 @@ export default function TasksPage() {
         // open the gate modal instead of writing. The modal's confirm
         // path will replay this update — see handleGateConfirm below.
         // Internal tasks (no client_id) bypass the gate per spec.
-        if (current?.client_id && current.status !== 'complete') {
+        // [2026-08-06] super_admins are exempt — see isPreShipGateExempt.
+        if (current?.client_id && current.status !== 'complete' && !isPreShipGateExempt(userProfile?.role)) {
           setGateTarget({
             taskId,
             taskName: current.task_name || 'this task',

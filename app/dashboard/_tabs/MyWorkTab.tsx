@@ -34,7 +34,7 @@ import {
 } from './SkeletonHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { PreShipGateModal, logPreShipGate, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
+import { PreShipGateModal, logPreShipGate, isPreShipGateExempt, type PreShipGateState } from '@/components/tasks/PreShipGateModal';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
@@ -80,14 +80,19 @@ export default function MyWorkTab() {
   // surfaces via console + reverts via the loadData refetch chain.
   // [2026-07-25] Pre-Ship Gate intercept, matching /tasks saveSelectField and
   // TaskDetailModal. This status circle wrote straight to the DB, so any
-  // client-linked task closed from here skipped the gate entirely. It read as
-  // "super_admins don't get the gate" because the team-wide Ready-for-Feedback
-  // queue above is super_admin-only (see isRffReviewer) — that's the surface
-  // where other people's client tasks get signed off from a status circle.
+  // client-linked task closed from here skipped the gate entirely.
   // Same rule as everywhere else: client_id set AND entering complete.
+  // [2026-08-06] …minus super_admins, who are now exempt by decision (see
+  // isPreShipGateExempt). Note this surface is where that matters most: the
+  // team-wide Ready-for-Feedback queue above is super_admin-only (see
+  // isRffReviewer), so it's mostly other people's client tasks being signed
+  // off from here.
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     const current = tasks.find(t => t.id === taskId);
-    if (newStatus === 'complete' && current?.client_id && current.status !== 'complete') {
+    if (
+      newStatus === 'complete' && current?.client_id && current.status !== 'complete'
+      && !isPreShipGateExempt(userProfile?.role)
+    ) {
       setGateTarget({ taskId, taskName: current.task_name || 'this task' });
       return;
     }

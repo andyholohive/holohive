@@ -20,7 +20,7 @@ import { TaskComments } from './TaskComments';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { SubtaskList } from './SubtaskList';
-import { PreShipGateModal, logPreShipGate, type PreShipGateState } from './PreShipGateModal';
+import { PreShipGateModal, logPreShipGate, isPreShipGateExempt, type PreShipGateState } from './PreShipGateModal';
 import { supabase } from '@/lib/supabase';
 import { RecurringConfigEditor } from './RecurringConfig';
 import { DeliverableProgressTracker } from './DeliverableProgressTracker';
@@ -330,9 +330,10 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
     // Reopen → recomplete also triggers (the modal fires every time the
     // task's status crosses INTO complete). Internal tasks (no client)
     // complete normally — zero new friction per spec.
+    // [2026-08-06] super_admins are exempt — see isPreShipGateExempt.
     const clientId = form.client_id || (task as any)?.client_id;
     const enteringComplete = form.status === 'complete' && task?.status !== 'complete';
-    if (task && clientId && enteringComplete) {
+    if (task && clientId && enteringComplete && !isPreShipGateExempt(userProfile?.role)) {
       setGateOpen(true);
       return;
     }
