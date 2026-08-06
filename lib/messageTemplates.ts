@@ -49,7 +49,7 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
     default: '<b>{campaign}</b>\nWeek {week} lineup proposed for review.',
     vars: ['campaign', 'week'],
     format: 'HTML',
-    appended: 'A "Review on HHP" link is appended automatically.',
+    appended: 'The angle/KOL roster and a "Review on HHP" link are appended automatically.',
   },
   tmpl_lineup_confirmed_header: {
     default: '*{campaign}* Week {week} Lineup Confirmed',

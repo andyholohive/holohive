@@ -813,17 +813,6 @@ export class LineupManagerService {
     const full = await this.getLineupFull(lineupId);
     if (!full) throw new Error('Lineup not found for group post.');
 
-    // Pull KOL names + handles.
-    const allKolIds = full.angles.flatMap(a => a.slots.map(s => s.kol_id));
-    const { data: kols } = await (this.supabase as any)
-      .from('master_kols')
-      .select('id, name, link')
-      .in('id', allKolIds.length > 0 ? allKolIds : ['00000000-0000-0000-0000-000000000000']);
-    const kolById = new Map<string, { name: string; link: string | null }>();
-    for (const k of (kols || []) as Array<{ id: string; name: string; link: string | null }>) {
-      kolById.set(k.id, { name: k.name, link: k.link });
-    }
-
     const lines: string[] = [];
     lines.push(headerTemplate
       ? renderTemplate(headerTemplate, {
@@ -833,21 +822,71 @@ export class LineupManagerService {
         })
       : `*${campaignName}* Week ${full.week_number} Lineup Confirmed`);
     lines.push('');
-    for (const angle of full.angles) {
-      lines.push(`*${angle.angle_name}* (${angle.slots.length} KOL${angle.slots.length === 1 ? '' : 's'})`);
-      for (const slot of angle.slots) {
-        const kol = kolById.get(slot.kol_id);
-        if (!kol) continue;
-        // Markdown link if we have a profile URL, plain text otherwise.
-        const display = kol.link
-          ? `[${kol.name}](${kol.link})`
-          : kol.name;
-        lines.push(`  • ${display}`);
-      }
+    const roster = await this.formatLineupRoster(lineupId, 'Markdown');
+    if (roster) {
+      lines.push(roster);
       lines.push('');
     }
     lines.push(`Confirmed by ${confirmedByName} | ${new Date(full.confirmed_at || Date.now()).toLocaleString()}`);
     return lines.join('\n');
+  }
+
+  /**
+   * The angle → KOL block, on its own so more than one message can
+   * carry it. Confirmed posts have shown this since § 7.2; [2026-08-06
+   * per Andy] the proposed broadcast now shows it too, so approvers can
+   * see who's in the lineup without opening HHP.
+   *
+   * Both parse modes are supported because the two senders differ:
+   * confirmed posts Markdown, the proposed broadcast posts HTML. Names
+   * are only escaped in the HTML branch — Telegram's Markdown mode has
+   * no escape that survives inside a link label, and the confirmed post
+   * has always emitted names raw. Returns null when the lineup has no
+   * slots, so callers can drop the section rather than print a heading
+   * over nothing.
+   */
+  async formatLineupRoster(
+    lineupId: string,
+    format: 'HTML' | 'Markdown',
+  ): Promise<string | null> {
+    const full = await this.getLineupFull(lineupId);
+    if (!full) return null;
+
+    // Pull KOL names + handles.
+    const allKolIds = full.angles.flatMap(a => a.slots.map(s => s.kol_id));
+    if (allKolIds.length === 0) return null;
+    const { data: kols } = await (this.supabase as any)
+      .from('master_kols')
+      .select('id, name, link')
+      .in('id', allKolIds);
+    const kolById = new Map<string, { name: string; link: string | null }>();
+    for (const k of (kols || []) as Array<{ id: string; name: string; link: string | null }>) {
+      kolById.set(k.id, { name: k.name, link: k.link });
+    }
+
+    const html = format === 'HTML';
+    const blocks: string[] = [];
+    for (const angle of full.angles) {
+      if (angle.slots.length === 0) continue;
+      const lines: string[] = [];
+      const count = `(${angle.slots.length} KOL${angle.slots.length === 1 ? '' : 's'})`;
+      lines.push(html
+        ? `<b>${escapeHtml(angle.angle_name)}</b> ${count}`
+        : `*${angle.angle_name}* ${count}`);
+      for (const slot of angle.slots) {
+        const kol = kolById.get(slot.kol_id);
+        if (!kol) continue;
+        // Linked name if we have a profile URL, plain text otherwise.
+        const display = html
+          ? (kol.link ? `<a href="${escapeHtml(kol.link)}">${escapeHtml(kol.name)}</a>` : escapeHtml(kol.name))
+          : (kol.link ? `[${kol.name}](${kol.link})` : kol.name);
+        lines.push(`  • ${display}`);
+      }
+      // An angle whose every slot pointed at a since-deleted KOL would
+      // otherwise print a heading with nothing under it.
+      if (lines.length > 1) blocks.push(lines.join('\n'));
+    }
+    return blocks.length > 0 ? blocks.join('\n\n') : null;
   }
 
   // ── Weekly Content Recap (§ Andy 2026-07-13) ─────────────────────

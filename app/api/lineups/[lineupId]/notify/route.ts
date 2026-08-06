@@ -130,11 +130,18 @@ export async function POST(
       // Message body is template-driven — editable on /admin/telegram-comm.
       // The review link is always appended.
       const broadcastTemplate = await getTemplate(supabase, 'tmpl_lineup_proposed_broadcast');
+      // [2026-08-06 per Andy] The proposal carries the same angle → KOL
+      // roster the confirmed post has always shown, so approvers can see
+      // what they're approving without opening HHP. Same formatter, HTML
+      // mode. A roster-less lineup (no slots yet) just omits the block.
+      const svc = new LineupManagerService(supabase as any);
+      const roster = await svc.formatLineupRoster(lineupId, 'HTML');
       const broadcastText =
         renderTemplate(broadcastTemplate, {
           campaign: escapeHtml(campaign.name),
           week: String(lineup.week_number),
         }) +
+        (roster ? `\n\n${roster}` : '') +
         `\n\n<a href="${reviewLink}">Review on HHP</a>`;
       let chatPosted = false;
       let chatPostError: string | null = null;
