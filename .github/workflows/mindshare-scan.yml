@@ -33,8 +33,12 @@ jobs:
           SCAN_MINUTES: '12'
         run: python scripts/tg-mindshare/scan.py
 
-  # Weekly aggregation — every Sunday at midnight UTC
-  aggregate:
-    runs-on: ubuntu-latest
-    if: github.event.schedule == '*/10 * * * *' && false  # disabled, use separate workflow
-    steps: []
+# [2026-08-07] A disabled `aggregate` job used to sit here with an empty steps
+# list. Actions requires every job to declare at least one step, so it failed
+# schema validation — which invalidates the WHOLE workflow, not just that job.
+# The scheduled trigger therefore never fired: 200 runs, 200 failures, zero
+# successes since the file was written on Mar 20. The only entries in the run
+# history were GitHub reporting the bad file against each push.
+# Weekly aggregation already lives in mindshare-aggregate.yml; the stub was
+# dead weight. Don't re-add an empty job to "disable" something — delete it,
+# or gate it with `if:` AND give it a real step.
