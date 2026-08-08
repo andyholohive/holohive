@@ -30,7 +30,7 @@ import MeetingActionItems from '@/components/clients/MeetingActionItems';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, CheckCircle2, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users, Star, Save, History, Radio } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, CheckCircle2, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users, Star, Save, History, Radio, TrendingUp, Loader2, AlertTriangle } from 'lucide-react';
 import { KrSignalSettingsDialog } from '@/components/krsignal/KrSignalSettingsDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
@@ -378,6 +378,20 @@ export default function ClientsPage() {
   // the tab: TabsContent unmounts when you switch back to Details.
   const [draftEngagement, setDraftEngagement] = useState<DraftStint[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // [2026-08-09] Mindshare auto-setup on client create. Adding a client used to
+  // do nothing for mindshare — the tracked project had to be hand-made on
+  // /mindshare, so in practice it often wasn't. Now it's created automatically
+  // AND shown, because the likely failure is a bad keyword guess and that's only
+  // fixable if someone sees it.
+  const [mindshareSetup, setMindshareSetup] = useState<{
+    clientName: string;
+    status: 'running' | 'done' | 'error';
+    projectId?: string;
+    keywords?: string[];
+    mentionsAdded?: number;
+    alreadyExisted?: boolean;
+    error?: string;
+  } | null>(null);
   const [clientToDelete, setClientToDelete] = useState<ClientWithAccess | null>(null);
   const [isStartClientOpen, setIsStartClientOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -2828,6 +2842,37 @@ export default function ClientsPage() {
           setDraftEngagement([]);
         }
 
+        // Kick off mindshare setup for the new client. Runs in the background —
+        // the keyword call plus a full-archive backfill takes ~30-60s and must
+        // not hold up the Engagement hand-off. The dialog reports the result.
+        const msName = newClient.name.trim();
+        setMindshareSetup({ clientName: msName, status: 'running' });
+        (async () => {
+          try {
+            const r = await fetch('/api/mindshare/projects/from-client', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ client_id: savedClientId, name: msName }),
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || 'Setup failed');
+            setMindshareSetup({
+              clientName: msName,
+              status: 'done',
+              projectId: j.project?.id,
+              keywords: j.keywords || [],
+              mentionsAdded: j.mentions_added ?? 0,
+              alreadyExisted: !!j.already_existed,
+            });
+          } catch (err: any) {
+            setMindshareSetup({
+              clientName: msName,
+              status: 'error',
+              error: err?.message || 'Unknown error',
+            });
+          }
+        })();
+
         const created = await ClientService.getClientByIdOrSlug(savedClientId).catch(() => null);
         await fetchClients();
         if (created) {
@@ -5251,6 +5296,92 @@ export default function ClientsPage() {
         </div>
 
         {/* Archive Confirmation Dialog */}
+        {/* Mindshare auto-setup result. Shows what adding this client put into
+            mindshare — project, keywords, and how much history it found — so a
+            bad keyword guess is caught here rather than discovered weeks later
+            as an empty chart. [2026-08-09] */}
+        <Dialog open={!!mindshareSetup} onOpenChange={(o) => { if (!o) setMindshareSetup(null); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-brand" />
+                Mindshare tracking
+              </DialogTitle>
+              <DialogDescription>
+                {mindshareSetup?.status === 'running'
+                  ? `Setting up tracking for ${mindshareSetup.clientName} and scanning the archive…`
+                  : mindshareSetup?.status === 'error'
+                    ? 'The client was created, but mindshare tracking was not.'
+                    : mindshareSetup?.alreadyExisted
+                      ? `${mindshareSetup?.clientName} was already tracked — nothing changed.`
+                      : `Added ${mindshareSetup?.clientName} to the Korean mindshare leaderboard.`}
+              </DialogDescription>
+            </DialogHeader>
+
+            {mindshareSetup?.status === 'running' && (
+              <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                This takes up to a minute.
+              </div>
+            )}
+
+            {mindshareSetup?.status === 'error' && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  {mindshareSetup.error}
+                  <div className="mt-1 text-xs text-rose-600">Add the project by hand on Mindshare.</div>
+                </div>
+              </div>
+            )}
+
+            {mindshareSetup?.status === 'done' && (
+              <div className="space-y-4 py-1">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                    Keywords being tracked
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(mindshareSetup.keywords || []).map((k) => (
+                      <span key={k} className="rounded-md bg-brand-light px-2 py-0.5 text-xs font-medium text-brand">
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-3">
+                  <div className="text-2xl font-bold tabular-nums text-gray-900">
+                    {(mindshareSetup.mentionsAdded ?? 0).toLocaleString('en-US')}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {mindshareSetup.alreadyExisted
+                      ? 'Existing project left as-is.'
+                      : (mindshareSetup.mentionsAdded ?? 0) > 0
+                        ? 'past mentions found in the archive'
+                        : 'past mentions — the keywords may be too specific. Edit them on Mindshare.'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              {mindshareSetup?.status === 'done' && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/mindshare">Open Mindshare</Link>
+                </Button>
+              )}
+              <Button
+                variant="brand"
+                size="sm"
+                onClick={() => setMindshareSetup(null)}
+                disabled={mindshareSetup?.status === 'running'}
+              >
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
