@@ -38,6 +38,12 @@ interface TelegramMessage {
 
 interface ScanResult {
   messages_scanned: number;
+  /** Of those scanned, how many came from a channel we actually count.
+   *  scanned > 0 with eligible == 0 is the signature of the 2026-08-08
+   *  channel-id mismatch: posts arriving, none of them joinable. Surfaced so
+   *  a health check can catch that shape instead of reporting a green
+   *  "scanned 1000, added 0". */
+  messages_eligible: number;
   mentions_added: number;
   daily_rows_upserted: number;
   watermark_advanced_to: string | null;
@@ -75,16 +81,30 @@ export function normalizeChannelId(raw: unknown): string | null {
 
 export async function runMindshareScan(
   supabase: SupabaseClient,
-  opts: { backfill?: boolean } = {},
+  opts: {
+    backfill?: boolean;
+    /** Scope the run to these projects only, ignoring the global watermark and
+     *  leaving it untouched. This is how a newly-created project gets its
+     *  history: the shared cursor has long since passed every old post, and
+     *  moving it backwards would make every other project re-scan the whole
+     *  corpus. Pair with `pulledAfter` to page. */
+    projectIds?: string[];
+    /** Explicit cursor for a scoped run — pass back the previous call's
+     *  `watermark_advanced_to` to fetch the next page. */
+    pulledAfter?: string | null;
+  } = {},
 ): Promise<ScanResult> {
+  const scoped = Array.isArray(opts.projectIds) && opts.projectIds.length > 0;
   const start = Date.now();
 
   // 1. Load active projects + their keywords. Drop projects with empty
   //    keyword lists — nothing to match.
-  const { data: projectRows } = await (supabase as any)
+  let projectQuery = (supabase as any)
     .from('mindshare_projects')
     .select('id, name, client_id, tracked_keywords')
     .eq('is_active', true);
+  if (scoped) projectQuery = projectQuery.in('id', opts.projectIds as string[]);
+  const { data: projectRows } = await projectQuery;
   const projects: MindshareProject[] = ((projectRows || []) as any[])
     .map(p => ({
       ...p,
@@ -93,7 +113,7 @@ export async function runMindshareScan(
     .filter(p => p.tracked_keywords.length > 0);
 
   if (projects.length === 0) {
-    return { messages_scanned: 0, mentions_added: 0, daily_rows_upserted: 0, watermark_advanced_to: null, duration_ms: Date.now() - start };
+    return { messages_scanned: 0, messages_eligible: 0, mentions_added: 0, daily_rows_upserted: 0, watermark_advanced_to: null, duration_ms: Date.now() - start };
   }
 
   // 2. Load Korean monitored channels. Only messages from these count
@@ -115,7 +135,11 @@ export async function runMindshareScan(
     .select('last_scanned_message_date')
     .eq('id', 1)
     .single();
-  const watermark: string | null = opts.backfill ? null : (stateRow?.last_scanned_message_date ?? null);
+  const watermark: string | null = scoped
+    ? (opts.pulledAfter ?? null)
+    : opts.backfill
+      ? null
+      : (stateRow?.last_scanned_message_date ?? null);
 
   // 4. Pull messages newer than the watermark. Cap at 5000 per run to
   //    keep Vercel function under timeout. If we have a backlog it'll
@@ -148,7 +172,7 @@ export async function runMindshareScan(
   const messages: TelegramMessage[] = (messageRows || []) as TelegramMessage[];
 
   if (messages.length === 0) {
-    await (supabase as any)
+    if (!scoped) await (supabase as any)
       .from('mindshare_scan_state')
       .update({
         last_run_at: new Date().toISOString(),
@@ -156,7 +180,7 @@ export async function runMindshareScan(
         last_run_duration_ms: Date.now() - start,
       })
       .eq('id', 1);
-    return { messages_scanned: 0, mentions_added: 0, daily_rows_upserted: 0, watermark_advanced_to: null, duration_ms: Date.now() - start };
+    return { messages_scanned: 0, messages_eligible: 0, mentions_added: 0, daily_rows_upserted: 0, watermark_advanced_to: null, duration_ms: Date.now() - start };
   }
 
   // 5. Pre-compile lowercase keywords per project for fast matching.
@@ -184,6 +208,7 @@ export async function runMindshareScan(
   };
   const hits: Hit[] = [];
 
+  let eligible = 0;
   for (const m of messages) {
     if (!m.text) continue;
     // If we have configured Korean channels, restrict to them. Otherwise
@@ -191,6 +216,7 @@ export async function runMindshareScan(
     // SOMETHING than nothing for v1.
     const normChatId = normalizeChannelId(m.chat_id);
     if (koreanChannelIds.size > 0 && (!normChatId || !koreanChannelIds.has(normChatId))) continue;
+    eligible += 1;
 
     const lowered = m.text.toLowerCase();
     for (const p of compiledProjects) {
@@ -374,7 +400,7 @@ export async function runMindshareScan(
   //    .gt('pulled_at', watermark) filter above. Must stay pulled_at: taking
   //    message_date here would reintroduce the skip this change removes.
   const newWatermark = messages[messages.length - 1].pulled_at;
-  await (supabase as any)
+  if (!scoped) await (supabase as any)
     .from('mindshare_scan_state')
     .update({
       last_scanned_message_date: newWatermark,
@@ -386,6 +412,7 @@ export async function runMindshareScan(
 
   return {
     messages_scanned: messages.length,
+    messages_eligible: eligible,
     mentions_added: mentionsAdded,
     daily_rows_upserted: dailyRowsUpserted,
     watermark_advanced_to: newWatermark,

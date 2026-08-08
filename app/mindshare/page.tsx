@@ -808,6 +808,41 @@ export default function MindsharePage() {
       toast({ title: isCreate ? 'Project created' : 'Project updated' });
       setEditingProject(null);
       await loadProjects();
+
+      // A new project starts blind: the scanner's watermark is shared and has
+      // long since passed every post in the archive, so without this it would
+      // only ever see posts ingested from now on. Backfill it against the full
+      // corpus (back to April 2026) in the background — the dialog closes
+      // immediately and a toast lands when it finishes. [2026-08-08]
+      if (isCreate && json.project?.id) {
+        const newId = json.project.id as string;
+        const newName = (json.project.name as string) || 'Project';
+        toast({ title: `Backfilling ${newName}…`, description: 'Scanning the archive for past mentions.' });
+        (async () => {
+          try {
+            let total = 0;
+            let after: string | null = null;
+            // Each call walks a bounded number of pages so it fits inside the
+            // route's timeout; resume_after carries the cursor to the next one.
+            for (let i = 0; i < 6; i++) {
+              const q = after ? `&after=${encodeURIComponent(after)}` : '';
+              const r = await fetch(`/api/mindshare/scan?projectId=${newId}${q}`, { method: 'POST' });
+              const j = await r.json();
+              if (!r.ok) throw new Error(j.error);
+              total += j.mentions_added || 0;
+              if (!j.has_more) break;
+              after = j.resume_after;
+            }
+            toast({
+              title: total > 0 ? `${newName}: ${total} past mention${total === 1 ? '' : 's'} found` : `${newName}: no past mentions`,
+              description: total > 0 ? undefined : 'Nothing in the archive matched these keywords — try broader ones.',
+            });
+            await loadProjects();
+          } catch (err: any) {
+            toast({ title: 'Backfill failed', description: err?.message, variant: 'destructive' });
+          }
+        })();
+      }
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
     } finally {

@@ -44,14 +44,27 @@ export async function GET(request: Request) {
     const result = await runMindshareScan(supabase, { backfill });
 
     // agent_runs log for cron-health-check coverage.
+    //
+    // [2026-08-08] This used to hardcode status:'success'. It logged green 48×
+    // a day for four months while the channel-id mismatch dropped 98% of the
+    // corpus before matching — the row said "scanned 1000, added 0" and nothing
+    // read it. A run that pulled posts but found none of them countable is a
+    // broken join, not a quiet day, so it now logs as failed and the
+    // cron-health-check sweep DMs Andy.
+    const hollow = result.messages_scanned > 0 && result.messages_eligible === 0;
     try {
       await (supabase as any).from('agent_runs').insert({
         agent_name: 'MINDSHARE_SCAN',
         run_type: 'cron',
         started_at: new Date(runStart).toISOString(),
         completed_at: new Date().toISOString(),
-        status: 'success',
-        output_summary: `Scanned ${result.messages_scanned} message(s), added ${result.mentions_added} mention(s).`,
+        status: hollow ? 'failed' : 'success',
+        error_message: hollow
+          ? `${result.messages_scanned} post(s) scanned, 0 from a channel we count. `
+            + 'Likely tg_monitored_channels (language=ko, is_active) no longer joins to '
+            + 'tg_channel_posts.channel_tg_id — check normalizeChannelId in lib/mindshareScanner.ts.'
+          : null,
+        output_summary: `Scanned ${result.messages_scanned} post(s), ${result.messages_eligible} from counted channels, added ${result.mentions_added} mention(s).`,
       });
     } catch { /* swallow */ }
 
