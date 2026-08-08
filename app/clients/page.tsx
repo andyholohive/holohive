@@ -5295,7 +5295,6 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        {/* Archive Confirmation Dialog */}
         {/* Mindshare auto-setup result. Shows what adding this client put into
             mindshare — project, keywords, and how much history it found — so a
             bad keyword guess is caught here rather than discovered weeks later
@@ -5349,18 +5348,26 @@ export default function ClientsPage() {
                     ))}
                   </div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <div className="text-2xl font-bold tabular-nums text-gray-900">
-                    {(mindshareSetup.mentionsAdded ?? 0).toLocaleString('en-US')}
+                {/* Only show the count for a project we actually just built.
+                    On an existing project mentions_added is 0 because nothing
+                    was backfilled, and a big "0" reads as "this project has no
+                    mentions" — the opposite of the truth. [2026-08-09] */}
+                {mindshareSetup.alreadyExisted ? (
+                  <div className="rounded-lg border border-gray-200 p-3 text-xs text-gray-500">
+                    Existing project left as-is — keywords and history unchanged.
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {mindshareSetup.alreadyExisted
-                      ? 'Existing project left as-is.'
-                      : (mindshareSetup.mentionsAdded ?? 0) > 0
+                ) : (
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <div className="text-2xl font-bold tabular-nums text-gray-900">
+                      {(mindshareSetup.mentionsAdded ?? 0).toLocaleString('en-US')}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {(mindshareSetup.mentionsAdded ?? 0) > 0
                         ? 'past mentions found in the archive'
                         : 'past mentions — the keywords may be too specific. Edit them on Mindshare.'}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -5382,6 +5389,7 @@ export default function ClientsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Archive Confirmation Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
