@@ -48,6 +48,31 @@ interface ScanResult {
  * Run one incremental scan. Backfill = true ignores the watermark and
  * re-scans every message (used by the "rebuild" admin action).
  */
+/**
+ * Telegram exposes the same channel under two id conventions and both are in
+ * our data:
+ *
+ *   tg_channel_posts.channel_tg_id      "1127796099"      (Telethon peer id)
+ *   tg_monitored_channels.channel_tg_id "-1001127796099"  (Bot API id)
+ *
+ * The scraper writes the first, the monitored-channel registry stores the
+ * second. Comparing them raw matched only 7 of 64 posting channels, so 98% of
+ * the corpus was silently dropped before keyword matching — 3,438 posts in a
+ * week reduced to 74, and mindshare sat at ~17 mentions across 82 projects.
+ * [2026-08-08]
+ *
+ * Canonical form is the bare digits. Normalise on read rather than rewriting
+ * either table: both producers keep working in their native convention, and a
+ * future writer using either one still joins.
+ */
+export function normalizeChannelId(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // -1001127796099 -> 1127796099 ; -1127796099 -> 1127796099
+  return s.replace(/^-100/, '').replace(/^-/, '') || null;
+}
+
 export async function runMindshareScan(
   supabase: SupabaseClient,
   opts: { backfill?: boolean } = {},
@@ -72,15 +97,16 @@ export async function runMindshareScan(
   }
 
   // 2. Load Korean monitored channels. Only messages from these count
-  //    toward Korean mindshare. Channel rows are matched against the
-  //    telegram_chats table by chat_id later.
+  //    toward Korean mindshare.
   const { data: koreanChannelRows } = await (supabase as any)
     .from('tg_monitored_channels')
     .select('channel_tg_id')
     .eq('language', 'ko')
     .eq('is_active', true);
   const koreanChannelIds = new Set<string>(
-    ((koreanChannelRows || []) as any[]).map(r => r.channel_tg_id).filter(Boolean),
+    ((koreanChannelRows || []) as any[])
+      .map(r => normalizeChannelId(r.channel_tg_id))
+      .filter(Boolean) as string[],
   );
 
   // 3. Load watermark.
@@ -163,7 +189,8 @@ export async function runMindshareScan(
     // If we have configured Korean channels, restrict to them. Otherwise
     // (no channels classified yet) count everything — better to surface
     // SOMETHING than nothing for v1.
-    if (koreanChannelIds.size > 0 && !koreanChannelIds.has(m.chat_id)) continue;
+    const normChatId = normalizeChannelId(m.chat_id);
+    if (koreanChannelIds.size > 0 && (!normChatId || !koreanChannelIds.has(normChatId))) continue;
 
     const lowered = m.text.toLowerCase();
     for (const p of compiledProjects) {
@@ -191,22 +218,32 @@ export async function runMindshareScan(
   //    accurate either way.
   let mentionsAdded = 0;
   if (hits.length > 0) {
+    // Query with BOTH conventions: the posts carry bare ids, the registry
+    // stores the -100 form, and an .in() on one shape finds none of the other.
     const distinctChatIds = Array.from(new Set(hits.map(h => h.chat_id)));
+    const lookupIds = Array.from(new Set(
+      distinctChatIds.flatMap(id => {
+        const bare = normalizeChannelId(id);
+        return bare ? [id, bare, `-100${bare}`] : [id];
+      }),
+    ));
     const { data: monitoredRows } = await (supabase as any)
       .from('tg_monitored_channels')
       .select('id, channel_tg_id')
-      .in('channel_tg_id', distinctChatIds);
+      .in('channel_tg_id', lookupIds);
+    // Same two-convention problem as the eligibility check above — key the
+    // lookup on the normalised id so channel_reach isn't undercounted.
     const chatIdToMonitoredUuid = new Map<string, string>(
       ((monitoredRows || []) as any[])
-        .filter(r => r.channel_tg_id)
-        .map(r => [r.channel_tg_id, r.id]),
+        .map(r => [normalizeChannelId(r.channel_tg_id), r.id] as [string | null, string])
+        .filter((e): e is [string, string] => e[0] !== null),
     );
 
     const insertable = hits.map(h => ({
       project_id: h.project_id,
       client_id: h.client_id,
       // null when chat isn't linked to a monitored channel record yet
-      channel_id: chatIdToMonitoredUuid.get(h.chat_id) ?? null,
+      channel_id: chatIdToMonitoredUuid.get(normalizeChannelId(h.chat_id) ?? '') ?? null,
       message_text: h.message_text,
       message_date: h.message_date,
       matched_keyword: h.matched_keyword,
@@ -236,14 +273,42 @@ export async function runMindshareScan(
         !existingKeys.has(`${h.project_id}::${h.message_date}::${h.message_text}`),
       );
 
-      if (fresh.length > 0) {
+      // Collapse duplicates WITHIN this batch too. The `existingKeys` filter
+      // above only removes rows already in the table; two posts carrying the
+      // same text on the same date (a forward, or the same announcement pasted
+      // into several channels) still collide on
+      // uniq_tg_mentions_project_msg. Postgres rejects the whole INSERT on one
+      // dupe, so a single collision used to cost the entire 500-row chunk —
+      // observed during the 2026-08-08 backfill, where one pass scanned 1,000
+      // posts and recorded zero. [2026-08-08]
+      const batchSeen = new Set<string>();
+      const deduped = fresh.filter(h => {
+        const key = `${h.project_id}::${h.message_date}::${h.message_text}`;
+        if (batchSeen.has(key)) return false;
+        batchSeen.add(key);
+        return true;
+      });
+
+      if (deduped.length > 0) {
         // Insert in chunks to avoid Postgres parameter limits.
         const CHUNK = 500;
-        for (let i = 0; i < fresh.length; i += CHUNK) {
-          const slice = fresh.slice(i, i + CHUNK);
+        for (let i = 0; i < deduped.length; i += CHUNK) {
+          const slice = deduped.slice(i, i + CHUNK);
           const { error } = await (supabase as any).from('tg_mentions').insert(slice);
-          if (!error) mentionsAdded += slice.length;
-          else console.error('[mindshare] tg_mentions insert error:', error);
+          if (!error) { mentionsAdded += slice.length; continue; }
+          if (error.code !== '23505') {
+            console.error('[mindshare] tg_mentions insert error:', error);
+            continue;
+          }
+          // Belt and braces: a race with a concurrent run can still collide.
+          // Fall back to row-by-row so one bad row can't sink 499 good ones.
+          for (const row of slice) {
+            const { error: rowErr } = await (supabase as any).from('tg_mentions').insert(row);
+            if (!rowErr) mentionsAdded += 1;
+            else if (rowErr.code !== '23505') {
+              console.error('[mindshare] tg_mentions row insert error:', rowErr);
+            }
+          }
         }
       }
     }
