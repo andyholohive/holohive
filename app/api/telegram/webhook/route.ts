@@ -1216,6 +1216,10 @@ function shortDueLabel(due: string | null): string {
   if (diffDays < 0) return `OVERDUE ${Math.abs(diffDays)}d`;
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Tomorrow';
+  // Weekday name ("Mon") is the point here — a due date inside the next week
+  // reads better on a TG button as a day than as 08/11/2026. Anything 7+ days
+  // out falls through to formatDate below, so mm/dd/yyyy still governs real dates.
+  // lint-conventions: disable-next-line no-raw-toLocaleDateString
   if (diffDays < 7) return dueDate.toLocaleDateString('en-US', { weekday: 'short' });
   return formatDate(dueDate);
 }

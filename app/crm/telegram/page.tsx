@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Dialog,
   DialogContent,
@@ -3422,15 +3423,11 @@ export default function TelegramChatsPage() {
                 })}
               </div>
             ) : viewingChatMessages.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-cream-100 mb-3">
-                  <MessageCircle className="h-5 w-5 text-ink-warm-400" />
-                </div>
-                <p className="text-sm font-medium text-ink-warm-700">No messages yet</p>
-                <p className="text-xs text-ink-warm-500 mt-1 max-w-xs mx-auto">
-                  The bot only records messages it can see. Make sure it&apos;s a member of this chat.
-                </p>
-              </div>
+              <EmptyState
+                icon={MessageCircle}
+                title="No messages yet"
+                description="The bot only records messages it can see. Make sure it's a member of this chat."
+              />
             ) : (() => {
               // ─── Refined chat renderer ─────────────────────────────
               // - Date separators (Today / Yesterday / Mon, Jun 2) when
@@ -3769,16 +3766,15 @@ function TopicsTabContent({
 
       {filteredGroups.length === 0 ? (
         <Card className="border-cream-200">
-          <CardContent className="p-10 text-center">
-            <Hash className="h-8 w-8 mx-auto mb-2 text-ink-warm-300" />
-            <p className="text-sm text-ink-warm-700 mb-1">
-              {topics.length === 0 ? 'No topics tracked yet' : 'No matches'}
-            </p>
-            <p className="text-xs text-ink-warm-500">
-              {topics.length === 0
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Hash}
+              title={topics.length === 0 ? 'No topics tracked yet' : 'No matches'}
+              description={topics.length === 0
                 ? 'Topics appear here as the bot sees messages in forum supergroups. Make sure the bot is in the group.'
                 : 'Try a different search term.'}
-            </p>
+              className="py-10"
+            />
           </CardContent>
         </Card>
       ) : (

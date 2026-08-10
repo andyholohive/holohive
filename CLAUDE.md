@@ -270,8 +270,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 **Standard row body padding:** `py-3` on TableCell. The default `p-4`
 makes rows too tall for data-dense admin tables.
 
-**Forbidden:** raw `<table><thead><tr>…</tr></thead><tbody>…</tbody></table>`.
-The May 2026 audit converted 3 inline tables; don't add new ones.
+**Default:** raw `<table><thead><tr>…</tr></thead><tbody>…</tbody></table>`
+is the wrong choice for a read-only data table. Use the primitives.
+
+**The documented exception — v11 spreadsheet surfaces.** As of
+2026-08-10 there are 14 files with a raw `<table className=…>`, and
+they are not all drift. `/lists`, `/wallets`, `/tasks`,
+`/delivery-logs`, `/clients/[id]/delivery-log` and the public
+list/campaign/portal tables are *inline-editable spreadsheets*, not
+read-only data tables. They need things the shadcn `Table` primitives
+don't give you: per-cell `border-r border-cream-200` gridlines, a
+solid `bg-cream-50` sticky header, `colSpan` add-a-row inputs, and
+drag-reorder cells. Fighting the primitives' defaults to get there
+produces worse code than a plain `<table>`.
+
+So the rule is by surface type, not by tag:
+
+| Surface | Use |
+|---|---|
+| Read-only data table (a list you scan) | `<Table>` primitives |
+| Inline-editable spreadsheet (cells you type into) | raw `<table>`, v11 chrome |
+
+If you write a raw `<table>`, match the v11 spreadsheet chrome that
+`/delivery-logs` and `/kols` use — `bg-cream-50` header, `text-[10px]
+uppercase tracking-[0.18em] text-ink-warm-500` header cells,
+`border-r border-cream-200` between columns, wrapped in a
+`<Card className="border-cream-200 overflow-hidden">` with an inner
+`overflow-x-auto`. Don't invent a third table look.
 
 ---
 
@@ -597,6 +622,21 @@ Forgetting #2 means the page renders in the sidebar but can't be
 bookmarked or hidden via the customize dialog. Both files share the
 lucide icon imports — add yours to both.
 
+**Both, or neither.** The registry is the list of *top-level sidebar
+entries*, not the list of routes. Three routes are deliberately absent
+from it and should stay that way — if an audit flags them, this is
+the answer:
+
+| Route | Why it's not in the registry |
+|---|---|
+| `/chat` (Holo GPT) | Its `NavItem` is commented out in `Sidebar.tsx` (removed 2026-05-05). A registry entry would put a show/hide toggle in the customize dialog that controls nothing. Restore the NavItem first, then register it. |
+| `/tasks/deliverables` | A `SubNavItem` that only renders while `pathname.startsWith('/tasks')`. It's a child of HQ, not its own sidebar entry. |
+| `/tasks/automations` | Same — contextual HQ sub-nav, admin-gated. |
+
+So the rule is: register a route when it has (or is getting) its own
+top-level `NavItem`. Contextual sub-nav and deliberately-hidden routes
+don't belong in the customize dialog.
+
 ---
 
 ## API routes — auth pattern
@@ -662,19 +702,29 @@ and `.is('deleted_at', null)` in Supabase JS.
 
 ## File sizes — don't make giant page files
 
-These are the bug magnets in this codebase (line counts as of the
-July 2026 audit):
-- `app/clients/page.tsx` (~6,000 lines) — now the biggest.
-- `app/public/portal/[id]/page.tsx` (~4,100 lines)
-- `app/kols/page.tsx` (~3,900 lines)
-- `app/crm/telegram/page.tsx` (~3,800 lines)
-- `app/public/campaigns/[id]/page.tsx` (~3,600 lines)
-- `app/crm/network/page.tsx` (~3,500 lines)
-- `app/forms/[id]/page.tsx` (~3,400 lines)
-- `app/crm/sales-pipeline/page.tsx` (~3,200 lines)
-- `app/campaigns/[id]/page.tsx` (~2,900 lines) — was ~11,000 before
-  the May 2026 audit; the structural split happened. Don't let it
-  regrow.
+These are the bug magnets in this codebase (measured 2026-08-10 —
+regenerate with `find app -name page.tsx | xargs wc -l | sort -rn`):
+
+| Lines | Page |
+|---|---|
+| 6,645 | `app/clients/page.tsx` — the biggest by a wide margin |
+| 4,242 | `app/kols/page.tsx` |
+| 4,008 | `app/public/portal/[id]/page.tsx` |
+| 3,878 | `app/crm/telegram/page.tsx` |
+| 3,447 | `app/crm/network/page.tsx` |
+| 3,422 | `app/forms/[id]/page.tsx` |
+| 3,283 | `app/public/campaigns/[id]/page.tsx` |
+| 3,229 | `app/campaigns/[id]/page.tsx` — **regrew** (see below) |
+| 3,168 | `app/crm/sales-pipeline/page.tsx` |
+| 3,096 | `app/lists/page.tsx` |
+| 2,505 | `app/admin/telegram-comm/page.tsx` |
+| 2,504 | `app/mindshare/page.tsx` |
+| 2,317 | `app/tasks/page.tsx` |
+
+`app/campaigns/[id]/page.tsx` was ~11,000 lines before the May 2026
+audit and ~2,900 right after the structural split. It's back to 3,229
+— the split held but the page has been accreting again. Put new
+campaign-tab work in `components/campaign/`, not in the page file.
 
 When adding new pages, **target <1,500 lines**. Extract:
 - Component-level pieces (dialogs, slide-overs, table cells) into separate functions in the same file
@@ -740,6 +790,17 @@ It catches:
 - `placeholder="X *"` patterns (use `<RequiredAsterisk />`)
 - `<Button className="bg-brand text-white">` (use `variant="brand"`)
 - `min-h-[calc(100vh-64px)] bg-gray-50` card-shell wrappers
+- raw `toLocaleDateString` / date-shaped `toLocaleString` (use `@/lib/dateFormat`)
+
+**Scope (widened 2026-08-10):** it now lints `.ts` as well as `.tsx`
+under `app/`, `components/`, and `lib/` — 682 files, up from 476.
+The 206 files it previously skipped were every API route, every cron,
+and the Telegram webhook, i.e. exactly where date formatting drifts
+without anyone noticing. One deliberate exception came out of that
+widening: `shortDueLabel()` in `app/api/telegram/webhook/route.ts`
+uses `weekday: 'short'` so a due date inside the next week renders as
+"Mon" on a TG button; anything 7+ days out falls through to
+`formatDate`, so mm/dd/yyyy still governs real dates.
 
 If you have a deliberate exception (form-builder preview, centered
 account-settings shell, etc.), add a directive:

@@ -151,9 +151,18 @@ function matchDisable(line, pattern, ruleId) {
  * Get the list of files to check.
  *
  * - If files are passed as argv, check those (pre-commit hook use case).
- * - Otherwise, find all *.tsx files under app/ and components/, plus
- *   *.ts under lib/ (services export className strings — e.g. STAGE_COLORS
- *   in salesPipelineService — so the color rules apply there too).
+ * - Otherwise, find all *.tsx AND *.ts files under app/ and components/,
+ *   plus *.ts under lib/ (services export className strings — e.g.
+ *   STAGE_COLORS in salesPipelineService — so the color rules apply there
+ *   too).
+ *
+ *   [2026-08-10] .ts under app/ was previously excluded, which silently left
+ *   206 files unchecked — every API route, every cron, and the Telegram
+ *   webhook. Date formatting had already drifted there (the webhook builds
+ *   due-date strings with raw toLocaleDateString), and nothing caught it
+ *   because bot output never passes through a .tsx file. Colour rules are
+ *   inert in API routes since they emit no classNames, so widening costs
+ *   nothing and closes the gap.
  *
  * Skips node_modules, .next, dist, build.
  */
@@ -168,7 +177,7 @@ function listFiles() {
   // find via git ls-files, fall back to find
   try {
     const out = execSync(
-      `git ls-files 'app/*.tsx' 'app/**/*.tsx' 'components/*.tsx' 'components/**/*.tsx' 'lib/*.ts' 'lib/**/*.ts'`,
+      `git ls-files 'app/*.tsx' 'app/**/*.tsx' 'app/*.ts' 'app/**/*.ts' 'components/*.tsx' 'components/**/*.tsx' 'components/*.ts' 'components/**/*.ts' 'lib/*.ts' 'lib/**/*.ts'`,
       { cwd: REPO_ROOT, encoding: 'utf-8' }
     );
     return out

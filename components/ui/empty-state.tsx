@@ -21,6 +21,12 @@ import React from 'react';
  *
  * For the "filters returned nothing" variant, omit children and pass a
  * filter-style title like "No tasks match your filters."
+ *
+ * [2026-08-10] Repainted from `gray-*` to `ink-warm-*`. The component
+ * was still on the pre-v11 gray palette, so it read cold on the cream
+ * v11 surfaces — which is why several pages (e.g. /crm/telegram) had
+ * hand-rolled their own warm empty states instead of importing this
+ * one. Now it matches, so import it rather than rolling a local copy.
  */
 
 interface EmptyStateProps {
@@ -46,10 +52,10 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={`text-center ${className ?? 'py-16'}`}>
-      <Icon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-      <p className="text-gray-500 font-medium">{title}</p>
+      <Icon className="h-12 w-12 text-ink-warm-300 mx-auto mb-3" />
+      <p className="text-ink-warm-500 font-medium">{title}</p>
       {description && (
-        <p className="text-sm text-gray-400 mt-1 max-w-sm mx-auto">{description}</p>
+        <p className="text-sm text-ink-warm-400 mt-1 max-w-sm mx-auto">{description}</p>
       )}
       {children && (
         <div className="mt-4 flex items-center justify-center gap-2">
