@@ -24,7 +24,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
@@ -40,7 +43,7 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw, Link2 } from 'lucide-react';
+import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw, Link2, Building2 } from 'lucide-react';
 import ShareLinkDialog from '@/components/documents/ShareLinkDialog';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
@@ -71,7 +74,7 @@ function endOfLocalDayIso(day: Date): string {
  */
 const STATUS_LABEL: Record<string, string> = { draft: 'Draft', published: 'Published', revoked: 'Revoked' };
 
-interface ClientOpt { id: string; name: string }
+interface ClientOpt { id: string; name: string; logo_url?: string | null }
 type DocWithClient = DocumentRow & { client_name?: string };
 
 function fmtFocused(ms: number): string {
@@ -102,6 +105,14 @@ export default function ActiveClientsDocuments() {
   // dialog so the row's Share button controls which document it targets.
   const [shareDoc, setShareDoc] = useState<DocWithClient | null>(null);
   const [expandedRecipient, setExpandedRecipient] = useState<string | null>(null);
+  // Per-client collapse, matching the other /links tabs.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapse = (name: string) =>
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,7 +127,7 @@ export default function ActiveClientsDocuments() {
         // filter on, so this now matches what those pages call "active".
         (supabase as any)
           .from('clients')
-          .select('id, name')
+          .select('id, name, logo_url')
           .is('archived_at', null)
           .eq('is_active', true)
           .order('name'),
@@ -284,6 +295,14 @@ export default function ActiveClientsDocuments() {
     finally { setAnalyticsLoading(false); }
   };
 
+  // Client logo by name, so the group header can show the client's brand
+  // mark like the other /links tabs do.
+  const clientLogoByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    clients.forEach(c => { if (c.logo_url) map[c.name] = c.logo_url; });
+    return map;
+  }, [clients]);
+
   // Group by client.
   const groups = useMemo(() => {
     const m = new Map<string, DocWithClient[]>();
@@ -297,6 +316,15 @@ export default function ActiveClientsDocuments() {
 
   return (
     <div className="space-y-4">
+      {/* Chapter divider, so this tab opens the same way the link tabs do
+          (they render a SectionHeader from the page). */}
+      <SectionHeader
+        label="Documents"
+        dot="brand"
+        counter={`${docs.length} document${docs.length === 1 ? '' : 's'}`}
+        first
+      />
+
       <div className="flex items-center gap-2">
         <p className="text-xs text-ink-warm-500">Hosted client-delivery PDFs, tracked in-portal.</p>
         <Button variant="brand" size="sm" className="ml-auto" onClick={() => setOpen(true)}>
@@ -314,17 +342,39 @@ export default function ActiveClientsDocuments() {
         <div className="space-y-4">
           {groups.map(([clientName, list]) => (
             <div key={clientName}>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">{clientName}</p>
+              {/* Same collapsible client header the other /links tabs use —
+                  cream bar, client logo, count badge — so switching to
+                  Documents doesn't change how the page reads. */}
+              <div
+                className={`flex items-center justify-between px-4 py-3 bg-cream-100 ${collapsed.has(clientName) ? 'rounded-lg' : 'rounded-t-lg'} border border-cream-200 ${collapsed.has(clientName) ? '' : 'border-b-0'} cursor-pointer select-none transition-all hover:bg-cream-200`}
+                onClick={() => toggleCollapse(clientName)}
+              >
+                <div className="flex items-center gap-3">
+                  {collapsed.has(clientName)
+                    ? <ChevronRight className="w-4 h-4 text-ink-warm-700" />
+                    : <ChevronDown className="w-4 h-4 text-ink-warm-700" />}
+                  {clientLogoByName[clientName] ? (
+                    <img src={clientLogoByName[clientName]} alt="" className="w-5 h-5 rounded object-contain bg-white border border-cream-200" />
+                  ) : (
+                    <Building2 className="w-4 h-4 text-ink-warm-700" />
+                  )}
+                  <h3 className="font-semibold text-ink-warm-700">{clientName}</h3>
+                  <Badge variant="secondary" className="text-xs font-medium">{list.length}</Badge>
+                </div>
+              </div>
+
+              {!collapsed.has(clientName) && (
+              <Card className="border-cream-200 border-t-0 rounded-t-none overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Title</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Engagement</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Shared</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Download</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Expires</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 text-right">Actions</TableHead>
+                  <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Title</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Engagement</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Shared</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Download</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Expires</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -332,31 +382,31 @@ export default function ActiveClientsDocuments() {
                     const r = rollups.get(d.id);
                     const expired = !!d.expires_at && new Date(d.expires_at).getTime() < Date.now();
                     return (
-                      <TableRow key={d.id} className="border-gray-100">
-                        <TableCell className="py-3 font-medium">{d.title}</TableCell>
-                        <TableCell className="py-3"><StatusBadge tone={STATUS_TONE[d.status] ?? 'neutral'} size="sm">{STATUS_LABEL[d.status] ?? d.status}</StatusBadge></TableCell>
-                        <TableCell className="py-3">
+                      <TableRow key={d.id} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5 font-medium">{d.title}</TableCell>
+                        <TableCell className="py-3.5 px-5"><StatusBadge tone={STATUS_TONE[d.status] ?? 'neutral'} size="sm">{STATUS_LABEL[d.status] ?? d.status}</StatusBadge></TableCell>
+                        <TableCell className="py-3.5 px-5">
                           {r && r.opens > 0 ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                            <span className="inline-flex items-center gap-1.5 text-xs text-ink-warm-700">
                               <span className="tabular-nums">{r.opens} Open{r.opens === 1 ? '' : 's'}</span>
-                              <span className="text-gray-300">·</span>
+                              <span className="text-ink-warm-300">·</span>
                               <span className="tabular-nums">
                                 {r.recipients} {r.recipients === 1 ? 'Reader' : 'Readers'}
                               </span>
                               {r.hotCount > 0 && <Flame className="h-3.5 w-3.5 text-amber-500" />}
                             </span>
-                          ) : <span className="text-xs text-gray-400">—</span>}
+                          ) : <span className="text-xs text-ink-warm-400">—</span>}
                         </TableCell>
-                        <TableCell className="py-3"><Switch checked={d.shared} onCheckedChange={() => toggleShared(d)} disabled={d.status === 'revoked'} /></TableCell>
-                        <TableCell className="py-3"><Switch checked={d.download_enabled} onCheckedChange={() => toggleDownload(d)} disabled={d.status === 'revoked'} /></TableCell>
-                        <TableCell className="py-3">
+                        <TableCell className="py-3.5 px-5"><Switch checked={d.shared} onCheckedChange={() => toggleShared(d)} disabled={d.status === 'revoked'} /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Switch checked={d.download_enabled} onCheckedChange={() => toggleDownload(d)} disabled={d.status === 'revoked'} /></TableCell>
+                        <TableCell className="py-3.5 px-5">
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="ghost" size="sm" className="h-7 px-2 font-normal text-xs focus-brand" disabled={d.status === 'revoked'}>
                                 <CalendarClock className="h-3.5 w-3.5 mr-1" />
                                 {d.expires_at
                                   ? <span className={expired ? 'text-rose-600' : ''}>{formatDate(d.expires_at)}</span>
-                                  : <span className="text-gray-400">Never</span>}
+                                  : <span className="text-ink-warm-400">Never</span>}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
@@ -377,7 +427,7 @@ export default function ActiveClientsDocuments() {
                             </PopoverContent>
                           </Popover>
                         </TableCell>
-                        <TableCell className="py-3">
+                        <TableCell className="py-3.5 px-5">
                           <div className="flex items-center justify-end gap-1">
                             {d.current_version_id && d.status !== 'revoked' && (
                               <Button asChild variant="outline" size="sm" className="h-7">
@@ -437,6 +487,8 @@ export default function ActiveClientsDocuments() {
                   })}
                 </TableBody>
               </Table>
+              </Card>
+              )}
             </div>
           ))}
         </div>
@@ -517,12 +569,12 @@ export default function ActiveClientsDocuments() {
             <div className="max-h-[70vh] overflow-y-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Recipient</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Opens</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Focused</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Read</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Last opened</TableHead>
+                  <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Recipient</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Opens</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Focused</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Read</TableHead>
+                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Last opened</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -533,31 +585,31 @@ export default function ActiveClientsDocuments() {
                     const maxMs = Math.max(1, ...pages.map(p => p.ms));
                     return (
                       <Fragment key={key}>
-                        <TableRow className="border-gray-100 cursor-pointer hover:bg-gray-50/60" onClick={() => setExpandedRecipient(isOpen ? null : key)}>
-                          <TableCell className="py-3">
+                        <TableRow className="border-cream-100 cursor-pointer hover:bg-cream-50/60" onClick={() => setExpandedRecipient(isOpen ? null : key)}>
+                          <TableCell className="py-3.5 px-5">
                             <span className="inline-flex items-center gap-1.5 font-medium">
-                              {pages.length > 0 ? (isOpen ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />) : <span className="w-3.5" />}
-                              {rec.viewer_email ?? <span className="italic text-gray-400">Internal preview</span>}
+                              {pages.length > 0 ? (isOpen ? <ChevronDown className="h-3.5 w-3.5 text-ink-warm-400" /> : <ChevronRight className="h-3.5 w-3.5 text-ink-warm-400" />) : <span className="w-3.5" />}
+                              {rec.viewer_email ?? <span className="italic text-ink-warm-400">Internal preview</span>}
                               {rec.hot && <Flame className="h-3.5 w-3.5 text-amber-500" />}
                             </span>
                           </TableCell>
                           <TableCell className="py-3 tabular-nums">{rec.opens}</TableCell>
                           <TableCell className="py-3 tabular-nums">{fmtFocused(rec.totalFocusedMs)}</TableCell>
                           <TableCell className="py-3 tabular-nums">{Math.round(rec.completion * 100)}%</TableCell>
-                          <TableCell className="py-3 text-xs text-gray-500">{rec.lastOpened ? formatDateTime(rec.lastOpened) : '—'}</TableCell>
+                          <TableCell className="py-3.5 px-5 text-xs text-ink-warm-500">{rec.lastOpened ? formatDateTime(rec.lastOpened) : '—'}</TableCell>
                         </TableRow>
                         {isOpen && pages.length > 0 && (
-                          <TableRow className="border-gray-100 bg-gray-50/40">
-                            <TableCell colSpan={5} className="py-3">
-                              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Per-page attention</p>
+                          <TableRow className="border-cream-100 bg-cream-50/40">
+                            <TableCell colSpan={5} className="py-3.5 px-5">
+                              <p className="text-xs font-semibold uppercase tracking-wider text-ink-warm-500 mb-2">Per-page attention</p>
                               <div className="space-y-1.5">
                                 {pages.map(({ page, ms }) => (
                                   <div key={page} className="flex items-center gap-2">
-                                    <span className="w-14 text-xs text-gray-500 flex-shrink-0">Page {page}</span>
-                                    <div className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
+                                    <span className="w-14 text-xs text-ink-warm-500 flex-shrink-0">Page {page}</span>
+                                    <div className="flex-1 h-2 rounded-full bg-cream-200 overflow-hidden">
                                       <div className="h-full rounded-full bg-brand" style={{ width: `${Math.round((ms / maxMs) * 100)}%` }} />
                                     </div>
-                                    <span className="w-16 text-right text-xs tabular-nums text-gray-600 flex-shrink-0">{fmtFocused(ms)}</span>
+                                    <span className="w-16 text-right text-xs tabular-nums text-ink-warm-700 flex-shrink-0">{fmtFocused(ms)}</span>
                                   </div>
                                 ))}
                               </div>
