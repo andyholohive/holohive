@@ -153,6 +153,12 @@ export default function DocumentPdfViewer({
       <style>{`@media print { .doc-portal-viewer { display: none !important; } }`}</style>
       <Document
         file={signedUrl}
+        // [2026-08-11] Links inside the PDF open in a new tab rather than
+        // navigating the viewer away mid-read (which would also cut the dwell
+        // timer short and lose the page_view). rel is set explicitly because
+        // these documents are client-facing and the destinations aren't ours.
+        externalLinkTarget="_blank"
+        externalLinkRel="noopener noreferrer"
         onLoadSuccess={({ numPages }) => setNumPages(numPages)}
         loading={<div className="py-20 text-center text-sm text-neutral-400">Loading document…</div>}
         error={<div className="py-20 text-center text-sm text-rose-500">Couldn&apos;t load this document.</div>}
@@ -205,7 +211,15 @@ function PageTracked({ pageNumber, width, onRatio }: { pageNumber: number; width
   }, [pageNumber]);
   return (
     <div ref={ref} className="mb-3 flex justify-center">
-      <Page pageNumber={pageNumber} width={width} renderTextLayer={false} renderAnnotationLayer={false}
+      {/* Annotation layer on, text layer off — deliberately.
+          The annotation layer is what makes a PDF's hyperlinks clickable
+          [2026-08-11]; without it the pages render as bare canvas and every
+          link in a delivery report is dead.
+          The text layer stays off: it would make the document's text
+          selectable and copyable, which quietly defeats the download_enabled
+          toggle and the print suppression above. Links are navigation, not
+          content — turning one on doesn't require the other. */}
+      <Page pageNumber={pageNumber} width={width} renderTextLayer={false} renderAnnotationLayer
         className="shadow-sm border border-neutral-200" />
     </div>
   );
