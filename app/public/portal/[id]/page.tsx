@@ -297,20 +297,9 @@ const formatNumber = (num: number) => {
   return num.toString();
 };
 
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'Active':
-      return 'bg-emerald-100 text-emerald-800';
-    case 'Planning':
-      return 'bg-blue-100 text-blue-800';
-    case 'Paused':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'Completed':
-      return 'bg-gray-100 text-gray-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
+// [2026-08-10] getStatusBadge deleted along with the campaign status badge it
+// fed. Status colour still reaches the card via statusBorderColor (left
+// border), which is a separate helper.
 
 const stripHtml = (html: string) => {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
@@ -1069,8 +1058,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       // Filtered in JS rather than the query so the stats row above (which
       // shares this fetch and is campaign-to-date by design) keeps its full
       // set — only the top-post pick narrows to the week.
+      //
+      // [2026-08-10] The loop below used to read `weekRows` for BOTH, which
+      // made the stats row week-scoped the moment the 2026-08-03 top-post
+      // change landed — contradicting the comment directly above it. It went
+      // unnoticed until a weekly update for the *upcoming* week (week_of
+      // 2026-08-10, created 03:10 that morning) selected a window with no
+      // posted content yet, and Fogo's portal showed a live 87-post campaign
+      // as "0 KOLs / 0 content / 0 views, ↓100% this week" to the client.
+      // Renamed from `rows` so a future edit can't silently pick the wrong
+      // one: `allRows` = campaign-to-date (stats), `weekRows` = the week
+      // (top post only).
       const allRows = (data as any[]) || [];
-      const rows = weekStart && weekEnd
+      const weekRows = weekStart && weekEnd
         ? allRows.filter(r => r.activation_date && r.activation_date >= weekStart! && r.activation_date < weekEnd!)
         : allRows;
 
@@ -1102,7 +1102,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         };
       })();
 
-      for (const r of rows) {
+      // Stats Row — campaign-to-date, so it walks allRows. postsThisWeek does
+      // its own Mon–Sun check below and is unaffected by the top-post window.
+      for (const r of allRows) {
         impressionsSum += r.impressions || 0;
         engagementsSum +=
           (r.likes || 0) +
@@ -1110,11 +1112,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           (r.comments || 0) +
           (r.bookmarks || 0);
         if (r.campaign_kols_id) distinctKolIds.add(r.campaign_kols_id);
-        // Track top post in the same pass — saves a sort. Engagement =
-        // impressions + likes + retweets + comments + bookmarks per spec
-        // § 3b. Bookmarks included because they're already in
-        // engagementsSum above; consistent metric across Stats Row and
-        // Top Post pick.
+        // Posted in the current Mon–Sun week?
+        // Need to also fetch activation_date — added to the SELECT above.
+        if (r.activation_date && r.activation_date >= weekStartStr && r.activation_date <= weekEndStr) {
+          postsThisWeek++;
+        }
+      }
+
+      // Top Post — the week's feature, so this walks weekRows. Ranked by
+      // engagement = impressions + likes + retweets + comments + bookmarks
+      // per spec § 3b. Separate pass from the stats above: they answer
+      // different questions over different row sets, and folding them back
+      // together is what caused the 2026-08-10 all-zeros incident.
+      for (const r of weekRows) {
         const rowEngagement =
           (r.impressions || 0) +
           (r.likes || 0) +
@@ -1125,16 +1135,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           topEngagement = rowEngagement;
           topRow = r;
         }
-        // Posted in the current Mon–Sun week?
-        // Need to also fetch activation_date — added to the SELECT above.
-        if (r.activation_date && r.activation_date >= weekStartStr && r.activation_date <= weekEndStr) {
-          postsThisWeek++;
-        }
       }
 
       const currentStats: ActiveCampaignStats = {
         kolsActivated: distinctKolIds.size,
-        contentLive: rows.length,
+        contentLive: allRows.length,
         impressions: impressionsSum,
         engagements: engagementsSum,
         postsThisWeek,
@@ -1184,7 +1189,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       // to the auto-pick if not found (e.g. post was archived or the
       // pinned content belongs to a different campaign).
       if (overrideContentId) {
-        const pinned = rows.find(r => r.id === overrideContentId);
+        const pinned = weekRows.find(r => r.id === overrideContentId);
         if (pinned) topRow = pinned;
       }
 
@@ -2287,13 +2292,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <div className="p-5">
                               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                 <div className="flex-1 min-w-0">
+                                  {/* [2026-08-10 per Andy] Status badge removed.
+                                      The tabs above already split All / Active /
+                                      Completed, so the per-row badge only
+                                      repeated the filter the client just chose.
+                                      The left border still carries the status
+                                      colour. */}
                                   <div className="flex items-center gap-3 mb-3">
                                     <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-brand transition-colors">
                                       {campaign.name}
                                     </h3>
-                                    <Badge className={`${getStatusBadge(campaign.status)} font-medium px-2.5 py-0.5 cursor-default pointer-events-none`}>
-                                      {campaign.status}
-                                    </Badge>
                                   </div>
                                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 mb-4">
                                     <div className="flex items-center gap-2">
@@ -3591,13 +3599,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                           {/* Campaign Info */}
                           <div className="flex-1 min-w-0">
+                            {/* [2026-08-10 per Andy] Status badge removed —
+                                matches the merged inline list above. */}
                             <div className="flex items-center gap-3 mb-3">
                               <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-brand transition-colors">
                                 {campaign.name}
                               </h3>
-                              <Badge className={`${getStatusBadge(campaign.status)} font-medium px-2.5 py-0.5 cursor-default pointer-events-none`}>
-                                {campaign.status}
-                              </Badge>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 mb-4">
