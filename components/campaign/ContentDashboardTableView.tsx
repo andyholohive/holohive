@@ -186,6 +186,12 @@ export function ContentDashboardTableView() {
   // it's also fired from the contents row delete pencil); we expose a
   // local setter so the bulk toolbar's Delete button can open it.
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  // [2026-08-10] Single-row delete used to fire immediately and never touch
+  // payments — that's how a $200 Venice payment ended up pointing at a content
+  // row that no longer existed. `payments.content_id` is a uuid[], so Postgres
+  // can't hold a foreign key on it and nothing catches this at the DB layer.
+  // Now it asks, and the caller picks.
+  const [deleteContentPending, setDeleteContentPending] = useState<any | null>(null);
 
   // Table scroll ref — internal to this component (sticky scrollbar
   // remains a page-level concern via the page's contentTableRef but
@@ -608,13 +614,71 @@ export function ContentDashboardTableView() {
     }
   };
 
-  const handleDeleteContent = async (contentId: string) => {
+  /** Payments whose content_id array references this content row. */
+  const linkedPaymentsFor = (contentId: string) =>
+    payments.filter((p: any) => {
+      const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+      return ids.includes(contentId);
+    });
+
+  /** Split linked payments into ones that ONLY cover this content (safe to
+   *  delete) and ones that also cover other posts (unlink this id instead —
+   *  deleting the row would wipe the other posts' payment too). content_id is
+   *  an array precisely so a multipost group can share one payment. */
+  const splitLinkedPayments = (contentId: string) => {
+    const linked = linkedPaymentsFor(contentId);
+    const sole: any[] = [];
+    const shared: any[] = [];
+    for (const p of linked) {
+      const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+      (ids.length > 1 ? shared : sole).push(p);
+    }
+    return { linked, sole, shared };
+  };
+
+  const handleDeleteContent = async (contentId: string, alsoDeletePayments: boolean) => {
+    const { sole, shared } = alsoDeletePayments
+      ? splitLinkedPayments(contentId)
+      : { sole: [] as any[], shared: [] as any[] };
+    const prevContents = [...contents];
+    setDeleteContentPending(null);
+    setContents((prev: any[]) => prev.filter(c => c.id !== contentId));
+    if (sole.length > 0) {
+      const ids = sole.map((p: any) => p.id);
+      setPayments((prev: any[]) => prev.filter(p => !ids.includes(p.id)));
+    }
     try {
-      await supabase.from('contents').delete().eq('id', contentId);
-      setContents((prev: any[]) => prev.filter(c => c.id !== contentId));
-      toast({ title: 'Content deleted' });
+      // Payments first: if this throws we still have the content row, which is
+      // the recoverable direction. The reverse leaves an orphan.
+      if (sole.length > 0) {
+        await Promise.all(sole.map((p: any) => supabase.from('payments').delete().eq('id', p.id)));
+      }
+      if (shared.length > 0) {
+        await Promise.all(shared.map((p: any) => {
+          const ids = (Array.isArray(p.content_id) ? p.content_id : [p.content_id])
+            .filter((id: string) => id !== contentId);
+          return supabase.from('payments').update({ content_id: ids } as any).eq('id', p.id);
+        }));
+      }
+      const { error } = await supabase.from('contents').delete().eq('id', contentId);
+      if (error) throw error;
+      const bits: string[] = [];
+      if (sole.length > 0) bits.push(`${sole.length} payment${sole.length !== 1 ? 's' : ''} deleted`);
+      if (shared.length > 0) bits.push(`${shared.length} unlinked (also covers other posts)`);
+      toast({
+        title: 'Content deleted',
+        description: bits.length > 0 ? bits.join(', ') + '.' : undefined,
+        variant: 'destructive',
+      });
     } catch (err) {
       console.error('Error deleting content:', err);
+      setContents(prevContents);
+      fetchPayments();
+      toast({
+        title: 'Delete failed',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -1919,7 +1983,7 @@ export function ContentDashboardTableView() {
                                       Verify
                                     </Button>
                                   )}
-                                  <Button size="sm" variant="outline" onClick={() => handleDeleteContent(content.id)}>
+                                  <Button size="sm" variant="outline" onClick={() => setDeleteContentPending(content)}>
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
@@ -1936,6 +2000,74 @@ export function ContentDashboardTableView() {
       {/* Bulk Delete confirmation — moved from the page's trailing
           dialog cluster into the component on 2026-06-02 so the
           delete flow is fully Table-view-internal. */}
+      {/* Single-row content delete. Always confirms, and when payments point at
+          this content it makes the choice explicit rather than silently
+          orphaning them. "Content only" stays available — a payment that has
+          actually been sent shouldn't vanish because the post came down — but
+          the consequence is spelled out. [2026-08-10] */}
+      <Dialog open={!!deleteContentPending} onOpenChange={(o) => { if (!o) setDeleteContentPending(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this content?</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const pending = deleteContentPending;
+            if (!pending) return null;
+            const { linked, sole, shared } = splitLinkedPayments(pending.id);
+            const total = sole.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+            return (
+              <>
+                <div className="text-sm text-ink-warm-700 mt-2 space-y-1">
+                  {pending.content_link && (
+                    <p className="font-mono text-xs break-all text-gray-500">{pending.content_link}</p>
+                  )}
+                  <p>This can&apos;t be undone.</p>
+                </div>
+
+                {linked.length > 0 ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm mt-1">
+                    <p className="font-medium text-amber-800">
+                      {linked.length} payment{linked.length !== 1 ? 's' : ''} linked to this content
+                    </p>
+                    {sole.length > 0 && (
+                      <p className="text-amber-700 mt-1 tabular-nums">
+                        ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} would be deleted
+                      </p>
+                    )}
+                    {shared.length > 0 && (
+                      <p className="text-amber-700 mt-1">
+                        {shared.length} of them also cover{shared.length === 1 ? 's' : ''} other posts — that payment is
+                        unlinked from this one, not deleted.
+                      </p>
+                    )}
+                    <p className="text-amber-700 mt-2 text-xs">
+                      Keeping them leaves the payment with no content behind it — it stays
+                      on the campaign&apos;s budget but disappears from any per-post reporting.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-1">No payments are linked to this content.</p>
+                )}
+
+                <DialogFooter className="border-t border-cream-100 pt-3 mt-0 gap-2">
+                  <Button variant="outline" onClick={() => setDeleteContentPending(null)}>Cancel</Button>
+                  {linked.length > 0 && (
+                    <Button variant="outline" onClick={() => handleDeleteContent(pending.id, false)}>
+                      Content only
+                    </Button>
+                  )}
+                  <Button variant="destructive" onClick={() => handleDeleteContent(pending.id, true)}>
+                    {linked.length > 0
+                      ? `Delete content + ${linked.length} payment${linked.length !== 1 ? 's' : ''}`
+                      : 'Delete content'}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1957,7 +2089,9 @@ export function ContentDashboardTableView() {
                       {linkedPayments.length} linked payment{linkedPayments.length !== 1 ? 's' : ''} will also be deleted
                     </p>
                     <p className="text-amber-700 mt-1">
-                      Total: ${linkedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0).toLocaleString()}
+                      Total: ${linkedPayments
+                        .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
+                        .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 )}
