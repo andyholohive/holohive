@@ -3601,6 +3601,7 @@ async function handleSubmReviewCallback(
       link: (sub as any).link,
       platform: (sub as any).platform,
       contentType: (sub as any).content_type,
+      approvedBy: teamMember.id,
     });
     if (result.error) {
       console.error('[/submit] contents insert on approve failed:', result.error);

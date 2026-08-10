@@ -698,6 +698,33 @@ For soft-delete, use `deleted_at timestamptz` (not a boolean
 `is_deleted`). Then add `WHERE deleted_at IS NULL` in default queries
 and `.is('deleted_at', null)` in Supabase JS.
 
+### Audit trail on money + content
+
+`payments` and `contents` carry `after insert or update or delete` row
+triggers that append to **`record_audit_log`** (`table_name`,
+`record_id`, `action`, `actor_id`, `snapshot` jsonb). Added 2026-08-10,
+after tracing a $200 payment dead-ended: nothing recorded who created
+a payment or who deleted the content it pointed at, and `contents` is
+hard-deleted so the row left no trace at all. The `snapshot` column
+keeps the row as it was, so a DELETE stays answerable.
+
+Two things to know when you touch these tables:
+
+- **`actor_id` is `auth.uid()`**, so it fills in for browser-side
+  writes and is NULL for service-role ones (crons, the TG bot). For
+  those paths, set **`created_by`** explicitly — see how
+  `createApprovedContentsRow` threads `approvedBy` through from both
+  the web review route and the TG approve handler.
+- **Don't log these mutations from app code as well.** The trigger
+  fires no matter which path wrote the row, which is exactly what
+  app-level logging failed to do here — payments are created from at
+  least four places.
+
+The table is RLS'd to admin/super_admin SELECT and has no write policy;
+the trigger is `security definer`, so it's append-only by construction.
+If you add a table that needs the same treatment, attach
+`public.fn_record_audit()` rather than writing a second one.
+
 ---
 
 ## File sizes — don't make giant page files

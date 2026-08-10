@@ -131,6 +131,7 @@ export async function POST(
       link: sub.link,
       platform: sub.platform,
       contentType: sub.content_type,
+      approvedBy: user.id,
     });
     createdContentId = result.contentId;
     createContentError = result.error;

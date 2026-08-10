@@ -24,6 +24,16 @@ export interface ApproveSubmissionInput {
   link: string;
   platform: string | null | undefined;
   contentType: string | null | undefined;
+  /**
+   * The approving team member's `users.id`. Stamped onto both the contents
+   * row and its auto-created payment.
+   *
+   * [2026-08-10] This path runs on the service-role client, so `auth.uid()`
+   * is null and the DB audit trigger records no actor. Without this, an
+   * approval — which creates a payment — was completely unattributable;
+   * tracing one took a log dig and still only produced a guess.
+   */
+  approvedBy?: string | null;
 }
 
 export interface ApproveResult {
@@ -95,6 +105,7 @@ export async function createApprovedContentsRow(
       type: contentsType,
       status: 'posted',
       activation_date: activationDate,
+      created_by: input.approvedBy ?? null,
     })
     .select('id')
     .single();
@@ -152,6 +163,7 @@ export async function createApprovedContentsRow(
         payment_date: null,
         payment_method: 'Fiat',
         notes: null,
+        created_by: input.approvedBy ?? null,
       });
     if (paymentErr) {
       console.warn('[approve] payment auto-insert failed:', paymentErr);
