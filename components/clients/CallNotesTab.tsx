@@ -27,8 +27,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { renderCallNote } from '@/lib/callNoteFormat';
+import { BoldTextEditor } from '@/components/clients/BoldTextEditor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -677,18 +677,16 @@ function CallNoteForm({
 
       <div className="grid gap-1.5">
         <Label>Summary <RequiredAsterisk /></Label>
-        <Textarea
+        <BoldTextEditor
           value={form.content}
-          onChange={(e) => setForm({ ...form, content: e.target.value })}
-          placeholder={'One key takeaway per line — the dashboard splits these into bullets.\n\nExample:\n- Launch date confirmed for end of Q3\n- Client wants creative review SLA tightened'}
-          className="focus-brand min-h-[120px]"
+          onChange={(next) => setForm({ ...form, content: next })}
+          placeholder="One key takeaway per line — the dashboard splits these into bullets."
+          className="min-h-[120px]"
         />
         <p className="text-[10px] text-ink-warm-500">
           Newline-separated bullets appear on the Team Dashboard&apos;s Client Success tab.
-          {' '}Formatting carries through to Telegram:{' '}
-          <code className="px-1 py-0.5 rounded bg-cream-100 text-ink-warm-700">**bold**</code>{' '}
-          <code className="px-1 py-0.5 rounded bg-cream-100 text-ink-warm-700">_italic_</code>{' '}
-          <code className="px-1 py-0.5 rounded bg-cream-100 text-ink-warm-700">[text](url)</code>
+          {' '}<kbd className="px-1 py-0.5 rounded bg-cream-100 border border-cream-200 text-ink-warm-700">⌘B</kbd>{' '}
+          for bold — it carries through to Telegram.
         </p>
       </div>
 
