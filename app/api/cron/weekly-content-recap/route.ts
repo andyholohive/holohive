@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { LineupManagerService } from '@/lib/lineupManagerService';
 import { getTemplate } from '@/lib/messageTemplates';
+import { resolveClientChatIds } from '@/lib/clientTelegramChat';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -122,28 +123,13 @@ export async function GET(request: Request) {
     }
 
     // Default per-client chat: the chat linked to that client in
-    // /crm/telegram. Pick the client-facing GC: not hidden, external
-    // before internal, most recently active.
-    const clientChatByClient = new Map<string, string>();
-    const clientIds = [...new Set(campaigns.map(c => c.clientId).filter(Boolean))] as string[];
-    if (clientIds.length > 0) {
-      const { data: chats } = await (supabase as any)
-        .from('telegram_chats')
-        .select('chat_id, client_id, is_internal, is_hidden, last_message_at')
-        .in('client_id', clientIds)
-        .or('is_hidden.is.null,is_hidden.eq.false');
-      for (const clientId of clientIds) {
-        const cands = ((chats as any[]) ?? []).filter(x => x.client_id === clientId && x.chat_id);
-        cands.sort((a, b) => {
-          const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0;
-          if (ai !== bi) return ai - bi; // external (client-facing) first
-          const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
-          const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
-          return bt - at; // most recently active first
-        });
-        if (cands[0]) clientChatByClient.set(clientId, cands[0].chat_id);
-      }
-    }
+    // /crm/telegram. [2026-08-11] Extracted to lib/clientTelegramChat.ts so
+    // this, KR Signal and the call-notes send share one implementation
+    // instead of three copies of the same sort.
+    const clientChatByClient = await resolveClientChatIds(
+      supabase as any,
+      campaigns.map(c => c.clientId).filter(Boolean) as string[],
+    );
 
     const headerTemplate = await getTemplate(supabase, 'tmpl_weekly_content_recap_header');
     const svc = new LineupManagerService(supabase as any);

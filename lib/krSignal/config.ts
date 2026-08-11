@@ -3,6 +3,7 @@
  * (the standalone repo used static JSON; in HHP the DB is the source of truth).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveClientChatIds } from '@/lib/clientTelegramChat';
 
 export interface KrSignalFeatures {
   weekly_market_report: boolean;
@@ -73,28 +74,14 @@ export async function loadActiveClients(supabase: SupabaseClient): Promise<KrSig
  * bots post to the same client GC by default.
  */
 async function attachResolvedChats(supabase: SupabaseClient, clients: KrSignalClient[]): Promise<void> {
-  const clientIds = Array.from(
-    new Set(clients.map((c) => c.client_id).filter((x): x is string => !!x)),
+  // [2026-08-11] Default-chat resolution lives in lib/clientTelegramChat.ts
+  // now — shared with the Weekly Content Recap cron and the call-notes send,
+  // so all three post to the same client GC by construction rather than by
+  // three copies of the same sort staying in agreement.
+  const defaultByClient = await resolveClientChatIds(
+    supabase,
+    clients.map((c) => c.client_id).filter((x): x is string => !!x),
   );
-  const defaultByClient = new Map<string, string>();
-  if (clientIds.length > 0) {
-    const { data: chats } = await supabase
-      .from("telegram_chats")
-      .select("chat_id, client_id, is_internal, is_hidden, last_message_at")
-      .in("client_id", clientIds)
-      .or("is_hidden.is.null,is_hidden.eq.false");
-    for (const cid of clientIds) {
-      const cands = ((chats ?? []) as any[]).filter((x) => x.client_id === cid && x.chat_id);
-      cands.sort((a, b) => {
-        const ai = a.is_internal ? 1 : 0, bi = b.is_internal ? 1 : 0; // prefer client-facing
-        if (ai !== bi) return ai - bi;
-        const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
-        const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
-        return bt - at;
-      });
-      if (cands[0]?.chat_id) defaultByClient.set(cid, String(cands[0].chat_id));
-    }
-  }
   for (const c of clients) {
     const override = c.telegram_chat_id || null;
     const dflt = c.client_id ? (defaultByClient.get(c.client_id) ?? null) : null;

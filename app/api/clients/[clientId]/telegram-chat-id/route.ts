@@ -7,19 +7,24 @@ export const dynamic = 'force-dynamic';
 /**
  * PATCH /api/clients/[clientId]/telegram-chat-id
  *
- * Set client_context.telegram_chat_id without going through the full
- * Edit Portal context save. Used by the dashboard's Recent Call Notes
- * card to let the user link a TG chat inline when the "Send to TG"
- * action fails with "no chat configured."
+ * Link a Telegram chat to a client. Used by the dashboard's Recent Call Notes
+ * card so the user can link inline when "Send to TG" reports no chat.
  *
- * Body: { chatId: string }  — TG chat ID (negative number for groups,
- *                              positive for users; passed through as text)
+ * [2026-08-11] Now writes `telegram_chats.client_id` — the same link the
+ * TG Chats page's "Link client" dialog sets, and the one every client-facing
+ * bot resolves through (call notes, weekly recap, KR Signal).
  *
- * Auth: any authenticated user. The save endpoint isn't admin-only
- * because the same field is editable in the existing Edit Portal flow.
+ * It used to write `client_context.telegram_chat_id`, a field nothing else
+ * wrote and nothing else read. That made "assign a client's chat" ambiguous:
+ * linking here had no effect on the recap or KR Signal, and linking in TG
+ * Chats had no effect on call notes. One link, one meaning, one place.
  *
- * Creates the client_context row if it doesn't exist yet (insert),
- * otherwise updates in place.
+ * The chat must already exist in `telegram_chats` — the picker only offers
+ * chats the bot has seen, and the bot has to be a member to post anyway.
+ *
+ * Body: { chatId: string }  — TG chat ID as text (negative for groups)
+ *
+ * Auth: any authenticated user, unchanged.
  */
 export async function PATCH(
   request: Request,
@@ -36,44 +41,34 @@ export async function PATCH(
 
   const chatId = (body.chatId ?? '').trim();
   if (!chatId) {
-    return NextResponse.json(
-      { error: 'chatId is required' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'chatId is required' }, { status: 400 });
   }
 
-  // Service-role client because client_context RLS is permissive but
-  // we want consistent write semantics with the existing send-tg
-  // endpoint (which already uses service-role for the JSONB update).
+  // Service-role: telegram_chats isn't writable under the anon role here.
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  // Upsert the chat ID. Look first to decide insert vs update so we
-  // don't accidentally clobber other fields on update.
-  const { data: existing } = await (supabaseAdmin as any)
-    .from('client_context')
-    .select('id')
-    .eq('client_id', params.clientId)
+  const { data: chat } = await (supabaseAdmin as any)
+    .from('telegram_chats')
+    .select('id, client_id')
+    .eq('chat_id', chatId)
     .maybeSingle();
 
-  const nowIso = new Date().toISOString();
-  if (existing) {
-    const { error } = await (supabaseAdmin as any)
-      .from('client_context')
-      .update({ telegram_chat_id: chatId, updated_at: nowIso })
-      .eq('id', existing.id);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-  } else {
-    const { error } = await (supabaseAdmin as any)
-      .from('client_context')
-      .insert({ client_id: params.clientId, telegram_chat_id: chatId });
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  if (!chat?.id) {
+    return NextResponse.json({
+      error: 'That chat is not registered yet',
+      hint: 'The bot has to be a member and see one message before the chat can be linked.',
+    }, { status: 400 });
+  }
+
+  const { error } = await (supabaseAdmin as any)
+    .from('telegram_chats')
+    .update({ client_id: params.clientId, updated_at: new Date().toISOString() })
+    .eq('id', chat.id);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, chat_id: chatId });

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@/lib/supabase-server';
 import { TelegramService } from '@/lib/telegramService';
+import { resolveClientChatId } from '@/lib/clientTelegramChat';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,12 +94,21 @@ export async function POST(
     });
   }
 
-  const chatId = ((ctx as any).telegram_chat_id ?? '').trim();
+  // [2026-08-11] Resolves the same way the weekly-content-recap cron and KR
+  // Signal do — the chat linked to this client in /crm/telegram. This used to
+  // read client_context.telegram_chat_id, which nothing else wrote, so linking
+  // a chat in the UI left this reporting "not configured". That field is now a
+  // legacy last-resort only; see lib/clientTelegramChat.ts.
+  const chatId = await resolveClientChatId(
+    supabaseAdmin as any,
+    params.clientId,
+    (ctx as any).telegram_chat_id,
+  );
   if (!chatId) {
     return NextResponse.json({
       ok: false,
-      error: 'No telegram_chat_id configured on this client',
-      hint: 'Set client_context.telegram_chat_id from the Context tab before sending.',
+      error: 'No Telegram chat linked to this client',
+      hint: 'Link the client\'s Telegram group in TG Chats → Link client.',
     }, { status: 400 });
   }
 
