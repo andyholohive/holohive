@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@/lib/supabase-server';
 import { TelegramService } from '@/lib/telegramService';
 import { resolveClientChatId } from '@/lib/clientTelegramChat';
+import { toTelegramHtml } from '@/lib/callNoteFormat';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,9 +118,13 @@ export async function POST(
   // Action Items block all removed per Andy 2026-06-29 — the note
   // content is already a fully-formatted recap on its own, so the
   // generated chrome was duplicative on the client side.
-  const esc = (s: string | null | undefined): string =>
-    (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const message = note.content ? esc(note.content) : '';
+  //
+  // [2026-08-11] toTelegramHtml replaces a blanket escape of the whole
+  // string. It parses the note's **bold** / _italic_ / [link](url) subset
+  // first and escapes each text node on the way out, so formatting survives
+  // without opening an HTML injection into a client group. See
+  // lib/callNoteFormat.ts.
+  const message = note.content ? toTelegramHtml(note.content) : '';
 
   // ─── Send via TG ───────────────────────────────────────────────
   const sent = await TelegramService.sendToChat(chatId, message, 'HTML');

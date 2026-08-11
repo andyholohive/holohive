@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { renderCallNote } from '@/lib/callNoteFormat';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -556,8 +557,12 @@ export function CallNotesTab({
 
                   {isExpanded && (
                     <>
+                      {/* renderCallNote turns the **bold** / _italic_ /
+                          [link](url) subset into real elements — same parser
+                          the Telegram send uses, so what you see here is what
+                          the client gets. [2026-08-11] */}
                       <p className="text-xs text-ink-warm-700 whitespace-pre-wrap mb-2 mt-3">
-                        {note.content}
+                        {renderCallNote(note.content)}
                       </p>
 
                       {note.action_items.length > 0 && (
@@ -678,7 +683,13 @@ function CallNoteForm({
           placeholder={'One key takeaway per line — the dashboard splits these into bullets.\n\nExample:\n- Launch date confirmed for end of Q3\n- Client wants creative review SLA tightened'}
           className="focus-brand min-h-[120px]"
         />
-        <p className="text-[10px] text-ink-warm-500">Newline-separated bullets appear on the Team Dashboard's Client Success tab.</p>
+        <p className="text-[10px] text-ink-warm-500">
+          Newline-separated bullets appear on the Team Dashboard&apos;s Client Success tab.
+          {' '}Formatting carries through to Telegram:{' '}
+          <code className="px-1 py-0.5 rounded bg-cream-100 text-ink-warm-700">**bold**</code>{' '}
+          <code className="px-1 py-0.5 rounded bg-cream-100 text-ink-warm-700">_italic_</code>{' '}
+          <code className="px-1 py-0.5 rounded bg-cream-100 text-ink-warm-700">[text](url)</code>
+        </p>
       </div>
 
       <div className="grid gap-1.5">
