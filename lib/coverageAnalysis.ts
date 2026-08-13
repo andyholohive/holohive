@@ -29,6 +29,25 @@ export type CoverageContract = {
     channels_scanned: number;   // every channel we attempted
     channels_readable: number;  // scans that succeeded (ok or no_posts)
     scanned_at_latest: string | null;
+    // Where the posts came from. A targeted scan asked Telegram directly
+    // and is authoritative for its query; corpus matches are posts the
+    // mindshare crawler already held that contain a tracked keyword.
+    // Renderers must not present the two as the same claim.
+    posts_from_scan: number;
+    posts_from_corpus: number;
+    keywords_used: string[];
+    // How far back the corpus actually reaches, overall and per channel.
+    // THIS IS THE HONESTY FIELD. The crawler only started covering most
+    // channels in late July 2026, so a corpus-sourced count is bounded by
+    // when we began watching, not by when the subject was discussed. A
+    // client whose engagement predates `oldest_post` will look quiet for
+    // reasons that have nothing to do with their coverage — surface the
+    // window wherever these counts are shown.
+    corpus_window: {
+      oldest_post: string | null;
+      newest_post: string | null;
+      channels: Array<{ channel_handle: string | null; oldest_post: string }>;
+    };
   };
   // The sample's E-1..E-4 strip.
   counts: {
@@ -65,6 +84,54 @@ export type CoverageContract = {
   topic_split: null;
 };
 
+/**
+ * The subject's tracked keywords, for matching against the standing
+ * corpus. Projects carry them directly; a client inherits them from its
+ * linked mindshare project. A pipeline prospect has none, so it falls
+ * back to the scan's own query — which is the term someone actually
+ * searched for, and the best available stand-in.
+ *
+ * Keywords containing PostgREST filter punctuation are dropped rather
+ * than escaped: they'd corrupt the `.or()` string, and a keyword with a
+ * comma or bracket in it is not a real ticker.
+ */
+async function resolveSubjectKeywords(
+  supabase: SupabaseClient,
+  subjectType: string,
+  subjectId: string,
+  fallbackQuery: string | null,
+): Promise<string[]> {
+  let raw: unknown = null;
+  if (subjectType === 'project') {
+    const { data } = await (supabase as any)
+      .from('mindshare_projects').select('tracked_keywords').eq('id', subjectId).maybeSingle();
+    raw = data?.tracked_keywords ?? null;
+  } else if (subjectType === 'client') {
+    const { data } = await (supabase as any)
+      .from('mindshare_projects').select('tracked_keywords').eq('client_id', subjectId).maybeSingle();
+    raw = data?.tracked_keywords ?? null;
+  }
+  const list = Array.isArray(raw) ? raw : [];
+  const cleaned = list
+    .map(k => (typeof k === 'string' ? k.trim() : ''))
+    .filter(k => k.length >= 2 && !/[,()*]/.test(k));
+  if (cleaned.length > 0) return cleaned;
+  const fb = (fallbackQuery ?? '').trim();
+  return fb.length >= 2 && !/[,()*]/.test(fb) ? [fb] : [];
+}
+
+/** Page past PostgREST's 1,000-row response cap. */
+async function fetchAllPages(build: (from: number, to: number) => any, pageSize = 1000): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await build(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    out.push(...rows);
+    if (rows.length < pageSize) return out;
+  }
+}
+
 export async function buildCoverageContract(
   supabase: SupabaseClient,
   subjectType: string,
@@ -87,8 +154,70 @@ export async function buildCoverageContract(
   if (pErr) throw pErr;
   if (cErr) throw cErr;
 
-  const postRows = (posts ?? []) as any[];
+  const scanRows = (posts ?? []) as any[];
   const covRows = (coverage ?? []) as any[];
+
+  // [2026-08-13] Second source: the standing mindshare corpus.
+  //
+  // Coverage used to read ONLY subject-stamped rows, which meant every
+  // question — including "is this client being talked about" — required
+  // its own Telegram scan, while ~20k already-collected posts sat unread
+  // because a crawl isn't subject-scoped and leaves subject_id NULL.
+  //
+  // So both sources feed the contract and `generated_basis` records which
+  // is which. They are not the same claim: a scan asked Telegram for a
+  // term; a corpus match is a term appearing in posts we happened to be
+  // holding. The corpus is also bounded by when the crawler started on
+  // each channel, which is why corpus_window ships alongside the counts.
+  const keywords = await resolveSubjectKeywords(
+    supabase, subjectType, subjectId, scanRows[0]?.query ?? covRows[0]?.query ?? null,
+  );
+  const sinceIso = new Date(Date.now() - windowDays * 86400_000).toISOString();
+  let corpusRows: any[] = [];
+  if (keywords.length > 0) {
+    const orFilter = keywords.map(k => `text.ilike.%${k}%`).join(',');
+    corpusRows = await fetchAllPages((from, to) => (supabase as any)
+      .from('tg_channel_posts')
+      .select('channel_tg_id, channel_handle, channel_title, channel_type, tg_message_id, posted_at, text, views, reaction_total, is_forward, query')
+      .is('subject_type', null)
+      .gte('posted_at', sinceIso)
+      .or(orFilter)
+      .order('posted_at', { ascending: false })
+      .range(from, to));
+  }
+
+  // Union, scan rows winning — a targeted pull carries the query that
+  // produced it, which the crawler's copy of the same message doesn't.
+  const seen = new Set<string>(
+    scanRows.map(p => `${p.channel_tg_id ?? p.channel_handle}:${p.tg_message_id}`),
+  );
+  const freshCorpus = corpusRows.filter(
+    p => !seen.has(`${p.channel_tg_id ?? p.channel_handle}:${p.tg_message_id}`),
+  );
+  const postRows = [...scanRows, ...freshCorpus]
+    .sort((a, b) => String(b.posted_at).localeCompare(String(a.posted_at)));
+
+  // Per-channel corpus depth — the earliest post we hold for each channel
+  // the crawler covers. A count that starts after a client's engagement
+  // did is narrow, not low.
+  const corpusOldestByChannel = new Map<string, string>();
+  for (const p of corpusRows) {
+    const h = p.channel_handle ?? null;
+    if (!h) continue;
+    const cur = corpusOldestByChannel.get(h);
+    if (!cur || String(p.posted_at) < cur) corpusOldestByChannel.set(h, String(p.posted_at));
+  }
+  const corpusDates = corpusRows.map(p => String(p.posted_at)).sort();
+
+  // Denominator for E-3. Once corpus matches join in, "covered / channels
+  // we scanned" breaks the moment a keyword hits a channel this subject
+  // was never scanned against — it read 1133% on the first union run.
+  // The tracked network is the monitored-channel registry: what we watch,
+  // which is the only honest thing a percentage here can be "of".
+  const { count: monitoredCount } = await (supabase as any)
+    .from('tg_monitored_channels')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_active', true);
 
   const channelsScanned = covRows.length;
   const channelsReadable = covRows.filter(c => c.status === 'ok' || c.status === 'no_posts').length;
@@ -170,13 +299,28 @@ export async function buildCoverageContract(
       channels_scanned: channelsScanned,
       channels_readable: channelsReadable,
       scanned_at_latest: scannedAtLatest,
+      posts_from_scan: scanRows.length,
+      posts_from_corpus: freshCorpus.length,
+      keywords_used: keywords,
+      corpus_window: {
+        oldest_post: corpusDates[0] ?? null,
+        newest_post: corpusDates[corpusDates.length - 1] ?? null,
+        channels: [...corpusOldestByChannel.entries()]
+          .map(([channel_handle, oldest_post]) => ({ channel_handle, oldest_post }))
+          .sort((a, b) => a.oldest_post.localeCompare(b.oldest_post)),
+      },
     },
     counts: {
       channels_covered: channelsCovered,
       posts_total: postRows.length,
-      pct_of_tracked_network: channelsReadable > 0
-        ? Math.round((channelsCovered / channelsReadable) * 100)
-        : null,
+      pct_of_tracked_network: (() => {
+        // Prefer the monitored registry; fall back to readable scans for a
+        // scan-only subject with no corpus keywords. Never exceeds 100.
+        const denom = (monitoredCount ?? 0) > 0
+          ? Math.max(monitoredCount as number, channelsCovered)
+          : channelsReadable;
+        return denom > 0 ? Math.round((channelsCovered / denom) * 100) : null;
+      })(),
       channels_repeat: channelsRepeat,
     },
     channel_type_breakdown: channelTypeBreakdown,
