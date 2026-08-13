@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { matchesKeyword } from './mindshareScanner';
 
 /**
  * TG Intelligence Layer — the contract producer.
@@ -184,6 +185,14 @@ export async function buildCoverageContract(
       .or(orFilter)
       .order('posted_at', { ascending: false })
       .range(from, to));
+    // ILIKE %kw% is a substring test, so Postgres hands back "Ventral"
+    // for Tria. Re-check each row on the same word-boundary rule the
+    // mindshare scanner uses, or this reader reintroduces the 40%
+    // inflation the scanner just stopped producing.
+    corpusRows = corpusRows.filter(p => {
+      const lowered = String(p.text ?? '').toLowerCase();
+      return keywords.some(k => matchesKeyword(lowered, k.toLowerCase()));
+    });
   }
 
   // Union, scan rows winning — a targeted pull carries the query that

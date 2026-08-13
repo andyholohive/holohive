@@ -79,6 +79,36 @@ export function normalizeChannelId(raw: unknown): string | null {
   return s.replace(/^-100/, '').replace(/^-/, '') || null;
 }
 
+/**
+ * Does `haystack` contain `needle` as a word, rather than as a fragment
+ * buried inside a longer one?
+ *
+ * [2026-08-13] Matching used to be a bare `includes`, which counted
+ * "Ven*tria*l striatum", "As*tria*" and "*tria*l" as mentions of Tria.
+ * Measured across every ASCII-keyword mention: 1,689 of 4,248 (40%)
+ * matched only as a substring. Every project's number was inflated, and
+ * these are numbers that end up in front of clients.
+ *
+ * Boundaries are only meaningful for Latin-script keywords. Korean has
+ * no inter-word spacing in the relevant sense and attaches particles
+ * directly to nouns (하이퍼리퀴드는, 하이퍼리퀴드가), so a boundary rule
+ * there would reject genuine mentions — those keep substring matching.
+ */
+export function matchesKeyword(loweredText: string, keyword: string): boolean {
+  if (!/[a-z0-9]/i.test(keyword)) return loweredText.includes(keyword);
+  let from = 0;
+  for (;;) {
+    const i = loweredText.indexOf(keyword, from);
+    if (i === -1) return false;
+    const before = i === 0 ? '' : loweredText[i - 1];
+    const after = loweredText[i + keyword.length] ?? '';
+    // A neighbouring letter or digit means we landed mid-word. Anything
+    // else — space, punctuation, $, emoji, Hangul — is a real boundary.
+    if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    from = i + 1;
+  }
+}
+
 export async function runMindshareScan(
   supabase: SupabaseClient,
   opts: {
@@ -222,7 +252,7 @@ export async function runMindshareScan(
     for (const p of compiledProjects) {
       // First matching keyword wins (don't double-count one message
       // for one project even if multiple of its keywords appear).
-      const matched = p.lowerKeywords.find(kw => lowered.includes(kw));
+      const matched = p.lowerKeywords.find(kw => matchesKeyword(lowered, kw));
       if (!matched) continue;
       hits.push({
         project_id: p.id,
