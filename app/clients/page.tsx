@@ -3676,9 +3676,18 @@ export default function ClientsPage() {
                           const rows = pinnedRow && !baseSlice.some(c => c.id === pinnedId)
                             ? [pinnedRow, ...baseSlice]
                             : baseSlice;
+                          // [2026-08-14] The portal skips posts with no views —
+                          // metrics land on a daily cron that ignores content
+                          // under 48h old, so a post logged this morning reads 0
+                          // for a day or two and "Top Post: 0 views" in front of
+                          // a client is worse than no card. Mark those rows here
+                          // so a pin that won't publish yet is visible as such,
+                          // and hang Auto-pick off the row the portal would
+                          // actually choose rather than the raw top of the list.
+                          const autoPickId = topPostCandidates.find(c => c.impressions > 0)?.id ?? null;
                           return (
                             <div className="space-y-2">
-                              {rows.map((c, idx) => {
+                              {rows.map((c) => {
                                 const isPinned = pinnedId === c.id;
                                 return (
                                   <button
@@ -3698,11 +3707,14 @@ export default function ClientsPage() {
                                           {c.platform && (
                                             <span className="text-[10px] uppercase tracking-wider text-ink-warm-500">{c.platform}</span>
                                           )}
-                                          {idx === 0 && !isPinned && !pinnedId && (
+                                          {c.id === autoPickId && !isPinned && !pinnedId && (
                                             <StatusBadge tone="brand" size="sm" bordered>Auto-pick</StatusBadge>
                                           )}
                                           {isPinned && (
                                             <StatusBadge tone="warning" size="sm" bordered withDot>Pinned</StatusBadge>
+                                          )}
+                                          {c.impressions === 0 && (
+                                            <StatusBadge tone="neutral" size="sm" bordered>Hidden until views land</StatusBadge>
                                           )}
                                         </div>
                                         {c.notes && (

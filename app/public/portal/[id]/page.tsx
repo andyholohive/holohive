@@ -1124,7 +1124,15 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       // per spec § 3b. Separate pass from the stats above: they answer
       // different questions over different row sets, and folding them back
       // together is what caused the 2026-08-10 all-zeros incident.
+      //
+      // [2026-08-14] Rows with no views are not eligible. Metrics arrive on a
+      // daily cron that only touches content 48h+ old, so a post logged this
+      // morning legitimately reads 0 for a day or two — and "Top Performing
+      // Post: 0 views" in front of a client is worse than no card at all. A
+      // week where one post has landed still features that one; a week where
+      // nothing has landed yet shows nothing until the numbers arrive.
       for (const r of weekRows) {
+        if (!(r.impressions > 0)) continue;
         const rowEngagement =
           (r.impressions || 0) +
           (r.likes || 0) +
@@ -1188,9 +1196,15 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       // campaign's posted content, swap it in for topRow. Falls back
       // to the auto-pick if not found (e.g. post was archived or the
       // pinned content belongs to a different campaign).
+      //
+      // The zero-views rule applies to a pin too. A CM pinning a post can't
+      // see whether its metrics have landed yet, and the client sees the same
+      // empty card either way. A pin with no views falls through to the
+      // auto-pick — same as a pin that can't be found — so it takes effect on
+      // its own once the cron fills the numbers in.
       if (overrideContentId) {
         const pinned = weekRows.find(r => r.id === overrideContentId);
-        if (pinned) topRow = pinned;
+        if (pinned && pinned.impressions > 0) topRow = pinned;
       }
 
       if (!topRow) {
