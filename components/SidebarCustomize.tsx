@@ -105,6 +105,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
 
   // Measurement — Mindshare + Wallet Analytics. Admin-only.
   { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Measurement', requiredRole: 'admin' },
+  { href: '/intelligence/client-watch', label: 'Client Watch', icon: Radar, section: 'Measurement', requiredRole: 'admin' },
   { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Measurement', requiredRole: 'admin' },
 
   // Logistics — Reminders + Submissions + Meetings + TG Chats + Forms.

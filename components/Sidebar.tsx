@@ -298,7 +298,7 @@ export default function Sidebar({ children }: SidebarProps) {
       kols:        ['/kols', '/lists'],
       crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
-      measurement: ['/mindshare', '/wallets'],
+      measurement: ['/mindshare', '/intelligence/client-watch', '/wallets'],
       logistics:   ['/reminders', '/crm/submissions', '/crm/meetings', '/crm/telegram', '/forms'],
       admin:       ['/admin', '/archive'],
     };
@@ -820,6 +820,7 @@ export default function Sidebar({ children }: SidebarProps) {
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                 <CollapsibleSection id="measurement" icon={TrendingUp}>
                   {canSeePage("/mindshare") && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
+                  {canSeePage("/intelligence/client-watch") && <NavItem href="/intelligence/client-watch" icon={Radar} label="Client Watch" />}
                   {/* [Wallet Analytics v1, May 2026] Admin-only campaign-
                       participant intelligence — imported from the
                       Data Bank xlsx (1,197 wallets). */}
