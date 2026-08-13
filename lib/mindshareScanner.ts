@@ -89,24 +89,60 @@ export function normalizeChannelId(raw: unknown): string | null {
  * matched only as a substring. Every project's number was inflated, and
  * these are numbers that end up in front of clients.
  *
- * Boundaries are only meaningful for Latin-script keywords. Korean has
- * no inter-word spacing in the relevant sense and attaches particles
- * directly to nouns (하이퍼리퀴드는, 하이퍼리퀴드가), so a boundary rule
- * there would reject genuine mentions — those keep substring matching.
+ * Korean needs a different rule, not the same one. Hangul attaches
+ * particles directly to nouns (하이퍼리퀴드는, 하이퍼리퀴드가), so a
+ * trailing-boundary test rejects genuine mentions — which is why this
+ * started out as plain substring matching for Hangul.
+ *
+ * [2026-08-14] Substring was too loose in the other direction: short
+ * transliterations landed inside ordinary words. 뮤 (MEW) matched
+ * 커*뮤*니티 — "community" — 678 times in 30 days against 18 real
+ * mentions, which put a meme coin at #3 on the leaderboard. 세이 (Sei)
+ * matched 오디*세이*, "Odyssey", every single time. Across all short
+ * Hangul keywords that was 1,233 of 6,041 mentions, 20% of the month.
+ *
+ * The asymmetry is the fix: Korean particles are suffixes, never
+ * prefixes. So a Hangul keyword must not be *preceded* by Hangul, while
+ * anything may follow it. 커|뮤 is rejected, 하이퍼리퀴드|는 survives, and
+ * 이더리움 still counts for 이더 because the keyword starts the word.
  */
+const HANGUL = /[가-힣]/;
+
 export function matchesKeyword(loweredText: string, keyword: string): boolean {
-  if (!/[a-z0-9]/i.test(keyword)) return loweredText.includes(keyword);
+  const latin = /[a-z0-9]/i.test(keyword);
   let from = 0;
   for (;;) {
     const i = loweredText.indexOf(keyword, from);
     if (i === -1) return false;
     const before = i === 0 ? '' : loweredText[i - 1];
-    const after = loweredText[i + keyword.length] ?? '';
-    // A neighbouring letter or digit means we landed mid-word. Anything
-    // else — space, punctuation, $, emoji, Hangul — is a real boundary.
-    if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    if (latin) {
+      const after = loweredText[i + keyword.length] ?? '';
+      // A neighbouring letter or digit means we landed mid-word. Anything
+      // else — space, punctuation, $, emoji, Hangul — is a real boundary.
+      if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    } else if (!HANGUL.test(before)) {
+      // Leading boundary only — see above.
+      return true;
+    }
     from = i + 1;
   }
+}
+
+/**
+ * Is this keyword short enough that it will match ordinary language?
+ *
+ * One or two Hangul syllables is where the false-positive problem lives
+ * even with the boundary rule above: 온도 (Ondo) is the everyday word for
+ * "temperature" and stands alone as its own word, so no boundary test can
+ * separate it from a real mention. Surfaced at save time rather than
+ * silently dropped, because a few are legitimate — 이더 genuinely opens
+ * 이더리움.
+ */
+export function isRiskyKeyword(keyword: string): boolean {
+  const k = keyword.trim();
+  if (!k) return false;
+  if (/[a-z0-9]/i.test(k)) return false;
+  return HANGUL.test(k) && [...k].length <= 2;
 }
 
 export async function runMindshareScan(

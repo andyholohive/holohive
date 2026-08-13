@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChannelRegistry } from '@/components/mindshare/ChannelRegistry';
+import { isRiskyKeyword } from '@/lib/mindshareScanner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1981,7 +1982,25 @@ export default function MindsharePage() {
                       placeholder="solana, SOL, 솔라나"
                       className="focus-brand"
                     />
-                    <p className="text-[11px] text-ink-warm-500">Add Korean spellings + English + ticker. Each is matched as a substring (case-insensitive) in monitored channel messages.</p>
+                    <p className="text-[11px] text-ink-warm-500">Add Korean spellings + English + ticker. Latin keywords match whole words; Korean matches from a word start, so particles still count (하이퍼리퀴드는).</p>
+                    {(() => {
+                      // A one- or two-syllable Korean keyword lands inside ordinary
+                      // words no boundary rule can separate it from — 뮤 (MEW) matched
+                      // 커뮤니티 678 times in a month, 세이 (Sei) matched 오디세이 every
+                      // time. Warn rather than block: 이더 legitimately opens 이더리움.
+                      const risky = (projectForm.tracked_keywords || []).filter(isRiskyKeyword);
+                      if (risky.length === 0) return null;
+                      return (
+                        <p className="text-[11px] text-amber-700 flex items-start gap-1.5">
+                          <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          <span>
+                            {risky.map(k => `“${k}”`).join(', ')} {risky.length === 1 ? 'is' : 'are'} short enough to
+                            match ordinary Korean words. Prefer the full name (온도 → 온도파이낸스) unless it only ever
+                            appears as this project.
+                          </span>
+                        </p>
+                      );
+                    })()}
                   </div>
                   <div className="col-span-2 flex items-center gap-3">
                     <Switch checked={!!projectForm.is_pre_tge} onCheckedChange={(v) => setProjectForm(f => ({ ...f, is_pre_tge: v }))} />
