@@ -78,6 +78,26 @@ export async function GET() {
     .limit(400);
   const runs = (runRows ?? []) as any[];
 
+  // `output_summary` is jsonb, so it arrives as an object as often as a
+  // string. Flatten it here rather than in the panel — the client contract
+  // for this field is "a line of text", and rendering the raw object threw
+  // "Objects are not valid as a React child" and blanked the whole page.
+  const asLine = (v: unknown): string | null => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      for (const k of ['message', 'summary', 'detail', 'text']) {
+        if (typeof o[k] === 'string') return o[k] as string;
+      }
+      return Object.entries(o)
+        .map(([k, val]) => `${k}: ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
+        .join(' · ');
+    }
+    return String(v);
+  };
+
   // Roll the log up per job — a list of 400 rows answers nothing, "which
   // job is failing and when did it last work" does.
   const byAgent = new Map<string, any>();
@@ -89,8 +109,8 @@ export async function GET() {
     if (!a.last_at || r.started_at > a.last_at) {
       a.last_at = r.started_at;
       a.last_status = r.status;
-      a.last_error = r.error_message ?? null;
-      a.last_summary = r.output_summary ?? null;
+      a.last_error = asLine(r.error_message);
+      a.last_summary = asLine(r.output_summary);
     }
   }
 
