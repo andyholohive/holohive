@@ -453,8 +453,8 @@ export default function LineupsTab({
   }
 
   /** Extended lifecycle stage for one lineup (display only). */
-  function lifecycleStage(l: Pick<CampaignLineup, 'id' | 'status'>): LineupLifecycleStage {
-    return deriveLineupLifecycleStage(l.status, briefStats.get(l.id) ?? null);
+  function lifecycleStage(l: Pick<CampaignLineup, 'id' | 'status' | 'week_of'>): LineupLifecycleStage {
+    return deriveLineupLifecycleStage(l.status, briefStats.get(l.id) ?? null, l.week_of);
   }
 
   async function refreshLineup() {

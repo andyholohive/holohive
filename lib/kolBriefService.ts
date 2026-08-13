@@ -365,7 +365,7 @@ export class KolBriefService {
       week_number: lineup.week_number,
       week_of: lineup.week_of,
       status: lineup.status,
-      stage: deriveLineupLifecycleStage(lineup.status as LineupStatus, briefStats),
+      stage: deriveLineupLifecycleStage(lineup.status as LineupStatus, briefStats, lineup.week_of),
       angles: anglesOut,
       sentCount,
       openedCount,

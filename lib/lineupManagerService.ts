@@ -58,10 +58,28 @@ export type LineupBriefStats = { minted: number; sent: number };
 export function deriveLineupLifecycleStage(
   status: LineupStatus,
   brief: LineupBriefStats | null | undefined,
+  /** `campaign_lineups.week_of` (YYYY-MM-DD). Pass it wherever it's on hand. */
+  weekOf?: string | null,
 ): LineupLifecycleStage {
   if (status !== 'confirmed') return status;
+  // A week that is over is over. The brief stages describe work in flight,
+  // so once the week has ended they stop being the useful fact — a week
+  // whose links were never minted was reading "Brief Preview" weeks later.
+  // Same rule the LINEUP_COMPLETION cron flips the stored status on
+  // (week_of + 6 < today); this just doesn't wait for 06:00 UTC.
+  if (weekOf && hasWeekEnded(weekOf)) return 'completed';
   if (!brief || brief.minted === 0) return 'brief_preview';
   return brief.sent >= brief.minted ? 'delivered' : 'approved';
+}
+
+/** Has the Mon-anchored week starting `weekOf` (YYYY-MM-DD) finished? */
+export function hasWeekEnded(weekOf: string): boolean {
+  const end = new Date(`${weekOf}T00:00:00Z`);
+  if (Number.isNaN(end.getTime())) return false;
+  end.setUTCDate(end.getUTCDate() + 6);
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  return end.getTime() < todayUtc;
 }
 
 export type LineupSlotStatus = 'pending' | 'posted' | 'missed';
