@@ -14,6 +14,7 @@ import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChannelRegistry } from '@/components/mindshare/ChannelRegistry';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -2124,6 +2125,10 @@ export default function MindsharePage() {
 
         {/* ─── Channels ────────────────────────────────────────── */}
         <TabsContent value="channels" className="space-y-4 mt-4">
+          {/* The registry first — import and scan controls are the plumbing,
+              but the question you arrive with is "is what we watch still
+              producing", and 17 active channels are currently silent. */}
+          <ChannelRegistry />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Bulk import */}
             <Card className="border-cream-200 p-4">
