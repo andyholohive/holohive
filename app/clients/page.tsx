@@ -3631,6 +3631,15 @@ export default function ClientsPage() {
                                 ? 'Pinned post overrides the auto-pick on the portal. Click again to unpin.'
                                 : 'Top 3 by engagement. Click any row to pin it as this week’s feature.'}
                             </p>
+                            {/* [2026-08-14] State the metrics lag here rather than
+                                only badging the affected rows. Without it, a post
+                                sitting at 0 reads as a post that flopped, and a CM
+                                pinning one has no way to know why nothing appears
+                                on the portal. */}
+                            <p className="text-[11px] text-emerald-800/60 mt-0.5">
+                              Views refresh daily, starting ~48h after a post is logged. Posts still at 0
+                              are held back from the portal — including pinned ones — until their numbers arrive.
+                            </p>
                           </div>
                           {topPostShowAll && (
                             <Button
