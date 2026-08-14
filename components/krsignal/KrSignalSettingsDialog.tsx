@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
+import { WeeklyReviewPanel } from './WeeklyReviewPanel';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
 import { Radio, Search, X, Plus, ChevronDown, Sliders, Loader2, Eye, Send, AlertTriangle } from 'lucide-react';
@@ -361,6 +362,13 @@ export function KrSignalSettingsDialog({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto pr-1 space-y-6">
+            {/* ── Pending review ──────────────────────────
+                [2026-08-14 per Andy] Reports now wait for a human before a
+                client sees them. This is where Telegram's "Edit" button lands
+                — it renders nothing when the queue is empty, so the dialog is
+                unchanged on any day without a report waiting. */}
+            <WeeklyReviewPanel krClientId={configId} onSent={() => { setReportsLoaded(false); }} />
+
             {/* ── Token identity ─────────────────────────── */}
             <Section title="Token identity">
               <div className="grid grid-cols-2 gap-3">

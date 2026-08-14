@@ -91,6 +91,12 @@ type ClientHealthRow = {
   // [2026-07-10] TG Comment Sentiment v3 — FUD spike in the last 14 days
   // (>=15% of scored comments or 5+ on one post; thresholds per Jdot).
   fudAlert?: boolean;
+  /** What fired the FUD alert — arithmetic + verbatims. Null unless alerted. */
+  fudDetail?: {
+    fud: number; scored: number; sharePct: number; maxOnPost: number;
+    reason: 'share' | 'concentration' | 'share + concentration' | null;
+    comments: Array<{ text: string; original: string | null; sentAt: string; reactions: number; link: string | null }>;
+  } | null;
   // [2026-07-06] Coverage-aware engagement status matching the Clients
   // page (active = covered today, paused = coverage lapsed).
   status: 'active' | 'paused';
@@ -191,14 +197,19 @@ function FragmentRow({
   hasDelivery: boolean;
   onToggle: () => void;
 }) {
+  // [2026-08-14] A client can be worth expanding for either reason — this
+  // week's KOL delivery, or a FUD spike we now explain inline. Gating the
+  // chevron on delivery alone hid the FUD detail on any client with no
+  // lineup that week.
+  const expandable = hasDelivery || Boolean(client.fudAlert && client.fudDetail);
   return (
     <>
       <TableRow
-        className="border-cream-100 row-accent cursor-pointer"
-        onClick={onToggle}
+        className={`border-cream-100 row-accent ${expandable ? 'cursor-pointer' : ''}`}
+        onClick={expandable ? onToggle : undefined}
       >
         <TableCell className="py-3.5 px-2 align-middle">
-          {hasDelivery ? (
+          {expandable ? (
             isExpanded
               ? <ChevronDown className="h-4 w-4 text-ink-warm-400" />
               : <ChevronRight className="h-4 w-4 text-ink-warm-400" />
@@ -262,6 +273,55 @@ function FragmentRow({
             : <span className="text-ink-warm-300">—</span>}
         </TableCell>
       </TableRow>
+
+      {/* ── Expanded FUD detail ─────────────────────────────────────── */}
+      {/* [2026-08-14 per Andy] The badge said a client tripped the alert but
+          not what was said, so the only way to act on it was to open the
+          campaign page and hunt. Expanding the row now shows the arithmetic
+          that fired it plus the actual comments, English gloss first with the
+          Korean underneath, each linking to the post. */}
+      {isExpanded && client.fudAlert && client.fudDetail && (
+        <TableRow className="bg-rose-50/40 hover:bg-rose-50/40 border-cream-100">
+          <TableCell colSpan={8} className="py-0 px-5">
+            <div className="py-3">
+              <div className="text-[10px] font-semibold text-rose-700 uppercase tracking-[0.18em] mb-2">
+                FUD spike · why
+                <span className="ml-2 text-ink-warm-500 normal-case font-normal tracking-normal">
+                  {client.fudDetail.fud} of {client.fudDetail.scored} scored comments ({client.fudDetail.sharePct}%) in the last 14 days
+                  {client.fudDetail.maxOnPost > 1 ? ` · up to ${client.fudDetail.maxOnPost} on one post` : ''}
+                  {client.fudDetail.reason ? ` · tripped on ${client.fudDetail.reason}` : ''}
+                  {' '}· threshold 15% of scored, or 5 on one post
+                </span>
+              </div>
+              {client.fudDetail.comments.length === 0 ? (
+                <p className="text-xs text-ink-warm-500">
+                  No verbatims available — the comments were scored but their text is no longer retrievable.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {client.fudDetail.comments.map((c, i) => (
+                    <div key={i} className="rounded-md border border-rose-100 bg-white px-3 py-2">
+                      <p className="text-xs text-ink-warm-800 leading-snug">{c.text}</p>
+                      {c.original && (
+                        <p className="text-[11px] text-ink-warm-400 leading-snug mt-0.5">{c.original}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-ink-warm-400">
+                        <span>{formatDate(c.sentAt)}</span>
+                        {c.reactions > 0 && <span>· {c.reactions} reactions</span>}
+                        {c.link && (
+                          <a href={c.link} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                            View post
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
 
       {/* ── Expanded KOL roll-up sub-row ────────────────────────────── */}
       {isExpanded && hasDelivery && (

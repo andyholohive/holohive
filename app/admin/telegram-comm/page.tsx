@@ -30,7 +30,7 @@ import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
   CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio, Newspaper, Send,
-  ListChecks,
+  ListChecks, ClipboardCheck,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
@@ -575,6 +575,9 @@ export default function LineupSettingsPage() {
       {/* ─── KR Signal Bot section [2026-07-10] ─── */}
       <KrSignalClientsSection />
 
+      {/* ─── KR Signal weekly review section [2026-08-14] ─── */}
+      <KrSignalReviewSection />
+
       {/* ─── Document Portal Alerts section [2026-07-17] ─── */}
       <DocumentPortalAlertsSection />
 
@@ -584,6 +587,136 @@ export default function LineupSettingsPage() {
       {/* ─── Action Board sweep section [2026-07-28] ─── */}
       <ActionBoardCronSection />
     </div>
+  );
+}
+
+
+/**
+ * KrSignalReviewSection — picker for the chat that reviews weekly KR Signal
+ * reports before clients see them.
+ *
+ * [2026-08-14 per Andy] Weekly reports no longer go straight out. Saturday's
+ * cron builds each one and posts it here with Approve / Edit / Skip; Sunday's
+ * cron delivers only what was approved, and re-posts anything still pending as
+ * a "this did NOT go out" card.
+ *
+ * Anyone in this chat can approve — the surface IS the permission, so point it
+ * at an internal chat, never a client GC. Leaving it unset is the one genuinely
+ * broken state: reports still generate but nobody is asked, so nothing ever
+ * sends. The badge says so rather than reading as merely "optional".
+ */
+function KrSignalReviewSection() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedChatId, setSavedChatId] = useState<string>('');
+  const [savedThreadId, setSavedThreadId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('');
+  const [threadId, setThreadId] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [chatSetting, threadSetting] = await Promise.all([
+          (supabase as any).from('app_settings').select('value').eq('key', 'kr_signal_review_chat_id').maybeSingle(),
+          (supabase as any).from('app_settings').select('value').eq('key', 'kr_signal_review_thread_id').maybeSingle(),
+        ]);
+        const c = (chatSetting.data as any)?.value ?? '';
+        const t = (threadSetting.data as any)?.value ?? '';
+        setSavedChatId(c);
+        setSavedThreadId(t);
+        setChatId(c);
+        setThreadId(t);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const isDirty = chatId !== savedChatId || threadId !== savedThreadId;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'kr_signal_review_chat_id', value: chatId || null }, { onConflict: 'key' });
+      await (supabase as any)
+        .from('app_settings')
+        .upsert({ key: 'kr_signal_review_thread_id', value: threadId || null }, { onConflict: 'key' });
+      setSavedChatId(chatId);
+      setSavedThreadId(threadId);
+      toast({
+        title: chatId ? 'Review chat saved' : 'Review chat cleared',
+        description: chatId
+          ? 'Weekly reports will be posted here for approval before any client sees them.'
+          : 'Warning: with no review chat, reports generate but can never be approved — nothing will send.',
+        variant: chatId ? undefined : 'destructive',
+      });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <CollapsibleSection
+      icon={ClipboardCheck}
+      title="KR Signal Weekly Review"
+      badge={!loading
+        ? (savedChatId
+            ? <StatusBadge tone="success" size="sm"><span className="inline-flex items-center gap-1"><Check className="h-2.5 w-2.5" />Set</span></StatusBadge>
+            : <StatusBadge tone="danger" size="sm">Blocking sends</StatusBadge>)
+        : null}
+      subtitle={(
+        <>Where weekly KR market reports go for <b>approval</b> before a client sees them. Anyone in this chat can approve, so pick an internal chat — never a client group.</>
+      )}
+    >
+      <WhenItSends>
+        Saturday 12:00 UTC each report is built and posted here with Approve /
+        Edit / Skip. Sunday 12:00 UTC only approved reports go to clients;
+        anything still pending is re-posted here as “not sent”, still
+        approvable in one tap. Edit opens the report in Korea Signal settings
+        on the Clients page.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4 space-y-4">
+          {loading ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
+              {!savedChatId && (
+                <div className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-rose-600 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-rose-700 leading-snug">
+                    No review chat set. Reports are still generated and queued, but
+                    nobody is asked to approve them — so no client receives one.
+                  </p>
+                </div>
+              )}
+              <ChatThreadPicker
+                chatId={chatId}
+                threadId={threadId}
+                onChange={({ chatId: nextChat, threadId: nextThread }) => {
+                  setChatId(nextChat);
+                  setThreadId(nextThread);
+                }}
+                label="Review chat"
+                disabled={saving}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="brand" size="sm" onClick={handleSave} disabled={saving || !isDirty}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
   );
 }
 

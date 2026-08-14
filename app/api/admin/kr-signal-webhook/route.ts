@@ -109,11 +109,28 @@ export async function POST(request: Request) {
   const url = webhookUrl(request);
   const secret = process.env.KR_SIGNAL_WEBHOOK_SECRET;
 
-  const body: Record<string, string> = { url };
+  const body: Record<string, unknown> = { url };
   // Omitting secret_token CLEARS any previously registered one, which is the
   // correct pairing: no secret in the env means the route's gate is off, so
   // Telegram must stop sending a token the route would no longer check.
   if (secret) body.secret_token = secret;
+
+  // [2026-08-14] State it rather than inherit it. Telegram's rule for
+  // allowed_updates on setWebhook is "if not specified, the PREVIOUS setting
+  // is kept" — not "reset to default" — so an omitted list silently carries
+  // forward whatever was registered at some point in the past. The weekly
+  // review buttons are callback_query updates; if this webhook was ever
+  // registered with a narrower list, Approve/Edit/Skip would do nothing and
+  // the only symptom would be a button that spins and gives up. Same failure
+  // shape as the Venice send: silent, weekly, invisible. Mirrors the main
+  // bot's list in lib/telegramService.ts.
+  body.allowed_updates = [
+    'message',
+    'edited_message',
+    'channel_post',
+    'my_chat_member',
+    'callback_query',
+  ];
 
   const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
     method: 'POST',

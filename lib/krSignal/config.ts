@@ -140,6 +140,26 @@ export async function loadClientByKey(supabase: SupabaseClient, key: string): Pr
   return (data as unknown as KrSignalClient) ?? null;
 }
 
+/** One config by its own id, WITH the digest destination resolved.
+ *  The review flow needs this: a weekly row stores kr_signal_clients.id, and
+ *  approving it has to re-resolve the destination the same way the cron would
+ *  — an override edited between generation and approval must win. */
+export async function loadClientById(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<KrSignalClient | null> {
+  const { data, error } = await supabase
+    .from("kr_signal_clients")
+    .select(COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`loadClientById: ${error.message}`);
+  if (!data) return null;
+  const client = data as unknown as KrSignalClient;
+  await attachResolvedChats(supabase, [client]);
+  return client;
+}
+
 /** The KR Signal config linked to a HHP client, or null if none exists yet.
  *  Powers the per-client Korea Signal settings dialog on /clients. */
 export async function loadConfigByHhpClientId(

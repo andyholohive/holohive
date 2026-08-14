@@ -1841,8 +1841,15 @@ export default function SOPsPage() {
               setRunAllQueue(rest);
               setWizardTemplateId(next.templateId);
               setWizardInitialTitle(next.title);
-              // wizardOpen stays true; the key change remounts the wizard
-              // for the next template.
+              // [2026-08-14] Re-open explicitly. This used to rely on
+              // "wizardOpen stays true", which was wrong: DeliverableWizard
+              // calls onOpenChange(false) immediately BEFORE onCreated
+              // (DeliverableWizard.tsx:287-288), so by this point the dialog
+              // has already closed itself and the queue-clear guard below has
+              // fired. The chain advanced its template id into a closed
+              // dialog, so Run All only ever prompted for the first template
+              // and every one after it was silently skipped.
+              setWizardOpen(true);
               toast({ title: 'Deliverable created', description: `Next up: ${next.title}` });
               return;
             }

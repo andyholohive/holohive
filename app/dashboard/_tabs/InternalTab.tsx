@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { SectionHeader } from '@/components/ui/section-header';
 import { CardHeaderEditorial } from '@/components/ui/card-header-editorial';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   SectionHeaderSkeleton, KpiCardSkeleton, TableCardSkeleton, ListCardSkeleton,
 } from './SkeletonHelpers';
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import {
   Users, ListTodo, AlertCircle, CheckCircle2, Flame, Compass, ClipboardCheck,
-  ChevronDown,
+  ChevronDown, TrendingUp,
 } from 'lucide-react';
 
 type CompletedTask = { id: string; title: string; completed_at: string | null; client: string | null };
@@ -85,7 +86,11 @@ type AdHocTask = {
 };
 
 type Scorecard = {
-  kind: 'renewal' | 'on_time' | 'composite';
+  /** `client_week` replaced `renewal` for Bolt on 2026-08-14. The card body
+   *  is kind-agnostic — it renders valuePct + the captions the API sends. */
+  kind: 'client_week' | 'on_time' | 'composite';
+  /** One concrete lever that moves this score — rendered as the card's hover. */
+  improvement: string;
   person: { id: string; name: string; photo: string | null };
   /** Headline value, 0–100. null means "no signal yet" — UI shows "—". */
   valuePct: number | null;
@@ -339,9 +344,16 @@ export default function InternalTab() {
       {data.scorecards.length > 0 && (
         <div className="space-y-4">
           <SectionHeader label="Scorecards" dot="violet" counter="02 — Anchor metrics · Live" />
+          {/* [2026-08-14 per Andy] Hovering a card says how to move the score.
+              The number alone is a grade; the tooltip names the one lever and
+              quotes the live shortfall, so "why am I at 63%" is answerable
+              without reading the route. */}
+          <TooltipProvider delayDuration={200}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {data.scorecards.map(sc => (
-              <Card key={sc.person.id} className="border-cream-200 p-4 flex flex-col gap-2">
+              <Tooltip key={sc.person.id}>
+              <TooltipTrigger asChild>
+              <Card className="border-cream-200 p-4 flex flex-col gap-2 cursor-help">
                 <div className="flex items-center gap-2.5">
                   {sc.person.photo ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
@@ -360,8 +372,30 @@ export default function InternalTab() {
                 <div className="text-[11px] text-ink-warm-500 leading-snug">{sc.detail}</div>
                 <div className="text-[10px] uppercase tracking-[0.14em] text-ink-warm-400 mt-1">{sc.sourceCaption}</div>
               </Card>
+              </TooltipTrigger>
+              {/* Kicker + hairline + body, same shape as CardHeaderEditorial —
+                  a tooltip this long reads as a mini-card, not a label, so it
+                  gets the page's card chrome rather than the shadcn default. */}
+              <TooltipContent
+                side="bottom"
+                align="start"
+                sideOffset={6}
+                className="max-w-[300px] !bg-white border-cream-200 shadow-lg rounded-lg p-0 overflow-hidden"
+              >
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-cream-50/70 border-b border-cream-100">
+                  <TrendingUp className="h-3 w-3 text-brand shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                    How to improve
+                  </span>
+                </div>
+                <p className="px-3 py-2.5 text-xs leading-relaxed text-ink-warm-700">
+                  {sc.improvement}
+                </p>
+              </TooltipContent>
+              </Tooltip>
             ))}
           </div>
+          </TooltipProvider>
         </div>
       )}
 

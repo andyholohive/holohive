@@ -93,6 +93,11 @@ export async function getClientPrior(
     .from("kr_signal_client_weekly")
     .select(`week_ending, ${metric}`)
     .eq("client_id", clientId)
+    // [2026-08-14] Delivered weeks only. Rows now persist at GENERATION time,
+    // so a report that was skipped (or is still awaiting approval) would
+    // otherwise become the baseline for next week's "vs last week" — printing
+    // a comparison against a week the client never saw.
+    .eq("status", "sent")
     .lt("week_ending", beforeWeek)
     .order("week_ending", { ascending: false })
     .limit(1)
@@ -114,6 +119,7 @@ export async function getClientKrVolPrior(
     .from("kr_signal_client_weekly")
     .select("week_ending, kr_token_vol_usd, kr_token_vol_window")
     .eq("client_id", clientId)
+    .eq("status", "sent")   // delivered weeks only — see getClientPrior
     .lt("week_ending", beforeWeek)
     .order("week_ending", { ascending: false })
     .limit(1)
@@ -195,4 +201,168 @@ export async function refreshBaselines(
     }
   }
   return out;
+}
+
+// ─── Weekly review queue ──────────────────────────────────────────────────
+//
+// A weekly report is now written the day BEFORE it can go out, in
+// `pending_review`, and only reaches the client when someone approves it.
+// These helpers are the whole state machine; the crons, the webhook and the
+// in-app editor all go through them so the transitions can't drift apart.
+
+export type WeeklyReviewStatus = "pending_review" | "approved" | "sent" | "skipped";
+
+export interface WeeklyReviewRow {
+  id: string;
+  client_id: string;
+  week_ending: string;
+  status: WeeklyReviewStatus;
+  report_html: string | null;
+  edited_html: string | null;
+  preflight: { ok: boolean; chat_id?: string | null; title?: string | null; error?: string } | null;
+  review_chat_id: string | null;
+  review_message_id: number | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  sent_at: string | null;
+}
+
+const REVIEW_COLUMNS =
+  "id, client_id, week_ending, status, report_html, edited_html, preflight, review_chat_id, review_message_id, approved_by_name, approved_at, sent_at";
+
+/** Park a freshly-generated report for review. Upsert so re-running the
+ *  generate cron in the same week refreshes the numbers rather than
+ *  duplicating the row — but never clobbers a decision already made. */
+export async function saveWeeklyForReview(
+  supabase: SupabaseClient,
+  clientId: string,
+  weekEnding: string,
+  vals: ClientWeekly & {
+    preflight: WeeklyReviewRow["preflight"];
+  }
+): Promise<WeeklyReviewRow | null> {
+  const { data: existing } = await supabase
+    .from("kr_signal_client_weekly")
+    .select("status")
+    .eq("client_id", clientId)
+    .eq("week_ending", weekEnding)
+    .maybeSingle();
+
+  // Re-generating over a sent or skipped week would resurrect a decided
+  // report as pending. Refresh nothing; the decision stands.
+  if (existing && (existing as any).status !== "pending_review") return null;
+
+  const { data, error } = await supabase
+    .from("kr_signal_client_weekly")
+    .upsert(
+      {
+        client_id: clientId,
+        week_ending: weekEnding,
+        status: "pending_review",
+        // Re-generating replaces the numbers, so any edit made against the
+        // PREVIOUS render is now attached to a report that no longer exists.
+        // Dropping it is the safe direction: the operator re-edits fresh copy
+        // instead of silently shipping last run's wording over new figures.
+        edited_html: null,
+        edited_at: null,
+        ...vals,
+      },
+      { onConflict: "client_id,week_ending" }
+    )
+    .select(REVIEW_COLUMNS)
+    .single();
+  if (error) throw new Error(`saveWeeklyForReview: ${error.message}`);
+  return data as unknown as WeeklyReviewRow;
+}
+
+/** Everything still waiting on a human, oldest week first. */
+export async function listWeekliesAwaitingReview(
+  supabase: SupabaseClient,
+  clientId?: string
+): Promise<WeeklyReviewRow[]> {
+  let q = supabase
+    .from("kr_signal_client_weekly")
+    .select(REVIEW_COLUMNS)
+    .in("status", ["pending_review", "approved"])
+    .order("week_ending", { ascending: true });
+  if (clientId) q = q.eq("client_id", clientId);
+  const { data, error } = await q;
+  if (error) throw new Error(`listWeekliesAwaitingReview: ${error.message}`);
+  return (data ?? []) as unknown as WeeklyReviewRow[];
+}
+
+export async function getWeeklyReviewById(
+  supabase: SupabaseClient,
+  id: string
+): Promise<WeeklyReviewRow | null> {
+  const { data } = await supabase
+    .from("kr_signal_client_weekly")
+    .select(REVIEW_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  return (data as unknown as WeeklyReviewRow) ?? null;
+}
+
+/** Store the operator's edited copy. Stays pending — editing is not approving,
+ *  so a typo fix can't accidentally ship the report. */
+export async function saveWeeklyEdit(
+  supabase: SupabaseClient,
+  id: string,
+  editedHtml: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("kr_signal_client_weekly")
+    .update({ edited_html: editedHtml, edited_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "pending_review");
+  if (error) throw new Error(`saveWeeklyEdit: ${error.message}`);
+}
+
+/** Record the delivery. `approved_by` is nullable on purpose: approval can come
+ *  from the ops chat, where the actor is a Telegram user we may not be able to
+ *  map to a HHP account — the name is always kept so the audit line reads. */
+export async function markWeeklySent(
+  supabase: SupabaseClient,
+  id: string,
+  opts: { messageId: number; byName: string | null; byUserId?: string | null }
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("kr_signal_client_weekly")
+    .update({
+      status: "sent",
+      sent_at: now,
+      sent_message_id: opts.messageId,
+      approved_at: now,
+      approved_by_name: opts.byName,
+      approved_by: opts.byUserId ?? null,
+    })
+    .eq("id", id);
+  if (error) throw new Error(`markWeeklySent: ${error.message}`);
+}
+
+export async function markWeeklySkipped(
+  supabase: SupabaseClient,
+  id: string,
+  byName: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from("kr_signal_client_weekly")
+    .update({ status: "skipped", approved_at: new Date().toISOString(), approved_by_name: byName })
+    .eq("id", id);
+  if (error) throw new Error(`markWeeklySkipped: ${error.message}`);
+}
+
+/** Remember where the review card was posted so approve/skip can edit it in
+ *  place instead of leaving a live button on a decided report. */
+export async function attachReviewCard(
+  supabase: SupabaseClient,
+  id: string,
+  chatId: string,
+  messageId: number
+): Promise<void> {
+  await supabase
+    .from("kr_signal_client_weekly")
+    .update({ review_chat_id: chatId, review_message_id: messageId })
+    .eq("id", id);
 }

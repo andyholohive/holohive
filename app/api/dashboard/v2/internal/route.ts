@@ -267,12 +267,20 @@ export async function GET() {
         .order('start_date', { ascending: true }),
       // Promoted specs completed in the last 30d (Andy scorecard). Merged
       // model: initiatives are specs with is_initiative=true.
+      //
+      // [2026-08-14] Windowed on initiative_completed_at, NOT updated_at.
+      // updated_at is a row-touch timestamp: it let a completed initiative
+      // age out on a clock unrelated to when it shipped, and — the direction
+      // that actually matters — re-entering the window every time anyone
+      // edited the row, so the score could be raised by opening and saving an
+      // old record. The new column is trigger-stamped on the transition and
+      // cleared if an initiative reopens.
       (sb as any)
         .from('specs')
-        .select('id, owner_id, initiative_status, updated_at')
+        .select('id, owner_id, initiative_status, initiative_completed_at')
         .eq('is_initiative', true)
         .eq('initiative_status', 'completed')
-        .gte('updated_at', SCORE_LOOKBACK_30D_ISO),
+        .gte('initiative_completed_at', SCORE_LOOKBACK_30D_ISO),
       (sb as any)
         .from('backlog_items')
         .select('id, assignee_id, type, live_at')
@@ -579,25 +587,173 @@ export async function GET() {
       ? Math.round(initShippedPct * 0.625 + bugsShippedPct * 0.375)
       : null;
 
+    // ─── Client-week completeness (Bolt) ─────────────────────────────
+    //
+    // [2026-08-14 per Andy, Jdot option 3] Replaces the 90-day renewal rate.
+    // Renewal measured a company outcome Bolt doesn't solely control and, with
+    // ~7 clients, sat under its minimum denominator most of the year — the
+    // card read "—". This measures the thing his week actually consists of,
+    // from the CLIENT's side: for each week a client was under contract, did
+    // the client-visible artifacts land?
+    //
+    // Score = clean client-weeks ÷ covered client-weeks.
+    //
+    // Weeks are Monday-anchored and only counted while a stint covers them, so
+    // a client who started last month isn't scored on weeks before they were
+    // ours. The current (incomplete) week is excluded — a week still in
+    // progress isn't a miss yet.
+    const CLIENT_WEEK_LOOKBACK = 8;
+
+    /**
+     * Signals a client should see each week. `enabled: false` means the
+     * underlying stamp exists but nothing writes it yet, so it's held out of
+     * the score rather than marking every week a miss — the same
+     * renormalize-and-say-so treatment Andy's composite uses.
+     */
+    const CLIENT_WEEK_SIGNALS = [
+      { key: 'weekly_update', label: 'weekly update', enabled: true },
+      { key: 'client_facing', label: 'client-facing delivery', enabled: true },
+      // [2026-08-14] OFF: client_meeting_notes has 1 row total and 0 with
+      // sent_to_client_tg_at — the TG send is built but ops doesn't use it.
+      // Flip to true once summaries are actually being sent, and the score
+      // tightens on its own.
+      { key: 'sync_summary', label: 'sync summary to client channel', enabled: false },
+    ] as const;
+    const activeSignals = CLIENT_WEEK_SIGNALS.filter(s => s.enabled);
+    const omittedSignals = CLIENT_WEEK_SIGNALS.filter(s => !s.enabled);
+
+    // Monday of the current week; the lookback ends the Monday before it.
+    const mondayOf = (d: Date) => {
+      const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+      return x;
+    };
+    const thisMonday = mondayOf(new Date());
+    const clientWeeks: string[] = [];
+    for (let i = CLIENT_WEEK_LOOKBACK; i >= 1; i--) {
+      const w = new Date(thisMonday);
+      w.setUTCDate(w.getUTCDate() - i * 7);
+      clientWeeks.push(w.toISOString().slice(0, 10));
+    }
+    const windowStart = clientWeeks[0];
+    const windowEndExclusive = thisMonday.toISOString().slice(0, 10);
+
+    const [cwUpdatesRes, cwDeliveryRes, cwSyncRes] = await Promise.all([
+      (sb as any)
+        .from('client_weekly_updates')
+        .select('client_id, week_of')
+        .gte('week_of', windowStart)
+        .lt('week_of', windowEndExclusive),
+      (sb as any)
+        .from('client_delivery_log')
+        .select('client_id, logged_at')
+        .eq('work_type', 'Client-Facing')
+        .gte('logged_at', windowStart)
+        .lt('logged_at', windowEndExclusive),
+      (sb as any)
+        .from('client_meeting_notes')
+        .select('client_id, sent_to_client_tg_at')
+        .not('sent_to_client_tg_at', 'is', null)
+        .gte('sent_to_client_tg_at', windowStart)
+        .lt('sent_to_client_tg_at', windowEndExclusive),
+    ]);
+
+    /** `${client_id}|${week_of}` keys, one set per signal. */
+    const cwKey = (clientId: string, week: string) => `${clientId}|${week}`;
+    const weekOfDate = (iso: string) => mondayOf(new Date(iso)).toISOString().slice(0, 10);
+    const hitUpdate = new Set<string>();
+    for (const r of ((cwUpdatesRes.data ?? []) as any[])) {
+      if (r.client_id && r.week_of) hitUpdate.add(cwKey(r.client_id, weekOfDate(r.week_of)));
+    }
+    const hitDelivery = new Set<string>();
+    for (const r of ((cwDeliveryRes.data ?? []) as any[])) {
+      if (r.client_id && r.logged_at) hitDelivery.add(cwKey(r.client_id, weekOfDate(r.logged_at)));
+    }
+    const hitSync = new Set<string>();
+    for (const r of ((cwSyncRes.data ?? []) as any[])) {
+      if (r.client_id && r.sent_to_client_tg_at) hitSync.add(cwKey(r.client_id, weekOfDate(r.sent_to_client_tg_at)));
+    }
+    const signalHit: Record<string, Set<string>> = {
+      weekly_update: hitUpdate, client_facing: hitDelivery, sync_summary: hitSync,
+    };
+
+    // Covered client-weeks: a week counts only while a stint spans it. Uses
+    // the same stints already fetched for the renewal metric.
+    const stintsForCoverage = ((stintsRes.data ?? []) as any[])
+      .filter(s => s.client_id && s.start_date);
+    let cwCovered = 0;
+    let cwClean = 0;
+    const cwMissesByClient = new Map<string, number>();
+    for (const c of standardClients) {
+      for (const week of clientWeeks) {
+        const covered = stintsForCoverage.some(s =>
+          s.client_id === c.id
+          && s.start_date <= week
+          && (!s.end_date || s.end_date >= week));
+        if (!covered) continue;
+        cwCovered++;
+        const key = cwKey(c.id, week);
+        const clean = activeSignals.every(s => signalHit[s.key].has(key));
+        if (clean) cwClean++;
+        else cwMissesByClient.set(c.name, (cwMissesByClient.get(c.name) ?? 0) + 1);
+      }
+    }
+    const clientWeekPct = cwCovered > 0 ? Math.round((cwClean / cwCovered) * 100) : null;
+    const cwWorst = [...cwMissesByClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+    // [2026-08-14 per Andy] Every card says how to move it.
+    //
+    // A number without a lever is just a grade. These strings name the ONE
+    // action that changes the score, and quote the live shortfall so it reads
+    // as a next step rather than advice — "log the 1 missing client-week",
+    // not "improve client-week completeness". Where a component is already
+    // maxed (Andy's bugs) it says so, because effort there is wasted.
+    const cwGap = cwCovered - cwClean;
+    const boltImprovement = cwCovered === 0
+      ? 'No client-weeks under contract yet — the score starts once a stint covers a full week.'
+      : cwGap === 0
+        ? `Every covered week is clean. Keep logging the weekly update + a client-facing delivery each week.`
+        : `Close the ${cwGap} incomplete week${cwGap === 1 ? '' : 's'}${cwWorst.length ? ` (${cwWorst.map(([n]) => n).join(', ')})` : ''}: each needs BOTH a weekly update row and a client-facing delivery-log entry in that week. One more clean week ≈ +${Math.round(100 / cwCovered)}pp.`;
+
+    const onTimeImprovement = (userId: string | null) => {
+      const stats = userId ? quarterStatsByUser.get(userId) : null;
+      if (!stats || stats.total === 0) return 'No tasks due this quarter — the score starts when work is scheduled.';
+      if (stats.stillOverdue > 0) {
+        return `${stats.stillOverdue} task${stats.stillOverdue === 1 ? ' is' : 's are'} still past due — closing them stops the count growing. Note the ${stats.resolvedLate} already resolved late stay counted for the quarter, so the fastest gain is not letting new ones slip.`;
+      }
+      return `Nothing is currently overdue. The ${stats.resolvedLate} resolved-late task${stats.resolvedLate === 1 ? '' : 's'} stay counted this quarter; the score recovers as new on-time tasks land.`;
+    };
+
+    const andyInitGap = Math.max(0, ANDY_TARGET - initShippedAndy);
+    const andyImprovement = `Bugs are maxed (${bugsShippedAndy} of ${ANDY_TARGET}) — more bug fixes cannot move this. `
+      + (andyInitGap > 0
+        ? `The whole gap is initiatives: ${andyInitGap} more completed in 30 days would reach 100%. An initiative counts on the transition to Completed, dated by initiative_completed_at.`
+        : 'Both halves are maxed.');
+
     const scorecards = [
       scoreUserBolt && {
-        kind: 'renewal' as const,
+        kind: 'client_week' as const,
+        improvement: boltImprovement,
         person: scoreUserBolt,
-        valuePct: renewalRatePct,
-        formulaCaption: 'Renewed ÷ Eligible (90d)',
-        sourceCaption: 'Source · client_stints end_date + status',
-        detail: renewalEligible === 0
-          ? 'No stints ended in the last 90 days.'
-          : renewalRatePct === null
-            // Say the count out loud when we're withholding the rate —
-            // otherwise "—" looks like missing data rather than a
-            // deliberate "too few to rate".
-            ? `${renewalRenewed} of ${renewalEligible} client${renewalEligible === 1 ? '' : 's'} renewed in the last 90 days`
-              + ` — too few eligible to show a rate (needs ${RENEWAL_MIN_ELIGIBLE}).`
-            : `${renewalRenewed} of ${renewalEligible} clients renewed in the last 90 days.`,
+        valuePct: clientWeekPct,
+        formulaCaption: `Clean client-weeks ÷ covered (${CLIENT_WEEK_LOOKBACK}w)`,
+        sourceCaption: 'Source · client_weekly_updates + client_delivery_log',
+        detail: cwCovered === 0
+          ? 'No client-weeks under contract in the window.'
+          : `${cwClean} of ${cwCovered} client-weeks had every client-visible artifact land.`
+            + (cwWorst.length > 0
+              ? ` Misses: ${cwWorst.map(([n, k]) => `${n} ×${k}`).join(', ')}.`
+              : '')
+            // Never let an omitted signal be invisible — a 95% that quietly
+            // isn't checking a third of the promise is worse than a lower
+            // number that says what it measured.
+            + (omittedSignals.length > 0
+              ? ` Checks ${activeSignals.map(s => s.label).join(' + ')}; ${omittedSignals.map(s => s.label).join(' + ')} omitted (not being logged yet).`
+              : ''),
       },
       scoreUserJaymz && {
         kind: 'on_time' as const,
+        improvement: onTimeImprovement(scoreUserJaymz.id),
         person: scoreUserJaymz,
         valuePct: onTimeRateFor(scoreUserJaymz.id),
         formulaCaption: `${quarterLabel} · 1 − (Was Overdue ÷ Total)`,
@@ -606,6 +762,7 @@ export async function GET() {
       },
       scoreUserQuazo && {
         kind: 'on_time' as const,
+        improvement: onTimeImprovement(scoreUserQuazo.id),
         person: scoreUserQuazo,
         valuePct: onTimeRateFor(scoreUserQuazo.id),
         formulaCaption: `${quarterLabel} · 1 − (Was Overdue ÷ Total)`,
@@ -614,6 +771,7 @@ export async function GET() {
       },
       scoreUserAndy && {
         kind: 'composite' as const,
+        improvement: andyImprovement,
         person: scoreUserAndy,
         valuePct: andyCompositePct,
         formulaCaption: 'Initiatives 50% + Bugs 30% (Ext visits 20% TBD)',
@@ -621,7 +779,9 @@ export async function GET() {
         detail: `${initShippedAndy} init shipped (30d) · ${bugsShippedAndy} bugs shipped (30d). Ext-visits omitted until portal analytics ships; weights renormalize to 62.5 / 37.5.`,
       },
     ].filter(Boolean) as Array<{
-      kind: 'renewal' | 'on_time' | 'composite';
+      kind: 'client_week' | 'on_time' | 'composite';
+      /** One concrete lever that moves this score, with the live shortfall. */
+      improvement: string;
       person: { id: string; name: string; photo: string | null };
       valuePct: number | null;
       formulaCaption: string;

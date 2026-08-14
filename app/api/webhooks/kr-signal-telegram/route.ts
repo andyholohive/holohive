@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { loadClientByKey, loadActiveClients, loadClientByChatId } from '@/lib/krSignal/config';
+import { loadClientByKey, loadActiveClients, loadClientByChatId, loadClientById } from '@/lib/krSignal/config';
 import { assembleWeekly } from '@/lib/krSignal/assembleWeekly';
-import { sendMessage } from '@/lib/krSignal/telegram';
+import { sendMessage, answerCallbackQuery } from '@/lib/krSignal/telegram';
 import { buildBackdrop } from '@/lib/krSignal/weeklyReport';
+import { getWeeklyReviewById } from '@/lib/krSignal/store';
+import { approveAndSend, skipReport } from '@/lib/krSignal/reviewActions';
+import { getAppSetting } from '@/lib/appSettings';
+import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -49,6 +53,20 @@ export async function POST(request: Request) {
     }
 
     const update = await request.json().catch(() => null);
+
+    // ─── Weekly-report review buttons ────────────────────────────────────
+    //
+    // Approve / Edit / Skip on the review card. Per Andy the gate is CHAT
+    // membership, not the users table: the card only ever goes to the
+    // configured internal review chat, so anyone who can see the buttons is
+    // already trusted to decide. That deliberately differs from the /weekly
+    // command gate below, which exists because those commands are reachable
+    // from CLIENT chats — here the surface itself is the permission.
+    if (update?.callback_query) {
+      await handleReviewCallback(update.callback_query);
+      return NextResponse.json({ ok: true });
+    }
+
     const msg = update?.message;
     const text: string | undefined = msg?.text;
     const chatId = msg?.chat?.id;
@@ -189,6 +207,123 @@ export async function POST(request: Request) {
     console.error('kr-signal webhook error', e);
   }
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Handle a tap on a weekly-report review card.
+ *
+ * callback_data is `krw:<action>:<rowId>` — the row id rather than a client
+ * key or week, so a decision can never land on the wrong report even if two
+ * cards are open in the chat at once.
+ *
+ * Every path answers the callback. Telegram spins the button until it gets an
+ * ack, so a silent early return reads to the operator as a hung bot.
+ */
+async function handleReviewCallback(cb: any): Promise<void> {
+  const cbId: string = cb?.id;
+  const data: string | undefined = cb?.data;
+  const chatId = cb?.message?.chat?.id;
+  if (!cbId || !data?.startsWith('krw:')) return;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    await answerCallbackQuery(cbId, 'Server not configured.', true);
+    return;
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Only the configured review chat may decide. Without this the buttons
+  // would be actionable by anyone who could forward the card elsewhere.
+  const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
+  if (!reviewChatId || String(chatId) !== String(reviewChatId)) {
+    await answerCallbackQuery(cbId, 'These buttons only work in the review chat.', true);
+    return;
+  }
+
+  const [, action, rowId] = data.split(':');
+  if (!rowId) {
+    await answerCallbackQuery(cbId, 'Malformed button.', true);
+    return;
+  }
+
+  // Name the actor for the audit line. They may have no HHP account — chat
+  // membership is the permission — so fall back through what Telegram gives us.
+  const from = cb?.from ?? {};
+  const actorName: string =
+    [from.first_name, from.last_name].filter(Boolean).join(' ') ||
+    from.username ||
+    (from.id ? `TG ${from.id}` : 'Unknown');
+  const { data: teamUser } = from.id
+    ? await supabase.from('users').select('id').eq('telegram_id', String(from.id)).maybeSingle()
+    : { data: null };
+  const actor = { name: actorName, userId: (teamUser as any)?.id ?? null };
+
+  const row = await getWeeklyReviewById(supabase, rowId);
+  if (!row) {
+    await answerCallbackQuery(cbId, 'That report no longer exists.', true);
+    return;
+  }
+  const cfg = await loadClientById(supabase, row.client_id);
+  const clientName = cfg?.name ?? 'client';
+
+  try {
+    if (action === 'approve') {
+      const res = await approveAndSend(supabase, rowId, actor);
+      if (res.ok) {
+        await answerCallbackQuery(cbId, `Sent to ${clientName}.`);
+      } else if (res.alreadyDecided) {
+        await answerCallbackQuery(cbId, `Already ${res.alreadyDecided} — nothing to do.`, true);
+      } else {
+        await answerCallbackQuery(cbId, `Could not send: ${res.error}`, true);
+      }
+      return;
+    }
+
+    if (action === 'skip') {
+      const res = await skipReport(supabase, rowId, actor);
+      await answerCallbackQuery(
+        cbId,
+        res.ok ? `Skipped — ${clientName} gets nothing this week.`
+               : res.alreadyDecided ? `Already ${res.alreadyDecided}.` : `Failed: ${res.error}`,
+        !res.ok,
+      );
+      return;
+    }
+
+    if (action === 'edit') {
+      // Editing happens in HHP, not here: the report body is a monospace
+      // block whose alignment matters, and Telegram has no good way to hand
+      // back a multi-line edit. The card keeps its buttons so the same person
+      // can approve straight from the chat once they have edited.
+      await answerCallbackQuery(cbId, 'Opening in HHP — link posted below.');
+      // Deep-link by the HHP client id, not kr_signal_clients.id: the dialog's
+      // client picker is keyed to clients.id. Falling back to a bare open is
+      // better than a link that lands on the wrong client.
+      const url = cfg?.client_id
+        ? `${baseUrl()}/clients?krSignal=${cfg.client_id}`
+        : `${baseUrl()}/clients`;
+      await sendMessage(
+        chatId,
+        `✏️ <b>Edit ${escapeHtml(clientName)} — week ending ${escapeHtml(row.week_ending)}</b>\n` +
+        `Open Korea Signal settings to edit the copy, then approve here or send from there:\n` +
+        `${escapeHtml(url)}`,
+      ).catch(() => {});
+      return;
+    }
+
+    await answerCallbackQuery(cbId, 'Unknown action.', true);
+  } catch (e: any) {
+    await answerCallbackQuery(cbId, `Error: ${String(e?.message || e)}`, true);
+  }
+}
+
+/** Public base URL for deep links back into HHP. */
+function baseUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_BASE_URL;
+  if (explicit) return explicit.startsWith('http') ? explicit : `https://${explicit}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return 'http://localhost:3000';
 }
 
 export async function GET() {

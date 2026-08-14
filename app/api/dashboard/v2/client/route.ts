@@ -460,6 +460,13 @@ export async function GET(request: Request) {
     // (threshold confirmed by Jdot: fud >= 15% of scored comments in the
     // last 14 days, or 5+ FUD comments on a single post).
     const fudAlertByClient = new Map<string, boolean>();
+    /** What fired the alert, for the Client Health row expansion. */
+    type FudDetail = {
+      fud: number; scored: number; sharePct: number; maxOnPost: number;
+      reason: 'share' | 'concentration' | 'share + concentration' | null;
+      comments: Array<{ text: string; original: string | null; sentAt: string; reactions: number; link: string | null }>;
+    };
+    const fudDetailByClient = new Map<string, FudDetail>();
     try {
       const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString();
       const { data: scoredRows } = await (sb as any)
@@ -494,7 +501,51 @@ export async function GET(request: Request) {
       }
       for (const [clientId, a] of agg) {
         const maxOnPost = Math.max(0, ...a.fudByPost.values());
-        fudAlertByClient.set(clientId, (a.scored > 0 && a.fud / a.scored >= 0.15) || maxOnPost >= 5);
+        const byShare = a.scored > 0 && a.fud / a.scored >= 0.15;
+        const byPost = maxOnPost >= 5;
+        fudAlertByClient.set(clientId, byShare || byPost);
+
+        // [2026-08-14 per Andy] A red flag with no explanation is unactionable
+        // — you can see THAT a client tripped the alert but not what was said.
+        // Carry the arithmetic and the actual comments so the row expansion
+        // can show what fired it.
+        fudDetailByClient.set(clientId, {
+          fud: a.fud,
+          scored: a.scored,
+          sharePct: a.scored > 0 ? Math.round((a.fud / a.scored) * 100) : 0,
+          maxOnPost,
+          reason: byShare && byPost ? 'share + concentration'
+            : byShare ? 'share' : byPost ? 'concentration' : null,
+          comments: [],
+        });
+      }
+
+      // Verbatims for the clients that actually tripped it. Fetched only for
+      // those, and capped — this is a dashboard row expansion, not the quote
+      // bank on the campaign page.
+      const alerted = [...fudAlertByClient.entries()].filter(([, on]) => on).map(([id]) => id);
+      if (alerted.length > 0) {
+        const { data: fudRows } = await (sb as any)
+          .from('post_comments')
+          .select('content_id, text, en_gloss, sent_at, reaction_total, contents!inner(content_link, campaigns!inner(client_id))')
+          .eq('sentiment_label', 'fud')
+          .gte('sent_at', since14)
+          .order('reaction_total', { ascending: false, nullsFirst: false })
+          .limit(200);
+        for (const r of ((fudRows ?? []) as any[])) {
+          const clientId = r?.contents?.campaigns?.client_id;
+          if (!clientId || !fudAlertByClient.get(clientId)) continue;
+          if (complimentary.has(r.content_id)) continue;
+          const d = fudDetailByClient.get(clientId);
+          if (!d || d.comments.length >= 5) continue;
+          d.comments.push({
+            text: r.en_gloss || r.text,
+            original: r.en_gloss ? r.text : null,
+            sentAt: r.sent_at,
+            reactions: Number(r.reaction_total) || 0,
+            link: r?.contents?.content_link ?? null,
+          });
+        }
       }
     } catch { /* sentiment tables optional — alert stays off */ }
 
@@ -540,6 +591,7 @@ export async function GET(request: Request) {
         extVisitsLast7d: extVisitsByClient.get(c.id) ?? 0,
         healthTone: healthToneFor(t.overdue),
         fudAlert: fudAlertByClient.get(c.id) ?? false,
+        fudDetail: fudAlertByClient.get(c.id) ? (fudDetailByClient.get(c.id) ?? null) : null,
         is_whitelisted: c.is_whitelisted ?? false,
         kolDelivery: delivery
           ? {

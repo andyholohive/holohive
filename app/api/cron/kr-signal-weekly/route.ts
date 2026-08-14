@@ -1,28 +1,38 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { loadActiveClients } from '@/lib/krSignal/config';
-import { assembleWeekly } from '@/lib/krSignal/assembleWeekly';
-import { saveGlobalWeekly, saveClientWeekly } from '@/lib/krSignal/store';
-import { sendMessage } from '@/lib/krSignal/telegram';
+import { loadClientById } from '@/lib/krSignal/config';
+import { sendMessageWithButtons } from '@/lib/krSignal/telegram';
+import { listWeekliesAwaitingReview, attachReviewCard } from '@/lib/krSignal/store';
+import { approveAndSend } from '@/lib/krSignal/reviewActions';
+import { buildReviewCard, reviewButtons } from '@/lib/krSignal/reviewCard';
+import { getAppSetting } from '@/lib/appSettings';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
- * GET /api/cron/kr-signal-weekly
+ * GET /api/cron/kr-signal-weekly — Sunday 12:00 UTC. The send window.
  *
- * Sunday 21:00 KST (12:00 UTC). Posts the Weekly KR Market Report (spec §7.A)
- * to each active client GC with weekly_market_report enabled + a telegram_chat_id,
- * via the SEPARATE KR Signal bot token. Persists this week's snapshot afterward
- * so next week's trend arrows + the §5 baseline job have history.
+ * [2026-08-14] This used to assemble AND send in one pass, which meant a
+ * report reached the client the instant it was built and there was no moment
+ * a human could inspect it. Assembly moved to kr-signal-weekly-generate on
+ * Saturday; this route now only delivers what a human already approved.
  *
- * Auth: Authorization: Bearer {CRON_SECRET}
+ * Two outcomes per queued report:
+ *   • status 'approved'       → send to the client, mark sent.
+ *   • status 'pending_review' → send NOTHING to the client. Post a "this did
+ *     not go out" card to the ops chat with the same Approve / Edit / Skip
+ *     buttons, so the miss is visible at exactly the moment the client would
+ *     have expected the report, and can still be sent late in one tap.
+ *
+ * Fail-closed is the deliberate choice (per Andy): silence to the client beats
+ * an unreviewed report reaching them. The nudge is what stops fail-closed from
+ * turning into a cadence that quietly dies.
  */
 export async function GET(request: Request) {
   const startedAt = new Date();
-
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  const auth = request.headers.get('authorization');
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -38,7 +48,10 @@ export async function GET(request: Request) {
 
   const { data: runRow } = await (supabase as any)
     .from('agent_runs')
-    .insert({ agent_name: 'KR_SIGNAL_WEEKLY', run_type: 'scheduled', status: 'running', started_at: startedAt.toISOString(), input_params: {} })
+    .insert({
+      agent_name: 'KR_SIGNAL_WEEKLY', run_type: 'scheduled', status: 'running',
+      started_at: startedAt.toISOString(), input_params: {},
+    })
     .select('id')
     .single();
   const runId = runRow?.id;
@@ -52,31 +65,54 @@ export async function GET(request: Request) {
   };
 
   const sent: any[] = [];
+  const nudged: any[] = [];
   try {
-    const clients = await loadActiveClients(supabase);
-    // resolved_chat_id = override (telegram_chat_id) ?? the client's /crm/telegram GC.
-    const targets = clients.filter((c) => c.features?.weekly_market_report && c.resolved_chat_id);
+    const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
+    const reviewThreadId = await getAppSetting(supabase, 'kr_signal_review_thread_id');
+    const queue = await listWeekliesAwaitingReview(supabase);
 
-    for (const c of targets) {
+    for (const row of queue) {
+      const cfg = await loadClientById(supabase, row.client_id);
+      const clientName = cfg?.name ?? row.client_id;
+
+      if (row.status === 'approved') {
+        const res = await approveAndSend(supabase, row.id, { name: 'Scheduled send' });
+        sent.push(res.ok
+          ? { client: clientName, message_id: res.messageId }
+          : { client: clientName, error: res.error ?? res.alreadyDecided });
+        continue;
+      }
+
+      // Still pending at the send window — tell the humans, not the client.
+      if (!reviewChatId) {
+        nudged.push({ client: clientName, error: 'no review chat configured' });
+        continue;
+      }
       try {
-        const res = await assembleWeekly(supabase, c);
-        const m = await sendMessage(c.resolved_chat_id!, res.html, c.resolved_thread_id);
-        // Persist AFTER a successful send so history reflects delivered reports.
-        await saveGlobalWeekly(supabase, res.weekEnding, res.global);
-        // Keep the delivered message verbatim so /clients can show exactly
-        // what the client received, rather than a lossy re-render.
-        await saveClientWeekly(supabase, c.id, res.weekEnding, { ...res.client, report_html: res.html });
-        sent.push({ client: c.name, message_id: m.message_id, pending: res.pending.length });
+        const card = buildReviewCard({
+          clientName,
+          weekEnding: row.week_ending,
+          row,
+          variant: 'missed',
+          edited: !!row.edited_html,
+        });
+        const msg = await sendMessageWithButtons(
+          reviewChatId, card, reviewButtons(row.id), reviewThreadId,
+        );
+        // Re-point the row at the newer card so a later Approve edits the
+        // message the reviewer is actually looking at.
+        await attachReviewCard(supabase, row.id, String(reviewChatId), msg.message_id);
+        nudged.push({ client: clientName, week_ending: row.week_ending });
       } catch (e: any) {
-        sent.push({ client: c.name, error: String(e?.message || e) });
+        nudged.push({ client: clientName, error: String(e?.message || e) });
       }
     }
 
-    const okCount = sent.filter((s) => s.message_id).length;
-    await finishRun('completed', { targets: targets.length, posted: okCount, sent });
-    return NextResponse.json({ ran: true, posted: okCount, sent });
+    const posted = sent.filter((s) => s.message_id).length;
+    await finishRun('completed', { queued: queue.length, posted, sent, nudged });
+    return NextResponse.json({ ran: true, posted, sent, nudged });
   } catch (e: any) {
-    await finishRun('failed', { sent }, String(e?.message || e));
+    await finishRun('failed', { sent, nudged }, String(e?.message || e));
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }

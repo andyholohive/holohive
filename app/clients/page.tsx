@@ -424,6 +424,10 @@ export default function ClientsPage() {
   // [2026-07-15] Korea Signal settings hub — per-client config for the KR
   // market-intel TG digest (peer basket, venues, SoV source, TG destination).
   const [krSignalOpen, setKrSignalOpen] = useState(false);
+  // [2026-08-14] Deep-link target for the weekly-report review flow. Tapping
+  // "Edit" on a review card in Telegram sends ?krSignal=<clients.id>, which
+  // opens this dialog straight onto that client's pending report.
+  const [krSignalInitialClient, setKrSignalInitialClient] = useState<string | null>(null);
   const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; telegram_chat_id: string; shared_drive_url: string; gtm_sync_url: string; kol_content_brief_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', telegram_chat_id: '', shared_drive_url: '', gtm_sync_url: '', kol_content_brief_url: '', onboarding_phase: '' });
   // [Phase edit in popup] The latest in-window campaign for the client
   // whose Context popup is currently open. Fetched lazily when the
@@ -2561,6 +2565,15 @@ export default function ClientsPage() {
   // client's Edit dialog once the list has loaded. Used by the Team
   // Dashboard's Client Health table (its old /clients/{id} links 404'd —
   // that route only has the delivery-log sub-page, no page.tsx).
+  // [2026-08-14] ?krSignal=<clients.id> opens the Korea Signal dialog on that
+  // client — the landing spot for the "Edit" button on a Telegram review card.
+  const krSignalParam = searchParams.get('krSignal');
+  useEffect(() => {
+    if (!krSignalParam) return;
+    setKrSignalInitialClient(krSignalParam);
+    setKrSignalOpen(true);
+  }, [krSignalParam]);
+
   const clientIdParam = searchParams.get('clientId');
   const openedFromParamRef = useRef(false);
   useEffect(() => {
@@ -6014,6 +6027,7 @@ export default function ClientsPage() {
           open={krSignalOpen}
           onOpenChange={setKrSignalOpen}
           clients={weeklyHubClients.map(c => ({ id: c.id, name: c.name }))}
+          initialClientId={krSignalInitialClient}
         />
 
         {/* Client Context Modal */}
