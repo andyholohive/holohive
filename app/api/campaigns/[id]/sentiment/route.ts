@@ -41,8 +41,32 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     /(^|\/\/)(t\.me|telegram\.me)\//i.test(c.content_link || '')
     || (c.platform === 'Telegram' && !c.content_link),
   );
-  const contentIds = tgContents.map(c => c.id);
-  const linkById = new Map<string, string>(tgContents.map(c => [c.id, c.content_link || '']));
+  // [2026-08-14 per Andy] Complimentary posts are excluded.
+  //
+  // A complimentary post is mostly about ANOTHER project with a passing
+  // mention of ours, so its comment thread is a crowd reacting to that other
+  // project — scoring it as audience sentiment toward our client says
+  // something untrue. Umia was the case that surfaced this: half its corpus
+  // came from complimentary posts and they carried 15 of its 22 negatives,
+  // making a campaign look disliked because of a reaction to someone else.
+  //
+  // The rows stay in post_comments; only the rollup filters. That keeps the
+  // door open for a separate "mentioned in others' posts" read later, and it
+  // retro-corrects the 88 already-ingested comments without a data migration.
+  //
+  // Caveat: the tag is applied by hand, so an untagged complimentary post
+  // still leaks in. This makes the number much better, not airtight — making
+  // it airtight means the tag becomes required on complimentary content.
+  const { data: compRows } = await (sb as any)
+    .from('content_tag_assignments')
+    .select('content_id, content_tags!inner(name)')
+    .eq('content_tags.name', 'Complimentary')
+    .in('content_id', tgContents.map(c => c.id));
+  const complimentary = new Set(((compRows ?? []) as Array<{ content_id: string }>).map(r => r.content_id));
+
+  const scoredContents = tgContents.filter(c => !complimentary.has(c.id));
+  const contentIds = scoredContents.map(c => c.id);
+  const linkById = new Map<string, string>(scoredContents.map(c => [c.id, c.content_link || '']));
   if (contentIds.length === 0) {
     return NextResponse.json({ hasData: false });
   }
@@ -110,6 +134,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({
     hasData: true,
+    // Surfaced, not silent: a reader who knows N posts were held out can tell
+    // "quiet week" from "we excluded most of the week's posts".
+    excludedComplimentaryPosts: complimentary.size,
     volume: { total: all.length, noise, hype, substantive },
     sentiment: {
       positive: pos.length, negative: neg.length, fud: fud.length,

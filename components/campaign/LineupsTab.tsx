@@ -193,6 +193,7 @@ export default function LineupsTab({
   currentUserId,
   currentUserName,
   campaignName,
+  embedded = false,
 }: {
   campaignId: string;
   campaignStartDate: string;
@@ -201,6 +202,20 @@ export default function LineupsTab({
   currentUserId: string | null;
   currentUserName: string;
   campaignName: string;
+  /**
+   * Rendered inside a dialog (the All Lineups rollup on /campaigns) rather
+   * than as the campaign page's tab. Two things change:
+   *
+   * 1. `AddKOLsDialog` is not rendered and its trigger is hidden. That dialog
+   *    calls `useCampaignDetail()`, which THROWS when no provider is above it
+   *    — so outside the campaign page this tab would crash on mount, not on
+   *    click, because the dialog sits in the tree unconditionally. Adding a
+   *    KOL to the roster stays a campaign-page action.
+   * 2. The split panes drop their `100vh`-relative max height, which is
+   *    measured against the window and so overflows a dialog that is itself
+   *    only 85vh tall.
+   */
+  embedded?: boolean;
 }) {
   const { toast } = useToast();
   const service = useMemo(() => new LineupManagerService(supabase as any), []);
@@ -1049,7 +1064,7 @@ export default function LineupsTab({
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* ─── Left: Roster ─── */}
-            <div className="border border-cream-200 rounded-lg bg-white overflow-hidden flex flex-col max-h-[calc(100vh-280px)]">
+            <div className={`border border-cream-200 rounded-lg bg-white overflow-hidden flex flex-col ${embedded ? 'max-h-[46vh]' : 'max-h-[calc(100vh-280px)]'}`}>
               <div className="px-4 py-3 border-b border-cream-200 flex items-center gap-2 shrink-0">
                 <Users className="h-3.5 w-3.5 text-brand" />
                 <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-700">
@@ -1061,7 +1076,7 @@ export default function LineupsTab({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 px-2 focus-brand"
+                  className={`h-7 px-2 focus-brand${embedded ? ' hidden' : ''}`}
                   onClick={() => setAddKolsOpen(true)}
                   title="Add KOLs to the campaign roster"
                 >
@@ -1112,7 +1127,7 @@ export default function LineupsTab({
             </div>
 
             {/* ─── Right: Lineup builder ─── */}
-            <div className="border border-cream-200 rounded-lg bg-white overflow-hidden flex flex-col max-h-[calc(100vh-280px)]">
+            <div className={`border border-cream-200 rounded-lg bg-white overflow-hidden flex flex-col ${embedded ? 'max-h-[46vh]' : 'max-h-[calc(100vh-280px)]'}`}>
               <div className="px-4 py-3 border-b border-cream-200 flex items-center gap-2 shrink-0">
                 <ListChecks className="h-3.5 w-3.5 text-brand" />
                 <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-700">
@@ -1393,13 +1408,19 @@ export default function LineupsTab({
           campaign + availableKOLs from useCampaignDetail(); on close
           we refresh the Lineups roster so newly-added KOLs appear
           without a tab switch. */}
-      <AddKOLsDialog
-        open={addKolsOpen}
-        onOpenChange={(open) => {
-          setAddKolsOpen(open);
-          if (!open) void refreshRoster();
-        }}
-      />
+      {/* Not rendered when embedded — see the `embedded` prop note: this
+          dialog reads useCampaignDetail() and throws without a provider, and
+          it sits in the tree unconditionally, so it would take the whole tab
+          down on mount rather than on click. */}
+      {!embedded && (
+        <AddKOLsDialog
+          open={addKolsOpen}
+          onOpenChange={(open) => {
+            setAddKolsOpen(open);
+            if (!open) void refreshRoster();
+          }}
+        />
+      )}
     </DndContext>
   );
 }

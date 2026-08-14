@@ -468,10 +468,22 @@ export async function GET(request: Request) {
         .in('sentiment_label', ['positive', 'negative', 'fud'])
         .gte('sent_at', since14)
         .limit(10000);
+      // [2026-08-14 per Andy] Complimentary posts don't raise a FUD alert.
+      // Their threads are a crowd reacting to ANOTHER project that our client
+      // was mentioned alongside, so FUD there isn't FUD about our client —
+      // and this alert is the one that would wake someone up over it. Same
+      // exclusion the campaign sentiment rollup applies.
+      const { data: compRows } = await (sb as any)
+        .from('content_tag_assignments')
+        .select('content_id, content_tags!inner(name)')
+        .eq('content_tags.name', 'Complimentary');
+      const complimentary = new Set(((compRows ?? []) as Array<{ content_id: string }>).map(r => r.content_id));
+
       const agg = new Map<string, { scored: number; fud: number; fudByPost: Map<string, number> }>();
       for (const r of ((scoredRows ?? []) as any[])) {
         const clientId = r?.contents?.campaigns?.client_id;
         if (!clientId) continue;
+        if (complimentary.has(r.content_id)) continue;
         const a = agg.get(clientId) ?? { scored: 0, fud: 0, fudByPost: new Map() };
         a.scored++;
         if (r.sentiment_label === 'fud') {

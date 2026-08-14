@@ -628,13 +628,23 @@ export class DeliverableService {
     /** Number of steps with a pre-assigned person (keys in step_assignees). */
     assigned_count: number;
   }>> {
+    // [2026-08-14 per Andy] Inactive + archived clients are hidden.
+    //
+    // A cycle on a client we no longer work with can't fire anyway, so it was
+    // only ever dead rows padding the panel and the count. `!inner` makes the
+    // client join filtering rather than optional — the cycle disappears with
+    // the client. Deliberately NOT the same thing as `client_lapsed`, which is
+    // an ACTIVE client whose coverage ran out: those still show, carrying the
+    // "Auto-skipped" chip, because that one is worth someone noticing.
     const { data, error } = await (supabase as any)
       .from('recurring_deliverables')
       .select(`
         id, client_id, template_id, cadence, day_of_week, active, last_fired_at, step_assignees,
-        client:clients(name),
+        client:clients!inner(name, is_active, archived_at),
         template:deliverable_templates(name)
       `)
+      .eq('client.is_active', true)
+      .is('client.archived_at', null)
       .order('active', { ascending: false })
       .order('created_at', { ascending: true });
     if (error) {

@@ -3081,11 +3081,10 @@ export default function ClientsPage() {
               <>
                 {/* "Start Client" hidden 2026-06-02 — Add Client is now the
                     primary CTA. State + Dialog left intact below for easy
-                    restore if/when the onboarding flow ships. */}
-                <Button variant="outline" disabled>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Templates
-                </Button>
+                    restore if/when the onboarding flow ships.
+                    "Templates" removed 2026-08-14 per Andy — /templates has
+                    its own sidebar entry, so the shortcut was a second door
+                    to the same room. */}
                 <Button variant="brand" disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Client
@@ -4401,19 +4400,10 @@ export default function ClientsPage() {
                   )}
                 </DialogContent>
               </Dialog>
-              {/* [Templates admin v1] Quick link to the milestone templates
-                  management surface. Placed inline with the other top-bar
-                  actions so admins can hop straight to template CRUD
-                  without going through a client's Action Board.
-                  [2026-08-05] Now points at the Action Board tab on
-                  /templates; the old /clients/templates route is a
-                  redirect stub. */}
-              <Link href="/templates?tab=action-board">
-                <Button variant="outline" className="hover:bg-cream-50">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Templates
-                </Button>
-              </Link>
+              {/* [2026-08-14 per Andy] The Templates shortcut is gone.
+                  /templates is its own sidebar entry, so this was a second
+                  door to the same room taking up header width next to the
+                  page's actual CTA. Template CRUD is unchanged. */}
               <Dialog open={isNewClientOpen} onOpenChange={(open) => {
                 if (!open) {
                   handleCloseClientModal();

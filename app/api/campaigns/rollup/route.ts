@@ -36,16 +36,43 @@ type LineupRow = {
   kol_count: number;
 };
 
-type BudgetRow = {
+/**
+ * Budget is a CLIENT-level fact, not a campaign one.
+ *
+ * [2026-08-14] First cut read `campaigns.total_budget` and reported Fogo at
+ * 113% of a $15,000 budget. That column is a stale scalar: Fogo has two
+ * engagement terms of $15,000 (the original plus a renewal), so the real
+ * contracted budget is $30,000 and it is at 57%, not over. total_budget was
+ * never updated when the second term was signed.
+ *
+ * The campaign Budget tab already resolves this correctly and says so in a
+ * comment naming Fogo as the example (components/campaign/BudgetDashboardV2
+ * :138-142). Precedence, matching it exactly:
+ *   1. sum of client_engagement_periods.amount across the client's stints
+ *   2. else sum of the campaign's budget_allocations
+ *   3. else campaigns.total_budget
+ *
+ * Because the terms total belongs to the client, campaigns nest UNDER the
+ * client here rather than each carrying a budget of their own — a client with
+ * four campaigns would otherwise show the same engagement total four times
+ * and imply 4× the money.
+ */
+type BudgetClient = {
   client_id: string;
   client_name: string;
-  campaign_id: string;
-  campaign_name: string;
   budget: number;
+  /** Where `budget` came from, so a surprising number is auditable. */
+  budget_source: 'engagement_terms' | 'allocations' | 'campaign_total' | 'none';
+  term_count: number;
   spent: number;
   remaining: number;
   pct_used: number | null;
-  paid_count: number;
+  campaigns: Array<{
+    campaign_id: string;
+    campaign_name: string;
+    spent: number;
+    paid_count: number;
+  }>;
 };
 
 export async function GET() {
@@ -67,23 +94,41 @@ export async function GET() {
   // Active, non-archived clients only. The dialogs are a working view — a
   // finished engagement's lineups and budget are history, and mixing them in
   // makes the list long enough that the live ones stop standing out.
-  const { data: clientRows } = await (supabase as any)
+  // Errors are surfaced, not swallowed. A failed query here returns null data,
+  // which reads as "no active clients" and renders a plausible, completely
+  // empty rollup — the one failure mode nobody would think to question.
+  const { data: clientRows, error: clientErr } = await (supabase as any)
     .from('clients')
     .select('id, name')
     .is('archived_at', null)
     .eq('is_active', true)
     .order('name');
+  if (clientErr) {
+    return NextResponse.json({ error: `clients: ${clientErr.message}` }, { status: 500 });
+  }
   const clients = (clientRows ?? []) as Array<{ id: string; name: string }>;
   const clientName = new Map(clients.map(c => [c.id, c.name]));
   if (clients.length === 0) {
-    return NextResponse.json({ ok: true, lineups: [], budgets: [], generated_at: new Date().toISOString() });
+    return NextResponse.json({ ok: true, lineups: [], budgets: [], no_clients: true, generated_at: new Date().toISOString() });
   }
 
-  const { data: campaignRows } = await (supabase as any)
+  // Allocations live in their own table (`campaign_budget_allocations`) and
+  // are embedded here; the app-level `campaign.budget_allocations` shape the
+  // Budget tab reads is that relation renamed at the page's fetch, not a
+  // column. Selecting it by that name silently errors the whole query out to
+  // an empty rollup.
+  const { data: campaignRows, error: campaignErr } = await (supabase as any)
     .from('campaigns')
-    .select('id, name, client_id, total_budget')
+    .select('id, name, client_id, total_budget, campaign_budget_allocations(allocated_budget)')
     .in('client_id', clients.map(c => c.id));
-  const campaigns = (campaignRows ?? []) as Array<{ id: string; name: string; client_id: string; total_budget: number | null }>;
+  if (campaignErr) {
+    return NextResponse.json({ error: `campaigns: ${campaignErr.message}` }, { status: 500 });
+  }
+  const campaigns = (campaignRows ?? []) as Array<{
+    id: string; name: string; client_id: string;
+    total_budget: number | null;
+    campaign_budget_allocations: Array<{ allocated_budget?: number | string | null }> | null;
+  }>;
   const campaignById = new Map(campaigns.map(c => [c.id, c]));
 
   if (campaigns.length === 0) {
@@ -160,28 +205,97 @@ export async function GET() {
     spendByCampaign.set(p.campaign_id, cur);
   }
 
-  const budgetOut: BudgetRow[] = campaigns.map(c => {
-    const budget = Number(c.total_budget) || 0;
-    const spend = spendByCampaign.get(c.id) ?? { total: 0, count: 0 };
+  // Engagement terms per client — the contracted budget, renewals included.
+  const { data: stintRows } = await (supabase as any)
+    .from('client_stints')
+    .select('id, client_id')
+    .in('client_id', clients.map(c => c.id));
+  const stints = (stintRows ?? []) as Array<{ id: string; client_id: string }>;
+  const clientForStint = new Map(stints.map(s => [s.id, s.client_id]));
+  const termsByClient = new Map<string, { total: number; count: number }>();
+  if (stints.length > 0) {
+    const { data: periodRows } = await (supabase as any)
+      .from('client_engagement_periods')
+      .select('stint_id, amount')
+      .in('stint_id', stints.map(s => s.id));
+    for (const p of (periodRows ?? []) as Array<{ stint_id: string; amount: number | string | null }>) {
+      const cid = clientForStint.get(p.stint_id);
+      if (!cid) continue;
+      const cur = termsByClient.get(cid) ?? { total: 0, count: 0 };
+      cur.total += Number(p.amount) || 0;
+      cur.count += 1;
+      termsByClient.set(cid, cur);
+    }
+  }
+
+  const budgetOut: BudgetClient[] = clients.map(cl => {
+    const own = campaigns.filter(c => c.client_id === cl.id);
+    const terms = termsByClient.get(cl.id) ?? { total: 0, count: 0 };
+    const allocationsSum = own.reduce((s, c) => s
+      + ((c.campaign_budget_allocations ?? []).reduce((a, x) => a + (Number(x.allocated_budget) || 0), 0)), 0);
+    const campaignTotals = own.reduce((s, c) => s + (Number(c.total_budget) || 0), 0);
+
+    const budget = terms.total > 0 ? terms.total
+      : allocationsSum > 0 ? allocationsSum
+        : campaignTotals;
+    const budgetSource: BudgetClient['budget_source'] = terms.total > 0 ? 'engagement_terms'
+      : allocationsSum > 0 ? 'allocations'
+        : campaignTotals > 0 ? 'campaign_total' : 'none';
+
+    const perCampaign = own.map(c => {
+      const spend = spendByCampaign.get(c.id) ?? { total: 0, count: 0 };
+      return { campaign_id: c.id, campaign_name: c.name, spent: spend.total, paid_count: spend.count };
+    }).sort((a, b) => b.spent - a.spent);
+    const spent = perCampaign.reduce((s, c) => s + c.spent, 0);
+
     return {
-      client_id: c.client_id,
-      client_name: clientName.get(c.client_id) ?? 'Unknown',
-      campaign_id: c.id,
-      campaign_name: c.name,
+      client_id: cl.id,
+      client_name: cl.name,
       budget,
-      spent: spend.total,
-      remaining: budget - spend.total,
-      // null rather than 0 when there's no budget on the record — "0% used"
-      // and "no budget set" are different facts and the UI says so.
-      pct_used: budget > 0 ? (spend.total / budget) * 100 : null,
-      paid_count: spend.count,
+      budget_source: budgetSource,
+      term_count: terms.count,
+      spent,
+      remaining: budget - spent,
+      // null rather than 0 when nothing is contracted — "0% used" and "no
+      // budget set" are different facts and the UI says so.
+      pct_used: budget > 0 ? (spent / budget) * 100 : null,
+      campaigns: perCampaign,
     };
   });
+
+  // ── Per-client tab index ───────────────────────────────────────────
+  // The dialogs' editable per-client tabs mount the real Lineup Manager,
+  // which needs the campaign's start date and its term end. Both come from
+  // `campaign_week_window` — the one source of "week N of M" — so they're
+  // resolved here rather than by one extra round-trip per tab click.
+  const { data: windowRows } = await (supabase as any)
+    .from('campaign_week_window')
+    .select('campaign_id, start_date, term_end')
+    .in('campaign_id', campaignIds);
+  const windowByCampaign = new Map(
+    ((windowRows ?? []) as Array<{ campaign_id: string; start_date: string | null; term_end: string | null }>)
+      .map(w => [w.campaign_id, w]),
+  );
+
+  const tabsOut = clients.map(cl => ({
+    client_id: cl.id,
+    client_name: cl.name,
+    campaigns: campaigns
+      .filter(c => c.client_id === cl.id)
+      .map(c => ({
+        campaign_id: c.id,
+        campaign_name: c.name,
+        start_date: windowByCampaign.get(c.id)?.start_date ?? null,
+        covered_through: windowByCampaign.get(c.id)?.term_end ?? null,
+      }))
+      .sort((a, b) => a.campaign_name.localeCompare(b.campaign_name)),
+  })).filter(t => t.campaigns.length > 0);
 
   return NextResponse.json({
     ok: true,
     generated_at: new Date().toISOString(),
     lineups: lineupOut,
     budgets: budgetOut,
+    tabs: tabsOut,
   });
 }
