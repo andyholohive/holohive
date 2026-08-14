@@ -533,7 +533,11 @@ export default function ActiveClientsDocuments() {
                       : f.title,
                   }));
                 }}
-                className="h-9 focus-brand"
+                // The Input base sets py-2, which on a h-9 override pushes the
+                // native "Choose File" button off the vertical centre — it sits
+                // on the text baseline rather than in the middle of the field.
+                // items-center + py-0 centres it.
+                className="h-9 focus-brand items-center py-0 cursor-pointer file:mr-3 file:cursor-pointer"
               />
             </div>
             <div className="flex items-center justify-between">

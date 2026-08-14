@@ -70,6 +70,7 @@ type ClientOption = {
   id: string;
   name: string;
   logo_url: string | null;
+  is_active: boolean | null;
 };
 
 const LINK_TYPES = [
@@ -206,7 +207,12 @@ export default function LinksPage() {
         // Skip archived clients — they shouldn't appear as options when
         // adding/editing links. Existing links pointing to archived
         // clients still resolve their stored client_id via clientMap.
-        supabase.from('clients').select('id, name, logo_url').is('archived_at', null).order('name'),
+        //
+        // is_active comes along for the Add Link picker, which shows only
+        // active clients to match the client-delivery upload picker. The
+        // fetch stays unfiltered so clientMap can still resolve the name of
+        // a link attached to a client who has since gone inactive.
+        supabase.from('clients').select('id, name, logo_url, is_active').is('archived_at', null).order('name'),
       ]);
       setClients(clientData || []);
 
@@ -1071,7 +1077,11 @@ export default function LinksPage() {
                   <SelectTrigger className="focus-brand"><SelectValue placeholder="Select client" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_holo_hive">Holo Hive (Internal)</SelectItem>
-                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {/* Active clients only — same list as the client-delivery
+                        upload picker. An inactive name here silently attaches a
+                        link to a dead engagement. A link already pointing at one
+                        keeps its stored client_id; only the picker narrows. */}
+                    {clients.filter(c => c.is_active).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               ) : (

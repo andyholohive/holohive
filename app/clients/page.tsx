@@ -5172,7 +5172,10 @@ export default function ClientsPage() {
                         variant="outline"
                         size="sm"
                         className={(client.campaign_count || 0) > 0 ? "flex-1 min-w-[120px]" : "w-full"}
-                        onClick={() => router.push(`/public/portal/${client.id}`)}
+                        // New tab: the portal is the client-facing surface, and
+                        // navigating away loses whatever the CM had open here.
+                        // noopener/noreferrer because it's a public route.
+                        onClick={() => window.open(`/public/portal/${client.id}`, '_blank', 'noopener,noreferrer')}
                       >
                         <ExternalLink className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                         <span className="truncate">View Portal</span>

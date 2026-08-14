@@ -349,21 +349,6 @@ const getStatusColor = (status: string) => {
   return kolStatusClassName(canonical);
 };
 
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'Active':
-      return 'bg-emerald-100 text-emerald-800';
-    case 'Planning':
-      return 'bg-blue-100 text-blue-800';
-    case 'Paused':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'Completed':
-      return 'bg-cream-100 text-ink-warm-800';
-    default:
-      return 'bg-cream-100 text-ink-warm-800';
-  }
-};
-
 export default function PublicCampaignPage({ params }: { params: { id: string } }) {
   const campaignId = params.id;
   // Showcase mode — Spec section 9. Detect ?showcase=<token> in the URL
@@ -1513,9 +1498,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <p className="text-xs text-ink-warm-500 truncate">{campaign.client_name}</p>
                   )}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadge(campaign.status)}`}>
-                  {campaign.status}
-                </span>
+                {/* [2026-08-14] Campaign status pill removed. It was an
+                    internal pipeline value ("Planning", "Paused") shown on a
+                    client-facing page, where it reads as a judgement on the
+                    engagement rather than a workflow state. The dates below
+                    already say where the campaign stands. */}
                 {/* Budget + dates. Showcase: budget hidden when the
                     flag is set; dates always shown (engagement window
                     isn't sensitive). When budget is hidden and we

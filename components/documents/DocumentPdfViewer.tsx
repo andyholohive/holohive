@@ -152,6 +152,12 @@ export default function DocumentPdfViewer({
           screenshot — but it stops casual Cmd-P/right-click-save. */}
       <style>{`@media print { .doc-portal-viewer { display: none !important; } }`}</style>
       <Document
+        // [2026-08-14] key on the URL so a new document mounts a fresh
+        // Document instead of swapping the file underneath the Page children.
+        // In the swap case the pages keep rendering against a transport that
+        // has already been destroyed, which surfaces as
+        // "Cannot read properties of null (reading 'sendWithPromise')".
+        key={signedUrl}
         file={signedUrl}
         // [2026-08-11] Links inside the PDF open in a new tab rather than
         // navigating the viewer away mid-read (which would also cut the dwell
@@ -160,6 +166,10 @@ export default function DocumentPdfViewer({
         externalLinkTarget="_blank"
         externalLinkRel="noopener noreferrer"
         onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+        // Drop the pages the moment the load fails, so nothing is left
+        // rendering against a document that never finished opening.
+        onLoadError={() => setNumPages(0)}
+        onSourceError={() => setNumPages(0)}
         loading={<div className="py-20 text-center text-sm text-neutral-400">Loading document…</div>}
         error={<div className="py-20 text-center text-sm text-rose-500">Couldn&apos;t load this document.</div>}
       >
@@ -210,7 +220,7 @@ function PageTracked({ pageNumber, width, onRatio }: { pageNumber: number; width
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageNumber]);
   return (
-    <div ref={ref} className="mb-3 flex justify-center">
+    <div ref={ref} className="mb-5 flex justify-center last:mb-0">
       {/* Annotation layer on, text layer off — deliberately.
           The annotation layer is what makes a PDF's hyperlinks clickable
           [2026-08-11]; without it the pages render as bare canvas and every
@@ -219,8 +229,10 @@ function PageTracked({ pageNumber, width, onRatio }: { pageNumber: number; width
           selectable and copyable, which quietly defeats the download_enabled
           toggle and the print suppression above. Links are navigation, not
           content — turning one on doesn't require the other. */}
+      {/* Sheet treatment: a real drop shadow and no border, so the page reads
+          as paper lifted off the ground rather than a bordered image. */}
       <Page pageNumber={pageNumber} width={width} renderTextLayer={false} renderAnnotationLayer
-        className="shadow-sm border border-neutral-200" />
+        className="shadow-[0_4px_24px_rgba(0,0,0,0.35)] rounded-[2px] overflow-hidden" />
     </div>
   );
 }
