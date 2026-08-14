@@ -102,6 +102,11 @@ export async function GET() {
     .select('id, name')
     .is('archived_at', null)
     .eq('is_active', true)
+    // [2026-08-14 per Andy] Ad-hoc clients out of both rollups. These are
+    // one-off engagements with no weekly lineup cadence and no ongoing
+    // budget to roll up, so they contributed empty columns that pushed the
+    // retained clients — the ones these views exist to compare — off screen.
+    .eq('is_ad_hoc', false)
     .order('name');
   if (clientErr) {
     return NextResponse.json({ error: `clients: ${clientErr.message}` }, { status: 500 });

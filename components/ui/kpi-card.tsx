@@ -99,6 +99,16 @@ interface KpiCardProps {
   topAccent?: boolean;
   /** Optional WoW trend chip. Rendered inline next to the big number. */
   trend?: KpiTrend;
+  /**
+   * Makes the card a drill-down. [2026-08-15] Added for /crm/outreach, where
+   * the three rate cards open a breakdown of the same number by owner and by
+   * message type. Omitted (the default) keeps the card display-only — the
+   * hover affordance below only appears when there is something to click,
+   * so a static card still can't imply interactivity.
+   */
+  onClick?: () => void;
+  /** Accessible label for the drill-down, e.g. "Break down Response Rate". */
+  actionLabel?: string;
 }
 
 function TrendChip({ trend }: { trend: KpiTrend }) {
@@ -123,11 +133,16 @@ function TrendChip({ trend }: { trend: KpiTrend }) {
   );
 }
 
-export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray', topAccent = false, trend }: KpiCardProps) {
-  // v11: no hover effect — KPI cards are display-only, not interactive.
-  // The Card-style hover (border + lift) would falsely imply clickability.
-  return (
-    <div className="relative bg-white rounded-[14px] border border-cream-200 p-5 shadow-card overflow-hidden">
+export function KpiCard({
+  icon: Icon, label, value, sub, accent = 'gray', topAccent = false, trend,
+  onClick, actionLabel,
+}: KpiCardProps) {
+  // v11: no hover effect on a plain KPI card — they're display-only, and the
+  // Card-style hover (border + lift) would falsely imply clickability. When
+  // `onClick` IS passed the card genuinely is a control, so it renders as a
+  // button and earns the hover treatment.
+  const body = (
+    <>
       {topAccent && (
         <span className={`absolute top-0 left-4 right-4 h-[2px] rounded-b ${ACCENT_TOP[accent]}`} aria-hidden />
       )}
@@ -147,6 +162,23 @@ export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray', topAcc
         {trend && <TrendChip trend={trend} />}
       </div>
       {sub && <p className="text-xs text-ink-warm-500 mt-2">{sub}</p>}
-    </div>
+    </>
   );
+
+  const shell = 'relative bg-white rounded-[14px] border border-cream-200 p-5 shadow-card overflow-hidden';
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={actionLabel ?? `${label} details`}
+        className={`${shell} w-full h-full text-left transition-colors hover:border-brand/40 focus-brand`}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={shell}>{body}</div>;
 }

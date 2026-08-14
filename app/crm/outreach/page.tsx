@@ -1,33 +1,31 @@
 'use client';
 
 /**
- * CRM · TG Outreach — MOCKUP (2026-08-07)
+ * CRM · TG Outreach
  *
- * A port of Yano's "Outreach TG (1)" Notion database into HHP, built as a
- * design mockup: the layout, funnel model, and metric definitions are real,
- * but the rows below are FIXTURES. Nothing here reads or writes Supabase yet.
+ * A port of Yano's "Outreach TG" Notion database into HHP. Shipped as a
+ * read-only mockup over fixtures on 2026-08-07; wired to a real table
+ * (outreach_prospects) on 2026-08-14 so Yano can actually work it.
  *
- * What the Notion source actually contains (surveyed 2026-08-07):
- *   • 1 table, 23 properties, 7 live rows, 11 saved views
- *   • A 21-value status funnel grouped To-do / In progress / Complete
- *   • 3 of the 11 views (Response, Lead Rate, Trial Rate) are CHARTS that
- *     Notion refuses to render — "your workspace has already used its 1
- *     free chart". Those three are the reason this page exists: the KPI
- *     strip + funnel bar below are the charts Yano is paying attention to
- *     and currently cannot see.
- *   • ~10 of the 23 properties are Notion defaults never used
- *     (Text, Checkbox, delete, Date, Hours, Message, Parent item, Sub-item 1,
- *     Bump 2, Bump 3). They're dropped here rather than ported.
+ * Why this page exists at all: 3 of Notion's 11 views — Response, Lead Rate,
+ * Trial Rate — are CHARTS that Notion refuses to render ("your workspace has
+ * already used its 1 free chart"). Those three numbers are what Yano is
+ * paying attention to and currently cannot see. They're the KPI strip below,
+ * and they recompute against whatever view + filters are active, so the same
+ * three questions can be asked of one owner or one message type rather than
+ * only of the whole board.
  *
- * Mockup scope: read-only. Status cells, row actions, and the New Prospect
- * button are inert — they exist to show the shape of the interaction, not to
- * mutate anything. Wiring is a separate build once Andy signs off on layout.
+ * The data is real: 7 rows carried over from Yano's Notion, plus ~844 copied
+ * from crm_opportunities with their stage mapped onto this funnel, so the
+ * rates have a genuine denominator instead of an invented one.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -42,114 +40,50 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Send, Search, Plus, MessageSquare, Target, Users,
-  ExternalLink, Repeat2, CalendarDays, Building2, Filter,
+  ExternalLink, Repeat2, CalendarDays, Building2, Trash2, Loader2,
 } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
+import { useToast } from '@/hooks/use-toast';
+import {
+  OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
+  type OutreachProspect, type OutreachStatus, type Stage,
+} from '@/lib/outreachService';
+import { RateBreakdownDialog, type RateKey } from '@/components/crm/RateBreakdownDialog';
 
-// ── Status model ─────────────────────────────────────────────────────
-// The 21 statuses from Notion's "Status 2" property, verbatim. Grouped the
-// way Notion groups them, because that grouping is what the funnel math
-// keys off. Kept as string literals so the eventual DB CHECK constraint
-// can be generated straight from this list.
+// ── Status presentation ──────────────────────────────────────────────
+// The funnel itself (which statuses mean what) lives in lib/outreachService
+// so the rate maths and the UI can't drift. This is only how they look.
 
-type OutreachStatus =
-  // To-do
-  | 'not_started' | 'to_contact' | 'ready_to_send' | 'contacted'
-  | 'bump_1_unseen' | 'bump_1_seen' | 'bump_2_unseen' | 'bump_2_seen'
-  | 'bump_3_unseen' | 'bump_3_seen' | 'final_bump'
-  | 'team_engaged' | 'team_denial' | 'blocked' | 'x'
-  // In progress
-  | 'response_interested' | 'response_referred'
-  | 'response_denial' | 'response_not_working'
-  // Complete
-  | 'lead' | 'lead_trial';
-
-interface StatusMeta {
-  label: string;
-  tone: BadgeTone;
-  /** Notion's own grouping — drives the funnel bucket + sort order. */
-  group: 'todo' | 'in_progress' | 'complete';
-}
+interface StatusMeta { label: string; tone: BadgeTone }
 
 const STATUS_META: Record<OutreachStatus, StatusMeta> = {
-  not_started:          { label: 'Not started',       tone: 'neutral', group: 'todo' },
-  to_contact:           { label: 'To Contact',        tone: 'pink',    group: 'todo' },
-  ready_to_send:        { label: 'Ready to send',     tone: 'warning', group: 'todo' },
-  contacted:            { label: 'Contacted',         tone: 'warning', group: 'todo' },
-  bump_1_unseen:        { label: 'Bump 1 (unseen)',   tone: 'slate',   group: 'todo' },
-  bump_1_seen:          { label: 'Bump 1 (seen)',     tone: 'slate',   group: 'todo' },
-  bump_2_unseen:        { label: 'Bump 2 (unseen)',   tone: 'slate',   group: 'todo' },
-  bump_2_seen:          { label: 'Bump 2 (seen)',     tone: 'slate',   group: 'todo' },
-  bump_3_unseen:        { label: 'Bump 3 (unseen)',   tone: 'slate',   group: 'todo' },
-  bump_3_seen:          { label: 'Bump 3 (seen)',     tone: 'slate',   group: 'todo' },
-  final_bump:           { label: 'Final Bump',        tone: 'slate',   group: 'todo' },
-  team_engaged:         { label: 'Team Engaged',      tone: 'success', group: 'todo' },
-  team_denial:          { label: 'Team Denial',       tone: 'danger',  group: 'todo' },
-  blocked:              { label: 'Blocked',           tone: 'danger',  group: 'todo' },
-  x:                    { label: 'X',                 tone: 'neutral', group: 'todo' },
-  response_interested:  { label: 'Interested',        tone: 'info',    group: 'in_progress' },
-  response_referred:    { label: 'Referred',          tone: 'purple',  group: 'in_progress' },
-  response_denial:      { label: 'Denied',            tone: 'danger',  group: 'in_progress' },
-  response_not_working: { label: 'Not a fit',         tone: 'danger',  group: 'in_progress' },
-  lead:                 { label: 'Lead',              tone: 'success', group: 'complete' },
-  lead_trial:           { label: 'Lead — Trial',      tone: 'brand',   group: 'complete' },
+  not_started:          { label: 'Not started',     tone: 'neutral' },
+  to_contact:           { label: 'To Contact',      tone: 'pink'    },
+  ready_to_send:        { label: 'Ready to send',   tone: 'warning' },
+  contacted:            { label: 'Contacted',       tone: 'warning' },
+  bump_1_unseen:        { label: 'Bump 1 (unseen)', tone: 'slate'   },
+  bump_1_seen:          { label: 'Bump 1 (seen)',   tone: 'slate'   },
+  bump_2_unseen:        { label: 'Bump 2 (unseen)', tone: 'slate'   },
+  bump_2_seen:          { label: 'Bump 2 (seen)',   tone: 'slate'   },
+  bump_3_unseen:        { label: 'Bump 3 (unseen)', tone: 'slate'   },
+  bump_3_seen:          { label: 'Bump 3 (seen)',   tone: 'slate'   },
+  final_bump:           { label: 'Final Bump',      tone: 'slate'   },
+  team_engaged:         { label: 'Team Engaged',    tone: 'success' },
+  team_denial:          { label: 'Team Denial',     tone: 'danger'  },
+  blocked:              { label: 'Blocked',         tone: 'danger'  },
+  x:                    { label: 'X',               tone: 'neutral' },
+  response_interested:  { label: 'Interested',      tone: 'info'    },
+  response_referred:    { label: 'Referred',        tone: 'purple'  },
+  response_denial:      { label: 'Denied',          tone: 'danger'  },
+  response_not_working: { label: 'Not a fit',       tone: 'danger'  },
+  lead:                 { label: 'Lead',            tone: 'success' },
+  lead_trial:           { label: 'Lead — Trial',    tone: 'brand'   },
 };
 
-// ── Funnel stages ────────────────────────────────────────────────────
-// Notion has no funnel — it has 11 flat views, and you infer the shape by
-// clicking between them. These five stages are the collapse of those views
-// into the order a prospect actually moves through.
-//
-// ⚠️ DELIBERATE DIVERGENCE FROM NOTION [2026-08-07, Andy's call]
-//
-// Notion's views are narrow hand-built filters, not a partition, and two of
-// them drop people on the floor:
-//
-//   • "Outreached" filters on `Status 2 is Contacted` — exactly that one
-//     value. The moment someone gets bumped (Bump 1 (unseen), …) they stop
-//     matching and appear in NO view except All. Euler / @gupta_kanv is the
-//     live example: messaged 7/28, bumped, now invisible in every working
-//     list Yano has.
-//   • "Dead" filters on `Response - Denial` only, so Blocked, X, and Team
-//     Denial rows are likewise homeless.
-//
-// Nobody designs a pipeline where following up removes a prospect from the
-// board, so this treats both as bugs and fixes them: Outreached means "we've
-// messaged them and they haven't answered yet" (bumps included), and Dead
-// means every terminal-negative status. Consequence: on the same data this
-// page shows rows where Notion shows zero. That's the point.
-
-type Stage = 'queued' | 'ready' | 'outreached' | 'responded' | 'lead' | 'dead';
-
-// Every way a prospect can end without becoming a lead. Notion counts only
-// the first of these.
-const DEAD_STATUSES: OutreachStatus[] = [
-  'response_denial', 'response_not_working', 'team_denial', 'blocked', 'x',
-];
-// A bump is still outreach awaiting a reply — these belong with 'contacted',
-// which is exactly what Notion's Outreached view fails to do.
-const BUMP_STATUSES: OutreachStatus[] = [
-  'bump_1_unseen', 'bump_1_seen', 'bump_2_unseen', 'bump_2_seen',
-  'bump_3_unseen', 'bump_3_seen', 'final_bump',
-];
-
-function stageOf(status: OutreachStatus): Stage {
-  if (DEAD_STATUSES.includes(status)) return 'dead';
-  if (status === 'lead' || status === 'lead_trial') return 'lead';
-  if (status === 'response_interested' || status === 'response_referred'
-      || status === 'team_engaged') return 'responded';
-  if (status === 'contacted' || BUMP_STATUSES.includes(status)) return 'outreached';
-  if (status === 'ready_to_send') return 'ready';
-  return 'queued';
-}
-
-// Drives the stage dot on each table row and the stage name in the row
-// dialog. (A `bar` colour per stage lived here for the hidden funnel; it
-// comes back with the funnel, not before.)
 const STAGE_META: Record<Stage, { label: string; dot: string }> = {
   queued:     { label: 'To Contact',    dot: 'bg-ink-warm-300' },
   ready:      { label: 'Ready to Send', dot: 'bg-amber-400' },
@@ -159,156 +93,129 @@ const STAGE_META: Record<Stage, { label: string; dot: string }> = {
   dead:       { label: 'Dead',          dot: 'bg-rose-400' },
 };
 
-// ── Fixture data ─────────────────────────────────────────────────────
-// The 7 real Notion rows, plus 17 invented ones so the funnel and the rate
-// cards have enough denominator to look like themselves. Invented rows are
-// flagged so nobody mistakes this for a live export.
+const MESSAGE_TYPES = ['3 Line TLDR', 'Case Study', 'Korea Deck'];
 
-interface Prospect {
-  id: string;
-  /** Notion's title column is confusingly named "Reason" and holds the
-   *  contact's role — Founder / Growth / HoM. Renamed to `role` here. */
-  role: string;
-  telegram: string;
-  company: string;
-  companyUrl: string;
-  owner: string;
-  status: OutreachStatus;
-  messageType: string | null;
-  dateOutreached: string | null;
-  bumpsUsed: number;
-  /** Only set once they convert — Notion's "Bump used Before conversion". */
-  bumpsBeforeConversion: number | null;
-  fromNotion: boolean;
-}
-
-const PROSPECTS: Prospect[] = [
-  // ---- The 7 real rows, as they stood on 2026-08-07 ----
-  { id: 'p1',  role: 'Growth',  telegram: '@maccanomics',   company: 'Morpho',       companyUrl: 'https://x.com/Morpho',        owner: 'Yano', status: 'to_contact',   messageType: '3 Line TLDR', dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: true },
-  { id: 'p2',  role: 'Founder', telegram: '@PaulFrambot',   company: 'Morpho',       companyUrl: 'https://x.com/Morpho',        owner: 'Yano', status: 'to_contact',   messageType: null,          dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: true },
-  { id: 'p3',  role: 'Founder', telegram: '@MerlinEgalite', company: 'Morpho',       companyUrl: 'https://x.com/Morpho',        owner: 'Yano', status: 'to_contact',   messageType: null,          dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: true },
-  { id: 'p4',  role: 'OPEN',    telegram: '@elk_xyz',       company: 'Arc',          companyUrl: 'https://x.com/Arc',           owner: 'Yano', status: 'to_contact',   messageType: null,          dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: true },
-  { id: 'p5',  role: '—',       telegram: '@drakebreeding', company: 'Arc',          companyUrl: 'https://x.com/Arc',           owner: 'Yano', status: 'to_contact',   messageType: null,          dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: true },
-  { id: 'p6',  role: 'HoM',     telegram: 'mgushansky',     company: '375ai',        companyUrl: 'https://x.com/375ai_',        owner: 'Yano', status: 'to_contact',   messageType: null,          dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: true },
-  { id: 'p7',  role: 'Growth',  telegram: '@gupta_kanv',    company: 'Euler',        companyUrl: 'https://x.com/eulerfinance',  owner: 'Yano', status: 'bump_1_unseen', messageType: '3 Line TLDR', dateOutreached: '2026-07-28', bumpsUsed: 1, bumpsBeforeConversion: null, fromNotion: true },
-
-  // ---- Invented rows, for funnel/metric shape only ----
-  { id: 'p8',  role: 'Founder', telegram: '@sky_protocol',  company: 'Sky',          companyUrl: 'https://x.com/SkyEcosystem',  owner: 'Yano',  status: 'lead_trial',          messageType: '3 Line TLDR', dateOutreached: '2026-06-30', bumpsUsed: 1, bumpsBeforeConversion: 1,    fromNotion: false },
-  { id: 'p9',  role: 'Growth',  telegram: '@pendle_gm',     company: 'Pendle',       companyUrl: 'https://x.com/pendle_fi',     owner: 'Yano',  status: 'lead',                messageType: 'Case Study',  dateOutreached: '2026-07-02', bumpsUsed: 2, bumpsBeforeConversion: 2,    fromNotion: false },
-  { id: 'p10', role: 'HoM',     telegram: '@ethena_mktg',   company: 'Ethena',       companyUrl: 'https://x.com/ethena_labs',   owner: 'Jdot',  status: 'lead',                messageType: '3 Line TLDR', dateOutreached: '2026-07-09', bumpsUsed: 0, bumpsBeforeConversion: 0,    fromNotion: false },
-  { id: 'p11', role: 'Founder', telegram: '@monad_dev',     company: 'Monad',        companyUrl: 'https://x.com/monad_xyz',     owner: 'Yano',  status: 'response_interested', messageType: 'Case Study',  dateOutreached: '2026-07-21', bumpsUsed: 1, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p12', role: 'Growth',  telegram: '@berachain_bd',  company: 'Berachain',    companyUrl: 'https://x.com/berachain',     owner: 'Jdot',  status: 'response_referred',   messageType: '3 Line TLDR', dateOutreached: '2026-07-23', bumpsUsed: 2, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p13', role: 'HoM',     telegram: '@eigen_growth',  company: 'EigenLayer',   companyUrl: 'https://x.com/eigenlayer',    owner: 'Yano',  status: 'team_engaged',        messageType: 'Korea Deck',  dateOutreached: '2026-07-25', bumpsUsed: 1, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p14', role: 'Growth',  telegram: '@jito_sol',      company: 'Jito',         companyUrl: 'https://x.com/jito_sol',      owner: 'Yano',  status: 'bump_2_seen',         messageType: '3 Line TLDR', dateOutreached: '2026-07-15', bumpsUsed: 2, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p15', role: 'Founder', telegram: '@drift_dev',     company: 'Drift',        companyUrl: 'https://x.com/DriftProtocol', owner: 'Jdot',  status: 'bump_1_seen',         messageType: '3 Line TLDR', dateOutreached: '2026-07-27', bumpsUsed: 1, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p16', role: 'HoM',     telegram: '@kamino_mktg',   company: 'Kamino',       companyUrl: 'https://x.com/KaminoFinance', owner: 'Yano',  status: 'bump_3_unseen',       messageType: 'Case Study',  dateOutreached: '2026-07-06', bumpsUsed: 3, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p17', role: 'Growth',  telegram: '@hyperliquid_x', company: 'Hyperliquid',  companyUrl: 'https://x.com/HyperliquidX',  owner: 'Yano',  status: 'final_bump',          messageType: 'Korea Deck',  dateOutreached: '2026-06-24', bumpsUsed: 4, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p18', role: 'Founder', telegram: '@zora_founder',  company: 'Zora',         companyUrl: 'https://x.com/zora',          owner: 'Jdot',  status: 'contacted',           messageType: '3 Line TLDR', dateOutreached: '2026-08-05', bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p19', role: 'Growth',  telegram: '@story_growth',  company: 'Story',        companyUrl: 'https://x.com/StoryProtocol', owner: 'Yano',  status: 'contacted',           messageType: 'Korea Deck',  dateOutreached: '2026-08-06', bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p20', role: 'HoM',     telegram: '@sui_korea',     company: 'Sui',          companyUrl: 'https://x.com/SuiNetwork',    owner: 'Jdot',  status: 'ready_to_send',       messageType: 'Korea Deck',  dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p21', role: 'Growth',  telegram: '@seinetwork_bd', company: 'Sei',          companyUrl: 'https://x.com/SeiNetwork',    owner: 'Yano',  status: 'ready_to_send',       messageType: '3 Line TLDR', dateOutreached: null,         bumpsUsed: 0, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p22', role: 'Founder', telegram: '@blast_io',      company: 'Blast',        companyUrl: 'https://x.com/Blast_L2',      owner: 'Yano',  status: 'response_denial',     messageType: '3 Line TLDR', dateOutreached: '2026-07-11', bumpsUsed: 2, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p23', role: 'Growth',  telegram: '@linea_build',   company: 'Linea',        companyUrl: 'https://x.com/LineaBuild',    owner: 'Jdot',  status: 'response_not_working', messageType: 'Case Study',  dateOutreached: '2026-07-14', bumpsUsed: 3, bumpsBeforeConversion: null, fromNotion: false },
-  { id: 'p24', role: 'HoM',     telegram: '@scroll_zkp',    company: 'Scroll',       companyUrl: 'https://x.com/Scroll_ZKP',    owner: 'Yano',  status: 'blocked',             messageType: '3 Line TLDR', dateOutreached: '2026-06-18', bumpsUsed: 4, bumpsBeforeConversion: null, fromNotion: false },
+// Column widths are declared rather than left to the browser's auto layout.
+// [2026-08-15] The Prospect column was blowing out to several hundred pixels
+// on the All tab: `telegram` was seeded straight from crm_opportunities'
+// poc_handle, which holds full profile URLs (sometimes several, space-
+// separated), and one 95-character row sets the width of the whole column.
+// The data has since been normalized to @handles, but a single bad paste
+// would do it again — so the cap lives here too, and `truncate` on the cell
+// now has a boundary to truncate against.
+const COLUMNS: Array<{ label: string; width: string }> = [
+  { label: 'Prospect',      width: 'w-[240px]' },
+  { label: 'Company',       width: 'w-[200px]' },
+  { label: 'Status',        width: 'w-[130px]' },
+  { label: 'Message',       width: 'w-[120px]' },
+  { label: 'Bumps',         width: 'w-[80px]'  },
+  { label: 'Last Outreach', width: 'w-[120px]' },
+  { label: 'Owner',         width: 'w-[100px]' },
 ];
 
-const MESSAGE_TYPES = ['3 Line TLDR', 'Case Study', 'Korea Deck'];
-const OWNERS = ['Yano', 'Jdot'];
-
 // ── View tabs ────────────────────────────────────────────────────────
-// Notion's 8 table views (the other 3 are the paywalled charts, replaced by
-// the KPI strip above the table).
+//
+// ⚠️ DELIBERATE DIVERGENCE FROM NOTION [2026-08-07, Andy's call]
+//
+// Notion's views are narrow hand-built filters, not a partition, and two of
+// them drop people on the floor:
+//
+//   • "Outreached" filters on `Status 2 is Contacted` — exactly that one
+//     value. The moment someone gets bumped they stop matching and appear
+//     in NO view except All.
+//   • "Dead" filters on `Response - Denial` only, so Blocked, X and Team
+//     Denial rows are likewise homeless.
+//
+// Nobody designs a pipeline where following up removes a prospect from the
+// board, so both are treated as bugs: Outreached means "messaged, no answer
+// yet" (bumps included) and Dead means every terminal-negative status.
 
-type ViewKey = 'all' | 'to_contact' | 'ready' | 'today' | 'outreached' | 'engaged' | 'leads' | 'dead';
+type ViewKey = 'all' | 'to_contact' | 'ready' | 'outreached' | 'engaged' | 'leads' | 'dead';
 
-const VIEWS: Array<{ key: ViewKey; label: string; match: (p: Prospect) => boolean }> = [
+const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect) => boolean }> = [
   { key: 'all',        label: 'All',           match: () => true },
   { key: 'to_contact', label: 'To Contact',    match: p => stageOf(p.status) === 'queued' },
   { key: 'ready',      label: 'Ready to Send', match: p => stageOf(p.status) === 'ready' },
-  // Notion filters this on "Date Outreached: This day" + status in the
-  // In-progress/Complete groups. Fixture dates make it a rolling 2-day
-  // window here so the tab isn't permanently empty in the mockup.
-  { key: 'today',      label: 'Today',         match: p => p.dateOutreached === '2026-08-06' || p.dateOutreached === '2026-08-05' },
   { key: 'outreached', label: 'Outreached',    match: p => stageOf(p.status) === 'outreached' },
   { key: 'engaged',    label: 'Engaged',       match: p => stageOf(p.status) === 'responded' },
   { key: 'leads',      label: 'Leads',         match: p => stageOf(p.status) === 'lead' },
   { key: 'dead',       label: 'Dead',          match: p => stageOf(p.status) === 'dead' },
 ];
 
-export default function OutreachMockupPage() {
+const emptyDraft = () => ({
+  telegram: '', company: '', role: '', company_url: '',
+  owner: 'Yano', status: 'to_contact' as OutreachStatus, message_type: '',
+});
+
+export default function OutreachPage() {
+  const { toast } = useToast();
+  const [prospects, setProspects] = useState<OutreachProspect[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [view, setView] = useState<ViewKey>('all');
   const [search, setSearch] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [msgFilter, setMsgFilter] = useState<string>('all');
-  const [selected, setSelected] = useState<Prospect | null>(null);
 
-  // Mock fetch. The data is a constant, but the page should boot the way
-  // every other page does — header first, skeleton where the data goes —
-  // so the layout can be judged as it'll actually feel.
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+  const [selected, setSelected] = useState<OutreachProspect | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  // ── Rates ──────────────────────────────────────────────────────────
-  // These are the three paywalled Notion charts, computed. Definitions are
-  // spelled out in the card subtext because "response rate" means three
-  // different things depending on what you put in the denominator.
-  const metrics = useMemo(() => {
-    const byStage = (s: Stage) => PROSPECTS.filter(p => stageOf(p.status) === s).length;
+  const [rateDrill, setRateDrill] = useState<RateKey | null>(null);
 
-    // Denominator for every rate: anyone we've actually sent to. A prospect
-    // still sitting in To Contact / Ready to Send has not been given the
-    // chance to respond and would only deflate the rates.
-    const contacted = PROSPECTS.filter(p => p.dateOutreached !== null).length;
-    const responded = PROSPECTS.filter(p => {
-      const st = stageOf(p.status);
-      // A denial IS a response — counting only positive replies would make
-      // "response rate" a synonym for "interest rate" and overstate reach.
-      return st === 'responded' || st === 'lead'
-        || p.status === 'response_denial' || p.status === 'response_not_working';
-    }).length;
-    const leads = PROSPECTS.filter(p => stageOf(p.status) === 'lead').length;
-    const trials = PROSPECTS.filter(p => p.status === 'lead_trial').length;
+  const [addOpen, setAddOpen] = useState(false);
+  const [draft, setDraft] = useState(emptyDraft());
+  const [creating, setCreating] = useState(false);
 
-    const pct = (n: number, d: number) => (d === 0 ? null : Math.round((n / d) * 100));
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setProspects(await OutreachService.list());
+    } catch (err: any) {
+      toast({ title: 'Could not load prospects', description: err?.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
-    return {
-      total: PROSPECTS.length,
-      contacted,
-      responded,
-      leads,
-      trials,
-      responseRate: pct(responded, contacted),
-      leadRate: pct(leads, contacted),
-      // Trial rate is leads→trial, not contacted→trial: it measures how many
-      // closed leads actually started, which is a different question.
-      trialRate: pct(trials, leads),
-      dead: byStage('dead'),
-    };
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
-  const rows = useMemo(() => {
-    const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
+  // Owners come from the data — hardcoding the list meant a new rep's rows
+  // were unfilterable until someone edited this file.
+  const owners = useMemo(
+    () => Array.from(new Set(prospects.map(p => p.owner).filter(Boolean))).sort(),
+    [prospects],
+  );
+
+  // Two populations, deliberately.
+  //
+  // [2026-08-15, Andy] The rates must NOT follow the view tabs. A tab is a
+  // filter on funnel STAGE, and stage is the very thing the rates measure —
+  // standing on the Leads tab and reading "Lead Rate 100%" is a tautology,
+  // not a metric, and the same collapse happens on every other tab. So the
+  // denominator is the whole board.
+  //
+  // Owner / message type / search are different in kind: they slice WHO was
+  // contacted, not how far they got. Those still move the rates, which is
+  // what makes "what's my response rate" and "which opener works" askable —
+  // the reason these cards exist (Notion paywalled the charts).
+  const rateRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return PROSPECTS
-      .filter(viewMatch)
+    return prospects
       .filter(p => ownerFilter === 'all' || p.owner === ownerFilter)
-      .filter(p => msgFilter === 'all' || p.messageType === msgFilter)
+      .filter(p => msgFilter === 'all' || p.message_type === msgFilter)
       .filter(p => !q
         || p.telegram.toLowerCase().includes(q)
         || p.company.toLowerCase().includes(q)
-        || p.role.toLowerCase().includes(q))
-      .sort((a, b) => {
-        // Most recently touched first; never-contacted rows sink to the
-        // bottom rather than sorting as epoch-zero.
-        if (!a.dateOutreached && !b.dateOutreached) return a.company.localeCompare(b.company);
-        if (!a.dateOutreached) return 1;
-        if (!b.dateOutreached) return -1;
-        return b.dateOutreached.localeCompare(a.dateOutreached);
-      });
-  }, [view, search, ownerFilter, msgFilter]);
+        || p.role.toLowerCase().includes(q));
+  }, [prospects, search, ownerFilter, msgFilter]);
+
+  const rows = useMemo(() => {
+    const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
+    return rateRows.filter(viewMatch);
+  }, [rateRows, view]);
+
+  const metrics = useMemo(() => computeRates(rateRows), [rateRows]);
 
   const activeFilter = [
     ownerFilter !== 'all' ? ownerFilter : null,
@@ -316,8 +223,61 @@ export default function OutreachMockupPage() {
     search.trim() ? `"${search.trim()}"` : null,
   ].filter(Boolean).join(' · ');
 
-  // Rendered identically in both branches so the title doesn't jump when
-  // the data lands.
+  // Names the rate population — never the view tab, which no longer scopes it.
+  const scopeLabel = activeFilter || 'whole board';
+
+  async function changeStatus(p: OutreachProspect, status: OutreachStatus) {
+    setSaving(true);
+    try {
+      const updated = await OutreachService.setStatus(p, status);
+      setProspects(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+      setSelected(updated);
+      toast({ title: 'Status updated', description: `${p.telegram} → ${STATUS_META[status].label}` });
+    } catch (err: any) {
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreate() {
+    if (!draft.telegram.trim() || !draft.company.trim()) return;
+    setCreating(true);
+    try {
+      const created = await OutreachService.create({
+        telegram: draft.telegram.trim(),
+        company: draft.company.trim(),
+        role: draft.role.trim() || '—',
+        company_url: draft.company_url.trim() || null,
+        owner: draft.owner,
+        status: draft.status,
+        message_type: draft.message_type || null,
+      });
+      setProspects(prev => [created, ...prev]);
+      setAddOpen(false);
+      setDraft(emptyDraft());
+      toast({ title: 'Prospect added', description: `${created.telegram} · ${created.company}` });
+    } catch (err: any) {
+      toast({ title: 'Could not add prospect', description: err?.message, variant: 'destructive' });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleDelete(p: OutreachProspect) {
+    setDeleting(true);
+    try {
+      await OutreachService.remove(p.id);
+      setProspects(prev => prev.filter(x => x.id !== p.id));
+      setSelected(null);
+      toast({ title: 'Prospect removed', description: `${p.telegram} · ${p.company}` });
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const header = (
     <PageHeader
       icon={Send}
@@ -326,20 +286,15 @@ export default function OutreachMockupPage() {
       title="TG Outreach"
       subtitle="Cold Telegram prospecting — who's queued, who's been bumped, who converted"
       actions={(
-        <>
-          <Button variant="outline" size="sm" disabled>
-            <Filter className="h-4 w-4 mr-2" />Saved views
-          </Button>
-          <Button variant="brand" size="sm" disabled>
-            <Plus className="h-4 w-4 mr-2" />New Prospect
-          </Button>
-        </>
+        <Button variant="brand" size="sm" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />New Prospect
+        </Button>
       )}
     />
   );
 
-  // Structural skeleton — same KPI grid and same table shape as the loaded
-  // state, so nothing reflows on arrival.
+  // Structural skeleton — same KPI grid and table shape as the loaded state,
+  // so nothing reflows on arrival.
   if (loading) {
     return (
       <div className="space-y-6">
@@ -393,26 +348,23 @@ export default function OutreachMockupPage() {
     <div className="space-y-6">
       {header}
 
-      {/* One quiet line, not a banner — the page should read as the real
-          thing, with the caveat available rather than shouted. */}
-      <p className="text-xs text-ink-warm-500">
-        Mockup — sample data, no live connection. Buttons and status cells are inert.
-      </p>
-
       <SectionHeader
-        label="Overview"
+        label="Rates"
         dot="brand"
-        counter={`01 — ${metrics.total} prospects · ${metrics.contacted} contacted`}
+        counter={`01 — ${scopeLabel} · ${metrics.contacted} contacted · click a rate to break it down`}
         first
       />
 
-      {/* The three paywalled Notion charts, as KPI cards. */}
+      {/* The three Notion charts Yano can't render, plus the pipeline count.
+          Every rate is denominated on outreach actually sent — a prospect
+          still in To Contact hasn't been given the chance to reply and would
+          only deflate all three. */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <KpiCard
           icon={Users}
           label="In Pipeline"
           value={metrics.total - metrics.dead}
-          sub={`${metrics.dead} dead · ${metrics.total} all-time`}
+          sub={`${metrics.dead} dead · ${metrics.total} in view`}
           accent="brand"
           topAccent
         />
@@ -423,33 +375,35 @@ export default function OutreachMockupPage() {
           sub={`${metrics.responded} replied of ${metrics.contacted} contacted`}
           accent="sky"
           topAccent
+          onClick={() => setRateDrill('response')}
+          actionLabel="Break down Response Rate by owner and message type"
         />
         <KpiCard
           icon={Target}
           label="Lead Rate"
           value={metrics.leadRate === null ? '—' : `${metrics.leadRate}%`}
-          sub={`${metrics.leads} leads of ${metrics.contacted} contacted`}
+          sub={`${metrics.leads} trial, convo or call of ${metrics.contacted}`}
           accent="emerald"
           topAccent
+          onClick={() => setRateDrill('lead')}
+          actionLabel="Break down Lead Rate by owner and message type"
         />
         <KpiCard
           icon={Repeat2}
           label="Trial Rate"
           value={metrics.trialRate === null ? '—' : `${metrics.trialRate}%`}
-          sub={`${metrics.trials} of ${metrics.leads} leads started a trial`}
+          sub={`${metrics.trials} took the free offer of ${metrics.contacted}`}
           accent="purple"
           topAccent
+          onClick={() => setRateDrill('trial')}
+          actionLabel="Break down Trial Rate by owner and message type"
         />
       </div>
-
-      {/* Stage-breakdown funnel bar lived here — hidden 2026-08-07 per Andy
-          until the table itself is signed off. The stage model still drives the
-          view tabs and the row dots, so nothing else changes when it returns. */}
 
       <SectionHeader
         label="Prospects"
         dot="sky"
-        counter={`02 — ${rows.length} of ${PROSPECTS.length} prospects${activeFilter ? ` · ${activeFilter}` : ''}`}
+        counter={`02 — ${rows.length} of ${prospects.length} prospects${activeFilter ? ` · ${activeFilter}` : ''}`}
       />
 
       {/* Filter toolbar — tabs left, search middle, power-user right. */}
@@ -457,7 +411,7 @@ export default function OutreachMockupPage() {
         <Tabs value={view} onValueChange={v => setView(v as ViewKey)}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             {VIEWS.map(v => {
-              const n = PROSPECTS.filter(v.match).length;
+              const n = prospects.filter(v.match).length;
               return (
                 <TabsTrigger
                   key={v.key}
@@ -491,7 +445,7 @@ export default function OutreachMockupPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All owners</SelectItem>
-              {OWNERS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              {owners.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={msgFilter} onValueChange={setMsgFilter}>
@@ -516,88 +470,95 @@ export default function OutreachMockupPage() {
             />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Prospect</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Company</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Message</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Bumps</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Last Outreach</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Owner</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(p => {
-                const meta = STATUS_META[p.status];
-                const stage = stageOf(p.status);
-                return (
-                  <TableRow
-                    key={p.id}
-                    className="border-cream-100 row-accent cursor-pointer"
-                    onClick={() => setSelected(p)}
-                  >
-                    <TableCell className="py-3.5 px-5">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STAGE_META[stage].dot}`} />
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-ink-warm-900 truncate">
-                            {p.telegram}
-                          </div>
-                          <div className="text-[11px] text-ink-warm-500 truncate">
-                            {p.role === '—' ? 'Role unknown' : p.role}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                  {COLUMNS.map(c => (
+                    <TableHead
+                      key={c.label}
+                      className={`py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 ${c.width}`}
+                    >
+                      {c.label}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(p => {
+                  const meta = STATUS_META[p.status];
+                  const stage = stageOf(p.status);
+                  return (
+                    <TableRow
+                      key={p.id}
+                      className="border-cream-100 row-accent cursor-pointer"
+                      onClick={() => setSelected(p)}
+                    >
+                      <TableCell className="py-3.5 px-5">
+                        <div className="flex items-center gap-2.5 min-w-0 max-w-[210px]">
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STAGE_META[stage].dot}`} />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-ink-warm-900 truncate" title={p.telegram}>
+                              {p.telegram}
+                            </div>
+                            <div className="text-[11px] text-ink-warm-500 truncate">
+                              {p.role === '—' ? 'Role unknown' : p.role}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      <a
-                        href={p.companyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-sm text-brand hover:text-brand-dark"
-                      >
-                        {p.company}
-                        <ExternalLink className="h-3 w-3 opacity-60" />
-                      </a>
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      <StatusBadge tone={meta.tone} size="sm">{meta.label}</StatusBadge>
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      {p.messageType
-                        ? <span className="text-xs text-ink-warm-700">{p.messageType}</span>
-                        : <span className="text-xs text-ink-warm-400">—</span>}
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      {p.bumpsUsed === 0
-                        ? <span className="text-xs text-ink-warm-400">—</span>
-                        : (
-                          <span className="inline-flex items-center gap-1 text-xs tabular-nums text-ink-warm-700">
-                            <Repeat2 className="h-3 w-3 text-ink-warm-400" />
-                            {p.bumpsUsed}
-                          </span>
+                      </TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        {p.company_url ? (
+                          <a
+                            href={p.company_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-sm text-brand hover:text-brand-dark"
+                          >
+                            {p.company}
+                            <ExternalLink className="h-3 w-3 opacity-60" />
+                          </a>
+                        ) : (
+                          <span className="text-sm text-ink-warm-800">{p.company}</span>
                         )}
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      {p.dateOutreached
-                        ? <span className="text-xs tabular-nums text-ink-warm-700">{formatDate(p.dateOutreached)}</span>
-                        : <span className="text-xs text-ink-warm-400">Not sent</span>}
-                    </TableCell>
-                    <TableCell className="py-3.5 px-5">
-                      <span className="text-xs text-ink-warm-700">{p.owner}</span>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        <StatusBadge tone={meta.tone} size="sm">{meta.label}</StatusBadge>
+                      </TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        {p.message_type
+                          ? <span className="text-xs text-ink-warm-700">{p.message_type}</span>
+                          : <span className="text-xs text-ink-warm-400">—</span>}
+                      </TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        {p.bumps_used === 0
+                          ? <span className="text-xs text-ink-warm-400">—</span>
+                          : (
+                            <span className="inline-flex items-center gap-1 text-xs tabular-nums text-ink-warm-700">
+                              <Repeat2 className="h-3 w-3 text-ink-warm-400" />
+                              {p.bumps_used}
+                            </span>
+                          )}
+                      </TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        {p.date_outreached
+                          ? <span className="text-xs tabular-nums text-ink-warm-700">{formatDate(p.date_outreached)}</span>
+                          : <span className="text-xs text-ink-warm-400">Not sent</span>}
+                      </TableCell>
+                      <TableCell className="py-3.5 px-5">
+                        <span className="text-xs text-ink-warm-700">{p.owner}</span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Card>
 
-      {/* Row detail — read-only in the mockup. */}
+      {/* ── Row detail — status is editable here ─────────────────────── */}
       <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}>
         <DialogContent className="sm:max-w-[480px] max-h-[85vh] flex flex-col">
           <DialogHeader>
@@ -607,15 +568,32 @@ export default function OutreachMockupPage() {
             </DialogTitle>
           </DialogHeader>
           {selected && (
-            <div className="flex-1 overflow-y-auto px-1 space-y-3">
-              <div className="flex items-center gap-2">
-                <StatusBadge tone={STATUS_META[selected.status].tone}>
-                  {STATUS_META[selected.status].label}
-                </StatusBadge>
-                <span className="text-xs text-ink-warm-500">
-                  {STAGE_META[stageOf(selected.status)].label} stage
-                </span>
+            <div className="flex-1 overflow-y-auto px-1 space-y-4">
+              <div>
+                <Label className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500">Status</Label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Select
+                    value={selected.status}
+                    onValueChange={v => changeStatus(selected, v as OutreachStatus)}
+                    disabled={saving}
+                  >
+                    <SelectTrigger className="h-9 focus-brand flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OUTREACH_STATUSES.map(s => (
+                        <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {saving && <Loader2 className="h-4 w-4 animate-spin text-ink-warm-400" />}
+                </div>
+                <p className="text-[11px] text-ink-warm-500 mt-1.5">
+                  {STAGE_META[stageOf(selected.status)].label} stage. Moving to Contacted or a
+                  bump stamps today&apos;s date and counts the bump automatically.
+                </p>
               </div>
+
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
                   <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Company</dt>
@@ -634,40 +612,173 @@ export default function OutreachMockupPage() {
                 </div>
                 <div>
                   <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Message type</dt>
-                  <dd className="text-ink-warm-900">{selected.messageType ?? 'Not chosen'}</dd>
+                  <dd className="text-ink-warm-900">{selected.message_type ?? 'Not chosen'}</dd>
                 </div>
                 <div>
                   <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Last outreach</dt>
                   <dd className="flex items-center gap-1.5 text-ink-warm-900 tabular-nums">
                     <CalendarDays className="h-3.5 w-3.5 text-ink-warm-400" />
-                    {selected.dateOutreached ? formatDate(selected.dateOutreached) : 'Not sent'}
+                    {selected.date_outreached ? formatDate(selected.date_outreached) : 'Not sent'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Bumps used</dt>
                   <dd className="text-ink-warm-900 tabular-nums">
-                    {selected.bumpsUsed}
-                    {selected.bumpsBeforeConversion !== null && (
+                    {selected.bumps_used}
+                    {selected.bumps_before_conversion !== null && (
                       <span className="text-ink-warm-500 text-xs">
-                        {' '}({selected.bumpsBeforeConversion} before converting)
+                        {' '}({selected.bumps_before_conversion} before converting)
                       </span>
                     )}
                   </dd>
                 </div>
               </dl>
-              {!selected.fromNotion && (
-                <p className="text-[11px] text-amber-700 bg-amber-50/60 border border-amber-200 rounded-md px-2.5 py-2">
-                  Fixture row — invented for the mockup, not from Yano&apos;s Notion.
+
+              {selected.source === 'crm' && (
+                <p className="text-[11px] text-ink-warm-500">
+                  Copied from the CRM pipeline — status was mapped from its sales stage.
                 </p>
               )}
             </div>
           )}
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0 sm:justify-between">
+            <Button
+              variant="outline"
+              className="border-rose-300 text-rose-600 hover:bg-rose-50"
+              onClick={() => selected && handleDelete(selected)}
+              disabled={deleting || saving}
+            >
+              {deleting
+                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+              Remove
+            </Button>
             <Button variant="outline" onClick={() => setSelected(null)}>Close</Button>
-            <Button variant="brand" disabled>Advance status</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── New prospect ─────────────────────────────────────────────── */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-brand" />New Prospect
+            </DialogTitle>
+            <DialogDescription>
+              One row per person per company — the board refuses a duplicate rather than
+              letting it inflate the rates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="op-tg">Telegram <RequiredAsterisk /></Label>
+                <Input
+                  id="op-tg"
+                  value={draft.telegram}
+                  onChange={e => setDraft({ ...draft, telegram: e.target.value })}
+                  placeholder="@handle"
+                  className="h-9 focus-brand mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="op-co">Company <RequiredAsterisk /></Label>
+                <Input
+                  id="op-co"
+                  value={draft.company}
+                  onChange={e => setDraft({ ...draft, company: e.target.value })}
+                  placeholder="Morpho"
+                  className="h-9 focus-brand mt-1"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="op-role">Role</Label>
+                <Input
+                  id="op-role"
+                  value={draft.role}
+                  onChange={e => setDraft({ ...draft, role: e.target.value })}
+                  placeholder="Founder / Growth / HoM"
+                  className="h-9 focus-brand mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="op-url">Company URL</Label>
+                <Input
+                  id="op-url"
+                  value={draft.company_url}
+                  onChange={e => setDraft({ ...draft, company_url: e.target.value })}
+                  placeholder="https://x.com/…"
+                  className="h-9 focus-brand mt-1"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Owner</Label>
+                <Select value={draft.owner} onValueChange={v => setDraft({ ...draft, owner: v })}>
+                  <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(owners.length ? owners : ['Yano']).map(o => (
+                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select
+                  value={draft.status}
+                  onValueChange={v => setDraft({ ...draft, status: v as OutreachStatus })}
+                >
+                  <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OUTREACH_STATUSES.map(s => (
+                      <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Message</Label>
+                <Select
+                  value={draft.message_type || 'none'}
+                  onValueChange={v => setDraft({ ...draft, message_type: v === 'none' ? '' : v })}
+                >
+                  <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None yet</SelectItem>
+                    {MESSAGE_TYPES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button
+              variant="brand"
+              onClick={handleCreate}
+              disabled={creating || !draft.telegram.trim() || !draft.company.trim()}
+            >
+              {creating && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Add Prospect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rate drill-down. Fed `rateRows`, the same attribute-filtered
+          population the cards use — so the dialog can never disagree with the
+          card that opened it. */}
+      <RateBreakdownDialog
+        rateKey={rateDrill}
+        rows={rateRows}
+        scopeLabel={scopeLabel}
+        onClose={() => setRateDrill(null)}
+      />
     </div>
   );
 }
