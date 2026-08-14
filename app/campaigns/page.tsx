@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import Link from "next/link";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight, Users, FileText } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight, Users, FileText, ListChecks, Wallet } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { ShareCampaignDialog } from '@/components/campaign/ShareCampaignDialog';
+import { AllClientsRollupDialog, type RollupMode } from '@/components/campaign/AllClientsRollupDialog';
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { getCampaignWeekState } from "@/lib/campaignWeekHelpers";
 import { CampaignTemplateService, CampaignTemplateWithDetails } from "@/lib/campaignTemplateService";
@@ -63,6 +64,9 @@ export default function CampaignsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState(false);
+  // Which cross-client rollup dialog is open (null = none). One piece of state
+  // for both buttons since they share a dialog and are mutually exclusive.
+  const [rollupMode, setRollupMode] = useState<RollupMode | null>(null);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
   const [sharingCampaign, setSharingCampaign] = useState<CampaignWithDetails | null>(null);
@@ -643,6 +647,19 @@ export default function CampaignsPage() {
         kicker="Clients · Campaigns"
         kickerDot="sky"
         actions={
+          <>
+            {/* [2026-08-14 per Andy] Cross-client rollups. Both answers lived
+                one client at a time inside each client's modal; these put the
+                whole book in one place so nobody opens seven clients to find
+                the one unconfirmed week or the campaign that's over budget. */}
+            <Button variant="outline" onClick={() => setRollupMode('lineups')}>
+              <ListChecks className="h-4 w-4 mr-2" />
+              All Lineups
+            </Button>
+            <Button variant="outline" onClick={() => setRollupMode('budgets')}>
+              <Wallet className="h-4 w-4 mr-2" />
+              All Budgets
+            </Button>
           <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
             <DialogTrigger asChild>
               <Button variant="brand">
@@ -1063,7 +1080,14 @@ export default function CampaignsPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </>
         }
+      />
+
+      <AllClientsRollupDialog
+        mode={rollupMode ?? 'lineups'}
+        open={rollupMode !== null}
+        onOpenChange={(o) => { if (!o) setRollupMode(null); }}
       />
       {/* ── Campaigns ─────────────────────────────────────────────────
           Single SectionHeader + toolbar (tabs left, search middle,
