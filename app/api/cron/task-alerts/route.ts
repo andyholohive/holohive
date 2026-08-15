@@ -2,8 +2,26 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
+
+// ── Staleness thresholds ─────────────────────────────────────────────
+//
+// [2026-08-15, Jdot] "both stale task deadlines are months away, I think
+// logic is flawed" — he was right. Staleness was `updated_at` older than a
+// flat 7 days with no reference to the deadline, so a task due 2027-02-06
+// that nobody had touched in 10 days got reported as stale. It isn't
+// stale; it hasn't started, and it isn't due for six months.
+//
+// Staleness only means something relative to a deadline: a task is stale
+// when it is drifting UNATTENDED toward one that is close, or when it has
+// no deadline at all and nothing will ever force the issue. A task with a
+// distant due date is simply not due yet, and pinging about it every day
+// trains people to ignore the digest.
+const STALE_DAYS = 7;          // untouched this long…
+const DUE_SOON_DAYS = 14;      // …and due within this window → stale
+const UNDATED_STALE_DAYS = 14; // no due date at all → a longer leash
 
 /**
  * End-of-day 23:00 UTC (Mon-Fri) cron: sends overdue task
@@ -51,15 +69,38 @@ export async function GET(request: Request) {
       .lt('due_date', today)
       .not('status', 'in', '("complete","paused")');
 
-    // 2. Get stale tasks (updated_at > 7 days ago, not complete/paused)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // 2. Get stale tasks — untouched AND actually at risk. See the
+    //    threshold block at the top for why the deadline has to be part of
+    //    this. The DB filter is only the cheap half (untouched at all);
+    //    the deadline test runs below, since it is two different windows.
+    const staleCutoff = new Date();
+    staleCutoff.setDate(staleCutoff.getDate() - STALE_DAYS);
 
-    const { data: staleTasks } = await supabase
+    const dueSoonCutoff = new Date();
+    dueSoonCutoff.setDate(dueSoonCutoff.getDate() + DUE_SOON_DAYS);
+    const dueSoonDate = dueSoonCutoff.toISOString().split('T')[0];
+
+    const undatedCutoff = new Date();
+    undatedCutoff.setDate(undatedCutoff.getDate() - UNDATED_STALE_DAYS);
+
+    const { data: staleCandidates } = await supabase
       .from('tasks')
-      .select('id, task_name, assigned_to, assigned_to_name, updated_at')
-      .lt('updated_at', sevenDaysAgo.toISOString())
+      .select('id, task_name, assigned_to, assigned_to_name, updated_at, due_date')
+      .lt('updated_at', staleCutoff.toISOString())
       .not('status', 'in', '("complete","paused")');
+
+    const staleTasks = (staleCandidates || []).filter(t => {
+      // Already in the Overdue block. Reporting the same task twice in one
+      // message is what made the digest look like it had duplicates.
+      if (t.due_date && t.due_date < today) return false;
+
+      // No deadline: nothing will ever force this, so drift IS the signal —
+      // but on a longer leash so it isn't nagged about every single day.
+      if (!t.due_date) return new Date(t.updated_at as string) < undatedCutoff;
+
+      // Has a deadline: only stale once that deadline is actually close.
+      return t.due_date <= dueSoonDate;
+    });
 
     // 3. Get user telegram IDs
     const userIds = new Set<string>();
@@ -123,7 +164,7 @@ export async function GET(request: Request) {
           const daysOverdue = Math.ceil(
             (new Date().getTime() - new Date(t.due_date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)
           );
-          message += `• ${t.task_name} (${daysOverdue}d overdue)\n`;
+          message += `• ${t.task_name} — due ${formatDate(t.due_date)} (${daysOverdue}d overdue)\n`;
         }
         message += '\n';
       }
@@ -134,7 +175,11 @@ export async function GET(request: Request) {
           const daysSinceUpdate = Math.ceil(
             (Date.now() - new Date(t.updated_at as string).getTime()) / (1000 * 60 * 60 * 24)
           );
-          message += `• ${t.task_name} (no update in ${daysSinceUpdate}d)\n`;
+          // The due date is what tells two same-named tasks apart — Jdot
+          // saw "Send Button Invoice" twice and read it as a duplicate when
+          // they were two real rows due a month apart.
+          const due = t.due_date ? `due ${formatDate(t.due_date)}` : 'no due date';
+          message += `• ${t.task_name} — ${due} (no update in ${daysSinceUpdate}d)\n`;
         }
       }
 
@@ -148,7 +193,7 @@ export async function GET(request: Request) {
 
     // 7. Also send summary to ops chat
     const totalOverdue = overdueTasks?.length || 0;
-    const totalStale = staleTasks?.length || 0;
+    const totalStale = staleTasks.length;
 
     if (totalOverdue > 0 || totalStale > 0) {
       const summary = [
