@@ -27,9 +27,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -44,9 +41,11 @@ import {
 } from '@/components/ui/dialog';
 import {
   Send, Search, Plus, MessageSquare, Target, Users,
-  ExternalLink, Repeat2, CalendarDays, Building2, Trash2, Loader2,
+  ExternalLink, Repeat2, Trash2, Loader2,
 } from 'lucide-react';
-import { formatDate } from '@/lib/dateFormat';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import {
   OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
@@ -104,14 +103,27 @@ const MESSAGE_TYPES = ['3 Line TLDR', 'Case Study', 'Korea Deck'];
 // would do it again — so the cap lives here too, and `truncate` on the cell
 // now has a boundary to truncate against.
 const COLUMNS: Array<{ label: string; width: string }> = [
-  { label: 'Prospect',      width: 'w-[240px]' },
-  { label: 'Company',       width: 'w-[200px]' },
-  { label: 'Status',        width: 'w-[130px]' },
-  { label: 'Message',       width: 'w-[120px]' },
-  { label: 'Bumps',         width: 'w-[80px]'  },
-  { label: 'Last Outreach', width: 'w-[120px]' },
-  { label: 'Owner',         width: 'w-[100px]' },
+  { label: 'Prospect',      width: 'w-[190px]' },
+  { label: 'Role',          width: 'w-[150px]' },
+  { label: 'Company',       width: 'w-[170px]' },
+  { label: 'Website',       width: 'w-[160px]' },
+  { label: 'Status',        width: 'w-[150px]' },
+  { label: 'Message',       width: 'w-[140px]' },
+  { label: 'Bumps',         width: 'w-[140px]' },
+  { label: 'Last Outreach', width: 'w-[130px]' },
+  { label: 'Owner',         width: 'w-[110px]' },
+  { label: 'Notes',         width: 'w-[200px]' },
 ];
+
+/** Every column that can be edited in place. */
+type EditField =
+  | 'telegram' | 'role' | 'company' | 'company_url'
+  | 'status' | 'message_type' | 'bumps_used' | 'date_outreached'
+  | 'owner' | 'notes';
+
+/** Radix Select forbids an empty-string value, so "no message type" needs a
+ *  sentinel that is mapped back to NULL on save. */
+const NONE = '__none__';
 
 // ── View tabs ────────────────────────────────────────────────────────
 //
@@ -157,7 +169,12 @@ export default function OutreachPage() {
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [msgFilter, setMsgFilter] = useState<string>('all');
 
-  const [selected, setSelected] = useState<OutreachProspect | null>(null);
+  // Which cell is open for editing, and the uncommitted text in it. One cell
+  // at a time: opening another commits or discards the first, which is what
+  // makes click-anywhere-and-type safe on a board this size.
+  const [edit, setEdit] = useState<{ id: string; field: EditField } | null>(null);
+  const [draftValue, setDraftValue] = useState('');
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -227,17 +244,67 @@ export default function OutreachPage() {
   const scopeLabel = activeFilter || 'whole board';
 
   async function changeStatus(p: OutreachProspect, status: OutreachStatus) {
+    if (status === p.status) return;
     setSaving(true);
     try {
+      // setStatus, not a raw column write: it stamps date_outreached on the
+      // first send and derives the bump count, so the rates keep a correct
+      // denominator no matter which surface moved the prospect.
       const updated = await OutreachService.setStatus(p, status);
       setProspects(prev => prev.map(x => (x.id === updated.id ? updated : x)));
-      setSelected(updated);
-      toast({ title: 'Status updated', description: `${p.telegram} → ${STATUS_META[status].label}` });
     } catch (err: any) {
       toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Inline editing ─────────────────────────────────────────────────
+  //
+  // Optimistic: the cell shows the new value immediately and only reverts
+  // (via a reload) if the write fails. On a board Yano is typing through,
+  // waiting on a round-trip per cell would feel broken.
+
+  function startEdit(p: OutreachProspect, field: EditField, current: string) {
+    setEdit({ id: p.id, field });
+    setDraftValue(current);
+  }
+
+  async function saveField(p: OutreachProspect, field: EditField, value: string | number | null) {
+    if ((p as any)[field] === value) return;
+    setProspects(prev => prev.map(x => (x.id === p.id ? { ...x, [field]: value } as OutreachProspect : x)));
+    try {
+      await OutreachService.update(p.id, { [field]: value } as any);
+    } catch (err: any) {
+      toast({ title: 'Could not save', description: err?.message, variant: 'destructive' });
+      load();
+    }
+  }
+
+  async function commitEdit() {
+    if (!edit) return;
+    const { id, field } = edit;
+    const p = prospects.find(x => x.id === id);
+    setEdit(null);
+    if (!p) return;
+
+    const raw = draftValue.trim();
+
+    if (field === 'bumps_used') {
+      const n = Number(raw);
+      // A bump count is a small non-negative integer; anything else is a
+      // typo, and writing it would corrupt the "bumps before conversion"
+      // figure this column exists to feed.
+      if (!Number.isFinite(n) || n < 0) return;
+      await saveField(p, field, Math.min(9, Math.round(n)));
+      return;
+    }
+
+    // telegram and company are the row's identity and carry a unique index —
+    // blanking either would orphan the row, so an empty edit is a no-op.
+    if ((field === 'telegram' || field === 'company') && !raw) return;
+
+    await saveField(p, field, raw || null);
   }
 
   async function handleCreate() {
@@ -269,7 +336,6 @@ export default function OutreachPage() {
     try {
       await OutreachService.remove(p.id);
       setProspects(prev => prev.filter(x => x.id !== p.id));
-      setSelected(null);
       toast({ title: 'Prospect removed', description: `${p.telegram} · ${p.company}` });
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
@@ -460,6 +526,17 @@ export default function OutreachPage() {
         </div>
       </div>
 
+      {/* ── The board ────────────────────────────────────────────────────
+          [2026-08-15, Yano] "id like to be able to edit from whereever /
+          doesnt let me edit anything atm / on notion i click and edit."
+          He was right — only Status was editable, and only from inside a
+          row dialog. Every column is now edited in place on a single click,
+          which is also why this is a raw <table> rather than the shadcn
+          Table primitives: per CLAUDE.md, inline-editable spreadsheets use
+          the v11 chrome (cream header, per-cell gridlines) and read-only
+          data tables use the primitives. The row-detail dialog is gone —
+          it held a second copy of the same fields, which is the exact
+          "where do I edit this" confusion Yano hit. */}
       <Card className="border-cream-200 overflow-hidden">
         {rows.length === 0 ? (
           <div className="py-4">
@@ -471,192 +548,258 @@ export default function OutreachPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-cream-50 hover:bg-cream-50 border-b border-cream-200">
                   {COLUMNS.map(c => (
-                    <TableHead
+                    <th
                       key={c.label}
-                      className={`py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 ${c.width}`}
+                      className={`bg-cream-50 text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 whitespace-nowrap ${c.width}`}
                     >
                       {c.label}
-                    </TableHead>
+                    </th>
                   ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  <th className="bg-cream-50 w-10 border-cream-200" />
+                </tr>
+              </thead>
+              <tbody>
                 {rows.map(p => {
                   const meta = STATUS_META[p.status];
                   const stage = stageOf(p.status);
-                  return (
-                    <TableRow
-                      key={p.id}
-                      className="border-cream-100 row-accent cursor-pointer"
-                      onClick={() => setSelected(p)}
+                  const isEditing = (f: EditField) => edit?.id === p.id && edit.field === f;
+
+                  /** Text/number cell: one click swaps the value for an input. */
+                  const textCell = (
+                    field: EditField,
+                    value: string,
+                    opts?: { placeholder?: string; numeric?: boolean; render?: React.ReactNode },
+                  ) => (
+                    <td
+                      className="border-r border-cream-200 align-middle"
+                      onClick={() => !isEditing(field) && startEdit(p, field, value)}
                     >
-                      <TableCell className="py-3.5 px-5">
-                        <div className="flex items-center gap-2.5 min-w-0 max-w-[210px]">
-                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STAGE_META[stage].dot}`} />
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-ink-warm-900 truncate" title={p.telegram}>
-                              {p.telegram}
-                            </div>
-                            <div className="text-[11px] text-ink-warm-500 truncate">
-                              {p.role === '—' ? 'Role unknown' : p.role}
-                            </div>
-                          </div>
+                      {isEditing(field) ? (
+                        <div className="py-1 px-2">
+                          <Input
+                            autoFocus
+                            type={opts?.numeric ? 'number' : 'text'}
+                            value={draftValue}
+                            onChange={e => setDraftValue(e.target.value)}
+                            onBlur={commitEdit}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+                              if (e.key === 'Escape') { e.preventDefault(); setEdit(null); }
+                            }}
+                            className="h-8 text-xs focus-brand bg-white"
+                            placeholder={opts?.placeholder}
+                          />
                         </div>
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        {p.company_url ? (
+                      ) : (
+                        <div className="py-3.5 px-4 cursor-text hover:bg-cream-50/60 min-h-[3rem] flex items-center">
+                          {opts?.render ?? (
+                            value
+                              ? <span className="text-xs text-ink-warm-800 truncate">{value}</span>
+                              : <span className="text-xs text-ink-warm-300">{opts?.placeholder ?? '—'}</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  );
+
+                  return (
+                    <tr key={p.id} className="border-b border-cream-100 hover:bg-cream-50/40 group">
+                      {/* Prospect handle */}
+                      {textCell('telegram', p.telegram, {
+                        placeholder: '@handle',
+                        render: (
+                          <span className="flex items-center gap-2.5 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STAGE_META[stage].dot}`} />
+                            <span className="text-sm font-medium text-ink-warm-900 truncate" title={p.telegram}>
+                              {p.telegram}
+                            </span>
+                          </span>
+                        ),
+                      })}
+
+                      {/* Role — '—' is the seed's stand-in for unknown, so show
+                          it as empty rather than making Yano delete a dash. */}
+                      {textCell('role', p.role === '—' ? '' : p.role, { placeholder: 'Role' })}
+
+                      {/* Company */}
+                      {textCell('company', p.company, { placeholder: 'Company' })}
+
+                      {/* Website — rendered as a link when set, but the cell
+                          still edits on click; the link itself stops the
+                          bubble so following it doesn't open an editor. */}
+                      {textCell('company_url', p.company_url ?? '', {
+                        placeholder: 'https://…',
+                        render: p.company_url ? (
                           <a
                             href={p.company_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-sm text-brand hover:text-brand-dark"
+                            className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark truncate"
                           >
-                            {p.company}
-                            <ExternalLink className="h-3 w-3 opacity-60" />
+                            {p.company_url.replace(/^https?:\/\/(www\.)?/, '')}
+                            <ExternalLink className="h-3 w-3 opacity-60 flex-shrink-0" />
                           </a>
+                        ) : undefined,
+                      })}
+
+                      {/* Status — the one field with bookkeeping behind it
+                          (stamps date_outreached, derives bumps), so it goes
+                          through setStatus rather than a raw column write. */}
+                      <td
+                        className="border-r border-cream-200 align-middle"
+                        onClick={() => !isEditing('status') && setEdit({ id: p.id, field: 'status' })}
+                      >
+                        {isEditing('status') ? (
+                          <div className="py-1 px-2">
+                            <Select
+                              defaultOpen
+                              value={p.status}
+                              onValueChange={v => { setEdit(null); changeStatus(p, v as OutreachStatus); }}
+                              onOpenChange={o => { if (!o) setEdit(null); }}
+                            >
+                              <SelectTrigger className="h-8 text-xs focus-brand bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {OUTREACH_STATUSES.map(s => (
+                                  <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         ) : (
-                          <span className="text-sm text-ink-warm-800">{p.company}</span>
+                          <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center">
+                            <StatusBadge tone={meta.tone} size="sm">{meta.label}</StatusBadge>
+                          </div>
                         )}
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        <StatusBadge tone={meta.tone} size="sm">{meta.label}</StatusBadge>
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        {p.message_type
-                          ? <span className="text-xs text-ink-warm-700">{p.message_type}</span>
-                          : <span className="text-xs text-ink-warm-400">—</span>}
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        {p.bumps_used === 0
-                          ? <span className="text-xs text-ink-warm-400">—</span>
-                          : (
-                            <span className="inline-flex items-center gap-1 text-xs tabular-nums text-ink-warm-700">
-                              <Repeat2 className="h-3 w-3 text-ink-warm-400" />
-                              {p.bumps_used}
-                            </span>
-                          )}
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        {p.date_outreached
-                          ? <span className="text-xs tabular-nums text-ink-warm-700">{formatDate(p.date_outreached)}</span>
-                          : <span className="text-xs text-ink-warm-400">Not sent</span>}
-                      </TableCell>
-                      <TableCell className="py-3.5 px-5">
-                        <span className="text-xs text-ink-warm-700">{p.owner}</span>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+
+                      {/* Message type */}
+                      <td
+                        className="border-r border-cream-200 align-middle"
+                        onClick={() => !isEditing('message_type') && setEdit({ id: p.id, field: 'message_type' })}
+                      >
+                        {isEditing('message_type') ? (
+                          <div className="py-1 px-2">
+                            <Select
+                              defaultOpen
+                              value={p.message_type ?? NONE}
+                              onValueChange={v => {
+                                setEdit(null);
+                                saveField(p, 'message_type', v === NONE ? null : v);
+                              }}
+                              onOpenChange={o => { if (!o) setEdit(null); }}
+                            >
+                              <SelectTrigger className="h-8 text-xs focus-brand bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={NONE}>—</SelectItem>
+                                {MESSAGE_TYPES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center">
+                            {p.message_type
+                              ? <span className="text-xs text-ink-warm-700">{p.message_type}</span>
+                              : <span className="text-xs text-ink-warm-300">—</span>}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Bumps — normally derived from the status, but editable
+                          so a miscount can be corrected without walking the
+                          prospect back through statuses. */}
+                      {textCell('bumps_used', String(p.bumps_used), {
+                        numeric: true,
+                        render: (
+                          <span className="inline-flex items-center gap-1 text-xs tabular-nums text-ink-warm-700">
+                            {p.bumps_used === 0 ? (
+                              <span className="text-ink-warm-300">—</span>
+                            ) : (
+                              <>
+                                <Repeat2 className="h-3 w-3 text-ink-warm-400" />
+                                {p.bumps_used}
+                                {p.bumps_before_conversion !== null && (
+                                  <span className="text-ink-warm-400">({p.bumps_before_conversion} to convert)</span>
+                                )}
+                              </>
+                            )}
+                          </span>
+                        ),
+                      })}
+
+                      {/* Last outreach — Popover + Calendar, never a native
+                          date input (CLAUDE.md). Opens straight from the click. */}
+                      <td className="border-r border-cream-200 align-middle">
+                        <Popover
+                          open={isEditing('date_outreached')}
+                          onOpenChange={o => setEdit(o ? { id: p.id, field: 'date_outreached' } : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center">
+                              {p.date_outreached
+                                ? <span className="text-xs tabular-nums text-ink-warm-700">{formatDate(p.date_outreached)}</span>
+                                : <span className="text-xs text-ink-warm-300">Not sent</span>}
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={p.date_outreached ? new Date(p.date_outreached + 'T00:00:00') : undefined}
+                              onSelect={d => {
+                                setEdit(null);
+                                saveField(p, 'date_outreached', d ? toIsoDate(d) : null);
+                              }}
+                              classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                            />
+                            <div className="border-t border-cream-100 p-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full h-7 text-xs text-ink-warm-500"
+                                onClick={() => { setEdit(null); saveField(p, 'date_outreached', null); }}
+                              >
+                                Clear date
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </td>
+
+                      {/* Owner */}
+                      {textCell('owner', p.owner, { placeholder: 'Owner' })}
+
+                      {/* Notes */}
+                      {textCell('notes', p.notes ?? '', { placeholder: 'Notes' })}
+
+                      <td className="px-2 align-middle">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-ink-warm-400 hover:text-rose-600"
+                          onClick={() => handleDelete(p)}
+                          disabled={deleting}
+                          title={`Remove ${p.telegram}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
-
-      {/* ── Row detail — status is editable here ─────────────────────── */}
-      <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}>
-        <DialogContent className="sm:max-w-[480px] max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-brand" />
-              {selected?.telegram}
-            </DialogTitle>
-          </DialogHeader>
-          {selected && (
-            <div className="flex-1 overflow-y-auto px-1 space-y-4">
-              <div>
-                <Label className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500">Status</Label>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <Select
-                    value={selected.status}
-                    onValueChange={v => changeStatus(selected, v as OutreachStatus)}
-                    disabled={saving}
-                  >
-                    <SelectTrigger className="h-9 focus-brand flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {OUTREACH_STATUSES.map(s => (
-                        <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {saving && <Loader2 className="h-4 w-4 animate-spin text-ink-warm-400" />}
-                </div>
-                <p className="text-[11px] text-ink-warm-500 mt-1.5">
-                  {STAGE_META[stageOf(selected.status)].label} stage. Moving to Contacted or a
-                  bump stamps today&apos;s date and counts the bump automatically.
-                </p>
-              </div>
-
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Company</dt>
-                  <dd className="flex items-center gap-1.5 text-ink-warm-900">
-                    <Building2 className="h-3.5 w-3.5 text-ink-warm-400" />
-                    {selected.company}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Role</dt>
-                  <dd className="text-ink-warm-900">{selected.role === '—' ? 'Unknown' : selected.role}</dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Owner</dt>
-                  <dd className="text-ink-warm-900">{selected.owner}</dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Message type</dt>
-                  <dd className="text-ink-warm-900">{selected.message_type ?? 'Not chosen'}</dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Last outreach</dt>
-                  <dd className="flex items-center gap-1.5 text-ink-warm-900 tabular-nums">
-                    <CalendarDays className="h-3.5 w-3.5 text-ink-warm-400" />
-                    {selected.date_outreached ? formatDate(selected.date_outreached) : 'Not sent'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mb-1">Bumps used</dt>
-                  <dd className="text-ink-warm-900 tabular-nums">
-                    {selected.bumps_used}
-                    {selected.bumps_before_conversion !== null && (
-                      <span className="text-ink-warm-500 text-xs">
-                        {' '}({selected.bumps_before_conversion} before converting)
-                      </span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-
-              {selected.source === 'crm' && (
-                <p className="text-[11px] text-ink-warm-500">
-                  Copied from the CRM pipeline — status was mapped from its sales stage.
-                </p>
-              )}
-            </div>
-          )}
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-0 sm:justify-between">
-            <Button
-              variant="outline"
-              className="border-rose-300 text-rose-600 hover:bg-rose-50"
-              onClick={() => selected && handleDelete(selected)}
-              disabled={deleting || saving}
-            >
-              {deleting
-                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-              Remove
-            </Button>
-            <Button variant="outline" onClick={() => setSelected(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ── New prospect ─────────────────────────────────────────────── */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
