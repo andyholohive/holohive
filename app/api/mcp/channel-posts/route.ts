@@ -102,6 +102,15 @@ export async function POST(request: Request) {
       // other hashtag is topical and must stay in the organic average.
       // Falls back to parsing text so a scanner that predates the MCP
       // change still lands usable rows instead of nulls.
+      // Forward origin [2026-08-18]. Null on originals and on forwards
+      // whose source hides itself — fwd_from_name is then the only handle
+      // the graph gets, which is why it is stored separately rather than
+      // folded into a resolved-peer field.
+      fwd_from_peer_id: p.fwd_from_peer_id ?? null,
+      fwd_from_handle: p.fwd_from_handle ?? null,
+      fwd_from_name: p.fwd_from_name ?? null,
+      fwd_from_msg_id: p.fwd_from_msg_id ?? null,
+      fwd_from_raw: p.fwd_from_raw ?? null,
       hashtags: Array.isArray(p.hashtags)
         ? p.hashtags.map((t: string) => String(t).toLowerCase())
         : extractHashtags(p.text ?? ''),
