@@ -272,10 +272,27 @@ async function crmFollowup(
     'account_churned',
   ];
 
+  // [2026-08-18] Top-of-funnel stages are excluded, not just closed ones.
+  //
+  // Without this the rule matched 803 opportunities, of which 721 were
+  // cold_dm (510) and orbit (211) — prospecting lists, not deals. Nobody
+  // "follows up" a cold-DM list one row at a time; that work happens on
+  // the Outreach board in bulk. Because the query is capped at 30 and
+  // sorted oldest-contact-first, the same 30 ancient cold DMs would have
+  // surfaced every single day forever, unchanged and unactionable. A
+  // digest that never changes is one people stop reading.
+  //
+  // Excluding the two prospecting stages takes the pool to 82 real deals,
+  // so the 30 shown are ones someone can actually act on and the list
+  // shrinks as they do. Kept as a param so the cut can be retuned from
+  // /reminders without a deploy.
+  const prospectingStages: string[] = params.exclude_stages ?? ['cold_dm', 'orbit'];
+  const skipStages = [...closedStages, ...prospectingStages];
+
   const { data: opps } = await supabase
     .from('crm_opportunities')
     .select('name, last_contacted_at, stage, owner_id')
-    .not('stage', 'in', `(${closedStages.join(',')})`)
+    .not('stage', 'in', `(${skipStages.join(',')})`)
     .or(`last_contacted_at.is.null,last_contacted_at.lt.${cutoff}`)
     .order('last_contacted_at', { ascending: true, nullsFirst: true })
     .limit(30);
