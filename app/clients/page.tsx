@@ -2653,10 +2653,19 @@ export default function ClientsPage() {
     if (!clientToDelete) return;
 
     try {
-      // Soft delete - set archived_at timestamp
+      // Soft delete — archived_at AND is_active together.
+      //
+      // [2026-08-18] Archiving used to set archived_at alone, and almost
+      // nothing reads that column: the client list, the reminder
+      // evaluators, the delivery-log rules and every "active clients"
+      // rollup filter on is_active. So an archived client stayed active
+      // everywhere except the one list it had been removed from. Huddle01
+      // (archived 02/10) and Altura (archived 05/14) both sat counting as
+      // active clients for months because of it — which is how the CDL
+      // reminder rules ended up pointed at churned accounts.
       const { error } = await supabase
         .from('clients')
-        .update({ archived_at: new Date().toISOString() })
+        .update({ archived_at: new Date().toISOString(), is_active: false })
         .eq('id', clientToDelete.id);
 
       if (error) throw error;
