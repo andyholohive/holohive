@@ -299,7 +299,7 @@ export default function Sidebar({ children }: SidebarProps) {
       crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
       measurement: ['/mindshare', '/intelligence/client-watch', '/intelligence/telegram', '/wallets'],
-      logistics:   ['/reminders', '/crm/submissions', '/crm/telegram', '/forms'],
+      logistics:   ['/crm/submissions', '/crm/telegram', '/forms'],
       admin:       ['/admin', '/archive'],
     };
 
@@ -829,13 +829,20 @@ export default function Sidebar({ children }: SidebarProps) {
                 </CollapsibleSection>
               )}
 
-              {/* Logistics Section — Reminders + the "things that need
-                  to happen" bucket: Submissions, Meetings, TG Chats,
-                  Forms. Pulled out of CRM + Documents + Workspace per
-                  the 2026-06-19 reorg. */}
-              {!guestHideSection(['/reminders', '/crm/submissions']) && (
+              {/* Logistics Section — the "things that need to happen"
+                  bucket: Submissions, Meetings, TG Chats, Forms. Pulled
+                  out of CRM + Documents + Workspace per the 2026-06-19
+                  reorg.
+
+                  Reminders folded into the Telegram page [2026-08-18,
+                  Andy]. Every reminder is a Telegram route; the only
+                  thing separating them from the routes already on that
+                  page is that these fire on a clock instead of an event.
+                  They now live at /intelligence/telegram → Reminders.
+                  Route left live at /reminders so nothing 404s, and off
+                  the registry per CLAUDE.md's "both, or neither" rule. */}
+              {!guestHideSection(['/crm/submissions']) && (
                 <CollapsibleSection id="logistics" icon={Bell}>
-                  {canSeePage("/reminders") && <NavItem href="/reminders" icon={Bell} label="Reminders" />}
                   {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
                   {/* Meetings hidden [2026-08-18, Andy]. `bookings` holds 6 rows,
                       newest 03/06/2026 — five months dead, and meetings are

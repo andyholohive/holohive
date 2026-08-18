@@ -109,8 +109,9 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/intelligence/telegram', label: 'Telegram Ops', icon: Send, section: 'Measurement', requiredRole: 'admin' },
   { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Measurement', requiredRole: 'admin' },
 
-  // Logistics — Reminders + Submissions + Meetings + TG Chats + Forms.
-  { href: '/reminders', label: 'Reminders', icon: Bell, section: 'Logistics' },
+  // Logistics — Submissions + Meetings + TG Chats + Forms.
+  // Reminders lives on the Telegram page's Reminders tab, so it has no
+  // top-level NavItem and therefore no registry entry [2026-08-18].
   { href: '/crm/submissions', label: 'Submissions', icon: Inbox, section: 'Logistics', pageKey: '/crm/submissions' },
   { href: '/crm/telegram', label: 'TG Chats', icon: MessageSquare, section: 'Logistics', requiredRole: 'super_admin' },
   { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Logistics', requiredRole: 'admin' },

@@ -25,6 +25,7 @@ import { Send, Activity, KeyRound, Database, AlertTriangle, CheckCircle2 } from 
 // than reimplementing it — /admin/telegram-comm stays a working URL, it just
 // is no longer the only way in, and Admin goes back to field options + tags.
 import TelegramCommPage from '@/app/admin/telegram-comm/page';
+import { RemindersManager } from '@/components/telegram/RemindersManager';
 
 type Feed = {
   key: string; label: string; via: string; rows: number;
@@ -99,6 +100,7 @@ export default function TelegramOpsPage() {
         <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="routes">Routes</TabsTrigger>
+          <TabsTrigger value="reminders">Reminders</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
         </TabsList>
@@ -146,6 +148,14 @@ export default function TelegramOpsPage() {
             posts into rather than three clicks away under Admin. */}
         <TabsContent value="routes" className="mt-4">
           <TelegramCommPage />
+        </TabsContent>
+
+        {/* Scheduled routes. Routes (above) fire on an event; these fire
+            on a clock. Same bot, same chats, same "which chat does this
+            go to" question — so they live one tab apart rather than
+            behind their own sidebar entry. */}
+        <TabsContent value="reminders" className="mt-4">
+          <RemindersManager embedded />
         </TabsContent>
 
         <TabsContent value="runs" className="mt-4">
