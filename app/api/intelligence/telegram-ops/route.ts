@@ -123,6 +123,39 @@ export async function GET() {
     .order('is_active', { ascending: false })
     .order('command');
 
+  // Request budget [2026-08-18]. 60m is the primary window, not 24h: per
+  // Jdot, Telegram throttles on a much shorter horizon, so a day's total
+  // can read comfortable while the account is already flood-waiting.
+  const { data: runRows60 } = await (supabase as any)
+    .from('tg_api_runs')
+    .select('account, calls, flood_waits, flood_seconds, started_at, tool, status, channels')
+    .gte('started_at', new Date(Date.now() - 24 * 3_600_000).toISOString())
+    .order('started_at', { ascending: false });
+
+  const hourAgo = Date.now() - 3_600_000;
+  const budget = ['main', 'coverage'].map(account => {
+    const mine = (runRows60 ?? []).filter((r: any) => r.account === account);
+    const lastHour = mine.filter((r: any) => Date.parse(r.started_at) >= hourAgo);
+    const sum = (rows: any[], k: string) => rows.reduce((n, r) => n + (Number(r[k]) || 0), 0);
+    // Cost per channel from real history, so the estimate for the next
+    // fan-out comes from what this account actually spends rather than a
+    // number someone guessed. Null until there is history to divide.
+    const withWidth = mine.filter((r: any) => Number(r.channels) > 0);
+    const callsPerChannel = withWidth.length
+      ? Math.round((sum(withWidth, 'calls') / sum(withWidth, 'channels')) * 10) / 10
+      : null;
+    return {
+      account,
+      calls_60m: sum(lastHour, 'calls'),
+      calls_24h: sum(mine, 'calls'),
+      flood_waits_24h: sum(mine, 'flood_waits'),
+      flood_seconds_24h: sum(mine, 'flood_seconds'),
+      calls_per_channel: callsPerChannel,
+      last_run_at: mine[0]?.started_at ?? null,
+      last_status: mine[0]?.status ?? null,
+    };
+  });
+
   const corpus = feeds.find(f => f.key === 'corpus');
   const coverage = feeds.find(f => f.key === 'coverage');
   const { count: coverageChannels } = await (supabase as any)
@@ -132,6 +165,7 @@ export async function GET() {
     ok: true,
     generated_at: new Date().toISOString(),
     feeds,
+    budget,
     commands: (commandRows ?? []).map((c: any) => ({
       command: c.command,
       description: c.description ?? null,

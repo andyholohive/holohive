@@ -46,6 +46,12 @@ type Channel = {
 type Command = {
   command: string; description: string | null; where: string; active: boolean;
 };
+type Budget = {
+  account: string; calls_60m: number; calls_24h: number;
+  flood_waits_24h: number; flood_seconds_24h: number;
+  calls_per_channel: number | null;
+  last_run_at: string | null; last_status: string | null;
+};
 type Account = {
   role: string; purpose: string; secret: string; proof: string;
   last_at: string | null; status: string;
@@ -56,7 +62,7 @@ const FEED_LABEL: Record<string, string> = { fresh: 'Producing', stale: 'Stopped
 
 export default function TelegramOpsPage() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<{ feeds: Feed[]; runs: Run[]; accounts: Account[]; commands?: Command[] } | null>(null);
+  const [data, setData] = useState<{ feeds: Feed[]; runs: Run[]; accounts: Account[]; commands?: Command[]; budget?: Budget[] } | null>(null);
   // The registry — v7 § Telegram puts it on this page, not under
   // Mindshare, because "which channels do we watch and is each producing"
   // is the same question the Overview tab asks one level up. Its own
@@ -348,6 +354,56 @@ export default function TelegramOpsPage() {
         </TabsContent>
 
         <TabsContent value="accounts" className="mt-4 space-y-3">
+          {/* Request budget [2026-08-18]. Jdot: "request budget, not money…
+              calls_24h can't answer that alone since throttling fires on a
+              much shorter window." So 60m leads and 24h is context. Time
+              parked in FloodWait is shown because it is the honest cost —
+              a run that "succeeded" after 900s of waiting has spent the
+              account, and a call count alone hides that entirely. */}
+          <Card className="border-cream-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Account</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Calls (60m)</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Calls (24h)</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Flood waits</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Cost / channel</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data?.budget ?? []).map(b => (
+                    <TableRow key={b.account} className="border-gray-100">
+                      <TableCell className="py-3 font-medium capitalize">{b.account}</TableCell>
+                      <TableCell className="py-3 tabular-nums font-semibold">{b.calls_60m.toLocaleString('en-US')}</TableCell>
+                      <TableCell className="py-3 tabular-nums text-ink-warm-600">{b.calls_24h.toLocaleString('en-US')}</TableCell>
+                      <TableCell className="py-3">
+                        {b.flood_waits_24h > 0 ? (
+                          <span className="text-rose-600 tabular-nums">
+                            {b.flood_waits_24h} · {Math.round(b.flood_seconds_24h / 60)}m parked
+                          </span>
+                        ) : (
+                          <span className="text-ink-warm-400">none</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 tabular-nums text-ink-warm-600">
+                        {b.calls_per_channel != null
+                          ? `~${b.calls_per_channel}`
+                          : <span className="text-ink-warm-300">no history</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+          <p className="text-xs text-ink-warm-400">
+            Cost per channel is measured from this account&apos;s own runs, not estimated — so a
+            fan-out over 147 channels can be priced in requests before it fires. Empty until
+            the first run lands: the ledger starts today and nothing is backfilled.
+          </p>
+
           {accounts.map(a => (
             <Card key={a.secret} className="border-cream-200 p-4">
               <div className="flex items-start justify-between gap-4 flex-wrap">
