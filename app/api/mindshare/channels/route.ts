@@ -43,6 +43,15 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const rows = (data ?? []) as any[];
+  const active = rows.filter(r => r.is_active);
+  // Channel taxonomy — Jdot's v7 answer #2. Reported as a distribution
+  // because the number that matters is how many rows are still `unknown`:
+  // that is the hand-classification queue, and it only shrinks if someone
+  // can see it.
+  const byKind = active.reduce((acc: Record<string, number>, r) => {
+    acc[r.channel_kind || 'unknown'] = (acc[r.channel_kind || 'unknown'] ?? 0) + 1;
+    return acc;
+  }, {});
   const now = Date.now();
   const stale = rows.filter(r => r.is_active && (!r.last_post_at || now - Date.parse(r.last_post_at) > 14 * 86400_000));
 
@@ -54,6 +63,9 @@ export async function GET() {
       active: rows.filter(r => r.is_active).length,
       producing: rows.filter(r => (r.posts_30d ?? 0) > 0).length,
       silent: stale.length,
+      by_kind: byKind,
+      unclassified: byKind.unknown ?? 0,
+      hired: active.filter(r => r.is_hired).length,
     },
   });
 }

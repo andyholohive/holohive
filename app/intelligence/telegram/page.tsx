@@ -42,6 +42,8 @@ type Channel = {
   channel_name: string | null; language: string | null; is_active: boolean;
   member_count: number | null; posts_30d: number | null;
   posts_total: number | null; last_post_at: string | null;
+  channel_kind: string | null; is_hired: boolean | null;
+  kind_source: string | null; forward_ratio: number | null;
 };
 type Command = {
   command: string; description: string | null; where: string; active: boolean;
@@ -55,6 +57,20 @@ type Budget = {
 type Account = {
   role: string; purpose: string; secret: string; proof: string;
   last_at: string | null; status: string;
+};
+
+// Channel taxonomy — Jdot's v7 answer #2. Four kinds plus unknown, with
+// `hired` deliberately kept off the axis: a creator we pay and one we
+// don't are the same kind of channel, and folding the commercial
+// relationship in would make "Creator" mean two things depending on the
+// month.
+const KIND_LABEL: Record<string, string> = {
+  creator: 'Creator', paid_desk: 'Paid desk', repost_bot: 'Repost bot',
+  official: 'Official', unknown: 'Unclassified',
+};
+const KIND_TONE: Record<string, BadgeTone> = {
+  creator: 'brand', paid_desk: 'purple', repost_bot: 'warning',
+  official: 'info', unknown: 'neutral',
 };
 
 const FEED_TONE: Record<string, BadgeTone> = { fresh: 'success', stale: 'danger', never: 'neutral' };
@@ -248,12 +264,32 @@ export default function TelegramOpsPage() {
             </Card>
           ) : (
             <>
+              {/* The taxonomy distribution, above the table because the only
+                  number here that asks for a decision is how many rows are
+                  still unclassified — that is the hand-classification queue,
+                  and it never shrinks if nobody can see its size. */}
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {(['creator', 'paid_desk', 'repost_bot', 'official', 'unknown'] as const).map(k => {
+                  const n = channels.filter(c => c.is_active && (c.channel_kind || 'unknown') === k).length;
+                  if (!n && k !== 'unknown') return null;
+                  return (
+                    <StatusBadge key={k} tone={KIND_TONE[k]} size="sm">
+                      {KIND_LABEL[k]} · {n}
+                    </StatusBadge>
+                  );
+                })}
+                <span className="text-xs text-ink-warm-500">
+                  {channels.filter(c => c.is_active && c.is_hired).length} hired
+                </span>
+              </div>
+
               <Card className="border-cream-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
                         <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Channel</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Kind</TableHead>
                         <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Members</TableHead>
                         <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Posts (30d)</TableHead>
                         <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Last post</TableHead>
@@ -276,6 +312,22 @@ export default function TelegramOpsPage() {
                                 <span className="font-medium text-ink-warm-900">{c.channel_name || c.channel_username || c.channel_tg_id}</span>
                                 {c.channel_username && (
                                   <span className="block text-[11px] text-ink-warm-400">@{c.channel_username}</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <div className="flex items-center gap-1.5">
+                                  <StatusBadge tone={KIND_TONE[c.channel_kind || 'unknown'] ?? 'neutral'} size="sm">
+                                    {KIND_LABEL[c.channel_kind || 'unknown'] ?? 'Unclassified'}
+                                  </StatusBadge>
+                                  {c.is_hired && <StatusBadge tone="success" size="sm">Hired</StatusBadge>}
+                                </div>
+                                {/* Forward ratio is the evidence behind a Repost bot
+                                    call, so it shows on that row rather than in a
+                                    separate column nobody would read. */}
+                                {c.channel_kind === 'repost_bot' && c.forward_ratio != null && (
+                                  <span className="block text-[11px] text-ink-warm-400">
+                                    {Math.round(c.forward_ratio * 100)}% forwarded
+                                  </span>
                                 )}
                               </TableCell>
                               <TableCell className="py-3 tabular-nums text-ink-warm-600">
