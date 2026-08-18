@@ -43,6 +43,9 @@ type Channel = {
   member_count: number | null; posts_30d: number | null;
   posts_total: number | null; last_post_at: string | null;
 };
+type Command = {
+  command: string; description: string | null; where: string; active: boolean;
+};
 type Account = {
   role: string; purpose: string; secret: string; proof: string;
   last_at: string | null; status: string;
@@ -53,7 +56,7 @@ const FEED_LABEL: Record<string, string> = { fresh: 'Producing', stale: 'Stopped
 
 export default function TelegramOpsPage() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<{ feeds: Feed[]; runs: Run[]; accounts: Account[] } | null>(null);
+  const [data, setData] = useState<{ feeds: Feed[]; runs: Run[]; accounts: Account[]; commands?: Command[] } | null>(null);
   // The registry — v7 § Telegram puts it on this page, not under
   // Mindshare, because "which channels do we watch and is each producing"
   // is the same question the Overview tab asks one level up. Its own
@@ -118,6 +121,7 @@ export default function TelegramOpsPage() {
           <TabsTrigger value="routes">Routes</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
           <TabsTrigger value="registry">Registry</TabsTrigger>
+          <TabsTrigger value="commands">Commands</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
         </TabsList>
@@ -173,6 +177,51 @@ export default function TelegramOpsPage() {
             behind their own sidebar entry. */}
         <TabsContent value="reminders" className="mt-4">
           <RemindersManager embedded />
+        </TabsContent>
+
+        {/* Commands — v7 § "Slash commands: over chats, never over the
+            registry". That distinction is the point of the section: the bot
+            acts on chats and tasks, never on the channel list, so nothing
+            here can change what the Registry tab shows. Read-only; the
+            editable copy lives in telegram_commands. */}
+        <TabsContent value="commands" className="mt-4">
+          <Card className="border-cream-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Command</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Does</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Where</TableHead>
+                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">State</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data?.commands ?? []).map(c => (
+                    <TableRow key={c.command} className={`border-gray-100 ${c.active ? '' : 'opacity-55'}`}>
+                      <TableCell className="py-3 font-mono text-xs font-medium text-ink-warm-900 whitespace-nowrap">/{c.command}</TableCell>
+                      <TableCell className="py-3 text-xs text-ink-warm-600 max-w-md">
+                        {c.description || <span className="text-ink-warm-300">—</span>}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <StatusBadge tone={c.where === 'HQ chats' ? 'slate' : 'brand'} size="sm">{c.where}</StatusBadge>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <StatusBadge tone={c.active ? 'success' : 'neutral'} size="sm">{c.active ? 'Live' : 'Off'}</StatusBadge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+          <p className="text-xs text-ink-warm-400 mt-3">
+            Where is the audience gate, not a location: HQ-chat commands refuse to answer a
+            KOL and vice versa. <span className="font-mono">/flag</span> is the one command in
+            the v7 mockup that was never built — everything else it lists as planned is live,
+            and <span className="font-mono">/done</span>, <span className="font-mono">/repost</span>,{' '}
+            <span className="font-mono">/wallet</span> and <span className="font-mono">/req</span> shipped after it was drawn.
+          </p>
         </TabsContent>
 
         {/* Registry — the channel list behind every mindshare and coverage

@@ -114,6 +114,15 @@ export async function GET() {
     }
   }
 
+  // v7 § Telegram "Slash commands — over chats, never over the registry".
+  // telegram_commands is already the registry with descriptions and the
+  // team/KOL gate on it, so this is a read, not a new source of truth.
+  const { data: commandRows } = await (supabase as any)
+    .from('telegram_commands')
+    .select('command, description, team_only, is_active')
+    .order('is_active', { ascending: false })
+    .order('command');
+
   const corpus = feeds.find(f => f.key === 'corpus');
   const coverage = feeds.find(f => f.key === 'coverage');
   const { count: coverageChannels } = await (supabase as any)
@@ -123,6 +132,14 @@ export async function GET() {
     ok: true,
     generated_at: new Date().toISOString(),
     feeds,
+    commands: (commandRows ?? []).map((c: any) => ({
+      command: c.command,
+      description: c.description ?? null,
+      // v7's "Where" column. The gate is the audience: team_only commands
+      // answer in HQ chats, the rest are the KOL-chat surface.
+      where: c.team_only ? 'HQ chats' : 'KOL chats',
+      active: c.is_active !== false,
+    })),
     runs: [...byAgent.values()].sort((a, b) => String(b.last_at).localeCompare(String(a.last_at))),
     accounts: [
       {
