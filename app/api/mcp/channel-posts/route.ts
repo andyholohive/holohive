@@ -33,6 +33,16 @@ export const maxDuration = 60;
  * Auth: Bearer CRON_SECRET (server-to-server only). Same pattern as
  * mindshare-ingest / kol-snapshot.
  */
+/** Hashtags out of raw text, lowercased — the fallback when a caller
+ *  hasn't been upgraded to send them. Explicit Korean range because
+ *  [a-z0-9_]+ silently drops #광고, which is the one tag that matters
+ *  most here. Mirrors the Postgres backfill pattern in the
+ *  tg_channel_posts_hashtags migration. */
+function extractHashtags(text: string): string[] {
+  const found = text.match(/#[\p{L}\p{N}_]+/gu) ?? [];
+  return Array.from(new Set(found.map(t => t.toLowerCase()))).sort();
+}
+
 export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
@@ -87,6 +97,14 @@ export async function POST(request: Request) {
       reactions_json: p.reactions_json ?? null,
       reaction_total: p.reaction_total ?? null,
       is_forward: p.is_forward === true,
+      // [2026-08-18] Store the tags, not a boolean. A post is only
+      // sponsored when the poster said so with a disclosure tag; every
+      // other hashtag is topical and must stay in the organic average.
+      // Falls back to parsing text so a scanner that predates the MCP
+      // change still lands usable rows instead of nulls.
+      hashtags: Array.isArray(p.hashtags)
+        ? p.hashtags.map((t: string) => String(t).toLowerCase())
+        : extractHashtags(p.text ?? ''),
       query,
       pulled_at: new Date().toISOString(),
     }));
