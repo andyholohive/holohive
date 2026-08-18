@@ -28,7 +28,7 @@ import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDate } from '@/lib/dateFormat';
-import { ListChecks, Wallet } from 'lucide-react';
+import { ListChecks, Wallet, Download } from 'lucide-react';
 
 /**
  * The per-client tabs mount the REAL editing surfaces, not copies:
@@ -198,6 +198,25 @@ export function AllClientsRollupDialog({
           <DialogTitle className="flex items-center gap-2">
             <Icon className="h-5 w-5 text-brand flex-shrink-0" />
             {isLineups ? 'All Lineups' : 'All Budgets'}
+            {/* [2026-08-18, Andy] One button to pull every unpaid payment
+                out for a finance chase. Budgets only — there is no unpaid
+                anything on the lineups side. Deliberately exports ALL
+                unpaid rows, not just this dialog's active non-ad-hoc
+                clients: only 2 of 83 sit in that scope, so scoping it here
+                would hide the other 81. See the route for the reasoning;
+                the CSV carries an "In Rollup Scope" column instead. */}
+            {!isLineups && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto mr-8"
+                onClick={() => { window.location.href = '/api/campaigns/unpaid-export'; }}
+                title="Download every payment with no payment date, across all clients"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export unpaid
+              </Button>
+            )}
           </DialogTitle>
           <DialogDescription>
             {activeTab

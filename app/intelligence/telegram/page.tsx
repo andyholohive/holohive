@@ -20,6 +20,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import { Send, Activity, KeyRound, Database, AlertTriangle, CheckCircle2 } from 'lucide-react';
+// [2026-08-18] v7 "Telegram" row: the 13 bot routes move out of Admin Tools
+// and sit with the chats they fire into. Rendering the existing page rather
+// than reimplementing it — /admin/telegram-comm stays a working URL, it just
+// is no longer the only way in, and Admin goes back to field options + tags.
+import TelegramCommPage from '@/app/admin/telegram-comm/page';
 
 type Feed = {
   key: string; label: string; via: string; rows: number;
@@ -55,7 +60,7 @@ export default function TelegramOpsPage() {
     <PageHeader
       icon={Send}
       title="Telegram"
-      subtitle="Whether the readers are still producing — not whether they're switched on"
+      subtitle="Readers, sessions and the bot routes — one place for everything Telegram"
     />
   );
 
@@ -93,6 +98,7 @@ export default function TelegramOpsPage() {
       <Tabs defaultValue="overview">
         <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="routes">Routes</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
         </TabsList>
@@ -134,6 +140,12 @@ export default function TelegramOpsPage() {
             A reader reads &ldquo;Stopped&rdquo; when it has produced nothing for longer than its own cadence allows.
             That is the shape every past Telegram failure took — the job stayed green and the rows stopped arriving.
           </p>
+        </TabsContent>
+
+        {/* Routes — every bot destination, configured beside the chats it
+            posts into rather than three clicks away under Admin. */}
+        <TabsContent value="routes" className="mt-4">
+          <TelegramCommPage />
         </TabsContent>
 
         <TabsContent value="runs" className="mt-4">
