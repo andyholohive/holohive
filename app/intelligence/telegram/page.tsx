@@ -18,8 +18,9 @@ import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { KpiCard } from '@/components/ui/kpi-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
-import { Send, Activity, KeyRound, Database, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Send, Activity, KeyRound, Database, AlertTriangle, CheckCircle2, Radio } from 'lucide-react';
 // [2026-08-18] v7 "Telegram" row: the 13 bot routes move out of Admin Tools
 // and sit with the chats they fire into. Rendering the existing page rather
 // than reimplementing it — /admin/telegram-comm stays a working URL, it just
@@ -36,6 +37,12 @@ type Run = {
   last_at: string | null; last_status: string | null;
   last_error: string | null; last_summary: string | null;
 };
+type Channel = {
+  id: string; channel_tg_id: string; channel_username: string | null;
+  channel_name: string | null; language: string | null; is_active: boolean;
+  member_count: number | null; posts_30d: number | null;
+  posts_total: number | null; last_post_at: string | null;
+};
 type Account = {
   role: string; purpose: string; secret: string; proof: string;
   last_at: string | null; status: string;
@@ -47,6 +54,11 @@ const FEED_LABEL: Record<string, string> = { fresh: 'Producing', stale: 'Stopped
 export default function TelegramOpsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<{ feeds: Feed[]; runs: Run[]; accounts: Account[] } | null>(null);
+  // The registry — v7 § Telegram puts it on this page, not under
+  // Mindshare, because "which channels do we watch and is each producing"
+  // is the same question the Overview tab asks one level up. Its own
+  // fetch so a slow RPC doesn't hold the rest of the page.
+  const [channels, setChannels] = useState<Channel[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -54,6 +66,10 @@ export default function TelegramOpsPage() {
       .then(r => r.json())
       .then(j => { if (alive) { setData(j); setLoading(false); } })
       .catch(() => { if (alive) setLoading(false); });
+    fetch('/api/mindshare/channels')
+      .then(r => r.json())
+      .then(j => { if (alive) setChannels(j.channels ?? []); })
+      .catch(() => { if (alive) setChannels([]); });
     return () => { alive = false; };
   }, []);
 
@@ -101,6 +117,7 @@ export default function TelegramOpsPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="routes">Routes</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
+          <TabsTrigger value="registry">Registry</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
         </TabsList>
@@ -156,6 +173,87 @@ export default function TelegramOpsPage() {
             behind their own sidebar entry. */}
         <TabsContent value="reminders" className="mt-4">
           <RemindersManager embedded />
+        </TabsContent>
+
+        {/* Registry — the channel list behind every mindshare and coverage
+            number. Read-only here on purpose: the same rule as the health
+            alerts, one surface reports and another edits. Sorted silent-
+            first because a registry read top-down by post count buries the
+            only rows that need a decision. */}
+        <TabsContent value="registry" className="mt-4">
+          {channels === null ? (
+            <Skeleton className="h-64 rounded-lg" />
+          ) : channels.length === 0 ? (
+            <Card className="border-cream-200">
+              <EmptyState
+                icon={Radio}
+                title="No channels registered"
+                description="The mindshare crawl reads from this list — nothing is being watched yet."
+              />
+            </Card>
+          ) : (
+            <>
+              <Card className="border-cream-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Channel</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Members</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Posts (30d)</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Last post</TableHead>
+                        <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...channels]
+                        .sort((a, b) => {
+                          const at = a.last_post_at ? Date.parse(a.last_post_at) : 0;
+                          const bt = b.last_post_at ? Date.parse(b.last_post_at) : 0;
+                          return at - bt; // oldest / never first
+                        })
+                        .map(c => {
+                          const ageMs = c.last_post_at ? Date.now() - Date.parse(c.last_post_at) : null;
+                          const silent = ageMs === null || ageMs > 7 * 86_400_000;
+                          return (
+                            <TableRow key={c.id} className="border-gray-100">
+                              <TableCell className="py-3">
+                                <span className="font-medium text-ink-warm-900">{c.channel_name || c.channel_username || c.channel_tg_id}</span>
+                                {c.channel_username && (
+                                  <span className="block text-[11px] text-ink-warm-400">@{c.channel_username}</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-3 tabular-nums text-ink-warm-600">
+                                {c.member_count != null ? c.member_count.toLocaleString('en-US') : <span className="text-ink-warm-400">—</span>}
+                              </TableCell>
+                              <TableCell className="py-3 tabular-nums">{(c.posts_30d ?? 0).toLocaleString('en-US')}</TableCell>
+                              <TableCell className="py-3">
+                                {c.last_post_at
+                                  ? <span title={formatDateTime(c.last_post_at)} className={silent ? 'text-rose-600' : ''}>{formatRelativeShort(c.last_post_at)}</span>
+                                  : <span className="text-ink-warm-400">never</span>}
+                              </TableCell>
+                              <TableCell className="py-3">
+                                {!c.is_active
+                                  ? <StatusBadge tone="neutral" size="sm">Inactive</StatusBadge>
+                                  : silent
+                                    ? <StatusBadge tone="warning" size="sm">Silent</StatusBadge>
+                                    : <StatusBadge tone="success" size="sm">Producing</StatusBadge>}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+              <p className="text-xs text-ink-warm-400 mt-3">
+                Silent, not unreachable — nothing has run a reachability check, so this
+                says the channel has produced nothing in 7 days without claiming why.
+                A handle change, a switch to private, and a genuinely quiet channel all
+                look identical from here.
+              </p>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="runs" className="mt-4">
