@@ -88,7 +88,7 @@ export async function POST(request: Request) {
   // task-assignment DMs from /reminders without us deploying code.
   const { data: rule } = await (supabase as any)
     .from('reminder_rules')
-    .select('is_active')
+    .select('id, is_active')
     .eq('rule_type', 'task_assigned')
     .maybeSingle();
   if (rule && rule.is_active === false) {
@@ -176,6 +176,17 @@ export async function POST(request: Request) {
     .from('tasks')
     .update({ last_assignee_notified_to: task.assigned_to })
     .eq('id', taskId);
+
+  // Stamp the rule so /reminders stops reading "Never fired" for a rule
+  // that fires constantly. The on_event rules are consumed by routes like
+  // this one rather than by the reminders cron, and none of them were
+  // writing back — so the page reported the opposite of the truth.
+  if (rule?.id) {
+    await (supabase as any)
+      .from('reminder_rules')
+      .update({ last_fired_at: new Date().toISOString() })
+      .eq('id', rule.id);
+  }
 
   return NextResponse.json({ ok: true, notified: assignee.id });
 }

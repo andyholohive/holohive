@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       // Check if there's a form_submission reminder rule with a specific chatroom
       const { data: formRule } = await supabaseAdmin
         .from('reminder_rules' as any)
-        .select('telegram_chat_id, telegram_thread_id')
+        .select('id, telegram_chat_id, telegram_thread_id')
         .eq('rule_type', 'form_submission')
         .eq('is_active', true)
         .limit(1)
@@ -220,6 +220,14 @@ export async function POST(request: NextRequest) {
           'HTML',
           (formRule as any).telegram_thread_id || undefined
         );
+        // Only the routed branch counts as the rule firing — the fallback
+        // below sends to the default chat and has nothing to do with it.
+        if (telegramSuccess) {
+          await supabaseAdmin
+            .from('reminder_rules' as any)
+            .update({ last_fired_at: new Date().toISOString() } as any)
+            .eq('id', (formRule as any).id);
+        }
       } else {
         // Fallback to default notification
         telegramSuccess = await TelegramService.sendFormSubmissionNotification(

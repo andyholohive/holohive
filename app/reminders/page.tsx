@@ -527,6 +527,12 @@ export default function RemindersPage() {
     }
   };
 
+  // A rule can fire only once it has a real chat to fire into. Everything
+  // that reads "is this rule live?" goes through here so the page and the
+  // engine agree on the same definition.
+  const isRouted = (rule: ReminderRule) =>
+    !!rule.telegram_chat_id && rule.telegram_chat_id !== 'PLACEHOLDER_CHAT_ID';
+
   // Helper to resolve chat ID to title
   const getChatLabel = (chatId: string) => {
     if (chatId === 'PLACEHOLDER_CHAT_ID') return null;
@@ -715,11 +721,18 @@ export default function RemindersPage() {
                     <h3 className="font-semibold text-ink-warm-900 truncate">{rule.name}</h3>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* v11 StatusBadge: brand tone for Active,
-                        neutral for Disabled. Was a bespoke Badge
-                        with brand-light/gray-100 className. */}
-                    <StatusBadge tone={rule.is_active ? 'brand' : 'neutral'} size="sm">
-                      {rule.is_active ? 'Active' : 'Disabled'}
+                    {/* Three states, not two. `is_active` alone rendered
+                        "Active" on rules the engine skips outright: a rule
+                        still on PLACEHOLDER_CHAT_ID has nowhere to send, so
+                        the evaluator `continue`s past it and last_run_at
+                        freezes. The badge read Active beside a four-month-old
+                        timestamp, which is how ten rules sat unnoticed.
+                        "Not routed" names the missing step instead. */}
+                    <StatusBadge
+                      tone={!rule.is_active ? 'neutral' : isRouted(rule) ? 'brand' : 'warning'}
+                      size="sm"
+                    >
+                      {!rule.is_active ? 'Disabled' : isRouted(rule) ? 'Active' : 'Not routed'}
                     </StatusBadge>
                     <Switch
                       checked={rule.is_active}

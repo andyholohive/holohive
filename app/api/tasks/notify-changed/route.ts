@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   // from /reminders).
   const { data: rule } = await (supabase as any)
     .from('reminder_rules')
-    .select('telegram_chat_id, telegram_thread_id, is_active')
+    .select('id, telegram_chat_id, telegram_thread_id, is_active')
     .eq('rule_type', 'task_changed')
     .maybeSingle();
 
@@ -156,6 +156,13 @@ export async function POST(request: Request) {
   if (!sent) {
     return NextResponse.json({ ok: false, error: 'Telegram send failed' }, { status: 502 });
   }
+
+  // See the note in notify-assignment: on_event rules are consumed here,
+  // not by the reminders cron, so this route owns the write-back.
+  await (supabase as any)
+    .from('reminder_rules')
+    .update({ last_fired_at: new Date().toISOString() })
+    .eq('id', rule.id);
 
   return NextResponse.json({ ok: true });
 }
