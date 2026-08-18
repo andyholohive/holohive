@@ -815,11 +815,15 @@ export default function Sidebar({ children }: SidebarProps) {
                 </CollapsibleSection>
               )}
 
-              {/* Measurement Section — Mindshare + Wallet Analytics.
+              {/* Measurement Section — Korea Signal + Wallet Analytics.
+                  Mindshare renamed to Korea Signal per v7 [2026-08-18]: the
+                  page answers "where do projects stand in Korean crypto TG",
+                  and "mindshare" is the metric inside it, not the surface.
+                  Route left at /mindshare — the tables are mindshare_*.
                   Admin-only audience-insight tools. */}
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                 <CollapsibleSection id="measurement" icon={TrendingUp}>
-                  {canSeePage("/mindshare") && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
+                  {canSeePage("/mindshare") && <NavItem href="/mindshare" icon={TrendingUp} label="Korea Signal" />}
                   {canSeePage("/intelligence/client-watch") && <NavItem href="/intelligence/client-watch" icon={Radar} label="Client Watch" />}
                   {canSeePage("/intelligence/telegram") && <NavItem href="/intelligence/telegram" icon={Send} label="Telegram Ops" />}
                   {/* [Wallet Analytics v1, May 2026] Admin-only campaign-

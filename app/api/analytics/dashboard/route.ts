@@ -237,12 +237,78 @@ export async function GET(request: Request) {
       return false;
     }).length;
 
+    // ── Telegram read-layer alerts (v7 Team Analytics § Health alerts) ──
+    //
+    // v7's rule: "Analytics keeps owning money and alarms… Telegram health
+    // joins the alert list. Nothing new gets built here and nothing gets
+    // duplicated in Telegram." So these are counts only — the fix for each
+    // is on the Telegram page, this is where you find out it needs fixing.
+    //
+    // Two deliberate departures from the mockup's numbers:
+    //
+    //  * "Channels unreachable" is reported here as SILENT, not
+    //    unreachable. tg_monitored_channels.bot_status is 'unknown' on all
+    //    147 active rows — nothing has ever run the reachability check — so
+    //    the mockup's "12 private, 7 deleted" split has no source. What the
+    //    table does know honestly is last_message_at, which gives "active
+    //    and producing nothing". Naming it unreachable would assert a cause
+    //    we have not checked.
+    //
+    //  * "Snapshots past 30 days" counts only KOLs that HAVE a snapshot and
+    //    it has gone stale. The 337 KOLs with no snapshot at all are a
+    //    different problem — no Channel Score exists rather than a wrong
+    //    one — and folding them in would bury the 3 that are actively
+    //    misleading a lineup decision.
+    const nowMs = Date.now();
+    const [{ data: snapKols }, { data: monitored }, { data: krClients }] = await Promise.all([
+      (supabase as any).from('kol_channel_snapshots').select('kol_id, snapshot_date'),
+      (supabase as any).from('tg_monitored_channels').select('last_message_at').eq('is_active', true),
+      (supabase as any).from('kr_signal_clients').select('name, peer_basket').eq('is_active', true),
+    ]);
+
+    // Latest snapshot per KOL, then how many of those have gone stale.
+    const latestSnap = new Map<string, number>();
+    for (const r of snapKols ?? []) {
+      if (!r.kol_id || !r.snapshot_date) continue;
+      const t = new Date(r.snapshot_date).getTime();
+      if (!latestSnap.has(r.kol_id) || t > latestSnap.get(r.kol_id)!) latestSnap.set(r.kol_id, t);
+    }
+    const snapshotsStale = [...latestSnap.values()]
+      .filter(t => t < nowMs - 30 * 86_400_000).length;
+
+    const channelsSilent = (monitored ?? []).filter((c: any) =>
+      !c.last_message_at || new Date(c.last_message_at).getTime() < nowMs - 7 * 86_400_000,
+    ).length;
+
+    // A session is degraded when the work that depends on it has stopped
+    // producing — the same inference /api/intelligence/telegram-ops makes,
+    // because session strings live in GHA secrets and cannot be read here.
+    const { data: lastPost } = await (supabase as any)
+      .from('tg_channel_posts').select('pulled_at').order('pulled_at', { ascending: false }).limit(1);
+    const mainStale = !lastPost?.[0]?.pulled_at
+      || new Date(lastPost[0].pulled_at).getTime() < nowMs - 24 * 3_600_000;
+
+    // The denominator under every CPM claim — a client with no peer basket
+    // has nothing to be compared against at wrap.
+    const noBaseline = (krClients ?? []).filter((c: any) =>
+      !Array.isArray(c.peer_basket) || c.peer_basket.length === 0,
+    );
+
     const alerts = {
       stale_crm: staleCrmCount,
       unpaid_payments: unpaidPayments,
       unpaid_value: Math.round(unpaidValue),
       new_kols_no_gc: newKolsNoGc,
       content_no_metrics: staleContent.length,
+      // v7 additions, all sourced from the read layer
+      tg_snapshots_stale: snapshotsStale,
+      // Never-scanned, kept separate on purpose — see the note above.
+      tg_snapshots_missing: kols.filter((k: any) => !latestSnap.has(k.id)).length,
+      tg_channels_silent: channelsSilent,
+      tg_channels_total: (monitored ?? []).length,
+      tg_sessions_degraded: mainStale ? 1 : 0,
+      tg_clients_no_baseline: noBaseline.length,
+      tg_clients_no_baseline_names: noBaseline.map((c: any) => c.name).filter(Boolean),
     };
 
     // ── Intelligence cost in window ──────────────────────────────────

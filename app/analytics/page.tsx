@@ -20,7 +20,7 @@ import {
   BarChart3, TrendingUp, Users, DollarSign, Sparkles, AlertTriangle,
   RefreshCw, Loader2, Activity, Target, ArrowRight, Zap, Bell, Building2,
   MessageSquare, Calendar, FileText, Phone, StickyNote, Send,
-  CreditCard, Edit3, ArrowUp, ArrowDown,
+  CreditCard, Edit3, ArrowUp, ArrowDown, Radar, KeyRound, Scale,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -91,6 +91,15 @@ interface DashboardData {
     unpaid_value: number;
     new_kols_no_gc: number;
     content_no_metrics: number;
+    // v7 Telegram read-layer alerts. Optional so an older cached payload
+    // renders zeroes rather than crashing the page.
+    tg_snapshots_stale?: number;
+    tg_snapshots_missing?: number;
+    tg_channels_silent?: number;
+    tg_channels_total?: number;
+    tg_sessions_degraded?: number;
+    tg_clients_no_baseline?: number;
+    tg_clients_no_baseline_names?: string[];
   };
 }
 
@@ -763,6 +772,60 @@ export default function AnalyticsPage() {
             count={data.alerts.content_no_metrics}
             detail="Published >7d ago"
             variant={data.alerts.content_no_metrics > 5 ? 'warn' : 'neutral'}
+          />
+
+          {/* ── Telegram read-layer alerts (v7 § Team Analytics) ──────────
+              v7's rule for these: "Analytics keeps owning money and
+              alarms… The fix for each is one click away in Telegram; this
+              is where you find out it needs fixing." Hence every card
+              deep-links into the Telegram page rather than doing anything
+              here. */}
+          <AlertCard
+            icon={Radar}
+            label="KOL Snapshots >30d"
+            count={data.alerts.tg_snapshots_stale ?? 0}
+            detail={
+              data.alerts.tg_snapshots_missing
+                ? `Stale score · ${data.alerts.tg_snapshots_missing} never scanned`
+                : 'Score computed on stale data'
+            }
+            href="/intelligence/telegram"
+            variant={(data.alerts.tg_snapshots_stale ?? 0) > 0 ? 'warn' : 'neutral'}
+          />
+          {/* "Silent", not "unreachable". bot_status has never been checked
+              on any row, so we report what the table actually knows —
+              active and producing nothing — instead of asserting a cause. */}
+          <AlertCard
+            icon={Send}
+            label="Channels Silent (7d)"
+            count={data.alerts.tg_channels_silent ?? 0}
+            detail={`of ${data.alerts.tg_channels_total ?? 0} monitored · no posts pulled`}
+            href="/intelligence/telegram"
+            variant={(data.alerts.tg_channels_silent ?? 0) > 10 ? 'warn' : 'neutral'}
+          />
+          <AlertCard
+            icon={KeyRound}
+            label="Sessions Degraded"
+            count={data.alerts.tg_sessions_degraded ?? 0}
+            detail={
+              (data.alerts.tg_sessions_degraded ?? 0) > 0
+                ? 'Crawl has stopped producing'
+                : 'Producing on schedule'
+            }
+            href="/intelligence/telegram"
+            variant={(data.alerts.tg_sessions_degraded ?? 0) > 0 ? 'warn' : 'neutral'}
+          />
+          <AlertCard
+            icon={Scale}
+            label="Clients No Baseline"
+            count={data.alerts.tg_clients_no_baseline ?? 0}
+            detail={
+              data.alerts.tg_clients_no_baseline_names?.length
+                ? data.alerts.tg_clients_no_baseline_names.join(', ')
+                : 'Peer basket set on every client'
+            }
+            href="/mindshare"
+            variant={(data.alerts.tg_clients_no_baseline ?? 0) > 0 ? 'warn' : 'neutral'}
           />
         </div>
       </div>

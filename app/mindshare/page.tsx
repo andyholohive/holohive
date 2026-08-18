@@ -1136,9 +1136,9 @@ export default function MindsharePage() {
       <div className="space-y-6">
         <PageHeader
           icon={BarChart3}
-          title="Korean Mindshare"
+          title="Korea Signal"
           subtitle="Where projects stand in Korean crypto Telegram channels."
-          kicker="Measurement · Mindshare"
+          kicker="Measurement · Korea Signal"
           kickerDot="emerald"
         />
         <Skeleton className="h-9 w-72 rounded-md" />
@@ -1159,9 +1159,9 @@ export default function MindsharePage() {
       <div className="space-y-6">
         <PageHeader
           icon={BarChart3}
-          title="Korean Mindshare"
+          title="Korea Signal"
           subtitle="Where projects stand in Korean crypto Telegram channels."
-          kicker="Measurement · Mindshare"
+          kicker="Measurement · Korea Signal"
           kickerDot="emerald"
         />
         <Card className="border-cream-200 overflow-hidden">
@@ -1217,9 +1217,9 @@ export default function MindsharePage() {
           2026-06-03: kicker + brand dot added to match other v11 pages. */}
       <PageHeader
         icon={BarChart3}
-        title="Korean Mindshare"
+        title="Korea Signal"
         subtitle="Where projects stand in Korean crypto Telegram channels."
-        kicker="Measurement · Mindshare"
+        kicker="Measurement · Korea Signal"
         kickerDot="emerald"
       />
 

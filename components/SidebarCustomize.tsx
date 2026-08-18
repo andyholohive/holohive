@@ -103,8 +103,10 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/expenses', label: 'Expenses', icon: DollarSign, section: 'Resources', requiredRole: 'super_admin' },
   { href: '/links', label: 'Links', icon: Link2, section: 'Resources', pageKey: '/links' },
 
-  // Measurement — Mindshare + Wallet Analytics. Admin-only.
-  { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Measurement', requiredRole: 'admin' },
+  // Measurement — Korea Signal + Wallet Analytics. Admin-only.
+  // Label is Korea Signal per v7; the route stays /mindshare because the
+  // backing tables are mindshare_* and the metric is still mindshare.
+  { href: '/mindshare', label: 'Korea Signal', icon: TrendingUp, section: 'Measurement', requiredRole: 'admin' },
   { href: '/intelligence/client-watch', label: 'Client Watch', icon: Radar, section: 'Measurement', requiredRole: 'admin' },
   { href: '/intelligence/telegram', label: 'Telegram Ops', icon: Send, section: 'Measurement', requiredRole: 'admin' },
   { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Measurement', requiredRole: 'admin' },

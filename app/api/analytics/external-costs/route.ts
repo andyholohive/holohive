@@ -38,6 +38,13 @@ const SERVICE_META: Record<string, { label: string; supports_balance: boolean }>
   anthropic: { label: 'Anthropic (Claude API)', supports_balance: true },
   vercel:    { label: 'Vercel',                 supports_balance: false },
   xai:       { label: 'xAI Grok',               supports_balance: false },
+  // v7 § Team Analytics: "TG MCP sessions … no API cost, but call volume
+  // and flood-wait time land here." It carries $0 by design — Telethon
+  // talks to Telegram directly and nobody bills for it. The row exists so
+  // the read layer is visible next to the services that DO cost money,
+  // and so the day a paid tier or a proxy appears there is a line to put
+  // it on. Rendered from SERVICE_META with no external_costs row needed.
+  tg_mcp:    { label: 'TG MCP sessions',        supports_balance: false },
 };
 
 function firstOfMonth(date: Date): string {
