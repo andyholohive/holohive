@@ -30,7 +30,7 @@ import {
   FileText, ClipboardList, Sliders, TrendingUp, Handshake, UserPlus,
   Send,
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
-  Calendar, Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
+  Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
   DollarSign,
 } from 'lucide-react';
 
@@ -112,7 +112,6 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // Logistics — Reminders + Submissions + Meetings + TG Chats + Forms.
   { href: '/reminders', label: 'Reminders', icon: Bell, section: 'Logistics' },
   { href: '/crm/submissions', label: 'Submissions', icon: Inbox, section: 'Logistics', pageKey: '/crm/submissions' },
-  { href: '/crm/meetings', label: 'Meetings', icon: Calendar, section: 'Logistics', pageKey: '/crm/meetings' },
   { href: '/crm/telegram', label: 'TG Chats', icon: MessageSquare, section: 'Logistics', requiredRole: 'super_admin' },
   { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Logistics', requiredRole: 'admin' },
 

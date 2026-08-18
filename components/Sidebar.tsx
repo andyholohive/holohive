@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -299,7 +299,7 @@ export default function Sidebar({ children }: SidebarProps) {
       crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
       measurement: ['/mindshare', '/intelligence/client-watch', '/intelligence/telegram', '/wallets'],
-      logistics:   ['/reminders', '/crm/submissions', '/crm/meetings', '/crm/telegram', '/forms'],
+      logistics:   ['/reminders', '/crm/submissions', '/crm/telegram', '/forms'],
       admin:       ['/admin', '/archive'],
     };
 
@@ -833,11 +833,18 @@ export default function Sidebar({ children }: SidebarProps) {
                   to happen" bucket: Submissions, Meetings, TG Chats,
                   Forms. Pulled out of CRM + Documents + Workspace per
                   the 2026-06-19 reorg. */}
-              {!guestHideSection(['/reminders', '/crm/submissions', '/crm/meetings']) && (
+              {!guestHideSection(['/reminders', '/crm/submissions']) && (
                 <CollapsibleSection id="logistics" icon={Bell}>
                   {canSeePage("/reminders") && <NavItem href="/reminders" icon={Bell} label="Reminders" />}
                   {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
-                  {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
+                  {/* Meetings hidden [2026-08-18, Andy]. `bookings` holds 6 rows,
+                      newest 03/06/2026 — five months dead, and meetings are
+                      actually tracked through client call notes. Route left
+                      live at /crm/meetings so nothing 404s and the history is
+                      still reachable by URL; only the nav entry is gone. Per
+                      CLAUDE.md, a route with no NavItem is also removed from
+                      the SidebarCustomize registry, so the customize dialog
+                      does not offer a toggle that controls nothing. */}
                   {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" dot={unassignedTgCount > 0} />}
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && canSeePage("/forms") && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                 </CollapsibleSection>
