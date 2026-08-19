@@ -1042,7 +1042,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
             <CheckCircle2 className="h-10 w-10 text-emerald-600" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank you!</h2>
-          <p className="text-lg text-gray-600 leading-relaxed">Your response has been submitted successfully.</p>
+          {/* [2026-08-19, Andy] Author-supplied close-out, falling back to the
+              default when blank. whitespace-pre-line so a message written as
+              two short paragraphs arrives as two paragraphs — these get used
+              for "what happens next" instructions, which read badly as one
+              run-on block. */}
+          <p className="text-lg text-gray-600 leading-relaxed whitespace-pre-line">
+            {form?.thank_you_message?.trim() || 'Your response has been submitted successfully.'}
+          </p>
           <p className="mt-6 text-sm text-gray-500">You can now close this tab.</p>
         </div>
       </div>

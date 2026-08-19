@@ -1196,6 +1196,8 @@ export default function FormBuilderPage() {
   const [editedName, setEditedName] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
   const [editedStatus, setEditedStatus] = useState<FormStatus>('draft');
+  // Post-submit close-out. Blank = the default sentence on the success screen.
+  const [editedThankYou, setEditedThankYou] = useState('');
   const [isSavingInfo, setIsSavingInfo] = useState(false);
 
   // Field editor state
@@ -1289,6 +1291,7 @@ export default function FormBuilderPage() {
       setForm(data);
       setEditedName(data.name);
       setEditedDescription(data.description || '');
+      setEditedThankYou((data as any).thank_you_message || '');
       setEditedStatus(data.status);
 
       // Calculate total pages
@@ -1358,6 +1361,10 @@ export default function FormBuilderPage() {
         name: editedName,
         description: editedDescription,
         status: editedStatus,
+        // Empty textarea means "use the default", so store null rather than
+        // an empty string — otherwise the success screen would render a blank
+        // line where the confirmation sentence belongs.
+        thank_you_message: editedThankYou.trim() || null,
       });
       toast({ title: 'Form updated' });
       setIsEditingInfo(false);
@@ -2268,6 +2275,19 @@ export default function FormBuilderPage() {
                         <div>
                           <Label className="text-sm text-ink-warm-700">Description</Label>
                           <Textarea value={editedDescription} onChange={(e) => setEditedDescription(e.target.value)} rows={2} className="focus-brand" />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-ink-warm-700">Message after submitting</Label>
+                          <Textarea
+                            value={editedThankYou}
+                            onChange={(e) => setEditedThankYou(e.target.value)}
+                            rows={3}
+                            placeholder="Your response has been submitted successfully."
+                            className="focus-brand"
+                          />
+                          <p className="mt-1 text-xs text-ink-warm-500">
+                            Shown under &ldquo;Thank you!&rdquo; once the form is submitted. Leave blank for the default.
+                          </p>
                         </div>
                         <div className="flex items-center gap-4">
                           <div>

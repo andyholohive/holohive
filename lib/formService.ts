@@ -15,6 +15,11 @@ export interface Form {
   subdomain_enabled: boolean | null;
   subdomain_url: string | null;
   enable_thank_you_page?: boolean | null;
+  /** Replaces the default "Your response has been submitted successfully."
+   *  on the post-submit screen. Null/blank falls back to that default.
+   *  Distinct from `enable_thank_you_page`, which repurposes the form's own
+   *  last page and only exists on multi-page forms. */
+  thank_you_message?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +77,7 @@ export interface UpdateFormData {
   subdomain_enabled?: boolean | null;
   subdomain_url?: string | null;
   enable_thank_you_page?: boolean | null;
+  thank_you_message?: string | null;
 }
 
 export interface CreateFieldData {
