@@ -1,0 +1,3870 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  MessageSquare,
+  RefreshCw,
+  Copy,
+  Link as LinkIcon,
+  Unlink,
+  Clock,
+  Hash,
+  CheckCircle,
+  Search,
+  Check,
+  ChevronsUpDown,
+  Plus,
+  Edit,
+  Trash2,
+  Terminal,
+  ToggleLeft,
+  ToggleRight,
+  User,
+  Users,
+  Megaphone,
+  MoreHorizontal,
+  EyeOff,
+  Eye,
+  Briefcase,
+  MessageCircle,
+  Bot,
+  Pencil,
+  X,
+} from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { supabase } from '@/lib/supabase';
+import { formatDate, formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
+import { useToast } from '@/hooks/use-toast';
+import { KolWelcomeDialog } from '@/components/telegram/KolWelcomeDialog';
+import { CRMOpportunity } from '@/lib/crmService';
+
+/**
+ * Default Korean onboarding message sent to a KOL's group chat the
+ * first time an unassigned chat is linked to them on /crm/telegram.
+ * Editable in the confirm dialog before sending.
+ */
+const KOL_WELCOME_MESSAGE = `안녕하세요! Holo Hive와 함께하게 되신 걸 환영해요. 시작 전에 봇으로 몇 가지만 세팅해주시면 돼요.
+
+1. 입금 지갑 등록 (/wallet)
+보수는 Arbitrum(ARB) 네트워크로 지급돼요. /wallet 뒤에 지갑 주소를 붙여서 채팅창에 보내주세요.
+예시: /wallet 0x...
+봇이 주소를 확인한 뒤 저장된 주소를 그대로 다시 보여드려요. 나중에 주소를 바꾸시려면 똑같이 /wallet로 새 주소를 보내고 Confirm만 눌러주시면 됩니다.
+
+2. 콘텐츠 제출 (/submit)
+포스팅 올리신 후에 채팅창에서 /submit 뒤에 올리신 포스트 링크만 넣어주시면 돼요. 캠페인 선택해서 제출하면 끝이라, 따로 채팅으로 링크 보내주실 필요 없어요.
+
+3. 공유 딜 (Share Deal)
+다른 크리에이터 포스트를 크리에이터님 채널에 공유하고 수익을 받는 기능도 있어요. 딜이 열리면 봇이 단체방으로 오퍼를 보내드리고, 공유 단가랑 마감 시간 확인하신 뒤에 Accept / Reject만 눌러주시면 됩니다. 선착순으로 진행되고 단가는 기본 포스팅 단가의 50%로 산정해 드려요. 포워딩 진행 의사가 있으시다면 채팅창에 /repost yes를 남겨주세요.
+
+궁금한 점 있으면 편하게 알려주세요!`;
+
+interface TelegramChat {
+  id: string;
+  chat_id: string;
+  title: string | null;
+  chat_type: string | null;
+  member_count: number | null;
+  first_seen_at: string;
+  last_message_at: string | null;
+  message_count: number;
+  opportunity_id: string | null;
+  master_kol_id: string | null;
+  /** Long-running client chats — surfaced in the "Clients" tab.
+   *  ON DELETE SET NULL via migration 058. */
+  client_id: string | null;
+  /** Marks the chat as an internal team/working chat. Surfaced under
+   *  the new "Internal" tab. (migration 057) */
+  is_internal: boolean;
+  /** Soft-hide flag — excludes the chat from every tab. Hidden chats
+   *  show up in the "Hidden" tab so the user can unhide later.
+   *  (migration 057) */
+  is_hidden: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  opportunity?: {
+    id: string;
+    name: string;
+    stage: string;
+  } | null;
+  master_kol?: {
+    id: string;
+    name: string;
+    platform: string[] | null;
+  } | null;
+  client?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+interface MasterKOL {
+  id: string;
+  name: string;
+  platform: string[] | null;
+}
+
+interface TelegramMessage {
+  id: string;
+  chat_id: string;
+  message_id: string;
+  from_user_id: string | null;
+  from_user_name: string | null;
+  from_username: string | null;
+  text: string | null;
+  message_date: string;
+}
+
+interface TelegramCommand {
+  id: string;
+  command: string;
+  response: string;
+  description: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  team_only: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Sample data for demo purposes
+const SAMPLE_CHATS: TelegramChat[] = [
+  {
+    id: 'sample-1',
+    chat_id: '-1001234567890',
+    title: 'Project Alpha Discussion',
+    chat_type: 'supergroup',
+    member_count: 12,
+    first_seen_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    last_message_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    message_count: 156,
+    opportunity_id: null,
+    master_kol_id: null,
+    client_id: null,
+    is_internal: false,
+    is_hidden: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    opportunity: { id: 'opp-1', name: 'Alpha Corp Deal', stage: 'proposal' }
+  },
+  {
+    id: 'sample-2',
+    chat_id: '-1009876543210',
+    title: 'Beta Partners Group',
+    chat_type: 'supergroup',
+    member_count: 8,
+    first_seen_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+    last_message_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    message_count: 89,
+    opportunity_id: null,
+    master_kol_id: null,
+    client_id: null,
+    is_internal: false,
+    is_hidden: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    opportunity: null
+  },
+  {
+    id: 'sample-3',
+    chat_id: '-1005555555555',
+    title: 'New Leads Chat',
+    chat_type: 'group',
+    member_count: 5,
+    first_seen_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    last_message_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    message_count: 23,
+    opportunity_id: null,
+    master_kol_id: null,
+    client_id: null,
+    is_internal: false,
+    is_hidden: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    opportunity: null
+  }
+];
+
+const SAMPLE_MESSAGES: Record<string, TelegramMessage[]> = {
+  '-1001234567890': [
+    { id: 'm1', chat_id: '-1001234567890', message_id: '101', from_user_id: '111', from_user_name: 'John Smith', from_username: 'johnsmith', text: "Let's schedule a call for tomorrow to discuss the proposal", message_date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+    { id: 'm2', chat_id: '-1001234567890', message_id: '100', from_user_id: '222', from_user_name: 'Sarah Chen', from_username: 'sarahc', text: 'Sounds good! I can do 2pm or 4pm', message_date: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() },
+    { id: 'm3', chat_id: '-1001234567890', message_id: '99', from_user_id: '111', from_user_name: 'John Smith', from_username: 'johnsmith', text: "Perfect, let's do 2pm. I'll send the invite", message_date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() },
+  ],
+  '-1009876543210': [
+    { id: 'm4', chat_id: '-1009876543210', message_id: '50', from_user_id: '333', from_user_name: 'Mike Johnson', from_username: 'mikej', text: 'Has anyone reviewed the partnership terms?', message_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'm5', chat_id: '-1009876543210', message_id: '49', from_user_id: '444', from_user_name: 'Lisa Wong', from_username: 'lisaw', text: 'Yes, looks good to me. Ready to proceed', message_date: new Date(Date.now() - 3.5 * 24 * 60 * 60 * 1000).toISOString() },
+  ],
+  '-1005555555555': [
+    { id: 'm6', chat_id: '-1005555555555', message_id: '20', from_user_id: '555', from_user_name: 'Alex Turner', from_username: null, text: 'Welcome to the group! Looking forward to working together', message_date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
+  ]
+};
+
+/**
+ * The Telegram chat surface — eight filtered views of the same chat list,
+ * plus Topics and the command editor.
+ *
+ * [2026-08-19] Moved out of app/crm/telegram/page.tsx. Jdot: "Fold it,
+ * retire /crm/telegram. Two Telegram surfaces is the exact thing we were
+ * trying to kill." The three views now mount as sibling tabs on
+ * /intelligence/telegram rather than as a second Telegram page.
+ *
+ * `view` selects which of the three mounts. The eight chat filters keep
+ * their own tab strip under `chats` — they are filters over one list, not
+ * three separate destinations, so flattening them into the parent nav
+ * would put eight near-identical entries next to Registry and Runs.
+ */
+export function ChatsManager({ view = 'chats' }: { view?: 'chats' | 'topics' | 'commands' } = {}) {
+  const { toast } = useToast();
+  const [chats, setChats] = useState<TelegramChat[]>([]);
+  /**
+   * Forum topics (telegram_threads). One row per topic in any supergroup.
+   * Fetched alongside chats so the Topics tab can group them by parent.
+   */
+  const [topics, setTopics] = useState<Array<{
+    id: string;
+    chat_id: string;
+    message_thread_id: number;
+    name: string | null;
+    last_seen_at: string;
+  }>>([]);
+  const [messages, setMessages] = useState<Record<string, TelegramMessage[]>>({});
+  const [opportunities, setOpportunities] = useState<CRMOpportunity[]>([]);
+  const [masterKOLs, setMasterKOLs] = useState<MasterKOL[]>([]);
+  // Active clients for the Link-to-Client picker. Excludes archived
+  // clients (matches the rest of the app's client dropdowns).
+  const [clientsList, setClientsList] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDemo, setShowDemo] = useState(false);
+
+  // Link dialog state (for opportunities)
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [selectedChat, setSelectedChat] = useState<TelegramChat | null>(null);
+  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string>('');
+  const [linking, setLinking] = useState(false);
+  const [opportunityPopoverOpen, setOpportunityPopoverOpen] = useState(false);
+
+  // KOL Link dialog state
+  const [kolLinkDialogOpen, setKolLinkDialogOpen] = useState(false);
+  const [selectedKolId, setSelectedKolId] = useState<string>('');
+  const [kolPopoverOpen, setKolPopoverOpen] = useState(false);
+
+  // KOL welcome-message dialog — fires the first time an unassigned
+  // chat is linked to a KOL, offering to send the onboarding message
+  // to that chat. Mirrors the payment-notification confirm popup.
+  const [welcomeDialogOpen, setWelcomeDialogOpen] = useState(false);
+  const [welcomeChat, setWelcomeChat] = useState<TelegramChat | null>(null);
+  const [welcomeKolName, setWelcomeKolName] = useState<string>('');
+  const [welcomeMessage, setWelcomeMessage] = useState<string>(KOL_WELCOME_MESSAGE);
+  const [sendingWelcome, setSendingWelcome] = useState(false);
+
+  // Client Link dialog state — mirrors the opportunity / KOL pattern
+  const [clientLinkDialogOpen, setClientLinkDialogOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
+
+  // Send message dialog state
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [chatToMessage, setChatToMessage] = useState<TelegramChat | null>(null);
+  const [messageContent, setMessageContent] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+
+  // Commands state
+  const [commands, setCommands] = useState<TelegramCommand[]>([]);
+  const [loadingCommands, setLoadingCommands] = useState(true);
+  const [commandDialogOpen, setCommandDialogOpen] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<TelegramCommand | null>(null);
+  const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '', image_url: '', team_only: false });
+  const [savingCommand, setSavingCommand] = useState(false);
+
+  // Team-member Telegram IDs — used to compute "needs reply" by
+  // distinguishing team messages from external (customer/lead) ones.
+  // Loaded once on mount alongside chats/messages.
+  const [teamTelegramIds, setTeamTelegramIds] = useState<Set<string>>(new Set());
+
+  // Active tab — persisted in localStorage so reloads don't yank you
+  // back to "Unassigned". Lazy initializer reads the saved value once
+  // on first mount; we don't read on every render.
+  const TG_TAB_STORAGE_KEY = 'crm.telegram.activeTab';
+  const VALID_TG_TABS = new Set([
+    'unassigned', 'leads', 'internal', 'clients', 'chats', 'dms', 'kols', 'hidden',
+  ]);
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (view !== 'chats') return view;
+    if (typeof window === 'undefined') return 'unassigned';
+    try {
+      const saved = localStorage.getItem(TG_TAB_STORAGE_KEY);
+      return saved && VALID_TG_TABS.has(saved) ? saved : 'unassigned';
+    } catch {
+      return 'unassigned';
+    }
+  });
+  useEffect(() => {
+    // Only the chat view owns the remembered tab. Topics and Commands are
+    // pinned by their prop, and persisting them would make the chat view
+    // reopen on whichever one was visited last.
+    if (view !== 'chats') return;
+    if (typeof window === 'undefined') return;
+    try { localStorage.setItem(TG_TAB_STORAGE_KEY, activeTab); } catch {}
+  }, [activeTab, view]);
+
+  useEffect(() => {
+    fetchData();
+    fetchCommands();
+  }, []);
+
+  const fetchData = async () => {
+    await Promise.all([
+      fetchChats(),
+      fetchTopics(),
+      fetchMessages(),
+      fetchOpportunities(),
+      fetchMasterKOLs(),
+      fetchClients(),
+      fetchTeamTelegramIds(),
+    ]);
+  };
+
+  /**
+   * Pull every visible forum topic. We render them grouped by parent chat
+   * in the Topics tab, and surface a "↳ N topics" chip on supergroup rows
+   * in the existing chat tabs so users know they exist.
+   */
+  const fetchTopics = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('telegram_threads')
+        .select('id, chat_id, message_thread_id, name, last_seen_at')
+        .eq('is_hidden', false)
+        .order('last_seen_at', { ascending: false })
+        .limit(2000);
+      if (error) throw error;
+      setTopics((data || []) as any);
+    } catch (err) {
+      console.error('Error fetching telegram topics:', err);
+    }
+  };
+
+  const fetchChats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('telegram_chats')
+        .select(`
+          *,
+          opportunity:crm_opportunities(id, name, stage),
+          master_kol:master_kols(id, name, platform),
+          client:clients(id, name)
+        `)
+        .order('last_message_at', { ascending: false, nullsFirst: false });
+
+      if (error) throw error;
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      // unknown cast needed because the new client:clients FK join (mig 058)
+      // isn't in the generated database.types.ts yet.
+      setChats((data || []) as unknown as TelegramChat[]);
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+      toast({
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load Telegram chats',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        // [2026-08-03 per Andy] Active clients only. This listed every
+        // non-archived client, so the Link Chat picker offered inactive and
+        // churned ones — you could bind a live Telegram chat to a client we
+        // no longer work with, and nothing downstream would flag it.
+        // Matches /sops, /initiatives, /admin/telegram-comm and
+        // /admin/short-links, which all already gate on is_active.
+        .select('id, name')
+        .eq('is_active', true)
+        .is('archived_at', null)
+        .order('name');
+      if (error) throw error;
+      setClientsList((data || []) as { id: string; name: string }[]);
+    } catch (error) {
+      console.error('Error fetching clients for telegram link picker:', error);
+    }
+  };
+
+  const fetchMasterKOLs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('master_kols')
+        .select('id, name, platform')
+        .is('archived_at', null)
+        .order('name');
+
+      if (error) throw error;
+      setMasterKOLs(data || []);
+    } catch (error) {
+      console.error('Error fetching master KOLs:', error);
+    }
+  };
+
+  // Platform icon helper
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'X':
+        return <span className="font-bold text-black text-sm">𝕏</span>;
+      case 'Telegram':
+        return (
+          <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+        );
+      case 'YouTube':
+        return (
+          <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        );
+      case 'Facebook':
+        return (
+          <svg className="h-4 w-4 text-brand" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        );
+      case 'TikTok':
+        return (
+          <svg className="h-4 w-4 text-black" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.10-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Detect Telegram and Twitter/X links in message text
+  const detectSocialLinks = (text: string | null): { hasTelegram: boolean; hasTwitter: boolean; links: { type: 'telegram' | 'twitter'; url: string }[] } => {
+    if (!text) return { hasTelegram: false, hasTwitter: false, links: [] };
+
+    const telegramRegex = /(https?:\/\/)?(t\.me|telegram\.me)\/[^\s]+/gi;
+    const twitterRegex = /(https?:\/\/)?(twitter\.com|x\.com)\/[^\s]+/gi;
+
+    const telegramMatches = text.match(telegramRegex) || [];
+    const twitterMatches = text.match(twitterRegex) || [];
+
+    const links: { type: 'telegram' | 'twitter'; url: string }[] = [
+      ...telegramMatches.map(url => ({ type: 'telegram' as const, url: url.startsWith('http') ? url : `https://${url}` })),
+      ...twitterMatches.map(url => ({ type: 'twitter' as const, url: url.startsWith('http') ? url : `https://${url}` }))
+    ];
+
+    return {
+      hasTelegram: telegramMatches.length > 0,
+      hasTwitter: twitterMatches.length > 0,
+      links
+    };
+  };
+
+  // Render message text with clickable links
+  const renderMessageWithLinks = (text: string | null, maxLength?: number): React.ReactNode => {
+    if (!text) return '[No text]';
+
+    const displayText = maxLength && text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+
+    // Combined regex for both Telegram and Twitter links
+    const linkRegex = /(https?:\/\/)?(t\.me|telegram\.me|twitter\.com|x\.com)\/[^\s]+/gi;
+
+    const parts = displayText.split(linkRegex);
+    const matches = displayText.match(linkRegex) || [];
+
+    if (matches.length === 0) return displayText;
+
+    const result: React.ReactNode[] = [];
+    let matchIndex = 0;
+    let lastIndex = 0;
+
+    displayText.replace(linkRegex, (match, _p1, _p2, offset) => {
+      // Add text before the match
+      if (offset > lastIndex) {
+        result.push(displayText.substring(lastIndex, offset));
+      }
+
+      // Add the link
+      const url = match.startsWith('http') ? match : `https://${match}`;
+      const isTelegram = match.includes('t.me') || match.includes('telegram.me');
+
+      result.push(
+        <a
+          key={`link-${matchIndex}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-0.5 ${isTelegram ? 'text-blue-500' : 'text-ink-warm-700'} hover:underline font-medium`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isTelegram ? (
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+          ) : (
+            <span className="font-bold text-xs">𝕏</span>
+          )}
+          {match.length > 30 ? match.substring(0, 30) + '...' : match}
+        </a>
+      );
+
+      lastIndex = offset + match.length;
+      matchIndex++;
+      return match;
+    });
+
+    // Add remaining text after last match
+    if (lastIndex < displayText.length) {
+      result.push(displayText.substring(lastIndex));
+    }
+
+    return result;
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('telegram_messages')
+        .select('*')
+        .order('message_date', { ascending: false });
+
+      if (error) throw error;
+
+      // Group messages by chat_id
+      const grouped: Record<string, TelegramMessage[]> = {};
+      (data || []).forEach((msg: TelegramMessage) => {
+        if (!grouped[msg.chat_id]) {
+          grouped[msg.chat_id] = [];
+        }
+        // Keep only last 5 messages per chat for display
+        if (grouped[msg.chat_id].length < 5) {
+          grouped[msg.chat_id].push(msg);
+        }
+      });
+      setMessages(grouped);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  // Pull the set of team-member Telegram IDs from the users table. A
+  // chat "needs reply" when its most recent message is from someone
+  // NOT in this set — i.e. an external counterparty waiting on us.
+  const fetchTeamTelegramIds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('telegram_id')
+        .not('telegram_id', 'is', null);
+      if (error) throw error;
+      const ids = new Set<string>(
+        ((data || []) as Array<{ telegram_id: string | null }>)
+          .map(u => (u.telegram_id || '').trim())
+          .filter(Boolean),
+      );
+      setTeamTelegramIds(ids);
+    } catch (err) {
+      console.error('Error fetching team telegram IDs:', err);
+    }
+  };
+
+  const fetchOpportunities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('crm_opportunities')
+        .select('id, name, stage')
+        .order('name');
+
+      if (error) throw error;
+      // Cast: select() returns 3 fields, the type wants the full
+      // CRMOpportunity. Safe because consumers only use id/name/stage.
+      setOpportunities((data || []) as unknown as CRMOpportunity[]);
+    } catch (error) {
+      console.error('Error fetching opportunities:', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+    toast({
+      title: 'Refreshed',
+      description: 'Chat list updated',
+    });
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: 'Copied',
+      description: 'Chat ID copied to clipboard',
+    });
+  };
+
+  // ─── Internal / Hide / Delete handlers (migration 057) ──────────────
+
+  /**
+   * Toggle the is_internal flag. Optimistic — patches local state first,
+   * then writes to DB and rolls back on error.
+   */
+  const handleToggleInternal = async (chat: TelegramChat) => {
+    const next = !chat.is_internal;
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_internal: next } : c));
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ is_internal: next, updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      if (error) throw error;
+      toast({ title: next ? 'Marked as internal' : 'Unmarked as internal', description: chat.title || chat.chat_id });
+    } catch (err: any) {
+      console.error('Error toggling internal:', err);
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_internal: !next } : c));
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  /**
+   * Toggle the is_hidden flag — soft-hide the chat from every tab
+   * except the Hidden tab. Reversible via the same action.
+   */
+  const handleToggleHidden = async (chat: TelegramChat) => {
+    const next = !chat.is_hidden;
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_hidden: next } : c));
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ is_hidden: next, updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      if (error) throw error;
+      toast({ title: next ? 'Hidden' : 'Unhidden', description: chat.title || chat.chat_id });
+    } catch (err: any) {
+      console.error('Error toggling hidden:', err);
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_hidden: !next } : c));
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  /**
+   * Hard-delete the row from telegram_chats. The webhook will recreate
+   * it if a new message arrives — for permanent removal the user should
+   * Hide instead. v11 destructive Dialog (replaces the old native
+   * confirm() — 2026-06-05).
+   */
+  const [deleteChatPending, setDeleteChatPending] = useState<TelegramChat | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
+
+  // [2026-06-05] View Chat dialog — chatroom-style read-only view of
+  // every message stored for a chat (the page's in-memory `messages`
+  // cache only keeps 5/chat for the inline preview; this fetches the
+  // full history on demand, capped at 500 to stay snappy). Auto-scrolls
+  // to the bottom on open.
+  const [viewingChat, setViewingChat] = useState<TelegramChat | null>(null);
+  const [viewingChatMessages, setViewingChatMessages] = useState<TelegramMessage[]>([]);
+  const [viewingChatLoading, setViewingChatLoading] = useState(false);
+
+  const handleViewChat = async (chat: TelegramChat) => {
+    setViewingChat(chat);
+    setViewingChatMessages([]);
+    setViewingChatLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('telegram_messages')
+        .select('*')
+        .eq('chat_id', chat.chat_id)
+        .order('message_date', { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      setViewingChatMessages((data || []) as TelegramMessage[]);
+    } catch (err: any) {
+      toast({
+        title: 'Load failed',
+        description: err?.message ?? 'Failed to load chat messages',
+        variant: 'destructive',
+      });
+    } finally {
+      setViewingChatLoading(false);
+    }
+  };
+
+  // Auto-scroll the chat body to the bottom when messages arrive so the
+  // newest message is in view on open. The ref is attached to the body
+  // wrapper in the Dialog JSX below.
+  const chatBodyRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!viewingChatLoading && viewingChatMessages.length > 0 && chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [viewingChatLoading, viewingChatMessages]);
+
+  const handleDeleteChat = (chat: TelegramChat) => {
+    setDeleteChatPending(chat);
+  };
+
+  const confirmDeleteChat = async () => {
+    if (!deleteChatPending) return;
+    setDeletingChat(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .delete()
+        .eq('id', deleteChatPending.id);
+      if (error) throw error;
+      setChats(prev => prev.filter(c => c.id !== deleteChatPending.id));
+      toast({ title: 'Chat deleted', description: deleteChatPending.title || deleteChatPending.chat_id });
+      setDeleteChatPending(null);
+    } catch (err: any) {
+      console.error('Error deleting chat:', err);
+      toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeletingChat(false);
+    }
+  };
+
+  /**
+   * Render the actions dropdown for a chat row. Used in every tab so
+   * the user has consistent access to internal/hide/delete from anywhere.
+   * Matches the existing Card layout — slot it next to the right-side
+   * action buttons (Link to Lead, Link to KOL, etc.).
+   */
+  const renderChatActions = (chat: TelegramChat) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={() => handleViewChat(chat)}>
+          <Eye className="h-4 w-4 mr-2" />
+          View Chat
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copyToClipboard(chat.chat_id)}>
+          <Copy className="h-4 w-4 mr-2" />
+          Copy chat ID
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleToggleInternal(chat)}>
+          <Briefcase className="h-4 w-4 mr-2" />
+          {chat.is_internal ? 'Unmark as internal' : 'Mark as internal'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleToggleHidden(chat)}>
+          <EyeOff className="h-4 w-4 mr-2" />
+          {chat.is_hidden ? 'Unhide' : 'Hide from all tabs'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleDeleteChat(chat)} className="text-rose-600 focus:text-rose-600">
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const openLinkDialog = (chat: TelegramChat) => {
+    setSelectedChat(chat);
+    setSelectedOpportunityId(chat.opportunity_id || '__none__');
+    setLinkDialogOpen(true);
+  };
+
+  const handleUnlink = async (chat: TelegramChat) => {
+    if (!chat.opportunity_id) return;
+
+    try {
+      // Update telegram_chats table to remove opportunity link
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          opportunity_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', chat.id);
+
+      if (chatError) throw chatError;
+
+      // Clear the gc field on the opportunity
+      await supabase
+        .from('crm_opportunities')
+        .update({
+          gc: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', chat.opportunity_id);
+
+      toast({
+        title: 'Chat unlinked',
+        description: 'Chat has been unlinked from the opportunity',
+      });
+
+      fetchChats();
+    } catch (error) {
+      console.error('Error unlinking chat:', error);
+      toast({
+        title: 'Unlink failed',
+        description: error instanceof Error ? error.message : 'Failed to unlink chat',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleLink = async () => {
+    if (!selectedChat) return;
+
+    // Treat "__none__" as no link (unlink)
+    const opportunityId = selectedOpportunityId === '__none__' ? null : selectedOpportunityId;
+
+    setLinking(true);
+    try {
+      // Update telegram_chats table
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          opportunity_id: opportunityId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedChat.id);
+
+      if (chatError) throw chatError;
+
+      // Also update the opportunity's gc field if linking
+      if (opportunityId) {
+        const { error: oppError } = await supabase
+          .from('crm_opportunities')
+          .update({
+            gc: selectedChat.chat_id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', opportunityId);
+
+        if (oppError) throw oppError;
+      }
+
+      // If unlinking, clear the gc field on the old opportunity
+      if (selectedChat.opportunity_id && !opportunityId) {
+        await supabase
+          .from('crm_opportunities')
+          .update({
+            gc: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedChat.opportunity_id);
+      }
+
+      toast({
+        title: opportunityId ? 'Chat linked' : 'Chat unlinked',
+        description: opportunityId
+          ? 'Chat has been linked to the opportunity'
+          : 'Chat has been unlinked from the opportunity',
+      });
+
+      setLinkDialogOpen(false);
+      fetchChats();
+    } catch (error) {
+      console.error('Error linking chat:', error);
+      toast({
+        title: 'Link failed',
+        description: error instanceof Error ? error.message : 'Failed to update chat link',
+        variant: 'destructive',
+      });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  // KOL Link functions
+  const openKolLinkDialog = (chat: TelegramChat) => {
+    setSelectedChat(chat);
+    setSelectedKolId(chat.master_kol_id || '__none__');
+    setKolLinkDialogOpen(true);
+  };
+
+  const handleUnlinkKol = async (chat: TelegramChat) => {
+    if (!chat.master_kol_id) return;
+
+    try {
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          master_kol_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', chat.id);
+
+      if (chatError) throw chatError;
+
+      toast({
+        title: 'Chat unlinked',
+        description: 'Chat has been unlinked from the KOL',
+      });
+
+      fetchChats();
+    } catch (error) {
+      console.error('Error unlinking chat from KOL:', error);
+      toast({
+        title: 'Unlink failed',
+        description: error instanceof Error ? error.message : 'Failed to unlink chat',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleLinkKol = async () => {
+    if (!selectedChat) return;
+
+    const kolId = selectedKolId === '__none__' ? null : selectedKolId;
+    // First-time link = a previously-unassigned chat now points at a KOL.
+    // That's the moment we offer to send the onboarding welcome message.
+    const isFirstLink = !selectedChat.master_kol_id && !!kolId;
+    const linkedChat = selectedChat;
+
+    setLinking(true);
+    try {
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          master_kol_id: kolId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedChat.id);
+
+      if (chatError) throw chatError;
+
+      toast({
+        title: kolId ? 'Chat linked' : 'Chat unlinked',
+        description: kolId
+          ? 'Chat has been linked to the KOL'
+          : 'Chat has been unlinked from the KOL',
+      });
+
+      setKolLinkDialogOpen(false);
+      fetchChats();
+
+      if (isFirstLink) {
+        setWelcomeChat(linkedChat);
+        setWelcomeKolName(masterKOLs.find(k => k.id === kolId)?.name || '');
+        setWelcomeMessage(KOL_WELCOME_MESSAGE);
+        setWelcomeDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error linking chat to KOL:', error);
+      toast({
+        title: 'Link failed',
+        description: error instanceof Error ? error.message : 'Failed to update chat link',
+        variant: 'destructive',
+      });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  // Send the KOL onboarding welcome message to the just-linked chat.
+  const sendKolWelcome = async () => {
+    if (!welcomeChat) return;
+    setSendingWelcome(true);
+    try {
+      const response = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: welcomeChat.chat_id,
+          message: welcomeMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      toast({
+        title: 'Welcome message sent',
+        description: welcomeKolName
+          ? `Onboarding message sent to ${welcomeKolName}'s chat`
+          : 'Onboarding message sent to the KOL chat',
+      });
+      setWelcomeDialogOpen(false);
+      setWelcomeChat(null);
+    } catch (error: any) {
+      console.error('Error sending KOL welcome message:', error);
+      toast({
+        title: 'Send failed',
+        description: error?.message ?? 'Failed to send welcome message',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingWelcome(false);
+    }
+  };
+
+  const skipKolWelcome = () => {
+    setWelcomeDialogOpen(false);
+    setWelcomeChat(null);
+  };
+
+  // ─── Client link handlers (mirrors opportunity / KOL pattern) ───────
+
+  const openClientLinkDialog = (chat: TelegramChat) => {
+    setSelectedChat(chat);
+    setSelectedClientId(chat.client_id || '__none__');
+    setClientLinkDialogOpen(true);
+  };
+
+  const handleUnlinkClient = async (chat: TelegramChat) => {
+    if (!chat.client_id) return;
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ client_id: null, updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      if (error) throw error;
+      toast({ title: 'Chat unlinked', description: 'Chat has been unlinked from the client' });
+      fetchChats();
+    } catch (error: any) {
+      console.error('Error unlinking chat from client:', error);
+      toast({ title: 'Unlink failed', description: error?.message ?? 'Failed to unlink chat', variant: 'destructive' });
+    }
+  };
+
+  const handleLinkClient = async () => {
+    if (!selectedChat) return;
+    const clientId = selectedClientId === '__none__' ? null : selectedClientId;
+    setLinking(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ client_id: clientId, updated_at: new Date().toISOString() })
+        .eq('id', selectedChat.id);
+      if (error) throw error;
+      toast({
+        title: clientId ? 'Chat linked' : 'Chat unlinked',
+        description: clientId ? 'Chat has been linked to the client' : 'Chat has been unlinked from the client',
+      });
+      setClientLinkDialogOpen(false);
+      fetchChats();
+    } catch (error: any) {
+      console.error('Error linking chat to client:', error);
+      toast({ title: 'Link failed', description: error?.message ?? 'Failed to update chat link', variant: 'destructive' });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  // Open message dialog
+  const openMessageDialog = (chat: TelegramChat) => {
+    setChatToMessage(chat);
+    setMessageContent('');
+    setMessageDialogOpen(true);
+  };
+
+  // Send message to chat
+  const handleSendMessage = async () => {
+    if (!chatToMessage || !messageContent.trim()) return;
+
+    setSendingMessage(true);
+    try {
+      const response = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: chatToMessage.chat_id,
+          message: messageContent.trim()
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      toast({
+        title: 'Message sent',
+        description: `Sent to ${chatToMessage.title || 'the chat'}.`,
+      });
+
+      setMessageDialogOpen(false);
+      setMessageContent('');
+      setChatToMessage(null);
+
+      // Refresh messages after sending
+      fetchMessages();
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast({
+        title: 'Send failed',
+        description: error?.message ?? 'Failed to send message',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const fetchCommands = async () => {
+    setLoadingCommands(true);
+    try {
+      const { data, error } = await supabase
+        .from('telegram_commands')
+        .select('*')
+        .order('command');
+
+      if (error) throw error;
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setCommands((data || []) as TelegramCommand[]);
+    } catch (error) {
+      console.error('Error fetching commands:', error);
+      toast({
+        title: 'Load failed',
+        description: error instanceof Error ? error.message : 'Failed to load commands',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingCommands(false);
+    }
+  };
+
+  const openCommandDialog = (command?: TelegramCommand) => {
+    if (command) {
+      setEditingCommand(command);
+      setCommandForm({
+        command: command.command,
+        response: command.response,
+        description: command.description || '',
+        image_url: command.image_url || '',
+        team_only: command.team_only || false
+      });
+    } else {
+      setEditingCommand(null);
+      setCommandForm({ command: '', response: '', description: '', image_url: '', team_only: false });
+    }
+    setCommandDialogOpen(true);
+  };
+
+  const handleSaveCommand = async () => {
+    if (!commandForm.command.trim() || !commandForm.response.trim()) {
+      toast({
+        title: 'Command and response required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Clean up command (remove leading slash if present)
+    const cleanCommand = commandForm.command.replace(/^\//, '').toLowerCase().trim();
+
+    setSavingCommand(true);
+    try {
+      if (editingCommand) {
+        // Update existing
+        const { error } = await supabase
+          .from('telegram_commands')
+          .update({
+            command: cleanCommand,
+            response: commandForm.response.trim(),
+            description: commandForm.description.trim() || null,
+            image_url: commandForm.image_url.trim() || null,
+            team_only: commandForm.team_only,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingCommand.id);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Command updated',
+          description: `/${cleanCommand} has been updated`,
+        });
+      } else {
+        // Create new
+        const { error } = await supabase
+          .from('telegram_commands')
+          .insert({
+            command: cleanCommand,
+            response: commandForm.response.trim(),
+            description: commandForm.description.trim() || null,
+            image_url: commandForm.image_url.trim() || null,
+            team_only: commandForm.team_only,
+            is_active: true
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Command created',
+          description: `/${cleanCommand} has been added`,
+        });
+      }
+
+      setCommandDialogOpen(false);
+      fetchCommands();
+    } catch (error: any) {
+      console.error('Error saving command:', error);
+      toast({
+        title: 'Save failed',
+        description: error?.message?.includes('duplicate')
+          ? 'A command with this name already exists'
+          : error?.message ?? 'Failed to save command',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingCommand(false);
+    }
+  };
+
+  // [v11 destructive Dialog] confirm() replaced by deleteCommandPending
+  // state + confirmDeleteCommand below. 2026-06-05.
+  const [deleteCommandPending, setDeleteCommandPending] = useState<TelegramCommand | null>(null);
+  const [deletingCommand, setDeletingCommand] = useState(false);
+
+  const handleDeleteCommand = (command: TelegramCommand) => {
+    setDeleteCommandPending(command);
+  };
+
+  const confirmDeleteCommand = async () => {
+    if (!deleteCommandPending) return;
+    setDeletingCommand(true);
+    try {
+      const { error } = await supabase
+        .from('telegram_commands')
+        .delete()
+        .eq('id', deleteCommandPending.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Command deleted',
+        description: `/${deleteCommandPending.command} has been removed`,
+      });
+      setDeleteCommandPending(null);
+      fetchCommands();
+    } catch (error) {
+      console.error('Error deleting command:', error);
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete command',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingCommand(false);
+    }
+  };
+
+  const handleToggleCommand = async (command: TelegramCommand) => {
+    try {
+      const { error } = await supabase
+        .from('telegram_commands')
+        .update({
+          is_active: !command.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', command.id);
+
+      if (error) throw error;
+
+      toast({
+        title: command.is_active ? 'Command disabled' : 'Command enabled',
+        description: `/${command.command} is now ${command.is_active ? 'disabled' : 'enabled'}`,
+      });
+      fetchCommands();
+    } catch (error) {
+      console.error('Error toggling command:', error);
+      toast({
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Failed to update command',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const formatTimeAgo = (dateString: string | null) => dateString ? formatRelativeShort(dateString) : 'Never';
+
+  const getActivityStatus = (lastMessageAt: string | null) => {
+    if (!lastMessageAt) return { color: 'bg-ink-warm-400', label: 'No activity' };
+    const date = new Date(lastMessageAt);
+    const now = new Date();
+    const diffHours = (now.getTime() - date.getTime()) / 3600000;
+
+    if (diffHours < 24) return { color: 'bg-emerald-500', label: 'Active' };
+    if (diffHours < 72) return { color: 'bg-yellow-500', label: 'Recent' };
+    if (diffHours < 168) return { color: 'bg-orange-500', label: 'Quiet' };
+    return { color: 'bg-rose-500', label: 'Inactive' };
+  };
+
+  // Use demo data if showDemo is true, otherwise use real data
+  const displayChats = showDemo ? SAMPLE_CHATS : chats;
+  const displayMessages = showDemo ? SAMPLE_MESSAGES : messages;
+
+  // Hidden chats live in their own tab. Every other tab filters them
+  // out so they don't pollute the workspace. Internal chats are
+  // similarly excluded from Unassigned (they wouldn't make sense
+  // there — internal isn't a stage of "needs assignment").
+  const hiddenChats = displayChats.filter(chat => chat.is_hidden);
+  const visibleChats = displayChats.filter(chat => !chat.is_hidden);
+
+  // Separate group chats from DMs and KOL chats
+  const groupChats = visibleChats.filter(chat => (chat.chat_type === 'group' || chat.chat_type === 'supergroup') && !chat.is_internal);
+  const dmChats = visibleChats.filter(chat => chat.chat_type === 'private');
+  const kolChats = visibleChats.filter(chat => chat.master_kol_id !== null);
+  const clientChats = visibleChats.filter(chat => chat.client_id !== null);
+  const internalChats = visibleChats.filter(chat => chat.is_internal);
+  // Unassigned now also excludes client-linked chats so a chat tied to
+  // a client doesn't keep nagging from the Unassigned tab.
+  const unassignedChats = visibleChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && !chat.client_id && !chat.is_internal && chat.chat_type !== 'private');
+  const leadsChats = visibleChats.filter(chat => chat.opportunity_id !== null);
+
+  // ── "Needs reply" detection ───────────────────────────────────────
+  // A chat needs reply if its most recent message in the past 7 days
+  // came from someone OUTSIDE the team. Internal chats are excluded —
+  // those are team↔team and the asymmetric concept doesn't apply.
+  // Time window keeps stale chats from forever-flagging as "unread".
+  const NEEDS_REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  const chatsNeedingReply = new Set<string>();
+  if (teamTelegramIds.size > 0) {
+    const cutoff = Date.now() - NEEDS_REPLY_WINDOW_MS;
+    for (const chat of visibleChats) {
+      if (chat.is_internal) continue;
+      const recent = (displayMessages[chat.chat_id] || [])[0];
+      if (!recent) continue;
+      const tsRaw = recent.message_date ? new Date(recent.message_date).getTime() : 0;
+      if (!tsRaw || tsRaw < cutoff) continue;
+      const fromId = (recent.from_user_id || '').toString();
+      // No from_user_id ⇒ unknown sender; skip rather than guessing.
+      if (!fromId) continue;
+      if (!teamTelegramIds.has(fromId)) {
+        chatsNeedingReply.add(chat.chat_id);
+      }
+    }
+  }
+  const needsReplyCount = (list: typeof visibleChats) =>
+    list.reduce((n, c) => n + (chatsNeedingReply.has(c.chat_id) ? 1 : 0), 0);
+  const unassignedNeedsReply = needsReplyCount(unassignedChats);
+  const leadsNeedsReply = needsReplyCount(leadsChats);
+  const clientNeedsReply = needsReplyCount(clientChats);
+  const groupNeedsReply = needsReplyCount(groupChats);
+  const dmNeedsReply = needsReplyCount(dmChats);
+  const kolNeedsReply = needsReplyCount(kolChats);
+
+  const filteredGroupChats = groupChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.opportunity?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredDMChats = dmChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
+    );
+  });
+
+  const filteredKolChats = kolChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.master_kol?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredUnassignedChats = unassignedChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
+    );
+  });
+
+  const filteredLeadsChats = leadsChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.opportunity?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredClientChats = clientChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.client?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredInternalChats = internalChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
+    );
+  });
+
+  const filteredHiddenChats = hiddenChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
+    );
+  });
+
+  if (loading) {
+    // Structural skeleton mirroring the loaded layout: PageHeader (same
+    // kicker so the title strip doesn't shift) → tab strip → per-tab
+    // filter row (copy left + search + Refresh right) → chat-card grid.
+    // Each chat is a separate Card with a title row (activity dot +
+    // name + type badge) + metadata row (chat id + last message +
+    // count) + action button cluster on the right — mirrors the
+    // actual unassigned/leads/etc. tab content shape.
+    return (
+      <div className="flex flex-col h-full gap-6">
+        {/* Tab strip skeleton — 9 chip-shaped placeholders inside the
+            v11 cream-100 outer container so the bar lines up exactly
+            with the rendered TabsList. `flex-wrap` matches the loaded
+            TabsList so 9 wide chips can break across rows on
+            narrower viewports without overflowing. */}
+        {view === 'chats' && (
+          <div className="flex flex-wrap gap-1 p-1 rounded-md bg-cream-100 border border-cream-200 w-fit max-w-full">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-24 rounded" />
+            ))}
+          </div>
+        )}
+
+        {/* Per-tab filter row — copy text on the left, search +
+            Refresh button on the right. Refresh has icon + text
+            label in the loaded state (~110px), so the skeleton is
+            sized to that, not the 36px icon-only width. */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Skeleton className="h-4 w-72" />
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-9 w-64 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+          </div>
+        </div>
+
+        {/* Chat-card grid — each chat renders as a separate Card in
+            the loaded state, NOT as table rows. Previously skeleton
+            used a single Card with internal rows, which gave the
+            wrong "density when data arrived" impression. */}
+        <div className="grid gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  {/* Left: chat info column */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    {/* Title row — activity dot (3x3 round) + chat
+                        title + chat-type badge */}
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-3 h-3 rounded-full flex-shrink-0" />
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-5 w-16 rounded" />
+                    </div>
+                    {/* Metadata row — hash id, last message, count */}
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                  {/* Right: action button cluster (Link to opp / KOL
+                      / Client + ⋯). Sized to the widest 3-action
+                      configuration; tabs with fewer buttons just
+                      under-fill, no shift. */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Skeleton className="h-9 w-32 rounded-md" />
+                    <Skeleton className="h-9 w-28 rounded-md" />
+                    <Skeleton className="h-9 w-9 rounded-md" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full gap-6">
+
+      {/* Tabs — v11 chrome: cream-100 outer container, white active
+          tile with shadow-card + brand text. 2026-06-03. */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+        {view === 'chats' && (
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
+          {/* v11 chip styling — brand-light tinted count + rose-100
+              tinted urgent-reply count. The previous solid rose-500
+              urgent badge was hard to read against the cream-100
+              tab strip; the softer tone keeps the urgency signal
+              without the visual shouting. */}
+          <TabsTrigger value="unassigned" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <Unlink className="h-4 w-4" />
+            Unassigned
+            {unassignedChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{unassignedChats.length}</span>
+            )}
+            {unassignedNeedsReply > 0 && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${unassignedNeedsReply} chat${unassignedNeedsReply === 1 ? '' : 's'} awaiting reply`}>{unassignedNeedsReply}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <LinkIcon className="h-4 w-4" />
+            Leads
+            {leadsChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{leadsChats.length}</span>
+            )}
+            {leadsNeedsReply > 0 && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${leadsNeedsReply} chat${leadsNeedsReply === 1 ? '' : 's'} awaiting reply`}>{leadsNeedsReply}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="internal" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <Briefcase className="h-4 w-4" />
+            Internal
+            {internalChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{internalChats.length}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="clients" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <CheckCircle className="h-4 w-4" />
+            Clients
+            {clientChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{clientChats.length}</span>
+            )}
+            {clientNeedsReply > 0 && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${clientNeedsReply} chat${clientNeedsReply === 1 ? '' : 's'} awaiting reply`}>{clientNeedsReply}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="chats" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <Users className="h-4 w-4" />
+            Groups
+            {groupChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{groupChats.length}</span>
+            )}
+            {groupNeedsReply > 0 && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${groupNeedsReply} chat${groupNeedsReply === 1 ? '' : 's'} awaiting reply`}>{groupNeedsReply}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="dms" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <User className="h-4 w-4" />
+            DMs
+            {dmChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{dmChats.length}</span>
+            )}
+            {dmNeedsReply > 0 && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${dmNeedsReply} chat${dmNeedsReply === 1 ? '' : 's'} awaiting reply`}>{dmNeedsReply}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="kols" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+            <Megaphone className="h-4 w-4" />
+            KOLs
+            {kolChats.length > 0 && (
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{kolChats.length}</span>
+            )}
+            {kolNeedsReply > 0 && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full ml-0.5 tabular-nums" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</span>
+            )}
+          </TabsTrigger>
+          {hiddenChats.length > 0 && (
+            <TabsTrigger value="hidden" className="px-3 py-1.5 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand">
+              <EyeOff className="h-4 w-4" />
+              Hidden
+              <span className="text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full ml-1 tabular-nums">{hiddenChats.length}</span>
+            </TabsTrigger>
+          )}
+        </TabsList>
+        )}
+
+        {/* Unassigned Tab */}
+        <TabsContent value="unassigned" className="mt-4 space-y-4">
+          {/* Unassigned Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Chats not linked to any opportunity or KOL ({unassignedChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Unassigned Chat List */}
+          {filteredUnassignedChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Unlink className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  {unassignedChats.length === 0 ? 'No unassigned chats' : 'No matching chats'}
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">
+                  {unassignedChats.length === 0
+                    ? 'All chats have been assigned to opportunities or KOLs.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredUnassignedChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: Chat Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" {...({ title: 'Contains Telegram link' } as any)}>
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-ink-warm-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-ink-warm-700">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openLinkDialog(chat)}
+                          >
+                            <LinkIcon className="h-4 w-4 mr-1.5" />
+                            Link to Lead
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openKolLinkDialog(chat)}
+                          >
+                            <Megaphone className="h-4 w-4 mr-1.5" />
+                            Link to KOL
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openClientLinkDialog(chat)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1.5" />
+                            Link to Client
+                          </Button>
+                          {renderChatActions(chat)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Leads Tab (Opportunities) */}
+        <TabsContent value="leads" className="mt-4 space-y-4">
+          {/* Leads Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Chats linked to opportunities ({leadsChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search leads..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Leads Chat List */}
+          {filteredLeadsChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <LinkIcon className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  {leadsChats.length === 0 ? 'No leads linked yet' : 'No matching leads'}
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">
+                  {leadsChats.length === 0
+                    ? 'Link chats to opportunities from the Unassigned tab to track them here.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredLeadsChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: Chat Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Linked Opportunity */}
+                          {chat.opportunity && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
+                              <span className="text-sm text-ink-warm-700">
+                                Linked to: <strong>{chat.opportunity.name}</strong>
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {chat.opportunity.stage.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              </Badge>
+                            </div>
+                          )}
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" {...({ title: 'Contains Telegram link' } as any)}>
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-ink-warm-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-ink-warm-700">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button variant="brand" size="sm" onClick={() => openMessageDialog(chat)}>
+                            <MessageSquare className="h-4 w-4 mr-1.5" />
+                            Send Message
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlink(chat)}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Unlink className="h-4 w-4 mr-1.5" />
+                            Unlink
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openLinkDialog(chat)}
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change Lead
+                          </Button>
+                          {renderChatActions(chat)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Chats Tab (Groups only) */}
+        <TabsContent value="chats" className="mt-4 space-y-4">
+          {/* Chats Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              {showDemo ? (
+                <span className="text-amber-600">Showing demo data • </span>
+              ) : null}
+              Group chats discovered by the bot ({groupChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              {false && (
+              <Button
+                variant={showDemo ? "default" : "outline"}
+                onClick={() => setShowDemo(!showDemo)}
+                className={showDemo ? "bg-amber-500 hover:bg-amber-600" : ""}
+              >
+                {showDemo ? 'Hide Demo' : 'Show Demo'}
+              </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Chat List */}
+      {filteredGroupChats.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Users className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+              {groupChats.length === 0 ? 'No group chats discovered yet' : 'No matching chats'}
+            </h3>
+            <p className="text-ink-warm-500 max-w-md mx-auto">
+              {groupChats.length === 0
+                ? 'Group chats will appear here when messages are sent in groups where your bot is a member. Make sure the webhook is connected in Settings.'
+                : 'Try a different search term.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {filteredGroupChats.map(chat => {
+            const activity = getActivityStatus(chat.last_message_at);
+            return (
+              <Card key={chat.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left: Chat Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                        <h3 className="font-semibold text-ink-warm-900 truncate">
+                          {chat.title || 'Unnamed Chat'}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs">
+                          {(chat.chat_type || 'group').charAt(0).toUpperCase() + (chat.chat_type || 'group').slice(1)}
+                        </Badge>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                        <div className="flex items-center gap-1.5">
+                          <Hash className="h-3.5 w-3.5" />
+                          <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
+                            {chat.chat_id}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => copyToClipboard(chat.chat_id)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>{formatTimeAgo(chat.last_message_at)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span>{chat.message_count} messages</span>
+                        </div>
+                      </div>
+
+                      {/* Linked Opportunity */}
+                      {chat.opportunity && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
+                          <span className="text-sm text-ink-warm-700">
+                            Linked to: <strong>{chat.opportunity.name}</strong>
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {chat.opportunity.stage.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Recent Messages */}
+                      {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-cream-100">
+                          <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
+                          <div className="space-y-1.5">
+                            {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
+                              <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
+                                <span className="font-medium text-ink-warm-700">
+                                  {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                </span>{' '}
+                                <span className="text-ink-warm-700">
+                                  {msg.text && msg.text.length > 80
+                                    ? msg.text.substring(0, 80) + '...'
+                                    : msg.text || '[No text]'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {chat.opportunity_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUnlink(chat)}
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                        >
+                          <Unlink className="h-4 w-4 mr-1.5" />
+                          Unlink
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openLinkDialog(chat)}
+                      >
+                        {chat.opportunity_id ? (
+                          <>
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change Link
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon className="h-4 w-4 mr-1.5" />
+                            Link to Opp
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openKolLinkDialog(chat)}
+                      >
+                        {chat.master_kol_id ? (
+                          <>
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change KOL
+                          </>
+                        ) : (
+                          <>
+                            <Megaphone className="h-4 w-4 mr-1.5" />
+                            Link to KOL
+                          </>
+                        )}
+                      </Button>
+                      {renderChatActions(chat)}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+        </TabsContent>
+
+        {/* DMs Tab */}
+        <TabsContent value="dms" className="mt-4 space-y-4">
+          {/* DMs Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              {showDemo ? (
+                <span className="text-amber-600">Showing demo data • </span>
+              ) : null}
+              Direct messages with the bot ({dmChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search DMs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* DM List */}
+          {filteredDMChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <User className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  {dmChats.length === 0 ? 'No direct messages yet' : 'No matching DMs'}
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">
+                  {dmChats.length === 0
+                    ? 'Direct messages will appear here when users message your bot privately.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredDMChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: DM Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <div className="p-1.5 bg-blue-50 rounded-full">
+                              <User className="h-4 w-4 text-brand" />
+                            </div>
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
+                              {chat.title || 'Unknown User'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              DM
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Linked KOL */}
+                          {chat.master_kol && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
+                              <span className="text-sm text-ink-warm-700">
+                                Linked to KOL: <strong>{chat.master_kol.name}</strong>
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" {...({ title: 'Contains Telegram link' } as any)}>
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-ink-warm-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-ink-warm-700">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {chat.master_kol_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUnlinkKol(chat)}
+                              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                            >
+                              <Unlink className="h-4 w-4 mr-1.5" />
+                              Unlink
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openKolLinkDialog(chat)}
+                          >
+                            {chat.master_kol_id ? (
+                              <>
+                                <Edit className="h-4 w-4 mr-1.5" />
+                                Change KOL
+                              </>
+                            ) : (
+                              <>
+                                <Megaphone className="h-4 w-4 mr-1.5" />
+                                Link to KOL
+                              </>
+                            )}
+                          </Button>
+                          {renderChatActions(chat)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* KOLs Tab */}
+        <TabsContent value="kols" className="mt-4 space-y-4">
+          {/* KOLs Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Chats linked to KOLs ({kolChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search KOL chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* KOL Chat List */}
+          {filteredKolChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Megaphone className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  {kolChats.length === 0 ? 'No KOL chats linked yet' : 'No matching KOL chats'}
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">
+                  {kolChats.length === 0
+                    ? 'Link chats to KOLs from the Groups or DMs tab to track conversations with them.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredKolChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: Chat Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Linked KOL */}
+                          {chat.master_kol && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
+                              <span className="text-sm text-ink-warm-700">
+                                Linked to KOL: <strong>{chat.master_kol.name}</strong>
+                              </span>
+                              {chat.master_kol.platform && chat.master_kol.platform.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  {chat.master_kol.platform.map((p, i) => (
+                                    <span key={i} title={p}>{getPlatformIcon(p)}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <p className="text-xs font-medium text-ink-warm-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-cream-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" {...({ title: 'Contains Telegram link' } as any)}>
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-ink-warm-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-ink-warm-700">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button variant="brand" size="sm" onClick={() => openMessageDialog(chat)}>
+                            <MessageSquare className="h-4 w-4 mr-1.5" />
+                            Send Message
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlinkKol(chat)}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Unlink className="h-4 w-4 mr-1.5" />
+                            Unlink
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openKolLinkDialog(chat)}
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change KOL
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Topics Tab — forum topics grouped by parent supergroup */}
+        <TabsContent value="topics" className="mt-4 space-y-4">
+          <TopicsTabContent
+            chats={chats}
+            topics={topics}
+            onTopicRenamed={(chatId, threadId, name) => {
+              setTopics(prev => prev.map(t =>
+                (t.chat_id === chatId && t.message_thread_id === threadId)
+                  ? { ...t, name }
+                  : t,
+              ));
+            }}
+            onRefresh={fetchTopics}
+          />
+        </TabsContent>
+
+        {/* Commands Tab */}
+        <TabsContent value="commands" className="mt-4 space-y-4">
+          {/* Commands Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Bot commands that respond to users ({commands.length} total)
+            </p>
+            <Button variant="brand" onClick={() => openCommandDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Command
+            </Button>
+          </div>
+
+          {/* Commands List */}
+          {loadingCommands ? (
+            <div className="grid gap-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : commands.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Terminal className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  No commands yet
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto mb-4">
+                  Add bot commands that will respond when users type them in Telegram chats.
+                </p>
+                <Button variant="brand" onClick={() => openCommandDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Your First Command
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {commands.map(command => (
+                <Card key={command.id} className={!command.is_active ? 'opacity-60' : ''}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Left: Command Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <code className="text-lg font-semibold text-ink-warm-900 bg-cream-100 px-2 py-0.5 rounded">
+                            /{command.command}
+                          </code>
+                          {command.team_only && (
+                            <StatusBadge tone="brand" size="sm">
+                              <Users className="h-3 w-3 mr-1" />
+                              Team Only
+                            </StatusBadge>
+                          )}
+                          {!command.is_active && (
+                            <Badge variant="secondary" className="text-xs">
+                              Disabled
+                            </Badge>
+                          )}
+                        </div>
+
+                        {command.description && (
+                          <p className="text-sm text-ink-warm-700 mb-2">
+                            {command.description}
+                          </p>
+                        )}
+
+                        <div className="mt-2 p-3 bg-cream-50 rounded-md">
+                          <p className="text-xs font-medium text-ink-warm-500 mb-1">Response:</p>
+                          <p className="text-sm text-ink-warm-700 whitespace-pre-wrap">
+                            {command.response.length > 200
+                              ? command.response.substring(0, 200) + '...'
+                              : command.response}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleCommand(command)}
+                          title={command.is_active ? 'Disable command' : 'Enable command'}
+                        >
+                          {command.is_active ? (
+                            <ToggleRight className="h-5 w-5 text-emerald-600" />
+                          ) : (
+                            <ToggleLeft className="h-5 w-5 text-ink-warm-400" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openCommandDialog(command)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCommand(command)}
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Internal Tab — chats marked as internal team/working chats.
+            Simple compact card list since internal chats don't need
+            Link to Lead / KOL actions. The dropdown menu still gives
+            access to Unmark / Hide / Delete. */}
+        <TabsContent value="internal" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Internal team chats ({internalChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search internal chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredInternalChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Briefcase className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  {internalChats.length === 0 ? 'No internal chats yet' : 'No matching chats'}
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">
+                  {internalChats.length === 0
+                    ? 'Mark a chat as internal from any other tab via the ⋯ menu to track it here.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredInternalChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <Briefcase className="h-4 w-4 text-ink-warm-500 flex-shrink-0" />
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs bg-cream-50">Internal</Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">{renderChatActions(chat)}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Clients Tab — chats linked to clients (post-sale delivery
+            groups, retainer chats, etc). Same compact card pattern as
+            Internal. Dropdown menu still gives access to Change/Unlink
+            via the inline Edit/Unlink buttons. */}
+        <TabsContent value="clients" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Chats linked to clients ({clientChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search clients..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredClientChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <CheckCircle className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">
+                  {clientChats.length === 0 ? 'No client chats yet' : 'No matching chats'}
+                </h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">
+                  {clientChats.length === 0
+                    ? 'Link chats to clients from the Unassigned tab via "Link to Client".'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredClientChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            <h3 className="font-semibold text-ink-warm-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+                          {chat.client && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
+                              <span className="text-sm text-ink-warm-700">
+                                Linked to: <strong>{chat.client.name}</strong>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlinkClient(chat)}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Unlink className="h-4 w-4 mr-1.5" />
+                            Unlink
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openClientLinkDialog(chat)}
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change Client
+                          </Button>
+                          {renderChatActions(chat)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Hidden Tab — soft-hidden chats. Only renders when at least
+            one chat is hidden (the TabsTrigger is conditional on the
+            same check). Same compact card pattern as Internal. */}
+        <TabsContent value="hidden" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-ink-warm-700">
+              Hidden chats ({hiddenChats.length} total) — excluded from every other tab
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400 z-10" />
+                <Input
+                  placeholder="Search hidden chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredHiddenChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <EyeOff className="h-12 w-12 text-ink-warm-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-ink-warm-900 mb-2">No matching hidden chats</h3>
+                <p className="text-ink-warm-500 max-w-md mx-auto">Try a different search term.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredHiddenChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="opacity-75">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <EyeOff className="h-4 w-4 text-ink-warm-400 flex-shrink-0" />
+                            <h3 className="font-semibold text-ink-warm-700 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-warm-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">{renderChatActions(chat)}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Link Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Chat to Opportunity</DialogTitle>
+            <DialogDescription>
+              Connect this Telegram chat to a CRM opportunity to track message activity.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chat</Label>
+              <div className="p-3 bg-cream-50 rounded-md">
+                <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
+                <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="opportunity">Opportunity</Label>
+              <Popover open={opportunityPopoverOpen} onOpenChange={setOpportunityPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={opportunityPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedOpportunityId && selectedOpportunityId !== '__none__'
+                      ? opportunities.find(opp => opp.id === selectedOpportunityId)?.name
+                      : selectedOpportunityId === '__none__'
+                        ? 'No link (unlink)'
+                        : 'Select an opportunity...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search opportunities..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No opportunity found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => {
+                            setSelectedOpportunityId('__none__');
+                            setOpportunityPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedOpportunityId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
+                          <span className="text-ink-warm-500">No link (unlink)</span>
+                        </CommandItem>
+                        {opportunities.map(opp => (
+                          <CommandItem
+                            key={opp.id}
+                            value={opp.name}
+                            onSelect={() => {
+                              setSelectedOpportunityId(opp.id);
+                              setOpportunityPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedOpportunityId === opp.id ? 'opacity-100' : 'opacity-0'}`} />
+                            {opp.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-ink-warm-500">
+                This will also update the opportunity's Telegram Chat ID field.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleLink} disabled={linking}>
+              {linking ? 'Saving...' : (selectedOpportunityId && selectedOpportunityId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* KOL Link Dialog */}
+      <Dialog open={kolLinkDialogOpen} onOpenChange={setKolLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Chat to KOL</DialogTitle>
+            <DialogDescription>
+              Connect this Telegram chat to a KOL to track conversations with them.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chat</Label>
+              <div className="p-3 bg-cream-50 rounded-md">
+                <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
+                <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="kol">KOL</Label>
+              <Popover open={kolPopoverOpen} onOpenChange={setKolPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={kolPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedKolId && selectedKolId !== '__none__'
+                      ? masterKOLs.find(kol => kol.id === selectedKolId)?.name
+                      : selectedKolId === '__none__'
+                        ? 'No link (unlink)'
+                        : 'Select a KOL...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search KOLs..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No KOL found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => {
+                            setSelectedKolId('__none__');
+                            setKolPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedKolId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
+                          <span className="text-ink-warm-500">No link (unlink)</span>
+                        </CommandItem>
+                        {masterKOLs.map(kol => (
+                          <CommandItem
+                            key={kol.id}
+                            value={kol.name}
+                            onSelect={() => {
+                              setSelectedKolId(kol.id);
+                              setKolPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedKolId === kol.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <div className="flex items-center gap-2">
+                              <span>{kol.name}</span>
+                              {kol.platform && kol.platform.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  {kol.platform.map((p, i) => (
+                                    <span key={i} title={p}>{getPlatformIcon(p)}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-ink-warm-500">
+                Link this chat to a KOL to track your conversations with them.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setKolLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleLinkKol} disabled={linking}>
+              {linking ? 'Saving...' : (selectedKolId && selectedKolId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* KOL welcome-message confirm — fires the first time an unassigned
+          chat is linked to a KOL. Mirrors the payment-notification popup. */}
+      <KolWelcomeDialog
+        open={welcomeDialogOpen}
+        onOpenChange={setWelcomeDialogOpen}
+        kolName={welcomeKolName}
+        chatTitle={welcomeChat?.title}
+        message={welcomeMessage}
+        onMessageChange={setWelcomeMessage}
+        sending={sendingWelcome}
+        onSend={sendKolWelcome}
+        onSkip={skipKolWelcome}
+      />
+
+      {/* Client Link Dialog — same shape as the opportunity / KOL link
+          dialogs. Popover + Command for searchable picker, "__none__"
+          sentinel = unlink. */}
+      <Dialog open={clientLinkDialogOpen} onOpenChange={setClientLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Chat to Client</DialogTitle>
+            <DialogDescription>
+              Connect this Telegram chat to a client (e.g. delivery group, retainer chat).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chat</Label>
+              <div className="p-3 bg-cream-50 rounded-md">
+                <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
+                <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="client">Client</Label>
+              <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={clientPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedClientId && selectedClientId !== '__none__'
+                      ? clientsList.find(c => c.id === selectedClientId)?.name
+                      : selectedClientId === '__none__'
+                        ? 'No link (unlink)'
+                        : 'Select a client...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search clients..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No client found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => {
+                            setSelectedClientId('__none__');
+                            setClientPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedClientId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
+                          <span className="text-ink-warm-500">No link (unlink)</span>
+                        </CommandItem>
+                        {clientsList.map(c => (
+                          <CommandItem
+                            key={c.id}
+                            value={c.name}
+                            onSelect={() => {
+                              setSelectedClientId(c.id);
+                              setClientPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedClientId === c.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <span>{c.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-ink-warm-500">
+                Pick the client this chat belongs to. Archived clients are excluded.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setClientLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleLinkClient} disabled={linking}>
+              {linking ? 'Saving...' : (selectedClientId && selectedClientId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Command Dialog (Add/Edit) */}
+      <Dialog open={commandDialogOpen} onOpenChange={setCommandDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{editingCommand ? 'Edit Command' : 'Add Command'}</DialogTitle>
+            <DialogDescription>
+              {editingCommand
+                ? 'Update the command and its response.'
+                : 'Create a new bot command. Users can trigger it by typing /<command> in any chat where the bot is present.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="command">Command</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-ink-warm-500">/</span>
+                <Input
+                  id="command"
+                  placeholder="help"
+                  value={commandForm.command}
+                  onChange={(e) => setCommandForm({ ...commandForm, command: e.target.value })}
+                  className="focus-brand flex-1"
+                />
+              </div>
+              <p className="text-xs text-ink-warm-500">
+                Lowercase letters only, no spaces. e.g., help, info, support
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Input
+                id="description"
+                placeholder="Shows help information"
+                value={commandForm.description}
+                onChange={(e) => setCommandForm({ ...commandForm, description: e.target.value })}
+                className="focus-brand"
+              />
+              <p className="text-xs text-ink-warm-500">
+                A short description of what this command does.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="image_url">Image URL (Optional)</Label>
+              <Input
+                id="image_url"
+                placeholder="https://example.com/image.jpg"
+                value={commandForm.image_url}
+                onChange={(e) => setCommandForm({ ...commandForm, image_url: e.target.value })}
+                className="focus-brand"
+              />
+              <p className="text-xs text-ink-warm-500">
+                If set, the image will appear above the response text.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="response">Response</Label>
+              <Textarea
+                id="response"
+                placeholder="Welcome! Here's how to get help..."
+                value={commandForm.response}
+                onChange={(e) => setCommandForm({ ...commandForm, response: e.target.value })}
+                rows={5}
+                className="focus-brand"
+              />
+              <p className="text-xs text-ink-warm-500">
+                The message the bot will send when this command is used. Supports HTML formatting.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="team_only" className="text-sm font-medium">Team Only</Label>
+                <p className="text-xs text-ink-warm-500">
+                  Only team members can use this command
+                </p>
+              </div>
+              <Switch
+                id="team_only"
+                checked={commandForm.team_only}
+                onCheckedChange={(checked) => setCommandForm({ ...commandForm, team_only: checked })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setCommandDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleSaveCommand} disabled={savingCommand}>
+              {savingCommand ? 'Saving...' : editingCommand ? 'Update Command' : 'Add Command'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Message Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+            <DialogDescription>
+              {chatToMessage?.master_kol
+                ? `Send a message to ${chatToMessage.master_kol.name} via ${chatToMessage.title || 'Telegram'}`
+                : `Send a message to ${chatToMessage?.title || 'this chat'}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="message">Message</Label>
+              <Textarea
+                id="message"
+                placeholder="Type your message here..."
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                rows={5}
+                className="focus-brand resize-none"
+              />
+              {chatToMessage && (
+                <p className="text-xs text-ink-warm-500">
+                  Will be sent to: {chatToMessage.title || `Chat ${chatToMessage.chat_id}`}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button
+              variant="outline"
+              onClick={() => setMessageDialogOpen(false)}
+              disabled={sendingMessage}
+            >
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={handleSendMessage} disabled={sendingMessage || !messageContent.trim()}>
+              {sendingMessage ? 'Sending...' : 'Send Message'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Chat dialog — chatroom-style read-only view of all
+          messages stored for a chat. Team messages sit right with
+          brand-soft bubbles; external messages sit left with cream
+          bubbles; bot messages use a slim outlined bubble. Auto-
+          scrolls to bottom on open via the chatBodyRef effect above.
+          Capped at 500 messages (LIMIT in handleViewChat). 2026-06-05. */}
+      <Dialog
+        open={!!viewingChat}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingChat(null);
+            setViewingChatMessages([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-brand" />
+              {viewingChat?.title || 'Untitled Chat'}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingChat ? (
+                <>
+                  {viewingChat.chat_type === 'private'
+                    ? 'Direct message'
+                    : viewingChat.chat_type === 'supergroup'
+                      ? 'Supergroup'
+                      : 'Group chat'}
+                  {' · '}
+                  {viewingChatLoading
+                    ? 'Loading messages…'
+                    : `${viewingChatMessages.length} message${viewingChatMessages.length === 1 ? '' : 's'}`}
+                  {viewingChatMessages.length >= 500 && ' (showing newest 500)'}
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            ref={chatBodyRef}
+            className="flex-1 overflow-y-auto px-1 py-3 space-y-2 bg-cream-50/40 rounded-md"
+          >
+            {viewingChatLoading ? (
+              <div className="space-y-4 py-4 px-3">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const right = i % 3 === 0;
+                  return (
+                    <div key={i} className={`flex items-end gap-2 ${right ? 'flex-row-reverse' : ''}`}>
+                      <Skeleton className="h-7 w-7 rounded-full shrink-0" />
+                      <div className={`flex flex-col gap-1 ${right ? 'items-end' : 'items-start'}`}>
+                        <Skeleton className="h-2.5 w-20" />
+                        <Skeleton className={`h-9 rounded-2xl ${i % 2 === 0 ? 'w-56' : 'w-40'}`} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : viewingChatMessages.length === 0 ? (
+              <EmptyState
+                icon={MessageCircle}
+                title="No messages yet"
+                description="The bot only records messages it can see. Make sure it's a member of this chat."
+              />
+            ) : (() => {
+              // ─── Refined chat renderer ─────────────────────────────
+              // - Date separators (Today / Yesterday / Mon, Jun 2) when
+              //   the day changes between consecutive messages
+              // - Sender blocks: avatar + name + timestamp on the first
+              //   message of a block; subsequent messages tuck under
+              //   with no header so consecutive messages from the same
+              //   person read as one thought
+              // - Bubble palette: brand-soft for team (right), white +
+              //   cream border for external (left), amber-tint for bot
+              // - Asymmetric corner rounding on the bubble facing the
+              //   speaker (iMessage / Telegram convention)
+              const initialsOf = (name: string | null | undefined): string => {
+                if (!name) return '?';
+                const parts = name.trim().split(/\s+/).filter(Boolean);
+                if (parts.length === 0) return '?';
+                if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+              };
+              const isSameDay = (a: Date, b: Date) =>
+                a.getFullYear() === b.getFullYear() &&
+                a.getMonth() === b.getMonth() &&
+                a.getDate() === b.getDate();
+              const formatDateSeparator = (date: Date): string => {
+                const now = new Date();
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                if (isSameDay(date, now)) return 'Today';
+                if (isSameDay(date, yesterday)) return 'Yesterday';
+                return formatDate(date);
+              };
+              const formatTime = (date: Date): string =>
+                date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+              const rendered: React.ReactNode[] = [];
+              let lastDateKey: string | null = null;
+              viewingChatMessages.forEach((msg, idx) => {
+                const isBot = msg.from_username === 'holo_hive_bot' || msg.from_user_name === 'Holo Hive Bot';
+                const fromId = msg.from_user_id;
+                const isTeam = !isBot && !!fromId && teamTelegramIds.has(fromId);
+                const isRight = isTeam || isBot;
+
+                const ts = msg.message_date ? new Date(msg.message_date) : null;
+                const validTs = ts && !isNaN(ts.getTime()) ? ts : null;
+
+                // Day separator — emit when the date changes vs. the
+                // previous rendered message (or always for the first).
+                if (validTs) {
+                  const dateKey = validTs.toDateString();
+                  if (dateKey !== lastDateKey) {
+                    rendered.push(
+                      <div key={`sep-${msg.id}`} className="flex items-center gap-3 my-4">
+                        <div className="flex-1 h-px bg-cream-200" />
+                        <span className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500">
+                          {formatDateSeparator(validTs)}
+                        </span>
+                        <div className="flex-1 h-px bg-cream-200" />
+                      </div>
+                    );
+                    lastDateKey = dateKey;
+                  }
+                }
+
+                // Sender block detection — first message of a run
+                // when the previous message was from a different person
+                // (or 30+ minutes earlier, so a long pause re-shows the
+                // header to anchor context).
+                const prev = idx > 0 ? viewingChatMessages[idx - 1] : null;
+                const prevTs = prev?.message_date ? new Date(prev.message_date) : null;
+                const sameAuthor = prev && prev.from_user_id === msg.from_user_id && prev.from_username === msg.from_username;
+                const longGap = prevTs && validTs && (validTs.getTime() - prevTs.getTime() > 30 * 60 * 1000);
+                const isFirstOfBlock = !sameAuthor || !!longGap;
+
+                const senderName = msg.from_user_name || msg.from_username || 'Unknown';
+                const initials = initialsOf(senderName);
+
+                rendered.push(
+                  <div key={msg.id} className={`flex items-end gap-2 ${isRight ? 'flex-row-reverse' : ''} ${isFirstOfBlock ? 'mt-3' : 'mt-0.5'}`}>
+                    {/* Avatar — shown only on first message of a block.
+                        Subsequent messages get a transparent placeholder
+                        to keep horizontal alignment. */}
+                    {isFirstOfBlock ? (
+                      isBot ? (
+                        <div className="w-7 h-7 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+                          <Bot className="h-3.5 w-3.5 text-amber-700" />
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                            isTeam
+                              ? 'bg-brand text-white'
+                              : 'bg-cream-200 text-ink-warm-700'
+                          }`}
+                          title={senderName}
+                        >
+                          {initials}
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-7 shrink-0" aria-hidden />
+                    )}
+                    <div className={`flex flex-col ${isRight ? 'items-end' : 'items-start'} max-w-[78%]`}>
+                      {isFirstOfBlock && (
+                        <div className={`flex items-center gap-1.5 mb-0.5 px-0.5 text-[11px] ${isRight ? 'flex-row-reverse' : ''}`}>
+                          <span className="font-semibold text-ink-warm-900">{senderName}</span>
+                          {validTs && (
+                            <span className="text-ink-warm-400">· {formatTime(validTs)}</span>
+                          )}
+                        </div>
+                      )}
+                      <div
+                        className={`px-3.5 py-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
+                          isBot
+                            ? `bg-amber-50 border border-amber-200 text-amber-900 ${isFirstOfBlock ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'}`
+                            : isRight
+                              ? `bg-brand-soft text-brand-deep ${isFirstOfBlock ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'}`
+                              : `bg-white border border-cream-200 text-ink-warm-900 ${isFirstOfBlock ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl'}`
+                        }`}
+                        // Hover shows the exact timestamp for any
+                        // message — useful for buried mid-block messages
+                        // that don't have an inline label.
+                        title={validTs ? formatDateTime(validTs) : undefined}
+                      >
+                        {msg.text || <span className="italic text-ink-warm-400">(empty message)</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+              return rendered;
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete chat confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in handleDeleteChat.
+          The row gets recreated if the chat sends a new message —
+          surface that caveat in the body. 2026-06-05. */}
+      <Dialog open={!!deleteChatPending} onOpenChange={(open) => { if (!open) setDeleteChatPending(null); }}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Chat?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>{deleteChatPending?.title || deleteChatPending?.chat_id || ''}</strong> will be removed from telegram_chats. The row will be recreated if the chat sends a new message — use Hide if you want it gone for good.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteChatPending(null)} disabled={deletingChat}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteChat} disabled={deletingChat}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingChat ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete command confirm — v11 destructive Dialog replacing the
+          native confirm() that used to live in handleDeleteCommand.
+          2026-06-05. */}
+      <Dialog open={!!deleteCommandPending} onOpenChange={(open) => { if (!open) setDeleteCommandPending(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Command?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              <strong>/{deleteCommandPending?.command ?? ''}</strong> will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeleteCommandPending(null)} disabled={deletingCommand}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteCommand} disabled={deletingCommand}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              {deletingCommand ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Topics tab ──────────────────────────────────────────────────────
+// Groups every visible forum topic under its parent supergroup. Supports
+// inline rename so names can be set without waiting for a fresh message
+// to flow through the webhook auto-capture path. Mirrors the rename
+// pattern from components/telegram/ChatThreadPicker.tsx.
+
+type TopicRow = {
+  id: string;
+  chat_id: string;
+  message_thread_id: number;
+  name: string | null;
+  last_seen_at: string;
+};
+
+function TopicsTabContent({
+  chats, topics, onTopicRenamed, onRefresh,
+}: {
+  chats: TelegramChat[];
+  topics: TopicRow[];
+  onTopicRenamed: (chatId: string, threadId: number, name: string) => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState('');
+  const [editKey, setEditKey] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const chatByChatId = useMemo(() => {
+    const m = new Map<string, TelegramChat>();
+    for (const c of chats) m.set(c.chat_id, c);
+    return m;
+  }, [chats]);
+
+  // Group topics by parent chat. Filter chats with at least one topic.
+  const groups = useMemo(() => {
+    const map = new Map<string, TopicRow[]>();
+    for (const t of topics) {
+      const arr = map.get(t.chat_id) || [];
+      arr.push(t);
+      map.set(t.chat_id, arr);
+    }
+    // Sort each chat's topics by last_seen_at desc
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (b.last_seen_at || '').localeCompare(a.last_seen_at || ''));
+    }
+    // Build [chat, topics][] entries sorted by chat title
+    return Array.from(map.entries())
+      .map(([chatId, ts]) => ({ chat: chatByChatId.get(chatId), chatId, topics: ts }))
+      .sort((a, b) => {
+        const at = (a.chat?.title || a.chatId).toLowerCase();
+        const bt = (b.chat?.title || b.chatId).toLowerCase();
+        return at.localeCompare(bt);
+      });
+  }, [topics, chatByChatId]);
+
+  const filteredGroups = useMemo(() => {
+    if (!search.trim()) return groups;
+    const q = search.toLowerCase();
+    return groups
+      .map(g => ({
+        ...g,
+        topics: g.topics.filter(t =>
+          (t.name || '').toLowerCase().includes(q)
+          || String(t.message_thread_id).includes(q)
+          || (g.chat?.title || '').toLowerCase().includes(q)
+          || g.chatId.includes(q),
+        ),
+      }))
+      .filter(g => g.topics.length > 0);
+  }, [groups, search]);
+
+  const startRename = (chatId: string, threadId: number, currentName: string | null) => {
+    setEditKey(`${chatId}:${threadId}`);
+    setRenameValue(currentName || '');
+  };
+  const cancelRename = () => { setEditKey(null); setRenameValue(''); };
+  const saveRename = async (chatId: string, threadId: number) => {
+    const name = renameValue.trim();
+    if (!name) { cancelRename(); return; }
+    setSaving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_threads')
+        .update({ name })
+        .eq('chat_id', chatId)
+        .eq('message_thread_id', threadId);
+      if (error) {
+        toast({ title: 'Rename failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      onTopicRenamed(chatId, threadId, name);
+      cancelRename();
+      toast({ title: 'Topic renamed', description: name });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await onRefresh();
+      toast({ title: 'Refreshed', description: `${topics.length} topic${topics.length === 1 ? '' : 's'} loaded.` });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const relative = (iso: string | null) => iso ? formatRelativeShort(iso) : '—';
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-ink-warm-700 text-sm">
+          Forum topics tracked across every supergroup — {topics.length} topic{topics.length === 1 ? '' : 's'} across {groups.length} chat{groups.length === 1 ? '' : 's'}.
+          {' '}
+          <span className="text-xs text-ink-warm-500">
+            Click the pencil to set a topic name. New topic names also auto-capture via the bot when anyone posts in them.
+          </span>
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 text-ink-warm-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              placeholder="Search topics or chats…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="focus-brand h-8 text-sm pl-7 w-[240px]"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="h-8 text-xs"
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {filteredGroups.length === 0 ? (
+        <Card className="border-cream-200">
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Hash}
+              title={topics.length === 0 ? 'No topics tracked yet' : 'No matches'}
+              description={topics.length === 0
+                ? 'Topics appear here as the bot sees messages in forum supergroups. Make sure the bot is in the group.'
+                : 'Try a different search term.'}
+              className="py-10"
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredGroups.map(g => {
+            const chatTitle = g.chat?.title || `Chat ${g.chatId}`;
+            const chatType = g.chat?.chat_type;
+            return (
+              <Card key={g.chatId} className="border-cream-200 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-cream-100 bg-cream-50/30 flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-brand" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-ink-warm-900 truncate">{chatTitle}</p>
+                    <p className="text-[10px] text-ink-warm-500 font-mono truncate">
+                      {g.chatId}
+                      {chatType && <span className="ml-2">· {chatType}</span>}
+                    </p>
+                  </div>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-light text-brand font-semibold tabular-nums">
+                    {g.topics.length} topic{g.topics.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <ul className="divide-y divide-cream-100">
+                  {g.topics.map(t => {
+                    const key = `${t.chat_id}:${t.message_thread_id}`;
+                    const isEditing = editKey === key;
+                    const hasName = !!t.name;
+                    return (
+                      <li key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-cream-50/40 group">
+                        <Hash className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') { e.preventDefault(); saveRename(t.chat_id, t.message_thread_id); }
+                                  else if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+                                }}
+                                placeholder={`Topic ${t.message_thread_id}`}
+                                className="h-7 text-sm focus-brand"
+                                autoFocus
+                                disabled={saving}
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50"
+                                onClick={() => saveRename(t.chat_id, t.message_thread_id)}
+                                disabled={saving}
+                                title="Save"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-ink-warm-400 hover:bg-cream-100"
+                                onClick={cancelRename}
+                                disabled={saving}
+                                title="Cancel"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <p className={`text-sm truncate ${hasName ? 'text-ink-warm-900 font-medium' : 'text-ink-warm-500 italic'}`}>
+                                {t.name || `Topic ${t.message_thread_id}`}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => startRename(t.chat_id, t.message_thread_id, t.name)}
+                                className={`p-0.5 rounded hover:bg-cream-100 text-ink-warm-400 hover:text-brand transition-opacity ${hasName ? 'opacity-0 group-hover:opacity-100' : 'opacity-60 hover:opacity-100'}`}
+                                title={hasName ? 'Rename topic' : 'Add topic name'}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                          <p className="text-[10px] text-ink-warm-500 font-mono">
+                            topic #{t.message_thread_id} · last seen {relative(t.last_seen_at)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

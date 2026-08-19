@@ -108,14 +108,16 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // backing tables are mindshare_* and the metric is still mindshare.
   { href: '/mindshare', label: 'Korea Signal', icon: TrendingUp, section: 'Measurement', requiredRole: 'admin' },
   { href: '/intelligence/client-watch', label: 'Client Watch', icon: Radar, section: 'Measurement', requiredRole: 'admin' },
-  { href: '/intelligence/telegram', label: 'Telegram Ops', icon: Send, section: 'Measurement', requiredRole: 'admin' },
   { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Measurement', requiredRole: 'admin' },
 
   // Logistics — Submissions + Meetings + TG Chats + Forms.
   // Reminders lives on the Telegram page's Reminders tab, so it has no
   // top-level NavItem and therefore no registry entry [2026-08-18].
   { href: '/crm/submissions', label: 'Submissions', icon: Inbox, section: 'Logistics', pageKey: '/crm/submissions' },
-  { href: '/crm/telegram', label: 'TG Chats', icon: MessageSquare, section: 'Logistics', requiredRole: 'super_admin' },
+  // [2026-08-19] /crm/telegram folded into the Telegram page and now
+  // redirects, so it is off the registry — a toggle there would control a
+  // route that no longer renders anything of its own.
+  { href: '/intelligence/telegram', label: 'Telegram', icon: Send, section: 'Logistics', requiredRole: 'admin' },
   { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Logistics', requiredRole: 'admin' },
 
   // Admin Tools — combines Field Options + Claude MCP into one tabbed

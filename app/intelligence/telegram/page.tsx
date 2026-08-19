@@ -27,6 +27,7 @@ import { Send, Activity, KeyRound, Database, AlertTriangle, CheckCircle2, Radio 
 // is no longer the only way in, and Admin goes back to field options + tags.
 import TelegramCommPage from '@/app/admin/telegram-comm/page';
 import { RemindersManager } from '@/components/telegram/RemindersManager';
+import { ChatsManager } from '@/components/telegram/ChatsManager';
 
 type Feed = {
   key: string; label: string; via: string; rows: number;
@@ -73,10 +74,40 @@ const KIND_TONE: Record<string, BadgeTone> = {
   official: 'info', unknown: 'neutral',
 };
 
+// The two access modes. Membership is the rule, not subject matter: a bot
+// tab is somewhere the bot is a member and can write; a reader tab is a
+// channel we read from outside and cannot post to. Overview sits above both
+// because it answers "is any of this running" for the whole layer.
+const GROUPS = [
+  { id: 'overview', label: 'Overview', hint: 'is the layer running',
+    tabs: [{ id: 'overview', label: 'Overview' }] },
+  { id: 'bot', label: 'Bot', hint: 'chats we are inside',
+    tabs: [
+      { id: 'chats', label: 'Chats' },
+      { id: 'topics', label: 'Topics' },
+      { id: 'routes', label: 'Routes' },
+      { id: 'commands', label: 'Commands' },
+      { id: 'reminders', label: 'Reminders' },
+    ] },
+  { id: 'reader', label: 'Reader', hint: 'channels we read from outside',
+    tabs: [
+      { id: 'registry', label: 'Registry' },
+      { id: 'runs', label: 'Runs' },
+      { id: 'accounts', label: 'Accounts' },
+    ] },
+] as const;
+
 const FEED_TONE: Record<string, BadgeTone> = { fresh: 'success', stale: 'danger', never: 'neutral' };
 const FEED_LABEL: Record<string, string> = { fresh: 'Producing', stale: 'Stopped', never: 'Never run' };
 
 export default function TelegramOpsPage() {
+  // ?tab= is honoured because /crm/telegram redirects here with it — an old
+  // TG Chats bookmark should land on Chats, not on Overview.
+  const [tab, setTab] = useState('overview');
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get('tab');
+    if (want && GROUPS.some(g => g.tabs.some(t => t.id === want))) setTab(want);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<{ feeds: Feed[]; runs: Run[]; accounts: Account[]; commands?: Command[]; budget?: Budget[] } | null>(null);
   // The registry — v7 § Telegram puts it on this page, not under
@@ -121,6 +152,7 @@ export default function TelegramOpsPage() {
   const feeds = data?.feeds ?? [];
   const runs = data?.runs ?? [];
   const accounts = data?.accounts ?? [];
+  const activeGroup = GROUPS.find(g => g.tabs.some(t => t.id === tab)) ?? GROUPS[0];
   const stopped = feeds.filter(f => f.status === 'stale');
   const failingJobs = runs.filter(r => r.last_status === 'failed');
 
@@ -137,15 +169,36 @@ export default function TelegramOpsPage() {
         <KpiCard icon={Database} label="Corpus rows" value={(feeds.find(f => f.key === 'corpus')?.rows ?? 0).toLocaleString('en-US')} sub="tg_channel_posts" accent="sky" />
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="routes">Routes</TabsTrigger>
-          <TabsTrigger value="reminders">Reminders</TabsTrigger>
-          <TabsTrigger value="registry">Registry</TabsTrigger>
-          <TabsTrigger value="commands">Commands</TabsTrigger>
-          <TabsTrigger value="runs">Runs</TabsTrigger>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
+      {/* Nine tabs, grouped by access mode — Jdot 2026-08-19: "group by
+          access mode, which is the split that actually explains Telegram to
+          anyone new". Bot is what we are inside and can post to; Reader is
+          what we read from the outside and cannot. He weighed a 3/3/3 split
+          by activity (monitor / configure / data) and rejected it: it
+          balances better but mixes bot chats with read channels, and that
+          distinction is the one people need to hold. */}
+      <Tabs value={tab} onValueChange={setTab}>
+        <div className="flex flex-wrap items-center gap-2">
+          {GROUPS.map(g => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => setTab(g.tabs[0].id)}
+              className={`h-8 rounded-md px-3 text-xs font-semibold uppercase tracking-wider transition-colors ${
+                g.id === activeGroup.id
+                  ? 'bg-brand text-white'
+                  : 'bg-cream-100 text-ink-warm-500 border border-cream-200 hover:text-brand'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+          <span className="text-xs text-ink-warm-400">{activeGroup.hint}</span>
+        </div>
+
+        <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 mt-2 flex-wrap">
+          {activeGroup.tabs.map(t => (
+            <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -201,56 +254,27 @@ export default function TelegramOpsPage() {
           <RemindersManager embedded />
         </TabsContent>
 
-        {/* Commands — v7 § "Slash commands: over chats, never over the
-            registry". That distinction is the point of the section: the bot
-            acts on chats and tasks, never on the channel list, so nothing
-            here can change what the Registry tab shows. Read-only; the
-            editable copy lives in telegram_commands. */}
-        <TabsContent value="commands" className="mt-4">
-          <Card className="border-cream-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Command</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Does</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Where</TableHead>
-                    <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">State</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(data?.commands ?? []).map(c => (
-                    <TableRow key={c.command} className={`border-gray-100 ${c.active ? '' : 'opacity-55'}`}>
-                      <TableCell className="py-3 font-mono text-xs font-medium text-ink-warm-900 whitespace-nowrap">/{c.command}</TableCell>
-                      <TableCell className="py-3 text-xs text-ink-warm-600 max-w-md">
-                        {c.description || <span className="text-ink-warm-300">—</span>}
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <StatusBadge tone={c.where === 'HQ chats' ? 'slate' : 'brand'} size="sm">{c.where}</StatusBadge>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <StatusBadge tone={c.active ? 'success' : 'neutral'} size="sm">{c.active ? 'Live' : 'Off'}</StatusBadge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-          <p className="text-xs text-ink-warm-400 mt-3">
-            Where is the audience gate, not a location: HQ-chat commands refuse to answer a
-            KOL and vice versa. <span className="font-mono">/flag</span> is the one command in
-            the v7 mockup that was never built — everything else it lists as planned is live,
-            and <span className="font-mono">/done</span>, <span className="font-mono">/repost</span>,{' '}
-            <span className="font-mono">/wallet</span> and <span className="font-mono">/req</span> shipped after it was drawn.
-          </p>
+        {/* Chats and Topics, moved off /crm/telegram. Eight chat filters
+            keep their own strip inside this tab — they are views of one
+            list, not eight destinations. */}
+        <TabsContent value="chats" className="mt-4">
+          <ChatsManager view="chats" />
         </TabsContent>
 
-        {/* Registry — the channel list behind every mindshare and coverage
-            number. Read-only here on purpose: the same rule as the health
-            alerts, one surface reports and another edits. Sorted silent-
-            first because a registry read top-down by post count buries the
-            only rows that need a decision. */}
+        <TabsContent value="topics" className="mt-4">
+          <ChatsManager view="topics" />
+        </TabsContent>
+
+        {/* Commands — v7 § "Slash commands: over chats, never over the
+            registry". The bot acts on chats and tasks, never on the channel
+            list, so nothing here can change what Registry shows.
+            [2026-08-19] This is the editable command surface from
+            /crm/telegram, not the read-only table that used to sit here —
+            folding the two pages had to keep the one that can edit. */}
+        <TabsContent value="commands" className="mt-4">
+          <ChatsManager view="commands" />
+        </TabsContent>
+
         <TabsContent value="registry" className="mt-4">
           {channels === null ? (
             <Skeleton className="h-64 rounded-lg" />

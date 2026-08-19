@@ -298,17 +298,24 @@ export default function Sidebar({ children }: SidebarProps) {
       kols:        ['/kols', '/lists'],
       crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
-      measurement: ['/mindshare', '/intelligence/client-watch', '/intelligence/telegram', '/wallets'],
-      logistics:   ['/crm/submissions', '/crm/telegram', '/forms'],
+      measurement: ['/mindshare', '/intelligence/client-watch', '/wallets'],
+      logistics:   ['/crm/submissions', '/crm/telegram', '/intelligence/telegram', '/forms'],
       admin:       ['/admin', '/archive'],
     };
 
     // Find which section (if any) owns the current path.
+    // Longest matching prefix wins, not the first one declared. With
+    // first-match, crm's '/intelligence' swallowed '/intelligence/telegram'
+    // and '/intelligence/client-watch', so those pages expanded CRM and left
+    // their own section collapsed.
     let owningSection: string | null = null;
+    let bestLen = -1;
     for (const [id, prefixes] of Object.entries(SECTION_PREFIXES)) {
-      if (prefixes.some(p => pathname.startsWith(p))) {
-        owningSection = id;
-        break;
+      for (const p of prefixes) {
+        if (pathname.startsWith(p) && p.length > bestLen) {
+          owningSection = id;
+          bestLen = p.length;
+        }
       }
     }
 
@@ -825,7 +832,6 @@ export default function Sidebar({ children }: SidebarProps) {
                 <CollapsibleSection id="measurement" icon={TrendingUp}>
                   {canSeePage("/mindshare") && <NavItem href="/mindshare" icon={TrendingUp} label="Korea Signal" />}
                   {canSeePage("/intelligence/client-watch") && <NavItem href="/intelligence/client-watch" icon={Radar} label="Client Watch" />}
-                  {canSeePage("/intelligence/telegram") && <NavItem href="/intelligence/telegram" icon={Send} label="Telegram Ops" />}
                   {/* [Wallet Analytics v1, May 2026] Admin-only campaign-
                       participant intelligence — imported from the
                       Data Bank xlsx (1,197 wallets). */}
@@ -856,7 +862,16 @@ export default function Sidebar({ children }: SidebarProps) {
                       CLAUDE.md, a route with no NavItem is also removed from
                       the SidebarCustomize registry, so the customize dialog
                       does not offer a toggle that controls nothing. */}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" dot={unassignedTgCount > 0} />}
+                  {/* [2026-08-19] TG Chats and Telegram Ops were the same
+                      subject behind two entries; /crm/telegram is folded in
+                      and redirects. Jdot on the merged page: "/intelligence/
+                      telegram reads like Telegram belongs to Intelligence. It
+                      doesn't — Intelligence is sales and this is ops." The URL
+                      stays (it is in bookmarks and TG links); the nav entry
+                      moves here, to the bucket for things that need to happen.
+                      The unassigned-chat dot comes along — it is the only
+                      count in this section that means someone must act. */}
+                  {canSeePage("/intelligence/telegram") && <NavItem href="/intelligence/telegram" icon={Send} label="Telegram" dot={unassignedTgCount > 0} />}
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && canSeePage("/forms") && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                 </CollapsibleSection>
               )}
