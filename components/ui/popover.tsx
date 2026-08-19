@@ -9,11 +9,24 @@ const Popover = PopoverPrimitive.Root;
 
 const PopoverTrigger = PopoverPrimitive.Trigger;
 
+/**
+ * `container` forwards to the Radix portal.
+ *
+ * Default is document.body, which breaks one specific case: a popover opened
+ * from inside a modal Dialog. Radix locks scrolling while a modal is open and
+ * only exempts the dialog's own subtree, so a popover portalled to the body
+ * sits outside that exemption and its wheel events are swallowed — the
+ * content renders, and nothing scrolls. Pass the dialog element as
+ * `container` and the popover is inside the exemption again, while still
+ * escaping any overflow-hidden ancestor the way a portal should.
+ */
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'center', sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
+    container?: HTMLElement | null;
+  }
+>(({ className, align = 'center', sideOffset = 4, container, ...props }, ref) => (
+  <PopoverPrimitive.Portal container={container ?? undefined}>
     <PopoverPrimitive.Content
       ref={ref}
       align={align}

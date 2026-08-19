@@ -1419,6 +1419,13 @@ export default function KOLsPage() {
                     // strong signal of an in-house relationship.
                     // Doesn't overwrite an existing agency assignment
                     // (CryptoCrowd, Qube, KGen, R3ACH, Reverse).
+                    //
+                    // [2026-08-19] The rule now also lives in a trigger
+                    // (master_kols_group_chat_in_house), because only this
+                    // dropdown ran it — bulk edit and the importer did not,
+                    // and four KOLs had ended up with group chat and no
+                    // in_house at all. This copy stays for the optimistic
+                    // paint; the database is what guarantees it.
                     const cascadeInHouse =
                       field === 'group_chat'
                       && boolValue

@@ -81,8 +81,27 @@ type BudgetClient = {
   budget_source: 'engagement_terms' | 'allocations' | 'campaign_total' | 'none';
   term_count: number;
   spent: number; remaining: number; pct_used: number | null;
-  campaigns: Array<{ campaign_id: string; campaign_name: string; spent: number; paid_count: number }>;
+  unpaid_count: number; unpaid_amount: number;
+  campaigns: Array<{
+    campaign_id: string; campaign_name: string; spent: number; paid_count: number;
+    unpaid_count: number; unpaid_amount: number;
+  }>;
 };
+
+/**
+ * The one thing in this dialog that needs chasing today. A count is easy to
+ * read past in a list of twelve clients; a dot is not, which is the whole
+ * point of putting it beside the name.
+ */
+function AttentionDot({ title }: { title: string }) {
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className="inline-block h-2 w-2 rounded-full bg-rose-500 flex-shrink-0"
+    />
+  );
+}
 
 /** Same tones the Lineup Manager uses, so a week reads identically in both. */
 const STAGE_TONE: Record<string, BadgeTone> = {
@@ -345,6 +364,9 @@ export function AllClientsRollupDialog({
                 <div key={b.client_id}>
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-sm font-semibold text-ink-warm-900">{b.client_name}</h3>
+                    {b.unpaid_count > 0 && (
+                      <AttentionDot title={`${b.unpaid_count} unpaid payment${b.unpaid_count === 1 ? '' : 's'} · ${money(b.unpaid_amount)}`} />
+                    )}
                     {/* Where the budget came from. A client on engagement terms
                         is the normal case; anything else is worth noticing,
                         because it means nobody has recorded the contract. */}
@@ -398,35 +420,68 @@ export function AllClientsRollupDialog({
 
                     {/* Spend split by campaign. Only shown when there's more
                         than one — for a single-campaign client the split is
-                        the total again, and the row adds nothing. */}
-                    {b.campaigns.length > 1 && (
+                        the total again, and the row adds nothing.
+
+                        [2026-08-19, Andy] While anything is unpaid, this lists
+                        only the campaigns that owe money — that is the reason
+                        anyone opens this dialog. Once a client is fully paid
+                        there is nothing to chase, so it falls back to the full
+                        split rather than rendering an empty table. */}
+                    {(() => {
+                      const owing = b.campaigns.filter(c => c.unpaid_count > 0);
+                      const rows = owing.length > 0 ? owing : b.campaigns;
+                      const filtered = owing.length > 0;
+                      if (rows.length <= 1 && !filtered) return null;
+                      return (
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
                             <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Campaign</TableHead>
                             <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Spent</TableHead>
-                            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Payments</TableHead>
+                            <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                              {filtered ? 'Owing' : 'Payments'}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {b.campaigns.map(c => (
+                          {rows.map(c => (
                             <TableRow key={c.campaign_id} className="border-gray-100">
-                              <TableCell className="py-3 font-medium">{c.campaign_name}</TableCell>
+                              <TableCell className="py-3 font-medium">
+                                <span className="inline-flex items-center gap-2">
+                                  {c.unpaid_count > 0 && (
+                                    <AttentionDot title={`${c.unpaid_count} unpaid · ${money(c.unpaid_amount)}`} />
+                                  )}
+                                  {c.campaign_name}
+                                </span>
+                              </TableCell>
                               <TableCell className="py-3 tabular-nums">{money(c.spent)}</TableCell>
-                              <TableCell className="py-3 tabular-nums">{c.paid_count}</TableCell>
+                              <TableCell className="py-3 tabular-nums">
+                                {c.unpaid_count > 0
+                                  ? <span className="text-rose-600">{c.unpaid_count} unpaid</span>
+                                  : c.paid_count}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
 
-              {isLineups && grouped.map(([clientId, group]) => (
+              {isLineups && grouped.map(([clientId, group]) => {
+                // Proposed means sent to the client and still waiting on them.
+                // It is the only stage in this dialog where someone is blocked,
+                // so it gets the same dot unpaid money gets on the other tab.
+                const pending = group.rows.filter(r => r.stage === 'proposed').length;
+                return (
                 <div key={clientId}>
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-sm font-semibold text-ink-warm-900">{group.name}</h3>
+                    {pending > 0 && (
+                      <AttentionDot title={`${pending} lineup${pending === 1 ? '' : 's'} proposed, awaiting confirmation`} />
+                    )}
                     <span className="text-[11px] uppercase tracking-wider text-ink-warm-400 tabular">
                       {group.rows.length} {group.rows.length === 1 ? 'week' : 'weeks'}
                     </span>
@@ -468,7 +523,8 @@ export function AllClientsRollupDialog({
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -72,7 +72,15 @@ type BudgetClient = {
     campaign_name: string;
     spent: number;
     paid_count: number;
+    /** Payments still owed. "Unpaid" is payment_date IS NULL — the same test
+     *  the Content tab and the unpaid export use. */
+    unpaid_count: number;
+    unpaid_amount: number;
   }>;
+  /** Rolled up across the client's campaigns, so the dialog can flag a client
+   *  without walking its campaign list. */
+  unpaid_count: number;
+  unpaid_amount: number;
 };
 
 export async function GET() {
@@ -200,13 +208,22 @@ export async function GET() {
   // budget is gone", and every category spends the same money.
   const { data: paymentRows } = await (supabase as any)
     .from('payments')
-    .select('campaign_id, amount')
+    .select('campaign_id, amount, payment_date')
     .in('campaign_id', campaignIds);
-  const spendByCampaign = new Map<string, { total: number; count: number }>();
-  for (const p of (paymentRows ?? []) as Array<{ campaign_id: string; amount: number | null }>) {
-    const cur = spendByCampaign.get(p.campaign_id) ?? { total: 0, count: 0 };
-    cur.total += Number(p.amount) || 0;
+  const spendByCampaign = new Map<string, {
+    total: number; count: number; unpaid: number; unpaidAmount: number;
+  }>();
+  for (const p of (paymentRows ?? []) as Array<{
+    campaign_id: string; amount: number | null; payment_date: string | null;
+  }>) {
+    const cur = spendByCampaign.get(p.campaign_id)
+      ?? { total: 0, count: 0, unpaid: 0, unpaidAmount: 0 };
+    const amount = Number(p.amount) || 0;
+    cur.total += amount;
     cur.count += 1;
+    // Unpaid is payment_date IS NULL, matching the unpaid export. A $0 row is
+    // still owed money until someone prices it, so it counts here too.
+    if (!p.payment_date) { cur.unpaid += 1; cur.unpaidAmount += amount; }
     spendByCampaign.set(p.campaign_id, cur);
   }
 
@@ -248,14 +265,21 @@ export async function GET() {
         : campaignTotals > 0 ? 'campaign_total' : 'none';
 
     const perCampaign = own.map(c => {
-      const spend = spendByCampaign.get(c.id) ?? { total: 0, count: 0 };
-      return { campaign_id: c.id, campaign_name: c.name, spent: spend.total, paid_count: spend.count };
+      const spend = spendByCampaign.get(c.id)
+        ?? { total: 0, count: 0, unpaid: 0, unpaidAmount: 0 };
+      return {
+        campaign_id: c.id, campaign_name: c.name,
+        spent: spend.total, paid_count: spend.count,
+        unpaid_count: spend.unpaid, unpaid_amount: spend.unpaidAmount,
+      };
     }).sort((a, b) => b.spent - a.spent);
     const spent = perCampaign.reduce((s, c) => s + c.spent, 0);
 
     return {
       client_id: cl.id,
       client_name: cl.name,
+      unpaid_count: perCampaign.reduce((s, c) => s + c.unpaid_count, 0),
+      unpaid_amount: perCampaign.reduce((s, c) => s + c.unpaid_amount, 0),
       budget,
       budget_source: budgetSource,
       term_count: terms.count,

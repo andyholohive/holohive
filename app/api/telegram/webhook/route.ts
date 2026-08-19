@@ -1103,7 +1103,7 @@ async function renderTasksList(
 
   let q = (supabaseAdmin as any)
     .from('tasks')
-    .select('id, short_id, task_name, due_date, assigned_to, assigned_to_name, status')
+    .select('id, short_id, task_name, due_date, assigned_to, assigned_to_name, status, client:clients(name)')
     .neq('status', 'complete')
     .order('due_date', { ascending: true, nullsFirst: false })
     .limit(50); // over-fetch so the 20-cap below picks the most urgent
@@ -1127,6 +1127,7 @@ async function renderTasksList(
     id: string; short_id: string | null; task_name: string;
     due_date: string | null; assigned_to: string | null;
     assigned_to_name: string | null; status: string;
+    client?: { name: string | null } | null;
   }>;
 
   // Sort: overdue first, then today, then upcoming, then no-date.
@@ -1167,9 +1168,14 @@ async function renderTasksList(
     const sid = t.short_id || '?';
     const due = shortDueLabel(t.due_date);
     const who = opts.teamWide && t.assigned_to_name ? ` · ${t.assigned_to_name}` : '';
-    lines.push(`<b>${escapeHtml(sid)}</b> ${escapeHtml(t.task_name)}${due ? ` <i>(${escapeHtml(due)})</i>` : ''}${escapeHtml(who)}`);
+    // [2026-08-19, Andy] Recurring per-client tasks all carry the same name,
+    // so three lines could read "3. Confirm weekly KOL lineup" and there was
+    // no way to tell Fogo from Umia from Venice — including on the Done
+    // button, where picking the wrong one closes the wrong client's task.
+    const client = t.client?.name ? `${t.client.name} · ` : '';
+    lines.push(`<b>${escapeHtml(sid)}</b> ${escapeHtml(client)}${escapeHtml(t.task_name)}${due ? ` <i>(${escapeHtml(due)})</i>` : ''}${escapeHtml(who)}`);
     buttons.push([{
-      text: truncateButton(`✅ ${sid} — ${t.task_name}${due ? ` (${due})` : ''}`),
+      text: truncateButton(`✅ ${sid} — ${client}${t.task_name}${due ? ` (${due})` : ''}`),
       callback_data: `done:${t.id}`,
     }]);
   }

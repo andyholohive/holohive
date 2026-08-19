@@ -26,23 +26,12 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   const formId = params.id;
   const searchParams = useSearchParams();
   const clientId = searchParams.get('client');
-  // Where to send the client after they submit (passed by the portal's
-  // "Fill Out Form" button). Same-origin relative paths only — guard against
-  // open-redirect to an external URL [Andy 2026-07-17].
-  const returnRaw = searchParams.get('return');
-  const returnUrl = (() => {
-    if (returnRaw) {
-      try {
-        const decoded = decodeURIComponent(returnRaw);
-        if (/^\/(?!\/)/.test(decoded)) return decoded;
-      } catch { /* fall through to the client-portal default */ }
-    }
-    // [2026-07-21 per Andy] No explicit return target, but a
-    // client-scoped link means the client's portal IS the source —
-    // always give them a real button back instead of the "you can
-    // close this tab" text.
-    return clientId ? `/public/portal/${clientId}` : null;
-  })();
+  // [2026-08-19, Andy] The post-submit "Return to your portal" button is
+  // gone. It assumed the form was opened from a portal, and most are not —
+  // the link gets shared directly, so the button sent people somewhere they
+  // had never been and could not necessarily sign into. The honest end state
+  // for a form filled from a link is that there is nowhere to go back to.
+  // (Reverses the 2026-07-21 default that derived a portal URL from ?client.)
   const [form, setForm] = useState<FormWithFields | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -1054,17 +1043,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank you!</h2>
           <p className="text-lg text-gray-600 leading-relaxed">Your response has been submitted successfully.</p>
-          {returnUrl ? (
-            <a
-              href={returnUrl}
-              className="mt-8 inline-flex items-center gap-1.5 rounded-lg bg-brand px-6 py-3 text-white font-medium hover:bg-[#2d6570] transition-colors"
-            >
-              Return to your portal
-              <ChevronRight className="h-4 w-4" />
-            </a>
-          ) : (
-            <p className="mt-6 text-sm text-gray-500">You can now close this tab and head back to your portal.</p>
-          )}
+          <p className="mt-6 text-sm text-gray-500">You can now close this tab.</p>
         </div>
       </div>
     );

@@ -1791,6 +1791,15 @@ function AuditLogButton({
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<LineupActivityLogRow[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // This tab also renders inside the all-lineups dialog. There, a popover
+  // portalled to the body falls outside the dialog's scroll exemption and the
+  // log will not scroll, so portal into the dialog when there is one.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setContainer(triggerRef.current?.closest('[role="dialog"]') as HTMLElement | null);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -1804,12 +1813,12 @@ function AuditLogButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="sm" variant="ghost" title="Audit log">
+        <Button ref={triggerRef} size="sm" variant="ghost" title="Audit log">
           <History className="h-3.5 w-3.5 mr-1" />
           Audit
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[420px] p-0" align="end">
+      <PopoverContent className="w-[420px] p-0" align="end" container={container}>
         <div className="p-3 border-b border-cream-100">
           <p className="text-sm font-semibold text-ink-warm-900">Activity log</p>
           <p className="text-[11px] text-ink-warm-500">Reverse chronological. Limit: latest 200.</p>
