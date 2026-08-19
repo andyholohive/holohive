@@ -1209,15 +1209,24 @@ const CampaignDetailsPage = () => {
   /**
    * [2026-08-05] Manual campaign-status override.
    *
-   * Stamps status_manual_at, which switches off the two auto-transitions
-   * (first posted content -> Active, all KOLs Concluded -> Completed) for this
-   * campaign. Without that, a correction survives only until the next posted
-   * link — the Umia failure, where automation owned a value nobody could hold.
+   * Stamps status_manual_at, which switches off automatic status changes for
+   * this campaign. Without that, a correction survives only until automation
+   * next disagrees — the Umia failure, where automation owned a value nobody
+   * could hold.
    *
-   * Worth knowing: as of today nothing in the app gates behaviour on
-   * campaigns.status. The /campaigns badges come from the client's
-   * is_active/is_ad_hoc, not this field. So this control records intent; it
-   * does not yet change what any other surface does.
+   * [2026-08-19] This comment used to name two auto-transitions ("first
+   * posted content -> Active, all KOLs Concluded -> Completed"). Neither
+   * exists — not in app code, not as a trigger. They were planned and never
+   * built, so status_manual_at was switching off nothing.
+   *
+   * There is exactly one now: finishing onboarding moves a client's Planning
+   * campaigns to Active (trigger client_milestones_activate_campaign). It
+   * honours this stamp, so a hand-set status still wins.
+   *
+   * Worth knowing: almost nothing gates behaviour on campaigns.status. The
+   * /campaigns badges come from the client's is_active/is_ad_hoc, and the
+   * delivery rollup accepts Active and Planning alike. The portal's
+   * active-campaign count is the one real consumer.
    */
   const handleStatusChange = async (nextStatus: string) => {
     if (!campaign || nextStatus === campaign.status) return;
