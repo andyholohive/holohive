@@ -41,6 +41,15 @@ const REPO_ROOT = resolve(dirname(__filename), '..');
 
 const RULES = [
   {
+    id: 'page-needs-section-layout',
+    description:
+      'Every in-app route needs app/<route>/layout.tsx (ProtectedRoute + Sidebar). '
+      + 'Without it the page renders with no sidebar and no auth gate. '
+      + 'Genuinely chrome-free pages go in NO_LAYOUT_EXPECTED with a reason.',
+    // Structural rule — evaluated by checkSectionLayouts(), not by regex.
+    pattern: null,
+  },
+  {
     id: 'rose-not-red',
     description:
       'Destructive intent uses rose-*, not red-*. The StatusBadge "danger" tone is rose; ' +
@@ -192,6 +201,63 @@ function listFiles() {
 
 /* ─── Main ───────────────────────────────────────────────────────── */
 
+/**
+ * Structural rule: every in-app route needs its own section layout.
+ *
+ * There is no global sidebar — `app/layout.tsx` provides none, and each
+ * route folder opts in with a `layout.tsx` that wraps children in
+ * ProtectedRoute + Sidebar. A page missing one builds, type-checks and
+ * passes every other rule here, then renders full-bleed with no sidebar and
+ * no auth gate. That shipped once (/repost-deals, 2026-08-20) and was caught
+ * by a screenshot, which is not a linting strategy.
+ *
+ * Unlike the rules above this is file-shaped, not line-shaped, so it runs as
+ * its own pass over app/ rather than as a regex.
+ *
+ * The exceptions are real pages that are meant to have no sidebar. Adding to
+ * this list is a deliberate act — say why.
+ */
+const NO_LAYOUT_EXPECTED = new Set([
+  'app/page.tsx',                      // root — redirects, never rendered as a page
+  'app/auth/page.tsx',                 // sign-in, pre-auth
+  'app/auth/reset-password/page.tsx',  // pre-auth
+  'app/oauth/authorize/page.tsx',      // OAuth consent screen, deliberately chrome-free
+  'app/settings/page.tsx',             // centered account-settings shell (documented in CLAUDE.md)
+  'app/mcp/page.tsx',                  // MCP connection info, standalone
+  'app/documents/[id]/page.tsx',       // standalone document viewer
+  'app/test-ai/page.tsx',              // dev scratch page
+]);
+
+function checkSectionLayouts() {
+  const out = [];
+  const pages = execSync('find app -name page.tsx -not -path "app/api/*"', {
+    cwd: REPO_ROOT, encoding: 'utf-8',
+  }).trim().split('\n').filter(Boolean);
+
+  for (const page of pages) {
+    // Public routes have their own layout at app/public/layout.tsx and must
+    // never get the sidebar one.
+    if (page.startsWith('app/public/')) continue;
+    if (NO_LAYOUT_EXPECTED.has(page)) continue;
+
+    let dir = dirname(page);
+    let found = false;
+    while (dir && dir !== 'app' && dir !== '.') {
+      if (existsSync(resolve(REPO_ROOT, dir, 'layout.tsx'))) { found = true; break; }
+      dir = dirname(dir);
+    }
+    if (!found) {
+      out.push({
+        rule: 'page-needs-section-layout',
+        file: page,
+        lineNumber: 1,
+        snippet: `no layout.tsx in ${dirname(page)} or any parent — page renders with no sidebar`,
+      });
+    }
+  }
+  return out;
+}
+
 function main() {
   const files = listFiles();
   if (files.length === 0) {
@@ -201,6 +267,12 @@ function main() {
 
   // violations: array of { rule, file, line, lineNumber, snippet }
   const violations = [];
+
+  // Structural pass — only meaningful over the whole tree, so skip it when
+  // the linter was invoked on an explicit file list (e.g. a pre-commit hook).
+  if (process.argv.slice(2).length === 0) {
+    violations.push(...checkSectionLayouts());
+  }
 
   for (const file of files) {
     let content;
@@ -212,6 +284,8 @@ function main() {
     const lines = content.split('\n');
 
     for (const rule of RULES) {
+      // Structural rules carry no regex — they run in their own pass.
+      if (!rule.pattern) continue;
       if (rule.excludePathRegex && rule.excludePathRegex.test(file)) continue;
 
       for (let i = 0; i < lines.length; i++) {

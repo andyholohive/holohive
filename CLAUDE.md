@@ -12,6 +12,58 @@ If you're tempted to write `className="bg-brand text-white"` or
 
 ---
 
+## Every new page needs a `layout.tsx` — this is step 1
+
+**A page without one renders with no sidebar and no auth gate.** There is
+no global sidebar in `app/layout.tsx`; each route folder opts in by
+providing its own layout. Miss it and the page still builds, still type-
+checks, still passes the linter, and looks obviously wrong the moment
+anyone opens it. This was missed on `/repost-deals` (2026-08-20) and only
+surfaced from a screenshot.
+
+So before writing `page.tsx`, create `app/<route>/layout.tsx`:
+
+```tsx
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import Sidebar from '@/components/Sidebar';
+
+export default function SectionLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <Sidebar>{children}</Sidebar>
+    </ProtectedRoute>
+  );
+}
+```
+
+That exact file is the default — it is already the most-duplicated layout
+in the repo. Re-exporting another section's copy
+(`export { default } from '../clients/layout';`) is an equally accepted
+variant and some pages use it; prefer the explicit version for new routes
+so the file reads on its own.
+
+`ProtectedRoute` only gates *authentication*. Role gating stays in
+`page.tsx` (or the API routes behind it) — see `/expenses` and
+`/repost-deals`, both super-admin, both gated at the page rather than the
+layout.
+
+**Public pages are the deliberate exception.** Anything under
+`app/public/**` must NOT get this layout — no sidebar, no auth. It has its
+own `app/public/layout.tsx`.
+
+### New-page checklist
+
+1. `app/<route>/layout.tsx` — the file above. Without it: no sidebar.
+2. `app/<route>/page.tsx` — the shell below.
+3. `components/Sidebar.tsx` — a `NavItem`, in the right section.
+4. `components/SidebarCustomize.tsx` — the matching registry entry.
+   Both, or neither.
+5. `SECTION_PREFIXES` in `Sidebar.tsx` — add the route so the correct
+   section auto-expands when someone lands on it.
+
+Steps 3–5 are the ones an audit catches later; step 1 is the one the user
+catches immediately.
+
 ## The standard page shell
 
 Copy-paste this as the starting point for any new admin page. It
