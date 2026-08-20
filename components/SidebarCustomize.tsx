@@ -32,6 +32,7 @@ import {
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
   Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
   DollarSign,
+  Repeat2,
 } from 'lucide-react';
 
 export type NavItemDef = {
@@ -84,6 +85,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
 
   // KOLs — KOLs + Lists (Campaigns moved to Clients).
   { href: '/kols', label: 'KOLs', icon: Crown, section: 'KOLs', pageKey: '/kols' },
+  { href: '/repost-deals', label: 'Repost Deals', icon: Repeat2, section: 'KOLs', requiredRole: 'super_admin' },
   { href: '/lists', label: 'Lists', icon: List, section: 'KOLs', pageKey: '/lists' },
 
   // Sales / CRM — pipeline + relationship surfaces only.

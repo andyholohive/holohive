@@ -10,6 +10,11 @@ import { isPreShipGateExempt } from '@/lib/preShipGate';
 import { classifyReply, isFridayUTC, pulseDateFor, PULSE_CUTOFF_HOUR_UTC } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
+
+import {
+  retireOfferMessage, retireOpenOffers,
+  ACCEPTED_TEXT, REJECTED_TEXT, CLOSED_TEXT,
+} from '@/lib/repostDealBot';
 // Audit H5: give handlers headroom so a slow update finishes and returns 200
 // before Telegram's retry timer fires (the default ~10s could 504 mid-work and
 // trigger a duplicate delivery).
@@ -1513,8 +1518,78 @@ async function handleCallbackQuery(cq: any) {
     return;
   }
 
+  // `rd:accept:<offer_id>` / `rd:reject:<offer_id>` — Repost Deal Bot offer
+  // buttons (§6.2, §6.3). Accept runs the atomic claim; reject just retires
+  // the message.
+  if (data.startsWith('rd:')) {
+    await handleRepostDealCallback(cq);
+    return;
+  }
+
   // Unknown callback — dismiss the spinner so the button doesn't hang.
   await answerCallbackQuery(callbackId);
+}
+
+/**
+ * `rd:accept:<offer_id>` / `rd:reject:<offer_id>` — Repost Deal Bot.
+ *
+ * Accept delegates the whole decision to claim_repost_offer, which holds a
+ * row lock on the deal while it checks both caps. §8 requires that two KOLs
+ * tapping at the same instant cannot both take the last slot, and that is
+ * only true if the check and the decrement happen inside one statement — so
+ * nothing here re-reads or re-decides.
+ */
+async function handleRepostDealCallback(cq: any) {
+  const data: string = cq.data || '';
+  const callbackId: string = cq.id;
+  const [, action, offerId] = data.split(':');
+  const chatId = String(cq.message?.chat?.id ?? '');
+  const messageId = cq.message?.message_id;
+
+  const { data: offer } = await (supabaseAdmin as any)
+    .from('repost_deal_offers').select('*').eq('id', offerId).maybeSingle();
+  if (!offer) { await answerCallbackQuery(callbackId, 'That offer is no longer available.'); return; }
+
+  if (action === 'reject') {
+    if (offer.status === 'pending') {
+      await (supabaseAdmin as any).from('repost_deal_offers')
+        .update({ status: 'rejected', responded_at: new Date().toISOString() })
+        .eq('id', offer.id).eq('status', 'pending');
+    }
+    if (messageId) await retireOfferMessage(chatId, messageId, REJECTED_TEXT);
+    await answerCallbackQuery(callbackId, 'Marked as a pass.');
+    return;
+  }
+
+  if (action !== 'accept') { await answerCallbackQuery(callbackId); return; }
+
+  const { data: claim, error } = await (supabaseAdmin as any)
+    .rpc('claim_repost_offer', { p_offer_id: offer.id });
+  const outcome = Array.isArray(claim) ? claim[0] : claim;
+
+  if (error || !outcome) {
+    await answerCallbackQuery(callbackId, 'Something went wrong — try again.');
+    return;
+  }
+
+  if (outcome.result === 'accepted') {
+    if (messageId) await retireOfferMessage(chatId, messageId, ACCEPTED_TEXT(outcome.price));
+    await answerCallbackQuery(callbackId, 'Slot locked.');
+    // The claim may have been the one that filled the deal. Retire everyone
+    // else's message now rather than leaving live buttons that cannot pay.
+    if (outcome.deal_closed) await retireOpenOffers(supabaseAdmin, offer.deal_id);
+    return;
+  }
+
+  if (outcome.result === 'already_actioned') {
+    await answerCallbackQuery(callbackId, 'You already responded to this one.');
+    return;
+  }
+
+  // slots_full / budget_exhausted / closed all read the same to the creator:
+  // there is nothing left for them (§6.2, §6.5).
+  if (messageId) await retireOfferMessage(chatId, messageId, CLOSED_TEXT);
+  await answerCallbackQuery(callbackId, 'This deal just closed.');
 }
 
 /**
@@ -2670,9 +2745,9 @@ async function handleSubmitCommand(chatId: string, args: string[], message: any)
       msg = '⚠️ <code>/submit</code> is for KOLs — log content through the dashboards.';
     } else if (message?.chat?.type && message.chat.type !== 'private') {
       // Came from a group/supergroup but the group isn't linked to a KOL.
-      msg = "This chat isn't linked to a KOL yet. A HoloHive team member can link it on /crm/telegram. Then /submit will work here.";
+      msg = "This chat isn't linked to a KOL yet. A Holo Hive team member can link it on /crm/telegram. Then /submit will work here.";
     } else {
-      msg = "I don't recognize you as a KOL. /submit only works in the per-KOL group chat your HoloHive contact set up. Ask them to add the bot to your chat.";
+      msg = "I don't recognize you as a KOL. /submit only works in the per-KOL group chat your Holo Hive contact set up. Ask them to add the bot to your chat.";
     }
     await sendTelegramMessage(chatId, msg, 'HTML', threadId);
     return;
@@ -3556,7 +3631,7 @@ async function handleSubmReviewCallback(
       // v1 generic rejection reason. v2 will prompt the reviewer for a
       // specific reason via a force_reply prompt (see spec).
       rejection_reason: action === 'reject'
-        ? 'Did not meet criteria. Contact your HoloHive lead for details.'
+        ? 'Did not meet criteria. Contact your Holo Hive lead for details.'
         : null,
     })
     .eq('id', submissionId)
@@ -3651,7 +3726,7 @@ async function handleSubmReviewCallback(
       await editMessageText(
         (sub as any).kol_receipt_chat_id,
         Number((sub as any).kol_receipt_message_id),
-        `❌ Your <b>${escapeHtml(displayName)}</b> submission wasn’t approved. Message your HoloHive lead for details.`,
+        `❌ Your <b>${escapeHtml(displayName)}</b> submission wasn’t approved. Message your Holo Hive lead for details.`,
       );
     }
   }

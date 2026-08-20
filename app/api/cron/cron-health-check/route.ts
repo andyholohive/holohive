@@ -43,6 +43,7 @@ export const maxDuration = 60;
 // (24 expected, 120 = 5× threshold).
 const EXPECTED_DAILY_MAX: Record<string, number> = {
   KOREAN_EXCHANGES: 24,        // hourly
+  REPOST_DEAL_EXPIRY: 24,      // hourly — closes deals past closes_at (Repost Deal Bot §4)
   ACTIVATION_SYNC: 24,         // hourly — activation microsite snapshot sync
   MINDSHARE_SCAN: 48,          // every 30 min
   GOOGLE_MEETING_REMINDERS: 288, // every 5 min

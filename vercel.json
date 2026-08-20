@@ -147,6 +147,10 @@
     {
       "path": "/api/cron/action-board-approvals",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/repost-deal-expiry",
+      "schedule": "5 * * * *"
     }
   ]
 }

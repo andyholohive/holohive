@@ -30,12 +30,16 @@
 
 export interface KolRateSource {
   post_price?: number | string | null;
+  /** The operator-entered repost price from the KOL pricing cell. Distinct
+   *  from `repost_rate`, which is auto-derived at 50% of standard on first
+   *  confirm — see resolvePaymentAmount. */
+  share_price?: number | string | null;
   standard_rate?: number | string | null;
   repost_rate?: number | string | null;
 }
 
 /** Columns any caller must select for these helpers to work. */
-export const KOL_RATE_COLUMNS = 'post_price, standard_rate, repost_rate' as const;
+export const KOL_RATE_COLUMNS = 'post_price, standard_rate, repost_rate, share_price' as const;
 
 function toNumber(v: number | string | null | undefined): number | null {
   if (v == null) return null;
@@ -77,6 +81,16 @@ export function resolvePaymentAmount(opts: {
   const standard = effectiveStandardRate(kol);
 
   if (contentType === 'Repost') {
+    // [2026-08-20] Repost Deal Bot spec §3: "A repost deliverable pulls the
+    // repost price." Two columns can answer that, and they are not the same
+    // thing — `share_price` is typed by an operator in the KOL pricing cell
+    // and is what makes a KOL eligible for a repost deal, while
+    // `repost_rate` is auto-seeded at half the standard rate on first
+    // confirm. An explicitly negotiated number beats a derived one, so
+    // share_price wins where it exists; nothing already relying on
+    // repost_rate changes, because only 1 KOL currently has a share price.
+    const share = toNumber(kol?.share_price);
+    if (share !== null) return share;
     const repost = toNumber(kol?.repost_rate);
     if (repost !== null) return repost;
     if (standard !== null) return Math.round(standard * 0.5 * 100) / 100;

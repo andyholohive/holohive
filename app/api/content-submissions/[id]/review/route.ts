@@ -65,7 +65,7 @@ export async function POST(
     return NextResponse.json({ error: 'action must be approve or reject' }, { status: 400 });
   }
   const rejectionReason = action === 'reject'
-    ? (body.rejection_reason || 'Did not meet criteria. Contact your HoloHive lead for details.')
+    ? (body.rejection_reason || 'Did not meet criteria. Contact your Holo Hive lead for details.')
     : null;
 
   // Use service role for writes so RLS doesn't get in the way
@@ -183,7 +183,7 @@ export async function POST(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: kolChatId,
-          text: `Submission issue: <i>${rejectionReason}</i>\nPlease contact your HoloHive lead, then resubmit with <code>/submit</code>.`,
+          text: `Submission issue: <i>${rejectionReason}</i>\nPlease contact your Holo Hive lead, then resubmit with <code>/submit</code>.`,
           parse_mode: 'HTML',
         }),
       }).catch(() => {/* best effort */});

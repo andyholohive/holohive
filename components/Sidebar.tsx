@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet, Repeat2
+} from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -295,7 +296,7 @@ export default function Sidebar({ children }: SidebarProps) {
     const SECTION_PREFIXES: Record<string, string[]> = {
       pinned:      ['/tasks', '/dashboard'],
       clients:     ['/clients', '/campaigns', '/delivery-logs'],
-      kols:        ['/kols', '/lists'],
+      kols:        ['/kols', '/lists', '/repost-deals'],
       crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
       measurement: ['/mindshare', '/intelligence/client-watch', '/wallets'],
@@ -778,6 +779,10 @@ export default function Sidebar({ children }: SidebarProps) {
                 <CollapsibleSection id="kols" icon={Crown}>
                   {!guestHide('/kols') && <NavItem href="/kols" icon={Crown} label="KOLs" />}
                   {!guestHide('/lists') && <NavItem href="/lists" icon={List} label="Lists" />}
+                  {/* Repost Deals — sits with KOLs because eligibility is a
+                      KOL-record property (a logged share price), not a
+                      campaign one. Super-admin: it commits real spend. */}
+                  {userProfile?.role === 'super_admin' && <NavItem href="/repost-deals" icon={Repeat2} label="Repost Deals" />}
                 </CollapsibleSection>
               )}
 
