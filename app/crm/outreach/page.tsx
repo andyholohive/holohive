@@ -347,6 +347,23 @@ export default function OutreachPage() {
       return;
     }
 
+    // Clearing a cell writes NULL, and `role` and `owner` are NOT NULL —
+    // the save failed with a constraint error and the cleared value
+    // reappeared on the next load.
+    //
+    // They get different treatment because the columns mean different
+    // things. `role` is optional information, and '—' is already the
+    // board's marker for "unknown" (the cell renders it as an empty
+    // placeholder), so an emptied Role stores that. `owner` is an
+    // assignment: falling back to its 'Yano' default would hand someone
+    // else's prospect to Yano because a cell was cleared, so an emptied
+    // Owner is a no-op, the same guard telegram and company get above.
+    if (field === 'owner' && !raw) return;
+    if (field === 'role' && !raw) {
+      await saveField(p, field, '—');
+      return;
+    }
+
     await saveField(p, field, raw || null);
   }
 
