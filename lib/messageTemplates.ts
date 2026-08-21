@@ -25,7 +25,8 @@ export type TemplateKey =
   | 'tmpl_lineup_reminder_friday'
   | 'tmpl_lineup_reminder_monday'
   | 'tmpl_lineup_reminder_thursday'
-  | 'tmpl_weekly_content_recap_header';
+  | 'tmpl_weekly_content_recap_header'
+  | 'tmpl_kol_welcome';
 
 export interface TemplateMeta {
   /** Built-in message used when the app_settings row is unset/empty. */
@@ -92,6 +93,36 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
     vars: ['week'],
     format: 'HTML',
     appended: 'The list of campaigns with unposted KOLs is appended automatically.',
+  },
+  /**
+   * Korean onboarding message sent into a KOL's group chat the first time
+   * that chat is linked to them. /api/telegram/send posts with
+   * parse_mode HTML, so the editor's formatting toolbar works here — but
+   * the built-in default is deliberately plain, and a literal < or & typed
+   * into it will fail the send rather than appear.
+   *
+   * {kol} is available but the built-in default does not use it: the
+   * message goes into the KOL's own group chat, where addressing them by
+   * name reads oddly to a room that already knows who it is for.
+   */
+  tmpl_kol_welcome: {
+    default: `안녕하세요! Holo Hive와 함께하게 되신 걸 환영해요. 시작 전에 봇으로 몇 가지만 세팅해주시면 돼요.
+
+1. 입금 지갑 등록 (/wallet)
+보수는 Arbitrum(ARB) 네트워크로 지급돼요. /wallet 뒤에 지갑 주소를 붙여서 채팅창에 보내주세요.
+예시: /wallet 0x...
+봇이 주소를 확인한 뒤 저장된 주소를 그대로 다시 보여드려요. 나중에 주소를 바꾸시려면 똑같이 /wallet로 새 주소를 보내고 Confirm만 눌러주시면 됩니다.
+
+2. 콘텐츠 제출 (/submit)
+포스팅 올리신 후에 채팅창에서 /submit 뒤에 올리신 포스트 링크만 넣어주시면 돼요. 캠페인 선택해서 제출하면 끝이라, 따로 채팅으로 링크 보내주실 필요 없어요.
+
+3. 공유 딜 (Share Deal)
+다른 크리에이터 포스트를 크리에이터님 채널에 공유하고 수익을 받는 기능도 있어요. 딜이 열리면 봇이 단체방으로 오퍼를 보내드리고, 공유 단가랑 마감 시간 확인하신 뒤에 Accept / Reject만 눌러주시면 됩니다. 선착순으로 진행되고 단가는 기본 포스팅 단가의 50%로 산정해 드려요. 포워딩 진행 의사가 있으시다면 채팅창에 /repost yes를 남겨주세요.
+
+궁금한 점 있으면 편하게 알려주세요!`,
+    vars: ['kol'],
+    format: 'HTML',
+    appended: 'Sent as-is. The operator can still edit this copy per-send before it goes out.',
   },
   tmpl_weekly_content_recap_header: {
     default: '<b>{campaign} Weekly Content Recap</b>',

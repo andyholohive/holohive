@@ -36,6 +36,17 @@ interface KolWelcomeDialogProps {
   sending: boolean;
   onSend: () => void;
   onSkip: () => void;
+  /**
+   * Persist the current text as the default every future KOL gets.
+   * Separate from onMessageChange on purpose: editing here is normally a
+   * one-off for this KOL, and silently promoting that to the default would
+   * be a surprising way to change what the whole roster receives.
+   */
+  onSaveDefault?: (next: string) => Promise<void>;
+  /** True while that save is in flight. */
+  savingDefault?: boolean;
+  /** Whether the text differs from the stored default — drives the button. */
+  isDefaultDirty?: boolean;
 }
 
 export function KolWelcomeDialog({
@@ -48,6 +59,9 @@ export function KolWelcomeDialog({
   sending,
   onSend,
   onSkip,
+  onSaveDefault,
+  savingDefault = false,
+  isDefaultDirty = false,
 }: KolWelcomeDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -65,7 +79,14 @@ export function KolWelcomeDialog({
         <div className="py-4">
           <div className="bg-cream-50 rounded-lg p-4 space-y-2 overflow-hidden">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-ink-warm-700">{isEditing ? 'Edit message:' : 'Message preview:'}</p>
+              <p className="text-sm text-ink-warm-700">
+                {isEditing ? 'Edit message:' : 'Message preview:'}
+                {isEditing && isDefaultDirty && (
+                  <span className="ml-2 text-xs text-ink-warm-500">
+                    edits apply to this KOL only unless you save as default
+                  </span>
+                )}
+              </p>
               {!isEditing && (
                 <button
                   type="button"
@@ -98,6 +119,18 @@ export function KolWelcomeDialog({
           <Button variant="outline" onClick={onSkip} disabled={sending}>
             Skip
           </Button>
+          {isEditing && onSaveDefault && (
+            <Button
+              variant="outline"
+              onClick={() => onSaveDefault(message)}
+              disabled={sending || savingDefault || !message.trim() || !isDefaultDirty}
+              title={isDefaultDirty
+                ? 'Make this the message every future KOL receives'
+                : 'This already matches the saved default'}
+            >
+              {savingDefault ? 'Saving…' : 'Save as default'}
+            </Button>
+          )}
           {isEditing && (
             <Button variant="outline" onClick={() => setIsEditing(false)} disabled={sending}>
               Done Editing

@@ -561,6 +561,7 @@ export default function LineupSettingsPage() {
       <LineupConfirmedChannelSection />
 
       {/* ─── Lineup Deadline Reminders section [2026-07-06] ─── */}
+      <KolWelcomeSection />
       <LineupReminderChannelSection />
 
       {/* ─── Weekly Content Recap section [2026-07-13] ─── */}
@@ -2526,6 +2527,38 @@ function ApproverAddButton({
  * app_settings.lineup_reminder_chat_id + lineup_reminder_chat_thread_id.
  * When unset the cron skips silently — no pings anywhere.
  */
+/**
+ * KolWelcomeSection — the default onboarding message a KOL gets when their
+ * group chat is first linked.
+ *
+ * It has no channel picker because it has no channel: the message goes to
+ * whichever KOL chat was just linked, so there is nothing to route. It sits
+ * here anyway, with the other editable messages, because "where do I change
+ * what we say to a new KOL" is the same question the rest of this page
+ * answers — and the only other way in was to link a KOL and catch the popup.
+ */
+function KolWelcomeSection() {
+  return (
+    <CollapsibleSection
+      icon={MessagesSquare}
+      title="KOL Welcome Message"
+      subtitle={(
+        <>The Korean onboarding message sent into a KOL&apos;s group chat the first time it is linked to them. Editable per-send too, in the confirm dialog.</>
+      )}
+    >
+      <WhenItSends>
+        Once per KOL — when an unassigned chat is first linked to them on the
+        Telegram page, after the operator confirms.
+      </WhenItSends>
+      <Card className="border-cream-200">
+        <CardContent className="p-4">
+          <MessageTemplateEditor settingKey="tmpl_kol_welcome" label="Welcome message" />
+        </CardContent>
+      </Card>
+    </CollapsibleSection>
+  );
+}
+
 function LineupReminderChannelSection() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
