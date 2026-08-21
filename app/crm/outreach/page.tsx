@@ -105,20 +105,53 @@ const MESSAGE_TYPES = ['3 Line TLDR', 'Case Study', 'Korea Deck'];
 const COLUMNS: Array<{ label: string; width: string }> = [
   { label: 'Prospect',      width: 'w-[190px]' },
   { label: 'Role',          width: 'w-[150px]' },
-  { label: 'Company',       width: 'w-[170px]' },
-  { label: 'Website',       width: 'w-[160px]' },
+  // [2026-08-22, Yano] Company and Website are one column. In practice the
+  // "website" was always the company's X profile — all 67 populated rows were
+  // x.com links — so a second column earned nothing. Paste an X link into
+  // Company and it stores the link and displays the handle.
+  { label: 'Company',       width: 'w-[210px]' },
   { label: 'Status',        width: 'w-[150px]' },
   { label: 'Message',       width: 'w-[140px]' },
-  { label: 'Bumps',         width: 'w-[140px]' },
+  // Bumps column removed [2026-08-22, Yano]: "the bumps section isn't
+  // necessary if the status part covers that". The status values ARE the
+  // bump ladder (Bump 1/2/3, Final Bump), so on the board it was the same
+  // fact twice. The column stays in the database and setStatus keeps
+  // maintaining it — 164 prospects have a bump count whose status has since
+  // moved on to replied/dead, and that history is the only record of how
+  // many bumps those took.
   { label: 'Last Outreach', width: 'w-[130px]' },
   { label: 'Owner',         width: 'w-[110px]' },
   { label: 'Notes',         width: 'w-[200px]' },
 ];
 
+/**
+ * Split what someone pasted into Company into a display name and a link.
+ *
+ * [2026-08-22, Yano] "will only paste their twitter links" — so Company
+ * accepts either. An x.com/twitter.com URL yields the handle as the name and
+ * the tidied URL as the link; anything else is just a name.
+ *
+ * The tidy-up matters: a real row reads
+ * `https://x.com/https://x.com/hyperstiti0ns`, from a full URL pasted into a
+ * field that prepended its own prefix. Parsing the LAST handle-looking
+ * segment rather than the first makes that case resolve correctly instead of
+ * preserving the mangling.
+ */
+function parseCompanyInput(input: string): { company: string; company_url: string | null } {
+  const raw = input.trim();
+  if (!raw) return { company: '', company_url: null };
+
+  const matches = [...raw.matchAll(/(?:x\.com|twitter\.com)\/@?([A-Za-z0-9_]{1,15})/gi)];
+  if (matches.length === 0) return { company: raw, company_url: null };
+
+  const handle = matches[matches.length - 1][1];
+  return { company: handle, company_url: `https://x.com/${handle}` };
+}
+
 /** Every column that can be edited in place. */
 type EditField =
-  | 'telegram' | 'role' | 'company' | 'company_url'
-  | 'status' | 'message_type' | 'bumps_used' | 'date_outreached'
+  | 'telegram' | 'role' | 'company'
+  | 'status' | 'message_type' | 'date_outreached'
   | 'owner' | 'notes';
 
 /** Radix Select forbids an empty-string value, so "no message type" needs a
@@ -155,7 +188,7 @@ const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect) =
 ];
 
 const emptyDraft = () => ({
-  telegram: '', company: '', role: '', company_url: '',
+  telegram: '', company: '', role: '',
   owner: 'Yano', status: 'to_contact' as OutreachStatus, message_type: '',
 });
 
@@ -290,19 +323,29 @@ export default function OutreachPage() {
 
     const raw = draftValue.trim();
 
-    if (field === 'bumps_used') {
-      const n = Number(raw);
-      // A bump count is a small non-negative integer; anything else is a
-      // typo, and writing it would corrupt the "bumps before conversion"
-      // figure this column exists to feed.
-      if (!Number.isFinite(n) || n < 0) return;
-      await saveField(p, field, Math.min(9, Math.round(n)));
-      return;
-    }
-
     // telegram and company are the row's identity and carry a unique index —
     // blanking either would orphan the row, so an empty edit is a no-op.
     if ((field === 'telegram' || field === 'company') && !raw) return;
+
+    // Company holds both halves now. Pasting an X link sets the name and the
+    // link together; typing a plain name clears any stale link, since the
+    // link is no longer separately editable and would otherwise point at the
+    // previous company forever.
+    if (field === 'company') {
+      const parsed = parseCompanyInput(raw);
+      setProspects(prev => prev.map(x =>
+        x.id === p.id ? { ...x, company: parsed.company, company_url: parsed.company_url } : x));
+      try {
+        await OutreachService.update(p.id, {
+          company: parsed.company,
+          company_url: parsed.company_url,
+        } as any);
+      } catch (err: any) {
+        toast({ title: 'Could not save', description: err?.message, variant: 'destructive' });
+        load();
+      }
+      return;
+    }
 
     await saveField(p, field, raw || null);
   }
@@ -313,9 +356,9 @@ export default function OutreachPage() {
     try {
       const created = await OutreachService.create({
         telegram: draft.telegram.trim(),
-        company: draft.company.trim(),
+        company: parseCompanyInput(draft.company).company,
         role: draft.role.trim() || '—',
-        company_url: draft.company_url.trim() || null,
+        company_url: parseCompanyInput(draft.company).company_url,
         owner: draft.owner,
         status: draft.status,
         message_type: draft.message_type || null,
@@ -625,14 +668,14 @@ export default function OutreachPage() {
                           it as empty rather than making Yano delete a dash. */}
                       {textCell('role', p.role === '—' ? '' : p.role, { placeholder: 'Role' })}
 
-                      {/* Company */}
-                      {textCell('company', p.company, { placeholder: 'Company' })}
-
-                      {/* Website — rendered as a link when set, but the cell
-                          still edits on click; the link itself stops the
-                          bubble so following it doesn't open an editor. */}
-                      {textCell('company_url', p.company_url ?? '', {
-                        placeholder: 'https://…',
+                      {/* Company — one cell for the name and the X link.
+                          Editing it shows the plain name so a paste replaces
+                          the name rather than a URL the user never typed; the
+                          link only decorates the read state, and stops the
+                          click bubbling so following it doesn't open an
+                          editor. */}
+                      {textCell('company', p.company, {
+                        placeholder: 'Company or x.com link',
                         render: p.company_url ? (
                           <a
                             href={p.company_url}
@@ -640,8 +683,9 @@ export default function OutreachPage() {
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
                             className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark truncate"
+                            title={p.company_url}
                           >
-                            {p.company_url.replace(/^https?:\/\/(www\.)?/, '')}
+                            {p.company}
                             <ExternalLink className="h-3 w-3 opacity-60 flex-shrink-0" />
                           </a>
                         ) : undefined,
@@ -713,27 +757,6 @@ export default function OutreachPage() {
                         )}
                       </td>
 
-                      {/* Bumps — normally derived from the status, but editable
-                          so a miscount can be corrected without walking the
-                          prospect back through statuses. */}
-                      {textCell('bumps_used', String(p.bumps_used), {
-                        numeric: true,
-                        render: (
-                          <span className="inline-flex items-center gap-1 text-xs tabular-nums text-ink-warm-700">
-                            {p.bumps_used === 0 ? (
-                              <span className="text-ink-warm-300">—</span>
-                            ) : (
-                              <>
-                                <Repeat2 className="h-3 w-3 text-ink-warm-400" />
-                                {p.bumps_used}
-                                {p.bumps_before_conversion !== null && (
-                                  <span className="text-ink-warm-400">({p.bumps_before_conversion} to convert)</span>
-                                )}
-                              </>
-                            )}
-                          </span>
-                        ),
-                      })}
 
                       {/* Last outreach — Popover + Calendar, never a native
                           date input (CLAUDE.md). Opens straight from the click. */}
@@ -831,32 +854,20 @@ export default function OutreachPage() {
                   id="op-co"
                   value={draft.company}
                   onChange={e => setDraft({ ...draft, company: e.target.value })}
-                  placeholder="Morpho"
+                  placeholder="Morpho or https://x.com/Morpho"
                   className="h-9 focus-brand mt-1"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="op-role">Role</Label>
-                <Input
-                  id="op-role"
-                  value={draft.role}
-                  onChange={e => setDraft({ ...draft, role: e.target.value })}
-                  placeholder="Founder / Growth / HoM"
-                  className="h-9 focus-brand mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="op-url">Company URL</Label>
-                <Input
-                  id="op-url"
-                  value={draft.company_url}
-                  onChange={e => setDraft({ ...draft, company_url: e.target.value })}
-                  placeholder="https://x.com/…"
-                  className="h-9 focus-brand mt-1"
-                />
-              </div>
+            <div>
+              <Label htmlFor="op-role">Role</Label>
+              <Input
+                id="op-role"
+                value={draft.role}
+                onChange={e => setDraft({ ...draft, role: e.target.value })}
+                placeholder="Founder / Growth / HoM"
+                className="h-9 focus-brand mt-1"
+              />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
