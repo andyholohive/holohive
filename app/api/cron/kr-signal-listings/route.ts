@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { loadActiveClients } from '@/lib/krSignal/config';
 import {
   fetchRecentKrwListings,
+  fetchRecentNonKrwListings,
   getTokenKrVolumeKrw,
   getTokenKrVolumeByVenueKrw,
   getTokenKrPriceKrw,
@@ -245,7 +246,10 @@ export async function GET(request: Request) {
         } catch (e) { /* entry renders with whatever enrichment landed */ }
         entries.push(entry);
       }
-      const html = buildListingsDigest(entries, weekLabelFor(now), fx);
+      // Non-KRW pairs (§ team request 2026-08-24): same window, minus anything
+      // the KRW section already reports on the same exchange.
+      const nonKrw = await fetchRecentNonKrwListings(supabase, since7, weekListings);
+      const html = buildListingsDigest(entries, weekLabelFor(now), fx, nonKrw);
 
       // [2026-08-24, Andy] The digest no longer sends itself. It is queued for
       // approval the same way the weekly report is, and fans out to every
@@ -296,9 +300,24 @@ export async function GET(request: Request) {
   }
 }
 
+/**
+ * The calendar week the digest covers, Monday–Sunday.
+ *
+ * [2026-08-24, Andy] Was "today minus 6 days", which labelled a Saturday run
+ * "Aug 16–22" — a window that starts mid-week and ends before the week does.
+ * A digest people read weekly should name the week, not the last seven days.
+ */
 function weekLabelFor(now: Date): string {
-  const start = new Date(now);
-  start.setUTCDate(start.getUTCDate() - 6);
   const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${M[start.getUTCMonth()]} ${start.getUTCDate()}–${now.getUTCDate()}`;
+  const monday = new Date(now);
+  // getUTCDay: Sun=0. Monday-anchored, so Sunday belongs to the week just ended.
+  const shift = (monday.getUTCDay() + 6) % 7;
+  monday.setUTCDate(monday.getUTCDate() - shift);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const left = `${M[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
+  const right = monday.getUTCMonth() === sunday.getUTCMonth()
+    ? `${sunday.getUTCDate()}`
+    : `${M[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
+  return `${left}–${right}`;
 }

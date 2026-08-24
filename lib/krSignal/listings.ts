@@ -100,7 +100,16 @@ export async function getTokenKrPriceKrw(symbol: string): Promise<number> {
 const VENUE_LABEL: Record<string, string> = { upbit: "Upbit", bithumb: "Bithumb" };
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const venueList = (v: string[]) => v.map((x) => VENUE_LABEL[x] || x).join(" + ");
-const krwT = (n: number) => "₩" + (n / 1e12).toFixed(2) + "T";
+/** Scaled KRW, mirroring usdCompact below. The old formatter was fixed at
+ *  trillions, so every real figure — day-1 volumes run ₩6M to ₩94B — printed
+ *  as "₩0.0XT", which is the least readable form of an otherwise good number.
+ *  [2026-08-24, Andy] */
+const krwCompact = (n: number) =>
+  n >= 1e12 ? "₩" + (n / 1e12).toFixed(2) + "T"
+  : n >= 1e9 ? "₩" + (n / 1e9).toFixed(1) + "B"
+  : n >= 1e6 ? "₩" + (n / 1e6).toFixed(0) + "M"
+  : n >= 1e3 ? "₩" + (n / 1e3).toFixed(0) + "K"
+  : "₩" + n.toFixed(0);
 /** Compact USD — thousands-range day-1 volumes rendered "$0.0M" with the old
  *  fixed-M formatter (Andy 2026-07-10). Mirrors weeklyReport's usdCompact. */
 const usdCompact = (n: number) =>
@@ -168,7 +177,7 @@ export function buildStage2Recap(
   ].filter(Boolean);
   const volLine = venueParts.length
     ? `Day-1 KR vol ${venueParts.join(" · ")}`
-    : `Day-1 KR vol ${krwT(day1ByVenueKrw.total)}${day1ByVenueKrw.total ? ` ≈ ${usdCompact(toUsd(day1ByVenueKrw.total))}` : ``}`;
+    : `Day-1 KR vol ${krwCompact(day1ByVenueKrw.total)}${day1ByVenueKrw.total ? ` ≈ ${usdCompact(toUsd(day1ByVenueKrw.total))}` : ``}`;
   const spikeLine =
     spikeMultiple != null && isFinite(spikeMultiple) && spikeMultiple > 0
       ? `Vol spike    ${spikeMultiple.toFixed(1)}× prior avg`
@@ -188,6 +197,70 @@ export function buildStage2Recap(
 
 /** §7.B digest entry — DetectedListing enriched with captured metrics. Optional
  *  lines render only when the underlying capture exists. */
+/**
+ * A non-KRW listing (BTC / USDT quote). Kept separate from DetectedListing
+ * because the quote currencies are part of what is reported — "Upbit (BTC +
+ * USDT)" — and because these never drive client alerts, only the digest.
+ */
+export interface NonKrwListing {
+  symbol: string;
+  exchange: string;
+  quotes: string[];        // ['BTC','USDT']
+  listedOn: string;
+  day1KrVolKrw?: number | null;
+}
+
+/**
+ * New non-KRW listings since `sinceIso`, excluding any symbol that also
+ * listed in KRW on the SAME exchange over the same window.
+ *
+ * The exclusion is what stops the digest reporting one event twice: when a
+ * token opens on Upbit it typically opens KRW, BTC and USDT together, and the
+ * KRW section already covers it. A cross-exchange pair is a genuinely separate
+ * event and stays — NEXO listing KRW on Bithumb and USDT on Upbit is two
+ * listings, not one.
+ */
+export async function fetchRecentNonKrwListings(
+  supabase: SupabaseClient,
+  sinceIso: string,
+  krwListings: DetectedListing[],
+): Promise<NonKrwListing[]> {
+  const { data, error } = await supabase
+    .from("korean_exchange_markets")
+    .select("exchange, symbol, quote_currency, first_seen_at")
+    .neq("quote_currency", "KRW")
+    .is("delisted_at", null)
+    .gte("first_seen_at", sinceIso)
+    .order("first_seen_at", { ascending: true });
+  if (error) throw new Error(`fetchRecentNonKrwListings: ${error.message}`);
+
+  // symbol|exchange pairs already reported in the KRW section.
+  const krwPairs = new Set<string>();
+  for (const k of krwListings) {
+    for (const v of k.venues) krwPairs.add(`${k.symbol.toUpperCase()}|${v}`);
+  }
+
+  const byKey = new Map<string, NonKrwListing>();
+  for (const row of (data ?? []) as any[]) {
+    const symbol = String(row.symbol || "").toUpperCase();
+    const exchange = String(row.exchange || "");
+    if (!symbol || !exchange) continue;
+    if (krwPairs.has(`${symbol}|${exchange}`)) continue;
+
+    const key = `${symbol}|${exchange}`;
+    const listedOn = String(row.first_seen_at).slice(0, 10);
+    const cur = byKey.get(key);
+    if (cur) {
+      if (!cur.quotes.includes(row.quote_currency)) cur.quotes.push(row.quote_currency);
+      if (listedOn < cur.listedOn) cur.listedOn = listedOn;
+    } else {
+      byKey.set(key, { symbol, exchange, quotes: [row.quote_currency], listedOn });
+    }
+  }
+  for (const l of byKey.values()) l.quotes.sort();
+  return [...byKey.values()].sort((a, b) => a.listedOn.localeCompare(b.listedOn) || a.symbol.localeCompare(b.symbol));
+}
+
 export interface DigestEntry extends DetectedListing {
   sinceListingPct?: number | null;
   day1KrVolKrw?: number | null;
@@ -195,13 +268,22 @@ export interface DigestEntry extends DetectedListing {
 }
 
 /** §7.B Korea Listings Digest — per-entry blocks per the spec template. */
-export function buildListingsDigest(listings: DigestEntry[], weekLabel: string, fxUsdKrw = 0): string {
+export function buildListingsDigest(
+  listings: DigestEntry[],
+  weekLabel: string,
+  fxUsdKrw = 0,
+  nonKrw: NonKrwListing[] = [],
+): string {
   const L = [`🇰🇷 <b>Korea Listings · Week of ${esc(weekLabel)}</b>`, HR];
-  if (listings.length === 0) {
+  if (listings.length === 0 && nonKrw.length === 0) {
     L.push(`No new KRW listings this week.`);
     return L.join("\n");
   }
-  L.push(`Upbit + Bithumb · KRW listings · ${listings.length} new`);
+  if (listings.length === 0) {
+    L.push(`No new KRW listings this week.`);
+  } else {
+    L.push(`Upbit + Bithumb · KRW listings · ${listings.length} new`);
+  }
   const sorted = [...listings].sort((a, b) => a.listedOn.localeCompare(b.listedOn));
   for (const l of sorted) {
     L.push(HR);
@@ -211,11 +293,31 @@ export function buildListingsDigest(listings: DigestEntry[], weekLabel: string, 
     }
     if (l.day1KrVolKrw != null && l.day1KrVolKrw > 0) {
       const usd = fxUsdKrw > 0 ? ` ≈ ${usdCompact(l.day1KrVolKrw / fxUsdKrw)}` : ``;
-      L.push(`Day-1 KR vol   ${krwT(l.day1KrVolKrw)}${usd}${l.venues.length > 1 ? " (combined)" : ""}`);
+      L.push(`Day-1 KR vol   ${krwCompact(l.day1KrVolKrw)}${usd}${l.venues.length > 1 ? " (combined)" : ""}`);
     }
     if (l.spikeMultiple != null && isFinite(l.spikeMultiple) && l.spikeMultiple > 0) {
       L.push(`Vol spike      ${l.spikeMultiple.toFixed(1)}× prior avg`);
     }
   }
+
+  // Non-KRW pairs get their own section rather than being mixed in: they are
+  // a different kind of event (a token already tradable in Korea gaining a
+  // BTC/USDT book) and their volumes are orders of magnitude smaller, so
+  // interleaving them would make the KRW numbers hard to scan.
+  if (nonKrw.length > 0) {
+    const byExchange = [...new Set(nonKrw.map(n => n.exchange))]
+      .map(x => VENUE_LABEL[x] || x).join(" + ");
+    L.push(HR);
+    L.push(`${esc(byExchange)} · non-KRW pairs · ${nonKrw.length} new`);
+    for (const n of nonKrw) {
+      L.push(HR);
+      L.push(`<b>$${esc(n.symbol)}</b>  🇰🇷 ${esc(VENUE_LABEL[n.exchange] || n.exchange)} (${esc(n.quotes.join(" + "))}) · ${esc(shortDate(n.listedOn))}`);
+      if (n.day1KrVolKrw != null && n.day1KrVolKrw > 0) {
+        const usd = fxUsdKrw > 0 ? ` ≈ ${usdCompact(n.day1KrVolKrw / fxUsdKrw)}` : ``;
+        L.push(`Day-1 KR vol   ${krwCompact(n.day1KrVolKrw)}${usd}`);
+      }
+    }
+  }
+
   return L.join("\n");
 }
