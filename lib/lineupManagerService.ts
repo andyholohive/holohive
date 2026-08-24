@@ -98,6 +98,8 @@ export type CampaignLineup = {
   proposed_at: string | null;
   confirmed_by: string | null;
   confirmed_at: string | null;
+  /** Internal-only weekly notes. Never rendered on a client-facing surface. */
+  notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -785,6 +787,75 @@ export class LineupManagerService {
   }
 
   // ── Activity log ─────────────────────────────────────────────────
+
+  /**
+   * Save the week's internal notes.
+   *
+   * Not logged to lineup_activity_log: the log records roster decisions, and
+   * an entry per keystroke-batch of prose would bury the add/remove events the
+   * Changes summary is built from.
+   */
+  async updateNotes(lineupId: string, notes: string): Promise<void> {
+    const { error } = await (this.supabase as any)
+      .from('campaign_lineups')
+      .update({ notes: notes.trim() || null, updated_at: new Date().toISOString() })
+      .eq('id', lineupId);
+    if (error) throw error;
+  }
+
+  /**
+   * Who came out of this week's lineup and who went in.
+   *
+   * Derived from the activity log rather than stored, because the swap is not
+   * a thing anyone records — it is a removal and an addition that happen to be
+   * related. Reconstructing it is what makes it visible: 12 KOLs were removed
+   * from one Fogo week and nothing on the page said so.
+   *
+   * Two rules keep this to actual swaps:
+   *
+   * Netting — a KOL added, removed, then re-added is not a swap, so a name is
+   * placed by its LAST event, and can never appear on both sides.
+   *
+   * Replacements only — every current member has a kol_added event, so "added"
+   * on its own would list the entire roster and mean nothing. An addition
+   * counts as a swap-in only if it happened after the first removal. A week
+   * with no removals has no swaps, which is the correct answer.
+   */
+  async getRosterChanges(lineupId: string): Promise<{
+    out: Array<{ name: string; ts: string; actor: string | null }>;
+    in_: Array<{ name: string; ts: string; actor: string | null }>;
+  }> {
+    const { data, error } = await (this.supabase as any)
+      .from('lineup_activity_log')
+      .select('action, details, ts, actor_user:users!lineup_activity_log_actor_fkey(name)')
+      .eq('lineup_id', lineupId)
+      .in('action', ['kol_added', 'kol_removed'])
+      .order('ts', { ascending: true });
+    if (error) throw error;
+
+    const rows = (data || []) as any[];
+    const firstRemoval = rows.find(r => r.action === 'kol_removed')?.ts ?? null;
+
+    // Last event per KOL name decides which side they land on.
+    const last = new Map<string, { action: string; ts: string; actor: string | null }>();
+    for (const r of rows) {
+      const name = (r.details || '').trim();
+      if (!name) continue;
+      last.set(name, { action: r.action, ts: r.ts, actor: r.actor_user?.name ?? null });
+    }
+
+    const out: Array<{ name: string; ts: string; actor: string | null }> = [];
+    const in_: Array<{ name: string; ts: string; actor: string | null }> = [];
+    for (const [name, e] of last) {
+      if (e.action === 'kol_removed') {
+        out.push({ name, ts: e.ts, actor: e.actor });
+      } else if (firstRemoval && e.ts > firstRemoval) {
+        in_.push({ name, ts: e.ts, actor: e.actor });
+      }
+    }
+    const byTs = (a: { ts: string }, b: { ts: string }) => (a.ts < b.ts ? 1 : -1);
+    return { out: out.sort(byTs), in_: in_.sort(byTs) };
+  }
 
   async getActivityLog(lineupId: string): Promise<LineupActivityLogRow[]> {
     // Join the actor's display name so the popover can show who did

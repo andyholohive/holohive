@@ -1028,6 +1028,12 @@ export default function LineupsTab({
           </div>
         )}
 
+        {/* Swaps + internal notes. Above the body because both describe the
+            whole week rather than any one angle, and the swap list is the
+            thing nobody could see: one Fogo week had 8 KOLs removed with
+            nothing on the page saying so. */}
+        {lineup && <LineupChangesAndNotes lineup={lineup} service={service} />}
+
         {/* ─── Body ─── */}
         {!lineup ? (
           <div className="border border-cream-200 rounded-lg bg-white">
@@ -1773,6 +1779,120 @@ function SummaryView({
             const posted = lineup.angles.flatMap(a => a.slots).filter(s => s.status === 'posted').length;
             return <p>{posted} of {totalKols} KOLs posted.</p>;
           })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Roster changes + weekly notes ─────────────────────────────────
+
+/**
+ * What changed in this week's roster, and somewhere to say why.
+ *
+ * The swap list is reconstructed from the activity log (see
+ * getRosterChanges) — a swap is never recorded as such, it is a removal and
+ * an addition that happen to be related, so it was invisible until you opened
+ * the audit popover and read raw events.
+ *
+ * Notes are internal-only. Nothing under app/public reads campaign_lineups,
+ * and the public tracker builds its KOL list from approved contents, so this
+ * is the right home for candid "swapped X out, kept going dark" reasoning.
+ */
+function LineupChangesAndNotes({
+  lineup,
+  service,
+}: {
+  lineup: { id: string; notes?: string | null };
+  service: LineupManagerService;
+}) {
+  const { toast } = useToast();
+  const [changes, setChanges] = useState<{
+    out: Array<{ name: string; ts: string; actor: string | null }>;
+    in_: Array<{ name: string; ts: string; actor: string | null }>;
+  } | null>(null);
+  const [notes, setNotes] = useState(lineup.notes ?? '');
+  const [savedNotes, setSavedNotes] = useState(lineup.notes ?? '');
+  const [saving, setSaving] = useState(false);
+  const [openNotes, setOpenNotes] = useState(!!lineup.notes);
+
+  useEffect(() => {
+    setNotes(lineup.notes ?? '');
+    setSavedNotes(lineup.notes ?? '');
+    setOpenNotes(!!lineup.notes);
+    let alive = true;
+    service.getRosterChanges(lineup.id)
+      .then(c => { if (alive) setChanges(c); })
+      .catch(() => { if (alive) setChanges({ out: [], in_: [] }); });
+    return () => { alive = false; };
+  }, [lineup.id, lineup.notes, service]);
+
+  const saveNotes = async () => {
+    setSaving(true);
+    try {
+      await service.updateNotes(lineup.id, notes);
+      setSavedNotes(notes.trim());
+      toast({ title: 'Notes saved', duration: 1500 });
+    } catch (err: any) {
+      toast({ title: 'Could not save notes', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const swapped = (changes?.out.length ?? 0) > 0;
+  const dirty = notes.trim() !== savedNotes;
+
+  return (
+    <div className="rounded-lg border border-cream-200 bg-white px-3 py-2.5 space-y-2">
+      <div className="flex items-start gap-2 flex-wrap">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-ink-warm-500 mt-1">Changes</span>
+        {changes === null ? (
+          <Skeleton className="h-5 w-40 rounded" />
+        ) : !swapped ? (
+          <span className="text-xs text-ink-warm-400">No swaps this week.</span>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {changes.out.map(k => (
+              <StatusBadge key={`out-${k.name}`} tone="danger" size="sm">
+                <span title={`Removed ${formatDateTime(k.ts)}${k.actor ? ` by ${k.actor}` : ''}`}>
+                  − {k.name}
+                </span>
+              </StatusBadge>
+            ))}
+            {changes.in_.map(k => (
+              <StatusBadge key={`in-${k.name}`} tone="success" size="sm">
+                <span title={`Added ${formatDateTime(k.ts)}${k.actor ? ` by ${k.actor}` : ''}`}>
+                  + {k.name}
+                </span>
+              </StatusBadge>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpenNotes(o => !o)}
+          className="ml-auto text-xs text-brand hover:underline"
+        >
+          {openNotes ? 'Hide notes' : savedNotes ? 'Notes' : 'Add notes'}
+        </button>
+      </div>
+
+      {openNotes && (
+        <div className="space-y-1.5">
+          <Textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Internal notes for this week — why a KOL was swapped, what to watch, anything the next person needs."
+            className="focus-brand text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="brand" onClick={saveNotes} disabled={saving || !dirty}>
+              {saving ? 'Saving…' : 'Save notes'}
+            </Button>
+            <span className="text-[11px] text-ink-warm-400">Internal only — never shown to the client.</span>
+          </div>
         </div>
       )}
     </div>
