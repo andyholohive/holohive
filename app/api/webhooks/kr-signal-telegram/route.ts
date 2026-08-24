@@ -7,6 +7,11 @@ import { buildBackdrop } from '@/lib/krSignal/weeklyReport';
 import { getWeeklyReviewById } from '@/lib/krSignal/store';
 import { approveAndSend, skipReport } from '@/lib/krSignal/reviewActions';
 import { approveAndSendDigest, skipDigest } from '@/lib/krSignal/listingDigestReview';
+import {
+  fetchRecentKrwListings, fetchRecentNonKrwListings, buildListingsDigest,
+  getTokenKrPriceKrw, type DigestEntry,
+} from '@/lib/krSignal/listings';
+import { getUsdKrw } from '@/lib/krSignal/adapters';
 import { getAppSetting } from '@/lib/appSettings';
 import { escapeHtml } from '@/lib/telegramHtml';
 
@@ -167,6 +172,7 @@ export async function POST(request: Request) {
       '',
       '/weekly [client] — Weekly KR Market Report',
       '/vl [client] — Market backdrop (volumes, KOSPI, FX, kimchi)',
+      '/listing — this week\'s Korea listings digest (internal chats only)',
       '/status — bot health',
       '/help — this message',
       '',
@@ -195,6 +201,49 @@ export async function POST(request: Request) {
           await sendMessage(chatId, '⏳ Building weekly report (live data)…');
           const res = await assembleWeekly(supabase, cfg);
           await sendMessage(chatId, res.html);
+          break;
+        }
+        // [2026-08-24, Andy] Preview the Saturday digest on demand.
+        //
+        // Refused in a client chat on purpose. The digest is a client
+        // deliverable that now requires approval before it is sent, and a
+        // command anyone could run in a client's own chat would be a way
+        // around that gate — the client would simply receive it.
+        case 'listing':
+        case 'listings': {
+          const bound = await loadClientByChatId(supabase, chatId);
+          if (bound) {
+            await sendMessage(chatId,
+              `This is ${bound.name}'s chat. The listings digest is sent after review — ask in an internal chat for a preview.`);
+            break;
+          }
+          await sendMessage(chatId, '⏳ Building this week\'s listings…');
+          const since7 = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+          const krwListings = await fetchRecentKrwListings(supabase, since7);
+          const nonKrw = await fetchRecentNonKrwListings(supabase, since7, krwListings);
+          const fx = await getUsdKrw().catch(() => 0);
+
+          // Same enrichment the cron does, so the preview is the message —
+          // not an approximation of it.
+          const entries: DigestEntry[] = [];
+          for (const l of krwListings) {
+            const entry: DigestEntry = { ...l };
+            const { data: rec } = await supabase
+              .from('kr_signal_listings')
+              .select('listing_price_krw, day1_kr_vol, baseline_7d')
+              .eq('ticker', l.symbol).eq('listed_on', l.listedOn).maybeSingle();
+            const listPrice = Number((rec as any)?.listing_price_krw ?? 0);
+            if (listPrice > 0) {
+              const nowPrice = await getTokenKrPriceKrw(l.symbol).catch(() => 0);
+              if (nowPrice > 0) entry.sinceListingPct = ((nowPrice - listPrice) / listPrice) * 100;
+            }
+            const day1 = Number((rec as any)?.day1_kr_vol ?? 0);
+            if (day1 > 0) entry.day1KrVolKrw = day1;
+            const base = Number((rec as any)?.baseline_7d ?? 0);
+            if (day1 > 0 && base > 0 && fx > 0) entry.spikeMultiple = day1 / fx / base;
+            entries.push(entry);
+          }
+          await sendMessage(chatId, buildListingsDigest(entries, krWeekLabel(new Date()), fx, nonKrw));
           break;
         }
         case 'vl': {
@@ -235,6 +284,21 @@ export async function POST(request: Request) {
  * clients at once, so the acknowledgement has to report how many landed —
  * "Sent to <client>" would be wrong here.
  */
+/** Calendar week (Mon–Sun) the digest covers — mirrors the cron's label so a
+ *  preview and the real send name the same week. */
+function krWeekLabel(now: Date): string {
+  const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monday = new Date(now);
+  const shift = (monday.getUTCDay() + 6) % 7;
+  monday.setUTCDate(monday.getUTCDate() - shift);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const right = monday.getUTCMonth() === sunday.getUTCMonth()
+    ? `${sunday.getUTCDate()}`
+    : `${M[sunday.getUTCMonth()]} ${sunday.getUTCDate()}`;
+  return `${M[monday.getUTCMonth()]} ${monday.getUTCDate()}–${right}`;
+}
+
 async function handleDigestCallback(cb: any): Promise<void> {
   const cbId: string = cb?.id;
   const data: string | undefined = cb?.data;
