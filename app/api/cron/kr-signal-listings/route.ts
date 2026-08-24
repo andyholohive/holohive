@@ -13,7 +13,10 @@ import {
   type DigestEntry,
 } from '@/lib/krSignal/listings';
 import { getUsdKrw, getTrailing7dAvgVolumeUsd, getCoinPriceAndMcapUsd, searchCoingeckoIdBySymbol, getPerVenueVolume } from '@/lib/krSignal/adapters';
-import { sendMessage, editMessageText } from '@/lib/krSignal/telegram';
+import { sendMessage, editMessageText, sendMessageWithButtons, probeChat } from '@/lib/krSignal/telegram';
+import { getAppSetting } from '@/lib/appSettings';
+import { saveDigestForReview, attachDigestCard } from '@/lib/krSignal/listingDigestReview';
+import { buildListingDigestCard, listingDigestButtons } from '@/lib/krSignal/reviewCard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -243,9 +246,45 @@ export async function GET(request: Request) {
         entries.push(entry);
       }
       const html = buildListingsDigest(entries, weekLabelFor(now), fx);
-      const digestClients = clients.filter((c) => c.features?.korea_listings_digest && c.resolved_chat_id);
+
+      // [2026-08-24, Andy] The digest no longer sends itself. It is queued for
+      // approval the same way the weekly report is, and fans out to every
+      // digest client only once someone approves.
+      //
+      // This also closes the hole that hid its own failure: the previous
+      // version sent inside a catch-and-ignore, so when the digest stopped
+      // going out after 2026-08-08 nothing recorded that it had.
+      const digestClients = clients.filter((c) => c.features?.korea_listings_digest);
+      const preflight = [] as any[];
       for (const c of digestClients) {
-        try { await sendMessage(c.resolved_chat_id!, html, c.resolved_thread_id); summary.digests++; } catch (e) { /* keep sweeping */ }
+        preflight.push(c.resolved_chat_id
+          ? { client_id: c.id, name: c.name, chat_id: String(c.resolved_chat_id), ...(await probeChat(c.resolved_chat_id)) }
+          : { client_id: c.id, name: c.name, chat_id: null, ok: false, error: 'No destination chat resolved' });
+      }
+
+      const weekEnding = now.toISOString().slice(0, 10);
+      const row = await saveDigestForReview(supabase, weekEnding, html, preflight);
+      if (!row) {
+        summary.digestQueued = 'already decided this week';
+      } else {
+        summary.digestQueued = true;
+        const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
+        const reviewThreadId = await getAppSetting(supabase, 'kr_signal_review_thread_id');
+        if (reviewChatId && !row.review_message_id) {
+          const card = buildListingDigestCard({
+            weekLabel: weekLabelFor(now),
+            html,
+            preflight,
+            listingCount: entries.length,
+          });
+          const msg = await sendMessageWithButtons(
+            reviewChatId, card, listingDigestButtons(row.id), reviewThreadId,
+          );
+          await attachDigestCard(supabase, row.id, String(reviewChatId), msg.message_id);
+        } else if (!reviewChatId) {
+          summary.digestWarning =
+            'kr_signal_review_chat_id is not set — the digest is queued but nobody will be asked to approve it.';
+        }
       }
     }
 

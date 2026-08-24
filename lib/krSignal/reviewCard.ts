@@ -78,9 +78,61 @@ export function decidedCard(
   detail?: string
 ): string {
   const stamp = {
-    sent: `✅ <b>Sent to client</b>${byName ? ` by ${escapeHtml(byName)}` : ''}`,
+    // `detail` is optional here: the weekly report goes to exactly one client
+    // and has nothing to add, while the listings digest fans out to several
+    // and needs to say how many landed.
+    sent: `✅ <b>Sent to client</b>${byName ? ` by ${escapeHtml(byName)}` : ''}${detail ? ` — ${escapeHtml(detail)}` : ''}`,
     skipped: `⏭ <b>Skipped</b>${byName ? ` by ${escapeHtml(byName)}` : ''} — not sent this week`,
     failed: `🚫 <b>Send failed</b>${detail ? ` — ${escapeHtml(detail)}` : ''}`,
   }[outcome];
   return `${stamp}\n\n${original}`;
+}
+
+/**
+ * The Saturday listings-digest card (spec §7.B).
+ *
+ * Separate from buildReviewCard because the two are reviewed differently: a
+ * weekly report belongs to one client and its preflight is one destination,
+ * while the digest is one message bound for several. The preflight therefore
+ * has to list every recipient, since approving sends to all of them at once
+ * and an unreachable chat among them should be visible before that, not after.
+ */
+export interface ListingDigestCardInput {
+  weekLabel: string;
+  html: string;
+  /** One entry per digest client: { name, chat_id, ok, error }. */
+  preflight: Array<{ name?: string | null; ok?: boolean; error?: string | null }>;
+  listingCount: number;
+}
+
+export function buildListingDigestCard(input: ListingDigestCardInput): string {
+  const { weekLabel, html, preflight, listingCount } = input;
+  const body = html.length > MAX_REPORT_CHARS
+    ? `${html.slice(0, MAX_REPORT_CHARS)}\n… (truncated — open in HHP for the full digest)`
+    : html;
+
+  const reachable = preflight.filter(p => p.ok);
+  const broken = preflight.filter(p => !p.ok);
+
+  const recipients = preflight.length === 0
+    ? '⚠️ <b>No recipients</b> — no active client has the listings digest enabled.'
+    : `Goes to ${reachable.length} of ${preflight.length}: ${
+        reachable.map(p => escapeHtml(p.name ?? 'unknown')).join(', ') || '—'
+      }`;
+  const problems = broken.length
+    ? `\n⚠️ Unreachable: ${broken.map(p => `${escapeHtml(p.name ?? 'unknown')} (${escapeHtml(p.error ?? 'unknown error')})`).join(', ')}`
+    : '';
+
+  const header = `📋 <b>Review — Korea listings digest</b>\n${escapeHtml(weekLabel)} · ${listingCount} listing${listingCount === 1 ? '' : 's'}. It will not send until approved.\n${recipients}${problems}`;
+
+  return `${header}\n\n———\n\n${body}`;
+}
+
+/** Distinct callback prefix from the weekly card so the webhook can tell a
+ *  digest decision from a report decision. */
+export function listingDigestButtons(rowId: string): InlineButton[][] {
+  return [[
+    { text: '✅ Approve & send', callback_data: `krd:approve:${rowId}` },
+    { text: '⏭ Skip', callback_data: `krd:skip:${rowId}` },
+  ]];
 }

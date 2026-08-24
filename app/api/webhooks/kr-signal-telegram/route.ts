@@ -6,6 +6,7 @@ import { sendMessage, answerCallbackQuery } from '@/lib/krSignal/telegram';
 import { buildBackdrop } from '@/lib/krSignal/weeklyReport';
 import { getWeeklyReviewById } from '@/lib/krSignal/store';
 import { approveAndSend, skipReport } from '@/lib/krSignal/reviewActions';
+import { approveAndSendDigest, skipDigest } from '@/lib/krSignal/listingDigestReview';
 import { getAppSetting } from '@/lib/appSettings';
 import { escapeHtml } from '@/lib/telegramHtml';
 
@@ -63,7 +64,14 @@ export async function POST(request: Request) {
     // command gate below, which exists because those commands are reachable
     // from CLIENT chats — here the surface itself is the permission.
     if (update?.callback_query) {
-      await handleReviewCallback(update.callback_query);
+      // `krd:` = listings digest, `krw:` = weekly report. Same review chat and
+      // the same permission model; separate handlers because the two decide
+      // over different rows.
+      if (String(update.callback_query?.data ?? '').startsWith('krd:')) {
+        await handleDigestCallback(update.callback_query);
+      } else {
+        await handleReviewCallback(update.callback_query);
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -219,6 +227,77 @@ export async function POST(request: Request) {
  * Every path answers the callback. Telegram spins the button until it gets an
  * ack, so a silent early return reads to the operator as a hung bot.
  */
+/**
+ * Handle a tap on the Saturday listings-digest card (`krd:<action>:<rowId>`).
+ *
+ * Same shape as the weekly handler and the same review-chat-only gate. It is
+ * separate rather than merged because approving a digest fans out to several
+ * clients at once, so the acknowledgement has to report how many landed —
+ * "Sent to <client>" would be wrong here.
+ */
+async function handleDigestCallback(cb: any): Promise<void> {
+  const cbId: string = cb?.id;
+  const data: string | undefined = cb?.data;
+  const chatId = cb?.message?.chat?.id;
+  if (!cbId || !data?.startsWith('krd:')) return;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    await answerCallbackQuery(cbId, 'Server not configured.', true);
+    return;
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
+  if (!reviewChatId || String(chatId) !== String(reviewChatId)) {
+    await answerCallbackQuery(cbId, 'These buttons only work in the review chat.', true);
+    return;
+  }
+
+  const [, action, rowId] = data.split(':');
+  if (!rowId) {
+    await answerCallbackQuery(cbId, 'Malformed button.', true);
+    return;
+  }
+
+  const from = cb?.from ?? {};
+  const actorName: string =
+    [from.first_name, from.last_name].filter(Boolean).join(' ') ||
+    from.username ||
+    (from.id ? `TG ${from.id}` : 'Unknown');
+  const { data: teamUser } = from.id
+    ? await supabase.from('users').select('id').eq('telegram_id', String(from.id)).maybeSingle()
+    : { data: null };
+  const actor = { name: actorName, userId: (teamUser as any)?.id ?? null };
+
+  try {
+    if (action === 'approve') {
+      const res = await approveAndSendDigest(supabase, rowId, actor);
+      if (res.ok) {
+        await answerCallbackQuery(cbId,
+          res.failed ? `Sent to ${res.delivered}, ${res.failed} failed.` : `Sent to ${res.delivered}.`);
+      } else if (res.alreadyDecided) {
+        await answerCallbackQuery(cbId, `Already ${res.alreadyDecided}.`, true);
+      } else {
+        await answerCallbackQuery(cbId, res.error ?? 'Could not send.', true);
+      }
+      return;
+    }
+    if (action === 'skip') {
+      const res = await skipDigest(supabase, rowId, actor);
+      await answerCallbackQuery(cbId,
+        res.ok ? 'Skipped — nothing sent.'
+          : res.alreadyDecided ? `Already ${res.alreadyDecided}.` : (res.error ?? 'Could not skip.'),
+        !res.ok);
+      return;
+    }
+    await answerCallbackQuery(cbId, 'Unknown action.', true);
+  } catch (e: any) {
+    await answerCallbackQuery(cbId, `Failed: ${(e && e.message) || String(e)}`, true);
+  }
+}
+
 async function handleReviewCallback(cb: any): Promise<void> {
   const cbId: string = cb?.id;
   const data: string | undefined = cb?.data;
