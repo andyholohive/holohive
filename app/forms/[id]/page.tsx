@@ -1294,8 +1294,13 @@ export default function FormBuilderPage() {
       setEditedThankYou((data as any).thank_you_message || '');
       setEditedStatus(data.status);
 
-      // Calculate total pages
-      const maxPage = data.fields.reduce((max, field) => Math.max(max, field.page_number), 1);
+      // Page count comes from the form, not the fields. A page with no fields
+      // — which is exactly what a thank-you page is — leaves no trace in
+      // form_fields, so deriving it here used to delete that page on reload.
+      // Fields still act as a floor, so a form saved before page_count existed
+      // cannot lose pages it demonstrably has.
+      const maxFieldPage = data.fields.reduce((max, field) => Math.max(max, field.page_number), 1);
+      const maxPage = Math.max((data as any).page_count ?? 1, maxFieldPage);
       setTotalPages(maxPage);
 
       // Initialize page order if not set
@@ -2002,11 +2007,24 @@ export default function FormBuilderPage() {
     }
   };
 
-  const handleAddPage = () => {
+  const handleAddPage = async () => {
     const newPageNum = totalPages + 1;
     setTotalPages(newPageNum);
     setPageOrder(prev => [...prev, newPageNum]);
     setCurrentPage(newPageNum);
+    // Persist immediately. The page is real the moment it is added, even with
+    // no fields on it, and the old code only ever held it in React state.
+    if (form?.id) {
+      try {
+        await FormService.updateForm({ id: form.id, page_count: newPageNum });
+      } catch (error) {
+        toast({
+          title: 'Page not saved',
+          description: error instanceof Error ? error.message : 'Could not save the new page.',
+          variant: 'destructive',
+        });
+      }
+    }
   };
 
   // [v11 destructive Dialog] confirm() replaced by deletePagePending
@@ -2036,6 +2054,10 @@ export default function FormBuilderPage() {
         await FormService.updateFieldPositions(fieldsToUpdate);
       }
 
+      // Persist the smaller count too, or the deleted page returns on reload.
+      if (form?.id) {
+        await FormService.updateForm({ id: form.id, page_count: Math.max(1, totalPages - 1) });
+      }
       setTotalPages(prev => prev - 1);
       setPageOrder(prev => prev.filter(p => p !== pageNumber).map(p => p > pageNumber ? p - 1 : p));
       if (currentPage >= pageNumber && currentPage > 1) {
@@ -2100,6 +2122,9 @@ export default function FormBuilderPage() {
           await FormService.updateFieldPositions(fieldsToUpdate);
         }
 
+        if (form?.id) {
+          await FormService.updateForm({ id: form.id, page_count: Math.max(1, totalPages - 1) });
+        }
         setTotalPages(prev => prev - 1);
         setPageOrder(prev => prev.filter(p => p !== pageNumber).map(p => p > pageNumber ? p - 1 : p));
         if (currentPage >= pageNumber && currentPage > 1) {

@@ -15,6 +15,9 @@ export interface Form {
   subdomain_enabled: boolean | null;
   subdomain_url: string | null;
   enable_thank_you_page?: boolean | null;
+  /** Page count, including pages with no fields. Not derivable from
+   *  form_fields — a thank-you page has no rows there. */
+  page_count?: number | null;
   /** Replaces the default "Your response has been submitted successfully."
    *  on the post-submit screen. Null/blank falls back to that default.
    *  Distinct from `enable_thank_you_page`, which repurposes the form's own
@@ -78,6 +81,7 @@ export interface UpdateFormData {
   subdomain_url?: string | null;
   enable_thank_you_page?: boolean | null;
   thank_you_message?: string | null;
+  page_count?: number | null;
 }
 
 export interface CreateFieldData {

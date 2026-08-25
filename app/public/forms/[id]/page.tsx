@@ -165,8 +165,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
       setForm(data);
 
-      // Calculate total pages
-      const maxPage = data.fields.reduce((max, field) => Math.max(max, field.page_number), 1);
+      // Same rule as the editor: page count is stored on the form, because a
+      // thank-you page has no fields and so leaves no trace in form_fields.
+      const maxFieldPage = data.fields.reduce((max, field) => Math.max(max, field.page_number), 1);
+      const maxPage = Math.max((data as any).page_count ?? 1, maxFieldPage);
       setTotalPages(maxPage);
 
       // Initialize form data with empty values
