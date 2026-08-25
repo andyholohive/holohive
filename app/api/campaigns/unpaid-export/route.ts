@@ -18,6 +18,10 @@ export const dynamic = 'force-dynamic';
  * instead. Filtering is something a spreadsheet does well; recovering rows
  * that were never exported is not.
  *
+ * The one exception, added 2026-08-25: rows on ARCHIVED clients are dropped.
+ * Archived means the record was deleted — test data and internal
+ * placeholders — so unlike an inactive client there is nothing to chase.
+ *
  * "Unpaid" is `payment_date IS NULL`, the same test the Content tab and the
  * Analytics alert use. Amount is NOT part of it: a $0 payment is a real
  * settled deal (token, WL, barter), so zero-amount rows still count as
@@ -71,7 +75,7 @@ export async function GET() {
 
   const [{ data: clients }, { data: kols }] = await Promise.all([
     clientIds.length
-      ? supabase.from('clients').select('id, name, is_active, is_ad_hoc').in('id', clientIds)
+      ? supabase.from('clients').select('id, name, is_active, is_ad_hoc, archived_at').in('id', clientIds)
       : Promise.resolve({ data: [] as any[] }),
     masterKolIds.length
       ? supabase.from('master_kols').select('id, name').in('id', masterKolIds)
@@ -89,7 +93,25 @@ export async function GET() {
     'Zero Amount', 'Category', 'Wallet', 'Notes', 'Created', 'In Rollup Scope', 'Payment ID',
   ];
 
-  const body = rows.map(p => {
+  // [2026-08-25, Andy] Archived clients are dropped entirely, unlike merely
+  // inactive ones which stay and are flagged out-of-scope.
+  //
+  // The distinction is whether the row is chaseable. An inactive client —
+  // Altura, Impossible, X1 — is a real engagement that ended, and money may
+  // genuinely still be owed. An archived one is a deleted record: test data
+  // and internal placeholders nobody will ever invoice. Those were 15 of the
+  // 95 rows and are noise even after filtering on In Rollup Scope.
+  //
+  // Deliberately narrower than the "export everything" rule above, which
+  // exists so a finance chase never silently loses a chaseable row. An
+  // archived client has none.
+  const visibleRows = rows.filter(p => {
+    const campaign = p.campaign_id ? campaignById.get(p.campaign_id) : null;
+    const client = campaign?.client_id ? clientById.get(campaign.client_id) : null;
+    return !client?.archived_at;
+  });
+
+  const body = visibleRows.map(p => {
     const campaign = p.campaign_id ? campaignById.get(p.campaign_id) : null;
     const client = campaign?.client_id ? clientById.get(campaign.client_id) : null;
     const inScope = !!client?.is_active && !client?.is_ad_hoc;
