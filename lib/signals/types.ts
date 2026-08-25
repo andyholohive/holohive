@@ -115,8 +115,8 @@ export const SIGNAL_WEIGHTS: Record<string, SignalWeightConfig> = {
   // ═══ SECTION 3: ENRICHMENT SIGNALS (Tier 4) ═══
   warm_intro_available:     { weight: 10, tier: 4, shelf_life_days: 90,  category: 'enrichment', description: 'Warm intro available via network' },
   decision_maker_identified:{ weight: 5,  tier: 4, shelf_life_days: 90,  category: 'enrichment', description: 'Decision maker identified + accessible' },
-  previous_contact_positive:{ weight: 5,  tier: 4, shelf_life_days: 180, category: 'enrichment', description: 'Previous HoloHive contact (positive)' },
-  previous_contact_cold:    { weight: -5, tier: 4, shelf_life_days: 180, category: 'enrichment', description: 'Previous HoloHive contact (cold/no response)' },
+  previous_contact_positive:{ weight: 5,  tier: 4, shelf_life_days: 180, category: 'enrichment', description: 'Previous Holo Hive contact (positive)' },
+  previous_contact_cold:    { weight: -5, tier: 4, shelf_life_days: 180, category: 'enrichment', description: 'Previous Holo Hive contact (cold/no response)' },
 
   // ═══ NEGATIVE SIGNALS ═══
   korea_exchange_delisting: { weight: -30, tier: 2, shelf_life_days: 90, category: 'korea', description: 'Delisted from Korean exchange' },

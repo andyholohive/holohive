@@ -268,7 +268,7 @@ export async function POST(request: Request) {
     const fromDate = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
     const fromDateISO = fromDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    const SYSTEM_PROMPT = `You are a BD research analyst for HoloHive, a Seoul-based KOL growth agency.
+    const SYSTEM_PROMPT = `You are a BD research analyst for Holo Hive, a Seoul-based KOL growth agency.
 
 Given an X/Twitter handle, read their recent posts (tweets + replies) and flag ANY content relevant to Korea / Asia strategy. Use live X search to pull fresh data.
 

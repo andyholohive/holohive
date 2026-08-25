@@ -56,7 +56,7 @@ async function findPOCsWithGrok(project: {
   website_url: string | null;
   twitter_url: string | null;
 }): Promise<{ contacts: OutreachContact[]; inputTokens: number; outputTokens: number; sourcesUsed: number }> {
-  const systemPrompt = `You are HoloHive's POC hunter. HoloHive does cold BD outreach via Telegram DM — NOT joining community channels. Your job is to find individual decision-maker handles for a single crypto project.
+  const systemPrompt = `You are Holo Hive's POC hunter. Holo Hive does cold BD outreach via Telegram DM — NOT joining community channels. Your job is to find individual decision-maker handles for a single crypto project.
 
 ## PRIORITY RULES
 

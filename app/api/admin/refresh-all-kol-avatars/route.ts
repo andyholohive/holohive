@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
   // Load the roster — active non-archived only. Per KOL-AVATAR.8 we no
   // longer need the group_chat_id join — that path was returning the
-  // HoloHive logo on every chat. Now: telegram_id (user) → getUserProfilePhotos,
+  // Holo Hive logo on every chat. Now: telegram_id (user) → getUserProfilePhotos,
   // else fall through to X.
   let query = (admin as any)
     .from('master_kols')

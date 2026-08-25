@@ -43,11 +43,11 @@ export async function POST(request: NextRequest) {
     return errorResp('invalid_request', 'client_id and redirect_uri required');
   }
 
-  // ── Verify user is logged into HoloHive ──
+  // ── Verify user is logged into Holo Hive ──
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return errorResp('unauthenticated', 'No HoloHive session — please sign in first');
+    return errorResp('unauthenticated', 'No Holo Hive session — please sign in first');
   }
 
   // ── Allowed-emails gate (mirrors the /oauth/authorize check) ──

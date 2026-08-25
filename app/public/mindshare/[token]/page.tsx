@@ -132,7 +132,7 @@ export default function PublicMindsharePage() {
           <ExternalLink className="h-6 w-6" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Report unavailable</h1>
-        <p className="text-sm text-gray-600">{error ?? "This link may have expired or been rotated. Reach out to your HoloHive contact for a fresh one."}</p>
+        <p className="text-sm text-gray-600">{error ?? "This link may have expired or been rotated. Reach out to your Holo Hive contact for a fresh one."}</p>
       </div>
     );
   }

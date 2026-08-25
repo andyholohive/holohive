@@ -585,7 +585,7 @@ export default function ClientsPage() {
     whitelist_partner_id: null as string | null,
     logo_url: null as string | null,
     // [2026-07-16] Every new client is pre-approved for holohive.io so the
-    // HoloHive team can always access the portal. Enforced again at insert.
+    // Holo Hive team can always access the portal. Enforced again at insert.
     approved_domains: ['holohive.io'] as string[],
     // Dashboard v2: specialized engagement models (Impossible, Robonet, …)
     // EXCLUDED from priority dashboard rollups so they don't skew KPIs.
@@ -2788,7 +2788,7 @@ export default function ClientsPage() {
         );
 
         // Save approved_domains + is_ad_hoc after client is created.
-        // holohive.io is always included so HoloHive staff can access the
+        // holohive.io is always included so Holo Hive staff can access the
         // portal, even if it was removed from the form [Andy 2026-07-16].
         if (client) {
           const extras: Record<string, any> = {};
@@ -2942,7 +2942,7 @@ export default function ClientsPage() {
           startClientForm.location.trim() || undefined
         );
         clientId = client.id;
-        // Pre-approve holohive.io so HoloHive staff can access the portal
+        // Pre-approve holohive.io so Holo Hive staff can access the portal
         // [Andy 2026-07-16] — mirrors the Add Client flow.
         await ClientService.updateClient(clientId, { approved_domains: ['holohive.io'] } as any);
       }

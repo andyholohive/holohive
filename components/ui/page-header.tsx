@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Standard page-header pattern for HoloHive Portal admin pages.
+ * Standard page-header pattern for Holo Hive Portal admin pages.
  *
  * Replaces the organic drift across pages where each page rebuilt its
  * own header — h1 vs h2, text-2xl vs text-3xl, varying icon positions,

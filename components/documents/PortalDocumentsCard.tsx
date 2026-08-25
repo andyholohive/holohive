@@ -120,7 +120,7 @@ export default function PortalDocumentsCard({ portalId, email, className }: { po
             </p>
             <CardTitle className="display-serif text-2xl text-ink-warm-900 mt-1">Delivery Documents</CardTitle>
             <p className="text-xs text-ink-warm-500 mt-1">
-              Prepared for you by HoloHive. {docs.length === 1 ? '1 document' : `${docs.length} documents`}.
+              Prepared for you by Holo Hive. {docs.length === 1 ? '1 document' : `${docs.length} documents`}.
             </p>
           </div>
         </div>

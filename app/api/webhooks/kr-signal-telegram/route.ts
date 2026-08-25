@@ -128,8 +128,8 @@ export async function POST(request: Request) {
       // linked their Telegram gets told why instead of being left guessing.
       await sendMessage(
         chatId,
-        'This bot is for the HoloHive team.\n\n' +
-        '<i>On the team and seeing this? Your Telegram isn\'t linked to your HoloHive account yet — ask Andy to add it.</i>',
+        'This bot is for the Holo Hive team.\n\n' +
+        '<i>On the team and seeing this? Your Telegram isn\'t linked to your Holo Hive account yet — ask Andy to add it.</i>',
       ).catch(() => {});
       console.warn('[kr-signal-webhook] non-team sender rejected', { fromUserId, chatId });
       return NextResponse.json({ ok: true });

@@ -105,7 +105,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'list_active_campaigns',
-      'List all active (non-archived, non-closed) HoloHive campaigns with client, status, budget, region, and manager.',
+      'List all active (non-archived, non-closed) Holo Hive campaigns with client, status, budget, region, and manager.',
       listActiveCampaignsSchema,
       async (args) => {
         const supabase = getServiceClient();
@@ -234,7 +234,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'list_clients',
-      'List HoloHive clients (the paying customers — distinct from CRM opportunities). Filter by active_only (default true) or search by name. Returns name, email, location, status, onboarding state.',
+      'List Holo Hive clients (the paying customers — distinct from CRM opportunities). Filter by active_only (default true) or search by name. Returns name, email, location, status, onboarding state.',
       listClientsSchema,
       async (args) => {
         const supabase = getServiceClient();
@@ -361,7 +361,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'get_kol_call_log',
-      'Call log entries for one KOL — date, type (First Onboarding / Repeat Onboarding / Check-in), project, and any of: notes (debrief), market intel, recommended angle, feedback on HoloHive. Reverse chronological.',
+      'Call log entries for one KOL — date, type (First Onboarding / Repeat Onboarding / Check-in), project, and any of: notes (debrief), market intel, recommended angle, feedback on Holo Hive. Reverse chronological.',
       getKolCallLogSchema,
       async (args) => {
         const supabase = getServiceClient();

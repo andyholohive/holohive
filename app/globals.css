@@ -131,7 +131,7 @@ thead span {
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
 
-  /* HoloHive brand palette — prefer these over hardcoded hex.
+  /* Holo Hive brand palette — prefer these over hardcoded hex.
      Use via: style={{ backgroundColor: 'var(--brand)' }} or Tailwind bg-brand. */
   --brand: #3e8692;
   --brand-hover: #2d6b75;

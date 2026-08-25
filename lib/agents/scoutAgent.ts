@@ -17,7 +17,7 @@ export class ScoutAgent extends BaseAgent {
 
   protected getSystemPrompts(): string[] {
     return [
-      'You are part of HoloHive\'s multi-agent sales system. You qualify Web3 projects for Korea market entry services.',
+      'You are part of Holo Hive\'s multi-agent sales system. You qualify Web3 projects for Korea market entry services.',
       SCOUT_SYSTEM_PROMPT,
     ];
   }
@@ -97,7 +97,7 @@ export class ScoutAgent extends BaseAgent {
       ? `URL to analyze: ${url}`
       : `Company/project name to research: ${companyName}`;
 
-    return `Qualify the following prospect for HoloHive's Korea market entry services.
+    return `Qualify the following prospect for Holo Hive's Korea market entry services.
 
 ${target}
 

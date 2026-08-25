@@ -225,7 +225,7 @@ async function fetchAvatarFromTelegramUser(
  *      setting, which most users don't enable. Falls through to nothing.
  *
  * Group-chat photo path was dropped in KOL-AVATAR.8 — every team group
- * chat shared the HoloHive logo, so it was useless.
+ * chat shared the Holo Hive logo, so it was useless.
  */
 export async function refreshKolAvatar(
   kol: { id: string; telegram_id?: string | null; link?: string | null },

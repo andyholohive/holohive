@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Book a Meeting - HoloHive',
+  title: 'Book a Meeting - Holo Hive',
   robots: {
     index: false,
     follow: false,

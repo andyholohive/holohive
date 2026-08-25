@@ -68,7 +68,7 @@ export function shortLinkNotFound(): NextResponse {
     `<!doctype html><meta charset="utf-8"><title>Link not found</title>
      <div style="font:16px/1.6 system-ui,sans-serif;max-width:32rem;margin:20vh auto;padding:0 1.5rem;color:#3f3f46">
        <h1 style="font-size:1.25rem;margin:0 0 .5rem">This link isn't active</h1>
-       <p style="margin:0;color:#71717a">It may have been turned off or mistyped. Check with your HoloHive contact.</p>
+       <p style="margin:0;color:#71717a">It may have been turned off or mistyped. Check with your Holo Hive contact.</p>
      </div>`,
     { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } },
   );

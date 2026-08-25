@@ -25,7 +25,7 @@ export default function BriefExpiredPage() {
         <div className="pt-20 text-center">
           <p className="text-lg font-semibold">This brief link has expired</p>
           <p className="text-sm text-neutral-500 mt-2">
-            Please contact your HoloHive point of contact for an updated link.
+            Please contact your Holo Hive point of contact for an updated link.
           </p>
         </div>
       </main>

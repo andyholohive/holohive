@@ -5,7 +5,7 @@ import { getKolScore as getKolScoreFromService } from '@/lib/kolScoreService';
 import { mcpAuthStorage } from '@/lib/mcp/context';
 
 /**
- * Tool definitions for the HoloHive MCP server.
+ * Tool definitions for the Holo Hive MCP server.
  *
  * Each tool takes a service-role Supabase client and the tool's input,
  * returns a string (Claude renders it as text content). The MCP route
@@ -470,7 +470,7 @@ export async function summarizePipeline(
     .neq('status', 'closed');
 
   const out: string[] = [];
-  out.push('## HoloHive pipeline snapshot');
+  out.push('## Holo Hive pipeline snapshot');
   out.push('');
   out.push(`**Discovery prospects (last 30d):** ${(recent || []).length} total`);
   for (const [tier, n] of Object.entries(tierCounts).sort((a, b) => b[1] - a[1])) {

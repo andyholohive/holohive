@@ -9,11 +9,11 @@ export const dynamic = 'force-dynamic';
  *
  * Claude.ai sends the user here when they connect our MCP server.
  * Responsibilities:
- *   1. Verify the user is logged into HoloHive (Supabase session).
+ *   1. Verify the user is logged into Holo Hive (Supabase session).
  *      If not, kick them to /auth and bounce back here after sign-in.
  *   2. Look up the registered client and validate redirect_uri.
  *   3. (Optional) Enforce an MCP_ALLOWED_EMAILS gate so a teammate
- *      with a HoloHive login can't grant access to OUR data on YOUR
+ *      with a Holo Hive login can't grant access to OUR data on YOUR
  *      Claude.ai account.
  *   4. Render an Allow/Deny form. The form POSTs to
  *      /api/oauth/consent (a regular handler, not a Server Action,
@@ -48,7 +48,7 @@ export default async function OAuthAuthorizePage({
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    // Send to /auth (HoloHive sign-in) with a redirectTo that rebuilds
+    // Send to /auth (Holo Hive sign-in) with a redirectTo that rebuilds
     // this exact URL after login completes.
     const callbackUrl = `/oauth/authorize?${new URLSearchParams(
       Object.fromEntries(
@@ -102,13 +102,13 @@ export default async function OAuthAuthorizePage({
           </div>
           <div>
             <h1 className="text-lg font-semibold text-gray-900">Authorize connection</h1>
-            <p className="text-xs text-gray-500">HoloHive · MCP connector</p>
+            <p className="text-xs text-gray-500">Holo Hive · MCP connector</p>
           </div>
         </div>
 
         <p className="text-sm text-gray-700 mb-2">
           <strong className="font-semibold">{client.client_name || 'An external app'}</strong> is requesting
-          access to your HoloHive data so it can answer questions on your behalf.
+          access to your Holo Hive data so it can answer questions on your behalf.
         </p>
         <p className="text-xs text-gray-500 mb-5">
           Signed in as <strong className="font-medium text-gray-700">{user.email}</strong>.
@@ -119,7 +119,7 @@ export default async function OAuthAuthorizePage({
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 mb-5 space-y-1">
           <div className="font-semibold text-gray-800 mb-1">This will allow it to:</div>
           <div>• Read prospects, campaigns, KOLs, and Korean exchange listings</div>
-          <div>• Run searches and summaries over your HoloHive data</div>
+          <div>• Run searches and summaries over your Holo Hive data</div>
           <div className="text-gray-500">• It will <strong>not</strong> be able to modify or delete records</div>
         </div>
 

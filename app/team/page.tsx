@@ -212,7 +212,7 @@ export default function TeamPage() {
   // potential link target for a team member. The team-member card's
   // popover filters out chats already linked to OTHER users so a
   // single chat can only point at one user (matches the unique
-  // semantics of users.telegram_id being one TG user per HoloHive user).
+  // semantics of users.telegram_id being one TG user per Holo Hive user).
   const fetchTgChats = async () => {
     try {
       const { data } = await (supabase as any)

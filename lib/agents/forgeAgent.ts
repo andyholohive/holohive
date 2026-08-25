@@ -16,7 +16,7 @@ export class ForgeAgent extends BaseAgent {
 
   protected getSystemPrompts(): string[] {
     return [
-      'You are part of HoloHive\'s multi-agent sales system. You generate proof material and content.',
+      'You are part of Holo Hive\'s multi-agent sales system. You generate proof material and content.',
       FORGE_SYSTEM_PROMPT,
     ];
   }
@@ -120,7 +120,7 @@ export class ForgeAgent extends BaseAgent {
 
     const topicLine = topic ? `\nFOCUS TOPIC: ${topic}\n` : '';
 
-    return `Generate a ${contentType === 'batch' ? 'batch of 3-5' : 'single'} content piece(s) for HoloHive's sales enablement.
+    return `Generate a ${contentType === 'batch' ? 'batch of 3-5' : 'single'} content piece(s) for Holo Hive's sales enablement.
 
 Today's date is ${new Date().toISOString().split('T')[0]}.
 ${topicLine}

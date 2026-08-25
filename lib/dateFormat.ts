@@ -1,6 +1,6 @@
 /**
  * Date formatting helpers — single source of truth for how dates are
- * shown to users across the HoloHive Portal.
+ * shown to users across the Holo Hive Portal.
  *
  * Canonical format is **mm/dd/yyyy** (en-US) per Andy 2026-06-14. All
  * absolute-date helpers output the same `12/15/2025` shape; only the

@@ -16,7 +16,7 @@ export class ColdcraftAgent extends BaseAgent {
 
   protected getSystemPrompts(): string[] {
     return [
-      'You are part of HoloHive\'s multi-agent sales system. You generate deeply personalized cold messages.',
+      'You are part of Holo Hive\'s multi-agent sales system. You generate deeply personalized cold messages.',
       COLDCRAFT_SYSTEM_PROMPT,
     ];
   }

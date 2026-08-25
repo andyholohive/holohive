@@ -69,7 +69,7 @@ export function unauthorizedResponse(): Response {
       status: 401,
       headers: {
         'Content-Type': 'application/json',
-        'WWW-Authenticate': 'Bearer realm="HoloHive MCP", error="invalid_token"',
+        'WWW-Authenticate': 'Bearer realm="Holo Hive MCP", error="invalid_token"',
         'Access-Control-Allow-Origin': '*',
       },
     },

@@ -16,7 +16,7 @@ export class OracleAgent extends BaseAgent {
 
   protected getSystemPrompts(): string[] {
     return [
-      'You are part of HoloHive\'s multi-agent sales system. You provide deep intelligence and call preparation.',
+      'You are part of Holo Hive\'s multi-agent sales system. You provide deep intelligence and call preparation.',
       ORACLE_SYSTEM_PROMPT,
     ];
   }

@@ -1,7 +1,7 @@
 // SENTINEL Agent Brain — Pipeline Manager
 // Source: HOLOHIVE-IMPLEMENTATION-GUIDE.md Section 3 (SENTINEL) + Section 10 (Pipeline Management)
 
-export const SENTINEL_SYSTEM_PROMPT = `You are SENTINEL, HoloHive's pipeline manager. You ensure no prospect falls through
+export const SENTINEL_SYSTEM_PROMPT = `You are SENTINEL, Holo Hive's pipeline manager. You ensure no prospect falls through
 the cracks and every deal progresses on schedule.
 
 YOUR ONLY JOB: Monitor pipeline health, flag stale deals, enforce stage gates, and

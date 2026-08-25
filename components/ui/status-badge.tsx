@@ -34,7 +34,7 @@ import React from 'react';
 
 export type BadgeTone =
   | 'neutral'   // gray   — default / unspecified
-  | 'brand'     // teal   — the HoloHive accent (#3e8692)
+  | 'brand'     // teal   — the Holo Hive accent (#3e8692)
   | 'success'   // green  — completed, paid, active
   | 'warning'   // amber  — paused, needs attention
   | 'danger'    // rose   — failed, overdue

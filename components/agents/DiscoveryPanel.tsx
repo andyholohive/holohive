@@ -286,7 +286,7 @@ function buildTelegramDraft(
   // hook reads naturally in first person.
   const cleanHeadline = bestSignal?.headline?.replace(/^[^:]+:\s*/, '') || '';
 
-  const intro = `Hey ${firstName} — Andy from HoloHive, we run Korean KOL + community campaigns for crypto projects (ecosystem clients include L1s, perps DEXs, CEXs).`;
+  const intro = `Hey ${firstName} — Andy from Holo Hive, we run Korean KOL + community campaigns for crypto projects (ecosystem clients include L1s, perps DEXs, CEXs).`;
 
   let hook = '';
   if (variant === 'signal' && bestSignal && cleanHeadline) {
@@ -306,7 +306,7 @@ function buildTelegramDraft(
 
   const cta = `Worth 15 min to walk through what the Korea push could look like? Calendly in my bio, or happy to share a deck first.`;
 
-  return [intro, '', hook, '', valueProp, '', cta, '', '— Andy @ HoloHive'].join('\n');
+  return [intro, '', hook, '', valueProp, '', cta, '', '— Andy @ Holo Hive'].join('\n');
 }
 
 /** Rotate through a few client name examples deterministically per prospect

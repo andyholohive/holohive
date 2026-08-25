@@ -8,7 +8,7 @@
  *   1. Whoever can call POST /api/mcp/kol-brief/page-ref (or whoever later
  *      mistypes a value into it) could point a client-facing page at an
  *      arbitrary origin, which would then run script in a page carrying the
- *      HoloHive name.
+ *      Holo Hive name.
  *   2. The spec makes page_ref per-ANGLE on purpose — the per-KOL part is the
  *      token and its open tracking, not the page content — so every KOL on an
  *      angle sees the same iframe src. A KOL who opens devtools and lifts that

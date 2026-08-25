@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
 
 /**
- * /mcp — HoloHive MCP Connector cookbook.
+ * /mcp — Holo Hive MCP Connector cookbook.
  *
  * Reference page for every tool exposed by our MCP server, with example
  * prompts you can paste straight into Claude.ai or Claude Code chats.
@@ -320,7 +320,7 @@ const TOOL_GROUPS: ToolGroup[] = [
         name: 'summarize_pipeline',
         description: 'High-level snapshot of Discovery + CRM + active campaigns.',
         prompts: [
-          'Give me a HoloHive snapshot — Discovery, CRM, campaigns.',
+          'Give me a Holo Hive snapshot — Discovery, CRM, campaigns.',
           'How are we doing overall?',
         ],
       },
@@ -345,7 +345,7 @@ interface Combo {
 const COMBOS: Combo[] = [
   {
     title: 'The morning briefing',
-    prompt: 'Give me my morning HoloHive briefing — pipeline snapshot, anyone overdue for follow-up, any new prospects worth my attention, and any Korean exchange listings overnight.',
+    prompt: 'Give me my morning Holo Hive briefing — pipeline snapshot, anyone overdue for follow-up, any new prospects worth my attention, and any Korean exchange listings overnight.',
     triggers: 'summarize_pipeline + crm_followups_due + list_recent_prospects(tier=REACH_OUT_NOW) + get_kr_listings',
   },
   {
@@ -563,7 +563,7 @@ export default function McpGuidePage() {
       <PageHeader
         icon={Bot}
         title="Claude MCP"
-        subtitle={`HoloHive's connector for Claude.ai — example prompts for every tool. ${totalTools} read-only tools across 8 surfaces.`}
+        subtitle={`Holo Hive's connector for Claude.ai — example prompts for every tool. ${totalTools} read-only tools across 8 surfaces.`}
         actions={(
           <a
             href="/analytics"
@@ -589,7 +589,7 @@ export default function McpGuidePage() {
           {[
             <>Open <strong>Claude.ai</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Connectors</strong> &rarr; click <strong>Add custom connector</strong>.</>,
             <>Paste the connector URL below into Claude&rsquo;s input box.</>,
-            <>Click <strong>Connect</strong>, then sign in to HoloHive when prompted, then click <strong>Allow</strong> on the consent screen.</>,
+            <>Click <strong>Connect</strong>, then sign in to Holo Hive when prompted, then click <strong>Allow</strong> on the consent screen.</>,
             <>You&rsquo;re done. Try one of the prompts below in any Claude chat.</>,
           ].map((line, i) => (
             <li key={i} className="flex items-start gap-3">

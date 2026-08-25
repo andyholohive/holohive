@@ -56,7 +56,7 @@ export async function POST(
 
   // ── Refresh ──────────────────────────────────────────────────────
   // Per KOL-AVATAR.8: only telegram_id (user) + link (X). Group chat path
-  // dropped because every group chat shares the HoloHive logo as its photo.
+  // dropped because every group chat shares the Holo Hive logo as its photo.
   const result = await refreshKolAvatar(
     { id: kol.id, telegram_id: kol.telegram_id, link: kol.link },
     admin,

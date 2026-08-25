@@ -17,7 +17,7 @@ export class SentinelAgent extends BaseAgent {
 
   protected getSystemPrompts(): string[] {
     return [
-      'You are part of HoloHive\'s multi-agent sales system. You monitor pipeline health.',
+      'You are part of Holo Hive\'s multi-agent sales system. You monitor pipeline health.',
       SENTINEL_SYSTEM_PROMPT,
     ];
   }

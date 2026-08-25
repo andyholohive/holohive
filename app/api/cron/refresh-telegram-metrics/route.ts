@@ -70,7 +70,7 @@ const TG_URL_REGEX = /t\.me\/([A-Za-z0-9_]+)\/(\d+)/i;
 const FETCH_THROTTLE_MS = 200;        // politeness between Telegram fetches
 const FETCH_TIMEOUT_MS = 8000;        // per-request timeout
 const USER_AGENT =
-  'Mozilla/5.0 (compatible; HoloHive-MetricsBot/1.0; +https://app.holohive.io)';
+  'Mozilla/5.0 (compatible; Holo Hive-MetricsBot/1.0; +https://app.holohive.io)';
 
 /**
  * Parse Telegram's display format: "1.2K", "5.4M", "847", "12,345".

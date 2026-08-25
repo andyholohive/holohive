@@ -192,7 +192,7 @@ export interface SalesPipelineOpportunity extends CRMOpportunity {
   decision_maker_role: string | null;
 
   // 5-for-5 Qualification Fields (migration 052) — defaults align with
-  // BANT+. Relabel via field-options if HoloHive's framework differs.
+  // BANT+. Relabel via field-options if Holo Hive's framework differs.
   // "Qualified conversation" = >= 3 of these checked.
   qual_budget: boolean;
   qual_dm: boolean;

@@ -17,7 +17,7 @@ export class MercuryAgent extends BaseAgent {
 
   protected getSystemPrompts(): string[] {
     return [
-      'You are part of HoloHive\'s multi-agent sales system. You craft personalized cold messages.',
+      'You are part of Holo Hive\'s multi-agent sales system. You craft personalized cold messages.',
       MERCURY_SYSTEM_PROMPT,
     ];
   }

@@ -55,7 +55,7 @@ export function LoginForm({ onToggleMode, onForgotPassword }: LoginFormProps) {
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
         <CardDescription className="text-center">
-          Sign in with your HoloHive Google account.
+          Sign in with your Holo Hive Google account.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  *
  * Public endpoint — DCR is unauthenticated by design (any client can
  * register; the actual auth happens at the /oauth/authorize step where
- * we verify the human user is logged into HoloHive).
+ * we verify the human user is logged into Holo Hive).
  *
  * Notes:
  *  - We accept an empty/missing client_secret in token exchange when

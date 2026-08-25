@@ -969,7 +969,7 @@ async function resolveTeamMember(message: any): Promise<{ id: string; name: stri
  * both tables to figure out who's typing.
  *
  * Returns:
- *   { kind: 'team', id, name, tgUserId }  — sender is on the HoloHive team
+ *   { kind: 'team', id, name, tgUserId }  — sender is on the Holo Hive team
  *   { kind: 'kol',  id, name, tgUserId }  — sender is a KOL we know about
  *   { kind: 'unknown', tgUserId }         — random Telegram user, reject
  *
@@ -1000,7 +1000,7 @@ type ResolvedCaller =
  *   3. Fallback to master_kols.telegram_id (kept as a secondary DM path)
  *   4. Unknown
  *
- * This matches existing operational reality: HoloHive already has per-KOL
+ * This matches existing operational reality: Holo Hive already has per-KOL
  * groups where team + KOL collaborate. /submit lives in those groups.
  */
 async function resolveCaller(message: any): Promise<ResolvedCaller> {

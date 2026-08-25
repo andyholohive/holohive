@@ -308,7 +308,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <Image src="/images/logo.png" alt="HoloHive" width={60} height={60} className="rounded-xl" />
+            <Image src="/images/logo.png" alt="Holo Hive" width={60} height={60} className="rounded-xl" />
           </div>
 
           {/* Owner avatar */}
@@ -612,7 +612,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
 
         {/* Footer */}
         <div className="mt-12 text-center">
-          <p className="text-xs text-gray-300">Powered by HoloHive</p>
+          <p className="text-xs text-gray-300">Powered by Holo Hive</p>
         </div>
       </div>
     </div>

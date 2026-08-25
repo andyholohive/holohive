@@ -71,7 +71,7 @@ export default function AuthPage() {
           <div className="flex justify-center mb-8">
             <Image
               src="/images/logo.png"
-              alt="HoloHive Portal Logo"
+              alt="Holo Hive Portal Logo"
               width={120}
               height={120}
               priority

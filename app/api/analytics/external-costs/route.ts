@@ -187,7 +187,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'amount_usd must be a non-negative number' }, { status: 400 });
   }
   // Sanity cap — anything over $100K/month for a single SaaS is
-  // almost certainly a typo. Adjust if HoloHive ever scales past this.
+  // almost certainly a typo. Adjust if Holo Hive ever scales past this.
   if (amount > 100_000) {
     return NextResponse.json({ error: 'amount_usd above 100000 — likely a typo' }, { status: 400 });
   }

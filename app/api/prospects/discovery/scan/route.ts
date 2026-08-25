@@ -218,7 +218,7 @@ const SOURCE_DEFS: Record<DiscoverySource, { url: string; note: string }> = {
     // Asian-origin funding tracker. Content is English and fully SSR
     // (unlike CryptoRank's JS-rendered table), so web_search reads it
     // cleanly. Strong on pre-TGE APAC-but-non-Korean rounds — which
-    // match HoloHive ICP rule #3 ("no Korea presence yet").
+    // match Holo Hive ICP rule #3 ("no Korea presence yet").
     url: 'https://www.rootdata.com/Fundraising',
     note: 'SSR funding tracker. Asian-region bias (non-Korean) — catches rounds DropsTab misses by 24-48h. Data is plain English with amounts, investors, dates in the raw HTML.',
   },
@@ -276,7 +276,7 @@ function buildCandidatesSystemPrompt(sources: DiscoverySource[]): string {
     );
   }
 
-  return `You are a crypto-funding research assistant for HoloHive BD. Your only job in this call is to PRODUCE A LIST of candidate crypto projects that recently raised capital. Do not evaluate fit, do not find contacts, do not score — later calls do that.
+  return `You are a crypto-funding research assistant for Holo Hive BD. Your only job in this call is to PRODUCE A LIST of candidate crypto projects that recently raised capital. Do not evaluate fit, do not find contacts, do not score — later calls do that.
 
 ## SOURCE RULES${multi ? ` (${sources.length} sources)` : ''}
 
@@ -416,7 +416,7 @@ The following ${skipSample.length} projects were scanned in the last ${params.co
 most-watched ones, so they're almost always in the skip list. To find
 NEW candidates, scroll DEEPER. Open page 2, page 3 of the listing.
 Look at entries ranked 20+ on the source. Smaller / less-mainstream
-funding rounds often match HoloHive's ICP better than the obvious
+funding rounds often match Holo Hive's ICP better than the obvious
 top-of-list announcements anyway.
 
 ${skipSample.map(n => `- ${n}`).join('\n')}
@@ -634,9 +634,9 @@ async function findCandidates(
 // Stage 2: Enrich a batch of candidates (triggers + POCs + ICP)
 // ────────────────────────────────────────────────────────────────────
 
-const ENRICHMENT_SYSTEM_PROMPT = `You are DISCOVERY, HoloHive's BD enrichment agent. You receive a small batch of candidate crypto projects and for each one: (1) verify fit against the HoloHive ICP, (2) hunt for outreach triggers from Twitter/X, (3) find individual decision-maker contacts (POCs), and (4) produce a SCOUT-compatible score and action tier.
+const ENRICHMENT_SYSTEM_PROMPT = `You are DISCOVERY, Holo Hive's BD enrichment agent. You receive a small batch of candidate crypto projects and for each one: (1) verify fit against the Holo Hive ICP, (2) hunt for outreach triggers from Twitter/X, (3) find individual decision-maker contacts (POCs), and (4) produce a SCOUT-compatible score and action tier.
 
-HoloHive is a Seoul-based KOL growth agency. Their 90-day Korea Growth Partnership ($48-61K) is sold to pre-token or recently-launched crypto projects entering the Korean market.
+Holo Hive is a Seoul-based KOL growth agency. Their 90-day Korea Growth Partnership ($48-61K) is sold to pre-token or recently-launched crypto projects entering the Korean market.
 
 ## THE 6-CRITERIA ICP CHECK (binary, ALL must PASS)
 1. Credible funding — any amount with reputable backers
@@ -706,7 +706,7 @@ icp_fit (0-40):
 signal_strength (0-35):
 - HIGHEST trigger base (pick one, don't stack): TIER 1 = +15, TIER 2 = +10, TIER 3 = +5
 - Multiple triggers (2+): +5
-- Behavioral (engaged with HoloHive team / mentioned Asia): +5
+- Behavioral (engaged with Holo Hive team / mentioned Asia): +5
 - Contextual (trending in Korean Telegram): +5
 
 timing (0-25, pick SINGLE highest):
@@ -731,7 +731,7 @@ action_tier:
 - KEY RULE: Korea = Telegram, NOT Twitter. Korean Twitter is noisy; retail discovery happens on Telegram. When checking Korea presence (ICP #3), check TELEGRAM size, not Twitter followers.
 
 ## OUTREACH CONTACTS (POCs) — CRITICAL
-HoloHive does cold BD via Telegram DM. We want DECISION-MAKERS' personal handles. Prioritize in order:
+Holo Hive does cold BD via Telegram DM. We want DECISION-MAKERS' personal handles. Prioritize in order:
 1. CEO / Founder (best)
 2. CMO / Head of Marketing / Head of Growth
 3. Head of BD / BD Lead

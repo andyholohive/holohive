@@ -59,7 +59,7 @@ export default function KolBriefPage() {
           <div className="pt-20 text-center">
             <p className="text-lg font-semibold">This brief link has expired</p>
             <p className="text-sm text-neutral-500 mt-2">
-              Please contact your HoloHive point of contact for an updated link.
+              Please contact your Holo Hive point of contact for an updated link.
             </p>
           </div>
         )}
@@ -94,7 +94,7 @@ export default function KolBriefPage() {
             ) : (
             /* [2026-07-27] sandboxed. The framed page is published by the
                kr-kol-comms generator, not by us, and it renders inside a page
-               carrying the HoloHive name to an external audience. allow-scripts
+               carrying the Holo Hive name to an external audience. allow-scripts
                is required for the creative card to work at all; allow-popups
                lets a KOL open a reference link. Deliberately withheld:
                allow-same-origin (so the frame gets an opaque origin and cannot
