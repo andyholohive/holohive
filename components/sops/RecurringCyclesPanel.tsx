@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -23,8 +24,15 @@ import { formatDate } from '@/lib/dateFormat';
 
 const UNASSIGNED = '__unassigned__';
 
-/** Per-step assignee editor for one recurring cycle. Loads the template's
- *  steps + current map, saves the step->user map back. */
+/**
+ * Per-step config for one recurring cycle: who does each step, and which steps
+ * this client skips entirely.
+ *
+ * [2026-08-25] Skip added per Jdot's "Per-client steps" mock. The alternative
+ * was cloning the template per client, which loses the property that editing
+ * the shared template propagates everywhere. A skip map on the cycle keeps one
+ * template and varies only what spawns.
+ */
 function AssigneesDialog({
   cycle, teamMembers, onClose, onSaved,
 }: {
@@ -36,8 +44,13 @@ function AssigneesDialog({
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [steps, setSteps] = useState<Array<{ id: string; step_name: string; step_order: number }>>([]);
+  const [steps, setSteps] = useState<Array<{
+    id: string; step_name: string; step_order: number; is_blocking: boolean;
+  }>>([]);
   const [map, setMap] = useState<Record<string, string>>({});
+  // step_id -> reason. Presence means skipped; the reason is required, so a
+  // step is only really skipped once its reason is non-empty.
+  const [skips, setSkips] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!cycle) return;
@@ -48,26 +61,65 @@ function AssigneesDialog({
       if (cancelled) return;
       setSteps(cfg.steps);
       setMap(cfg.assignees);
+      setSkips(cfg.skipped);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [cycle]);
 
+  // A skip toggled on but left without a reason is not saveable — the reason
+  // is the whole point, since an unexplained trim is what this replaces.
+  const missingReason = Object.entries(skips).filter(([, r]) => !r.trim()).map(([id]) => id);
+
   const save = async () => {
     if (!cycle) return;
+    if (missingReason.length > 0) {
+      toast({
+        title: 'Skip reason required',
+        description: `${missingReason.length} skipped step${missingReason.length === 1 ? '' : 's'} still need a reason.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     // Strip empty selections so the stored map only holds real assignments.
     const clean: Record<string, string> = {};
     for (const [k, v] of Object.entries(map)) if (v) clean[k] = v;
-    const ok = await DeliverableService.setRecurringStepAssignees(cycle.id, clean);
+    const ok = await DeliverableService.setRecurringStepConfig(cycle.id, clean, skips);
     setSaving(false);
     if (!ok) {
-      toast({ title: 'Save failed', description: 'Could not save assignees.', variant: 'destructive' });
+      toast({ title: 'Save failed', description: 'Could not save steps.', variant: 'destructive' });
       return;
     }
-    onSaved(cycle.id, Object.keys(clean).length);
-    toast({ title: 'Assignees saved', description: 'Applies automatically every cycle.' });
+    const activeAssigned = Object.keys(clean).filter(k => !skips[k]).length;
+    onSaved(cycle.id, activeAssigned);
+    const skipped = Object.keys(skips).length;
+    toast({
+      title: 'Steps saved',
+      description: skipped
+        ? `${steps.length - skipped} of ${steps.length} steps active. Applies from the next cycle.`
+        : 'Applies automatically every cycle.',
+    });
     onClose();
+  };
+
+  const toggleSkip = (step: { id: string; step_order: number; is_blocking: boolean }) => {
+    setSkips((prev) => {
+      if (prev[step.id] !== undefined) {
+        const { [step.id]: _drop, ...rest } = prev;
+        return rest;
+      }
+      // Skipping a blocking step releases everything gated behind it. Say so
+      // at the point of skipping rather than letting the gate vanish quietly.
+      if (step.is_blocking) {
+        // eslint-disable-next-line no-alert
+        const ok = window.confirm(
+          `Step ${step.step_order} is a blocking step.\n\nSkipping it releases every step behind it for this client. Continue?`,
+        );
+        if (!ok) return prev;
+      }
+      return { ...prev, [step.id]: '' };
+    });
   };
 
   return (
@@ -86,33 +138,71 @@ function AssigneesDialog({
         ) : steps.length === 0 ? (
           <p className="text-sm text-ink-warm-500 py-4">This template has no steps.</p>
         ) : (
-          <div className="space-y-2 py-1 max-h-[50vh] overflow-y-auto">
-            {steps.map((s) => (
-              <div key={s.id} className="flex items-center gap-3">
-                <span className="text-sm text-ink-warm-800 flex-1 min-w-0 truncate">
-                  <span className="text-ink-warm-400 tabular-nums mr-1">{s.step_order}.</span>{s.step_name}
-                </span>
-                <Select
-                  value={map[s.id] || UNASSIGNED}
-                  onValueChange={(v) => setMap((prev) => ({ ...prev, [s.id]: v === UNASSIGNED ? '' : v }))}
-                >
-                  <SelectTrigger className="h-8 w-44 focus-brand text-xs">
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                    {teamMembers.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+          <>
+          <div className="flex items-center justify-between pb-2 mb-1 border-b border-cream-100">
+            <span className="text-xs font-semibold text-ink-warm-700">
+              {steps.length - Object.keys(skips).length} of {steps.length} steps active
+            </span>
+            <span className="text-[11px] text-ink-warm-400">Skip drops a step for this client only</span>
           </div>
+          <div className="space-y-2 py-1 max-h-[50vh] overflow-y-auto">
+            {steps.map((s) => {
+              const skipped = skips[s.id] !== undefined;
+              return (
+              <div key={s.id} className={`rounded-md ${skipped ? 'bg-cream-50/70 px-2 py-1.5' : ''}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm flex-1 min-w-0 truncate ${skipped ? 'text-ink-warm-400 line-through' : 'text-ink-warm-800'}`}>
+                    {/* Numbering stays the template's, so a skip shows as a gap
+                        (1, 2, 4, 6) rather than silently renumbering. */}
+                    <span className="text-ink-warm-400 tabular-nums mr-1">{s.step_order}.</span>{s.step_name}
+                    {s.is_blocking && (
+                      <StatusBadge tone="warning" size="sm" className="ml-2 align-middle">Blocking</StatusBadge>
+                    )}
+                  </span>
+                  <Select
+                    value={map[s.id] || UNASSIGNED}
+                    disabled={skipped}
+                    onValueChange={(v) => setMap((prev) => ({ ...prev, [s.id]: v === UNASSIGNED ? '' : v }))}
+                  >
+                    <SelectTrigger className="h-8 w-44 focus-brand text-xs">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                      {teamMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={skipped ? 'outline' : 'ghost'}
+                    className={`h-8 px-2 text-xs ${skipped ? 'border-rose-300 text-rose-600 hover:bg-rose-50' : 'text-ink-warm-500'}`}
+                    onClick={() => toggleSkip(s)}
+                  >
+                    {skipped ? 'Skipped' : 'Skip'}
+                  </Button>
+                </div>
+                {skipped && (
+                  <div className="mt-1.5 pl-5">
+                    <Input
+                      value={skips[s.id]}
+                      onChange={(e) => setSkips((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                      placeholder="Why is this skipped for this client?"
+                      className={`h-8 text-xs focus-brand ${!skips[s.id].trim() ? 'border-rose-300' : ''}`}
+                    />
+                  </div>
+                )}
+              </div>
+              );
+            })}
+          </div>
+          </>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="brand" onClick={save} disabled={saving || loading}>Save assignees</Button>
+          <Button variant="brand" onClick={save} disabled={saving || loading}>Save steps</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

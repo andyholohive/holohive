@@ -67,6 +67,8 @@ type RecurringRow = {
   /** Map of deliverable_template_steps.id -> users.id. Pre-assignment set on
    *  the recurring row; cron stamps spawned subtask assigned_to from it. */
   step_assignees: Record<string, string> | null;
+  /** step_id -> reason. Steps listed here never spawn for this client. */
+  skipped_steps: Record<string, string> | null;
 };
 
 export async function GET(request: Request) {
@@ -275,6 +277,7 @@ export async function GET(request: Request) {
           templateName,
           templateCategory: (await getTemplateCategory(supabase, row.template_id)) || 'client',
           stepAssignees: row.step_assignees ?? {},
+          skippedSteps: row.skipped_steps ?? {},
           userNameById,
         });
 
@@ -351,6 +354,7 @@ type SpawnArgs = {
   templateCategory: string;  // 'client' | 'internal' | 'bd'
   /** Map of template step id -> user id (pre-assignment). Empty = unassigned. */
   stepAssignees: Record<string, string>;
+  skippedSteps: Record<string, string>;
   /** Resolver for assigned_to_name so the task shows a name without a join. */
   userNameById: Map<string, string>;
 };
@@ -435,6 +439,12 @@ async function spawnTemplateAsServiceRole(
   //    offset-0 step is due on the cycle's Monday and multiple steps can share
   //    a day. No more cumulative auto-push.
   for (const step of steps as any[]) {
+    // Per-client skip. Dropped here rather than filtered out of `steps`
+    // earlier, so step_order — and therefore the "3." in a subtask's name —
+    // stays the template's numbering. A client skipping step 3 reads
+    // 1, 2, 4, 6: the gap shows the trim was deliberate rather than lost.
+    if (args.skippedSteps[step.id]) continue;
+
     const due = new Date(args.startDate + 'T00:00:00Z');
     due.setUTCDate(due.getUTCDate() + (step.day_offset || 0));
     const dueDate = due.toISOString().slice(0, 10);

@@ -706,29 +706,70 @@ export class DeliverableService {
    * Powers the "Assignees" dialog on the Recurring Cycles panel.
    */
   static async getRecurringAssigneeConfig(recurringId: string): Promise<{
-    steps: Array<{ id: string; step_name: string; step_order: number }>;
+    steps: Array<{ id: string; step_name: string; step_order: number; is_blocking: boolean }>;
     assignees: Record<string, string>;
+    /** step_id -> skip reason. Present = this step never spawns for this client. */
+    skipped: Record<string, string>;
   }> {
     const { data: row, error: rowErr } = await (supabase as any)
       .from('recurring_deliverables')
-      .select('template_id, step_assignees')
+      .select('template_id, step_assignees, skipped_steps')
       .eq('id', recurringId)
       .maybeSingle();
     if (rowErr || !row) {
       console.error('[getRecurringAssigneeConfig] row load failed:', rowErr);
-      return { steps: [], assignees: {} };
+      return { steps: [], assignees: {}, skipped: {} };
     }
     const { data: steps } = await (supabase as any)
       .from('deliverable_template_steps')
-      .select('id, step_name, step_order')
+      .select('id, step_name, step_order, is_blocking')
       .eq('template_id', (row as any).template_id)
       .order('step_order');
     return {
       steps: ((steps ?? []) as any[]).map((s) => ({
         id: s.id, step_name: s.step_name, step_order: s.step_order,
+        is_blocking: !!s.is_blocking,
       })),
       assignees: ((row as any).step_assignees ?? {}) as Record<string, string>,
+      skipped: ((row as any).skipped_steps ?? {}) as Record<string, string>,
     };
+  }
+
+  /**
+   * Persist which steps this client skips, and why.
+   *
+   * Written together with the assignees rather than separately: they are edited
+   * in one dialog and a half-applied save (skips without their assignee changes,
+   * or the reverse) would be invisible until the next Monday spawn.
+   *
+   * Entries with a blank reason are dropped instead of stored. The contract
+   * requires a reason, and a skip whose reason is an empty string is the same
+   * unexplained trim this feature exists to remove.
+   */
+  static async setRecurringStepConfig(
+    recurringId: string,
+    assignees: Record<string, string>,
+    skipped: Record<string, string>,
+  ): Promise<boolean> {
+    const cleaned: Record<string, string> = {};
+    for (const [stepId, reason] of Object.entries(skipped)) {
+      const r = (reason ?? '').trim();
+      if (r) cleaned[stepId] = r;
+    }
+    // A skipped step keeps no assignee — nothing spawns to assign.
+    const assigneesForActive: Record<string, string> = {};
+    for (const [stepId, userId] of Object.entries(assignees)) {
+      if (!cleaned[stepId] && userId) assigneesForActive[stepId] = userId;
+    }
+    const { error } = await (supabase as any)
+      .from('recurring_deliverables')
+      .update({ step_assignees: assigneesForActive, skipped_steps: cleaned })
+      .eq('id', recurringId);
+    if (error) {
+      console.error('[setRecurringStepConfig] update failed:', error);
+      return false;
+    }
+    return true;
   }
 
   /**
