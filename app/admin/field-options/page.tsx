@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FieldOptionsService, FieldOption, CreateFieldOptionData } from '@/lib/fieldOptionsService';
 import { formatDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
@@ -100,6 +101,7 @@ export default function FieldOptionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedField, setSelectedField] = useState<string | null>(null);
   const [editingOption, setEditingOption] = useState<FieldOption | null>(null);
   const [newOption, setNewOption] = useState<CreateFieldOptionData>({
     field_name: 'in_house',
@@ -261,9 +263,27 @@ export default function FieldOptionsPage() {
     }
   };
 
+  // [2026-08-26] Was hardcoded to 'in_house', so every other dropdown stored
+  // in this table was invisible here — including the outreach message types,
+  // which meant "editable without a deploy" was true of the data and false of
+  // the product. The page now lists whatever field_names exist.
+  const fieldNames = Array.from(new Set(fieldOptions.map(o => o.field_name))).sort();
+  const activeField = selectedField && fieldNames.includes(selectedField)
+    ? selectedField
+    : (fieldNames[0] ?? 'in_house');
+
   const inHouseOptions = fieldOptions
-    .filter(option => option.field_name === 'in_house')
+    .filter(option => option.field_name === activeField)
     .sort((a, b) => a.display_order - b.display_order);
+
+  /** Human label for a field_name. Unknown fields render as-is rather than
+   *  being hidden — a new option list should show up here the moment it is
+   *  written, without this map needing an entry first. */
+  const FIELD_LABELS: Record<string, string> = {
+    in_house: 'In-House (KOLs)',
+    outreach_message_type: 'Message Type (Outreach)',
+  };
+  const labelFor = (f: string) => FIELD_LABELS[f] ?? f;
 
   if (loading) {
     // Canonical page-shell wrapper (audit 2026-05-06): just space-y-6.
@@ -273,7 +293,7 @@ export default function FieldOptionsPage() {
         <PageHeader
           icon={Sliders}
           title="Field Options"
-          subtitle="Manage dynamic dropdown options for KOL fields"
+          subtitle="Manage the dropdown options used across the app"
         />
         <Skeleton className="h-64 rounded-lg" />
       </div>
@@ -285,7 +305,7 @@ export default function FieldOptionsPage() {
           <PageHeader
             icon={Sliders}
             title="Field Options"
-            subtitle="Manage dynamic dropdown options for KOL fields"
+            subtitle="Manage the dropdown options used across the app"
             actions={(
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
@@ -354,10 +374,27 @@ export default function FieldOptionsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>In-House Field Options</CardTitle>
-              <CardDescription>
-                Manage the dropdown options for the in-house field. These options will appear in the KOLs table and forms.
-              </CardDescription>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <CardTitle>{labelFor(activeField)}</CardTitle>
+                  <CardDescription>
+                    Drag to reorder, toggle to retire an option without deleting it.
+                    Changes apply wherever this dropdown is used.
+                  </CardDescription>
+                </div>
+                {fieldNames.length > 1 && (
+                  <Select value={activeField} onValueChange={setSelectedField}>
+                    <SelectTrigger className="h-9 w-[240px] focus-brand">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fieldNames.map(f => (
+                        <SelectItem key={f} value={f}>{labelFor(f)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <DndContext
