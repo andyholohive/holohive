@@ -47,6 +47,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
+import { Switch } from '@/components/ui/switch';
 import {
   OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
   listOwnerOptions, listMessageTypes, listStatuses, addStatus, addMessageType,
@@ -200,8 +202,29 @@ const emptyDraft = () => ({
   owner: '', owner_user_id: '', status: 'to_contact' as OutreachStatus, message_type: '',
 });
 
+/** The pre-HHP import: 844 rows out of crm_opportunities plus 7 out of
+ *  Yano's Notion. Everything tracked from here on is 'manual'. The cut is
+ *  the import itself, not a date — a row added today by anyone is new. */
+const isLegacy = (p: OutreachProspect) => p.source !== 'manual';
+
 export default function OutreachPage() {
   const { toast } = useToast();
+  const { roleView } = useGuestPermissions();
+
+  // Who gets the legacy board at all. The new starter tracks his own outreach
+  // from this week and nothing is passed to him, so the old import would only
+  // drown his numbers — the rates re-scope to whatever is on screen, and 851
+  // imported rows would peg his response rate at the import's 11% no matter
+  // what he actually does. Admin and above keep it, defaulted on, so Yano's
+  // board is unchanged.
+  //
+  // This is a UI-level hide, not a security boundary: the rows are still
+  // readable through the API. It's about whose numbers are whose, not secrecy.
+  // roleView, not userProfile.role — this decides visibility, so previewing
+  // "view as <the new guy>" has to show what he'll actually see. Gating on the
+  // signed-in user is the exact bug that made the sidebar preview useless.
+  const canSeeLegacy = roleView === 'admin' || roleView === 'super_admin';
+  const [showLegacy, setShowLegacy] = useState(true);
   const [prospects, setProspects] = useState<OutreachProspect[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -315,16 +338,22 @@ export default function OutreachPage() {
   // contacted, not how far they got. Those still move the rates, which is
   // what makes "what's my response rate" and "which opener works" askable —
   // the reason these cards exist (Notion paywalled the charts).
+  /** Everything the current user is allowed to see, before any filter. */
+  const visible = useMemo(
+    () => (canSeeLegacy && showLegacy ? prospects : prospects.filter(p => !isLegacy(p))),
+    [prospects, canSeeLegacy, showLegacy],
+  );
+
   const rateRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return prospects
+    return visible
       .filter(p => ownerFilter === 'all' || p.owner === ownerFilter)
       .filter(p => msgFilter === 'all' || p.message_type === msgFilter)
       .filter(p => !q
         || p.telegram.toLowerCase().includes(q)
         || p.company.toLowerCase().includes(q)
         || p.role.toLowerCase().includes(q));
-  }, [prospects, search, ownerFilter, msgFilter]);
+  }, [visible, search, ownerFilter, msgFilter]);
 
   const rows = useMemo(() => {
     const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
@@ -342,8 +371,8 @@ export default function OutreachPage() {
     () => computeRates(rateRows.filter(p => p.parked_at === null), statusCatalogue),
     [rateRows, statusCatalogue],
   );
-  const parkedCount = useMemo(() => prospects.filter(p => p.parked_at !== null).length, [prospects]);
-  const liveCount = prospects.length - parkedCount;
+  const parkedCount = useMemo(() => visible.filter(p => p.parked_at !== null).length, [visible]);
+  const liveCount = visible.length - parkedCount;
 
   const activeFilter = [
     ownerFilter !== 'all' ? ownerFilter : null,
@@ -590,7 +619,7 @@ export default function OutreachPage() {
           icon={Users}
           label="In Pipeline"
           value={liveMetrics.total - liveMetrics.dead}
-          sub={`${liveCount} live · ${parkedCount} parked · ${prospects.length} total`}
+          sub={`${liveCount} live · ${parkedCount} parked · ${visible.length} total`}
           accent="brand"
           topAccent
         />
@@ -637,7 +666,7 @@ export default function OutreachPage() {
         <Tabs value={view} onValueChange={v => setView(v as ViewKey)}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             {VIEWS.map(v => {
-              const n = prospects
+              const n = visible
                 .filter(p => (v.key === 'parked' ? true : p.parked_at === null))
                 .filter(p => v.match(p, statusCatalogue)).length;
               return (
@@ -685,6 +714,21 @@ export default function OutreachPage() {
               {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
+
+          {/* Only rendered for admin and above — the new starter's board is
+              his own outreach, and he never sees the switch or the rows. */}
+          {canSeeLegacy && (
+            <label className="flex items-center gap-2 pl-1 cursor-pointer select-none">
+              <Switch
+                checked={showLegacy}
+                onCheckedChange={setShowLegacy}
+                aria-label="Show the pre-HHP CRM import"
+              />
+              <span className="text-xs text-ink-warm-500 whitespace-nowrap">
+                Previous CRM
+              </span>
+            </label>
+          )}
         </div>
       </div>
 
@@ -702,11 +746,26 @@ export default function OutreachPage() {
       <Card className="border-cream-200 overflow-hidden">
         {rows.length === 0 ? (
           <div className="py-4">
-            <EmptyState
-              icon={Send}
-              title="No prospects match"
-              description="Try a different view or widen the owner / message-type filters."
-            />
+            {visible.length === 0 ? (
+              /* A fresh board rather than a failed filter — this is what the
+                 new starter sees on day one, so it says what to do, not that
+                 nothing matched. */
+              <EmptyState
+                icon={Send}
+                title="No outreach tracked yet"
+                description="Add the first prospect and the response, lead and trial rates start building from there."
+              >
+                <Button variant="brand" onClick={() => setAddOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />Add First Prospect
+                </Button>
+              </EmptyState>
+            ) : (
+              <EmptyState
+                icon={Send}
+                title="No prospects match"
+                description="Try a different view or widen the owner / message-type filters."
+              />
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
