@@ -724,11 +724,24 @@ export async function GET() {
       return `Nothing is currently overdue. The ${stats.resolvedLate} resolved-late task${stats.resolvedLate === 1 ? '' : 's'} stay counted this quarter; the score recovers as new on-time tasks land.`;
     };
 
+    // [2026-08-26] This sentence used to open with "Bugs are maxed" whatever
+    // the count was — so at 0 of 5 it read "Bugs are maxed (0 of 5) — more bug
+    // fixes cannot move this", which is the exact opposite of true and steered
+    // the reader away from the larger of the two available gains. Each half is
+    // now described by its own state.
     const andyInitGap = Math.max(0, ANDY_TARGET - initShippedAndy);
-    const andyImprovement = `Bugs are maxed (${bugsShippedAndy} of ${ANDY_TARGET}) — more bug fixes cannot move this. `
-      + (andyInitGap > 0
-        ? `The whole gap is initiatives: ${andyInitGap} more completed in 30 days would reach 100%. An initiative counts on the transition to Completed, dated by initiative_completed_at.`
-        : 'Both halves are maxed.');
+    const andyBugGap = Math.max(0, ANDY_TARGET - bugsShippedAndy);
+    const halves: string[] = [];
+    if (andyInitGap > 0) {
+      halves.push(`${andyInitGap} more initiative${andyInitGap === 1 ? '' : 's'} completed in 30 days (worth up to ${Math.round(62.5)} pts)`);
+    }
+    if (andyBugGap > 0) {
+      halves.push(`${andyBugGap} more bug${andyBugGap === 1 ? '' : 's'} shipped in 30 days (worth up to ${Math.round(37.5)} pts)`);
+    }
+    const andyImprovement = halves.length === 0
+      ? 'Both halves are maxed.'
+      : `${halves.join(', and ')}. An initiative counts on the transition to Completed `
+        + `(initiative_completed_at); a bug counts when backlog_items.live_at is stamped.`;
 
     const scorecards = [
       scoreUserBolt && {
