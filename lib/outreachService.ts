@@ -145,7 +145,20 @@ export interface OutreachProspect {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Set when the row has left the worklist. Nothing is deleted — parking is
+   *  reversible and the row keeps every field it had. */
+  parked_at: string | null;
+  parked_reason: ParkReason | null;
 }
+
+export type ParkReason = 'no_handle' | 'duplicate' | 'terminal' | 'stale_no_reply';
+
+export const PARK_REASON_LABELS: Record<ParkReason, string> = {
+  no_handle: 'No handle',
+  duplicate: 'Duplicate',
+  terminal: 'Said no',
+  stale_no_reply: 'No reply, 90d+',
+};
 
 export type CreateProspectData = Pick<OutreachProspect, 'telegram' | 'company'> &
   Partial<Omit<OutreachProspect, 'id' | 'created_at' | 'updated_at'>>;
@@ -164,7 +177,7 @@ const db = () => supabase as any;
 const COLUMNS =
   'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
   'date_outreached, bumps_used, bumps_before_conversion, source, ' +
-  'crm_opportunity_id, notes, created_at, updated_at';
+  'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason';
 
 // ── Rates ────────────────────────────────────────────────────────────
 //
@@ -260,6 +273,20 @@ export class OutreachService {
       .order('company', { ascending: true });
     if (error) throw new Error(`Failed to load prospects: ${error.message}`);
     return (data ?? []) as unknown as OutreachProspect[];
+  }
+
+  /** Park or unpark. Nothing is deleted; the row keeps every field and
+   *  comes back with one call. */
+  static async setParked(
+    id: string, parked: boolean, reason?: ParkReason,
+  ): Promise<void> {
+    const { error } = await db()
+      .from('outreach_prospects')
+      .update(parked
+        ? { parked_at: new Date().toISOString(), parked_reason: reason ?? 'terminal' }
+        : { parked_at: null, parked_reason: null })
+      .eq('id', id);
+    if (error) throw new Error(`Failed to update prospect: ${error.message}`);
   }
 
   static async create(input: CreateProspectData): Promise<OutreachProspect> {

@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Send, Search, Plus, MessageSquare, Target, Users,
-  ExternalLink, Repeat2, Trash2, Loader2,
+  ExternalLink, Repeat2, Trash2, Loader2, Archive, ArchiveRestore,
 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -51,6 +51,7 @@ import {
   OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
   listOwnerOptions, listMessageTypes, listStatuses, addStatus, addMessageType,
   stageOfRow, type OutreachStatusRow,
+  PARK_REASON_LABELS, type ParkReason,
   type OutreachProspect, type OutreachStatus, type Stage,
 } from '@/lib/outreachService';
 import { RateBreakdownDialog, type RateKey } from '@/components/crm/RateBreakdownDialog';
@@ -179,7 +180,7 @@ const NONE = '__none__';
 // board, so both are treated as bugs: Outreached means "messaged, no answer
 // yet" (bumps included) and Dead means every terminal-negative status.
 
-type ViewKey = 'all' | 'to_contact' | 'ready' | 'outreached' | 'engaged' | 'leads' | 'dead';
+type ViewKey = 'all' | 'to_contact' | 'ready' | 'outreached' | 'engaged' | 'leads' | 'dead' | 'parked';
 
 const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect, cat?: OutreachStatusRow[] | null) => boolean }> = [
   { key: 'all',        label: 'All',           match: () => true },
@@ -189,6 +190,9 @@ const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect, c
   { key: 'engaged',    label: 'Engaged',       match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'responded' },
   { key: 'leads',      label: 'Leads',         match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'lead' },
   { key: 'dead',       label: 'Dead',          match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'dead' },
+  // Parked is the only view that shows parked rows; every other view is the
+  // live worklist. Nothing here is deleted — this tab is where it went.
+  { key: 'parked',     label: 'Parked',        match: p => p.parked_at !== null },
 ];
 
 const emptyDraft = () => ({
@@ -324,10 +328,22 @@ export default function OutreachPage() {
 
   const rows = useMemo(() => {
     const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
-    return rateRows.filter(p => viewMatch(p, statusCatalogue));
+    const live = view === 'parked' ? rateRows : rateRows.filter(p => p.parked_at === null);
+    return live.filter(p => viewMatch(p, statusCatalogue));
   }, [rateRows, view, statusCatalogue]);
 
   const metrics = useMemo(() => computeRates(rateRows, statusCatalogue), [rateRows, statusCatalogue]);
+
+  // Rates are deliberately computed over parked rows too. A row parked for
+  // "no reply in 90 days" is a real message that got no answer — dropping it
+  // from the denominator would lift Response Rate from 11% to a number that
+  // describes nothing. Parking changes the worklist, not the history.
+  const liveMetrics = useMemo(
+    () => computeRates(rateRows.filter(p => p.parked_at === null), statusCatalogue),
+    [rateRows, statusCatalogue],
+  );
+  const parkedCount = useMemo(() => prospects.filter(p => p.parked_at !== null).length, [prospects]);
+  const liveCount = prospects.length - parkedCount;
 
   const activeFilter = [
     ownerFilter !== 'all' ? ownerFilter : null,
@@ -467,6 +483,27 @@ export default function OutreachPage() {
     }
   }
 
+  async function handlePark(p: OutreachProspect, parked: boolean) {
+    setDeleting(true);
+    try {
+      await OutreachService.setParked(p.id, parked, 'terminal');
+      const stamp = parked ? new Date().toISOString() : null;
+      setProspects(prev => prev.map(x => x.id === p.id
+        ? { ...x, parked_at: stamp, parked_reason: parked ? 'terminal' as ParkReason : null }
+        : x));
+      toast({
+        title: parked ? 'Parked' : 'Back on the board',
+        description: parked
+          ? `${p.telegram} · ${p.company} — nothing deleted, it's in the Parked tab.`
+          : `${p.telegram} · ${p.company}`,
+      });
+    } catch (err: any) {
+      toast({ title: 'Could not update', description: err?.message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const header = (
     <PageHeader
       icon={Send}
@@ -540,7 +577,7 @@ export default function OutreachPage() {
       <SectionHeader
         label="Rates"
         dot="brand"
-        counter={`01 — ${scopeLabel} · ${metrics.contacted} contacted · click a rate to break it down`}
+        counter={`01 — ${scopeLabel} · ${metrics.contacted} contacted${parkedCount ? ` (incl. ${parkedCount} parked)` : ''} · click a rate to break it down`}
         first
       />
 
@@ -552,8 +589,8 @@ export default function OutreachPage() {
         <KpiCard
           icon={Users}
           label="In Pipeline"
-          value={metrics.total - metrics.dead}
-          sub={`${metrics.dead} dead · ${metrics.total} in view`}
+          value={liveMetrics.total - liveMetrics.dead}
+          sub={`${liveCount} live · ${parkedCount} parked · ${prospects.length} total`}
           accent="brand"
           topAccent
         />
@@ -592,7 +629,7 @@ export default function OutreachPage() {
       <SectionHeader
         label="Prospects"
         dot="sky"
-        counter={`02 — ${rows.length} of ${prospects.length} prospects${activeFilter ? ` · ${activeFilter}` : ''}`}
+        counter={`02 — ${rows.length} of ${view === 'parked' ? parkedCount : liveCount} ${view === 'parked' ? 'parked' : 'live'} prospects${activeFilter ? ` · ${activeFilter}` : ''}`}
       />
 
       {/* Filter toolbar — tabs left, search middle, power-user right. */}
@@ -600,7 +637,9 @@ export default function OutreachPage() {
         <Tabs value={view} onValueChange={v => setView(v as ViewKey)}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             {VIEWS.map(v => {
-              const n = prospects.filter(p => v.match(p, statusCatalogue)).length;
+              const n = prospects
+                .filter(p => (v.key === 'parked' ? true : p.parked_at === null))
+                .filter(p => v.match(p, statusCatalogue)).length;
               return (
                 <TabsTrigger
                   key={v.key}
@@ -738,8 +777,15 @@ export default function OutreachPage() {
                           <span className="flex items-center gap-2.5 min-w-0">
                             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STAGE_META[stage].dot}`} />
                             <span className="text-sm font-medium text-ink-warm-900 truncate" title={p.telegram}>
-                              {p.telegram}
+                              {p.telegram === '—'
+                                ? <span className="text-ink-warm-300 italic">no handle</span>
+                                : p.telegram}
                             </span>
+                            {p.parked_reason && (
+                              <StatusBadge tone="neutral" size="sm">
+                                {PARK_REASON_LABELS[p.parked_reason]}
+                              </StatusBadge>
+                            )}
                           </span>
                         ),
                       })}
@@ -937,7 +983,19 @@ export default function OutreachPage() {
                       {/* Notes */}
                       {textCell('notes', p.notes ?? '', { placeholder: 'Notes' })}
 
-                      <td className="px-2 align-middle">
+                      <td className="px-2 align-middle whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-ink-warm-400 hover:text-brand"
+                          onClick={() => handlePark(p, p.parked_at === null)}
+                          disabled={deleting}
+                          title={p.parked_at ? `Put ${p.telegram} back on the board` : `Park ${p.telegram} — not deleted`}
+                        >
+                          {p.parked_at
+                            ? <ArchiveRestore className="h-3.5 w-3.5" />
+                            : <Archive className="h-3.5 w-3.5" />}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
