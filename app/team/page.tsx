@@ -17,6 +17,7 @@ import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronD
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
 import { useViewAs } from '@/contexts/ViewAsContext';
+import { GUEST_PAGES, MEMBER_GRANT_PAGES } from '@/hooks/useGuestPermissions';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/lib/userService';
@@ -141,29 +142,10 @@ export default function TeamPage() {
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isAdmin = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
 
-  const GUEST_PAGES = [
-    { key: '/crm/sales-pipeline', label: 'Sales Pipeline', group: 'CRM' },
-    { key: '/crm/network', label: 'Network', group: 'CRM' },
-    { key: '/crm/contacts', label: 'Contacts', group: 'CRM' },
-    { key: '/crm/submissions', label: 'Submissions', group: 'CRM' },
-    { key: '/crm/meetings', label: 'Meetings', group: 'CRM' },
-    { key: '/clients', label: 'Clients', group: 'Core' },
-    { key: '/campaigns', label: 'Campaigns', group: 'Core' },
-    { key: '/kols', label: 'KOLs', group: 'Core' },
-    { key: '/links', label: 'Links', group: 'Core' },
-    { key: '/delivery-logs', label: 'Delivery Logs', group: 'Core' },
-    { key: '/lists', label: 'Lists', group: 'Core' },
-    { key: '/tasks', label: 'Tasks', group: 'Core' },
-  ];
+  // GUEST_PAGES is imported, not redeclared. It used to be copied here, so
+  // adding a page to the hook's list left this grid unchanged and the page
+  // stayed ungrantable with no sign of why. One list, one place.
 
-  // [2026-07-24 per Andy] Extra pages a MEMBER can be granted beyond the
-  // role's defaults (rows in the same guest_permissions table, read as
-  // ADDITIVE grants for members). Keep in sync with MEMBER_GRANT_PAGES in
-  // hooks/useGuestPermissions.ts.
-  const MEMBER_GRANT_PAGES = [
-    { key: '/sops', label: 'SOPs', group: 'Extra' },
-    { key: '/templates', label: 'Templates — Tasks & Deliverables editors', group: 'Extra' },
-  ];
 
   // [2026-07-28] Pages an ADMIN can be restricted to. When a member has
   // users.page_access_restricted set, these checkboxes become an allowlist
@@ -184,6 +166,7 @@ export default function TeamPage() {
     { key: '/kols', label: 'KOLs', group: 'KOLs' },
     { key: '/lists', label: 'Lists', group: 'KOLs' },
     { key: '/crm/sales-pipeline', label: 'Sales', group: 'Sales / CRM' },
+    { key: '/crm/outreach', label: 'Outreach', group: 'Sales / CRM' },
     { key: '/crm/network', label: 'Network', group: 'Sales / CRM' },
     { key: '/crm/contacts', label: 'Contacts', group: 'Sales / CRM' },
     { key: '/intelligence', label: 'Intelligence', group: 'Sales / CRM' },
