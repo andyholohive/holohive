@@ -175,5 +175,29 @@ export function useGuestPermissions() {
     isGuest, isRestricted, permissions, loading,
     canView, canEdit, canDelete, canAccessPath, canSeePage,
     firstAllowedPath, hasMemberGrant,
+    /**
+     * Guest-ness as the CURRENT VIEW sees it: the preview target's role
+     * while previewing, otherwise the signed-in user's.
+     *
+     * [2026-08-26] Exported because the Sidebar was deriving this itself
+     * from userProfile.role, which is the signed-in user and never the
+     * target — so "view sidebar as <guest>" showed a super_admin the whole
+     * app. Every other gate in this hook already reads the target.
+     */
+    isGuestView: effectiveIsGuest,
+    /**
+     * The role the CURRENT VIEW should be gated on: the preview target's
+     * while previewing, otherwise the signed-in user's.
+     *
+     * [2026-08-26] Sections gated directly on `userProfile.role` bypassed
+     * every guest check, so previewing as a guest still showed the
+     * admin-only Measurement, Logistics and Admin sections. Anything that
+     * decides VISIBILITY should read this; anything that decides what data
+     * to fetch for the real user should keep reading userProfile.
+     */
+    roleView: (previewing ? viewAs!.role : userProfile?.role) as string | undefined,
+    /** True while rendering as someone else. Permission rows come from the
+     *  target, so the hook's own `loading` is not meaningful then. */
+    previewing,
   };
 }

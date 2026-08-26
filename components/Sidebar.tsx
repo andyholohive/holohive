@@ -31,7 +31,7 @@ export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userProfile, signOut, loading: authLoading } = useAuth();
-  const { isGuest, canView, loading: guestLoading, hasMemberGrant, canSeePage } = useGuestPermissions();
+  const { isGuest, canView, loading: guestLoading, hasMemberGrant, canSeePage, isGuestView, previewing, roleView } = useGuestPermissions();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebarCollapsed');
@@ -221,8 +221,14 @@ export default function Sidebar({ children }: SidebarProps) {
   };
 
   // For guests: don't show any restricted nav until permissions are loaded
-  const isGuestUser = userProfile?.role === 'guest';
-  const guestStillLoading = isGuestUser && guestLoading;
+  // [2026-08-26] The VIEW's guest-ness, not the signed-in user's. Reading
+  // userProfile here meant "view sidebar as <a guest>" evaluated the guest
+  // branch against the admin doing the previewing, so it never applied and
+  // the preview showed the full app.
+  const isGuestUser = isGuestView;
+  // While previewing, rows come from the target and the hook's own fetch
+  // never runs — so `loading` stays true forever and would hide everything.
+  const guestStillLoading = isGuestUser && guestLoading && !previewing;
 
   // Helper: hide nav items guests can't access (or still loading).
   //
@@ -715,7 +721,7 @@ export default function Sidebar({ children }: SidebarProps) {
               {(() => {
                 const ctx: AvailabilityCtx = {
                   isGuest: isGuestUser,
-                  role: userProfile?.role,
+                  role: roleView,
                   canView,
                   hasMemberGrant,
                 };
@@ -751,7 +757,7 @@ export default function Sidebar({ children }: SidebarProps) {
                     <div className="pl-6 space-y-0.5">
                       <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
                       <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
-                      {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                      {(roleView === 'admin' || roleView === 'super_admin') && (
                         <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
                       )}
                     </div>
@@ -782,7 +788,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   {/* Repost Deals — sits with KOLs because eligibility is a
                       KOL-record property (a logged share price), not a
                       campaign one. Super-admin: it commits real spend. */}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/repost-deals" icon={Repeat2} label="Repost Deals" />}
+                  {roleView === 'super_admin' && <NavItem href="/repost-deals" icon={Repeat2} label="Repost Deals" />}
                 </CollapsibleSection>
               )}
 
@@ -815,14 +821,14 @@ export default function Sidebar({ children }: SidebarProps) {
                   {canSeePage("/templates") && <NavItem href="/templates" icon={MessageSquare} label="Templates" />}
                   {/* [2026-07-24 per Andy] SOPs also visible to members with an
                       explicit per-member grant (set on /team → Extra Access). */}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || hasMemberGrant('/sops')) && canSeePage("/sops") && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                  {(roleView === 'admin' || roleView === 'super_admin' || hasMemberGrant('/sops')) && canSeePage("/sops") && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
                   {canSeePage("/initiatives") && <NavItem href="/initiatives" icon={Target} label="Initiatives" />}
                   {!isGuest && canSeePage("/team") && <NavItem href="/team" icon={Shield} label="Team" />}
                   {/* [Expenses v1, 2026-05-29] Super-admin only. Reimbursable
                       spend tracking with recurrence (daily/weekly/monthly
                       instance generation via cron) + per-instance paid
                       tracking + receipt attachments. */}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/expenses" icon={DollarSign} label="Expenses" />}
+                  {roleView === 'super_admin' && <NavItem href="/expenses" icon={DollarSign} label="Expenses" />}
                   {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
                 </CollapsibleSection>
               )}
@@ -833,7 +839,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   and "mindshare" is the metric inside it, not the surface.
                   Route left at /mindshare — the tables are mindshare_*.
                   Admin-only audience-insight tools. */}
-              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+              {(roleView === 'admin' || roleView === 'super_admin') && (
                 <CollapsibleSection id="measurement" icon={TrendingUp}>
                   {canSeePage("/mindshare") && <NavItem href="/mindshare" icon={TrendingUp} label="Korea Signal" />}
                   {canSeePage("/intelligence/client-watch") && <NavItem href="/intelligence/client-watch" icon={Radar} label="Client Watch" />}
@@ -877,7 +883,7 @@ export default function Sidebar({ children }: SidebarProps) {
                       The unassigned-chat dot comes along — it is the only
                       count in this section that means someone must act. */}
                   {canSeePage("/intelligence/telegram") && <NavItem href="/intelligence/telegram" icon={Send} label="Telegram" dot={unassignedTgCount > 0} />}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && canSeePage("/forms") && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
+                  {(roleView === 'admin' || roleView === 'super_admin') && canSeePage("/forms") && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                 </CollapsibleSection>
               )}
 
@@ -898,7 +904,7 @@ export default function Sidebar({ children }: SidebarProps) {
                       the "rarely used, easy to find when needed"
                       mental model for archived content. */}
                   {canSeePage("/admin") && <NavItem href="/admin" icon={Sliders} label="Admin Tools" />}
-                  {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
+                  {roleView === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
                   {canSeePage("/archive") && <NavItem href="/archive" icon={Archive} label="Archive" />}
                 </CollapsibleSection>
               )}
@@ -1013,7 +1019,7 @@ export default function Sidebar({ children }: SidebarProps) {
         onToggleBookmark={toggleBookmark}
         onToggleHidden={toggleHidden}
         onReset={resetCustomization}
-        ctx={{ isGuest: isGuestUser, role: userProfile?.role, canView, hasMemberGrant }}
+        ctx={{ isGuest: isGuestUser, role: roleView, canView, hasMemberGrant }}
       />
 
       {/* Changelog History Dialog */}
