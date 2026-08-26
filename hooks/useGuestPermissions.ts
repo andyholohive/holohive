@@ -25,6 +25,13 @@ export const MEMBER_GRANT_PAGES = [
 // All pages a guest could potentially access
 export const GUEST_PAGES = [
   { key: '/crm/sales-pipeline', label: 'Sales Pipeline', group: 'CRM' },
+  // [2026-08-26] Both already carried a `pageKey` in the nav registry, so
+  // their visibility was being checked against a permission row — but they
+  // were missing here, which is what creates the row. The gate was wired to
+  // something that could never exist, so a guest could never be granted
+  // either page. Adding them here is what makes the existing check reachable.
+  { key: '/crm/outreach', label: 'Outreach', group: 'CRM' },
+  { key: '/intelligence', label: 'Intelligence', group: 'CRM' },
   { key: '/crm/network', label: 'Network', group: 'CRM' },
   { key: '/crm/contacts', label: 'Contacts', group: 'CRM' },
   { key: '/crm/submissions', label: 'Submissions', group: 'CRM' },

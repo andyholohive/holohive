@@ -49,6 +49,7 @@ import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import {
   OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
+  listOwnerOptions, listMessageTypes,
   type OutreachProspect, type OutreachStatus, type Stage,
 } from '@/lib/outreachService';
 import { RateBreakdownDialog, type RateKey } from '@/components/crm/RateBreakdownDialog';
@@ -92,7 +93,9 @@ const STAGE_META: Record<Stage, { label: string; dot: string }> = {
   dead:       { label: 'Dead',          dot: 'bg-rose-400' },
 };
 
-const MESSAGE_TYPES = ['3 Line TLDR', 'Case Study', 'Korea Deck'];
+// Message types now come from field_options so a new one can be added from
+// the board. The old constant is gone rather than kept as a fallback: a
+// stale hardcoded list is how the owner column drifted from reality.
 
 // Column widths are declared rather than left to the browser's auto layout.
 // [2026-08-15] The Prospect column was blowing out to several hundred pixels
@@ -189,7 +192,7 @@ const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect) =
 
 const emptyDraft = () => ({
   telegram: '', company: '', role: '',
-  owner: 'Yano', status: 'to_contact' as OutreachStatus, message_type: '',
+  owner: '', owner_user_id: '', status: 'to_contact' as OutreachStatus, message_type: '',
 });
 
 export default function OutreachPage() {
@@ -230,12 +233,19 @@ export default function OutreachPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Owners come from the data — hardcoding the list meant a new rep's rows
-  // were unfilterable until someone edited this file.
-  const owners = useMemo(
-    () => Array.from(new Set(prospects.map(p => p.owner).filter(Boolean))).sort(),
-    [prospects],
-  );
+  // Owners are real users now, from app_settings.outreach_owner_emails.
+  // Deriving them from the rows (the previous approach) meant the filter only
+  // ever offered people who ALREADY had prospects — a new rep was invisible
+  // until someone else assigned them something.
+  const [ownerOptions, setOwnerOptions] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [messageTypes, setMessageTypes] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    listOwnerOptions().then(o => { if (alive) setOwnerOptions(o); }).catch(() => {});
+    listMessageTypes().then(m => { if (alive) setMessageTypes(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const owners = useMemo(() => ownerOptions.map(o => o.name), [ownerOptions]);
 
   // Two populations, deliberately.
   //
@@ -379,6 +389,7 @@ export default function OutreachPage() {
         owner: draft.owner,
         status: draft.status,
         message_type: draft.message_type || null,
+        owner_user_id: draft.owner_user_id || null,
       });
       setProspects(prev => [created, ...prev]);
       setAddOpen(false);
@@ -580,7 +591,7 @@ export default function OutreachPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All messages</SelectItem>
-              {MESSAGE_TYPES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -761,7 +772,7 @@ export default function OutreachPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value={NONE}>—</SelectItem>
-                                {MESSAGE_TYPES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
@@ -814,8 +825,48 @@ export default function OutreachPage() {
                         </Popover>
                       </td>
 
-                      {/* Owner */}
-                      {textCell('owner', p.owner, { placeholder: 'Owner' })}
+                      {/* Owner — a user, not free text. Writes owner_user_id
+                          (the truth) and owner (the display name) together, so
+                          the pair cannot disagree. */}
+                      <td
+                        className="border-r border-cream-200 align-middle"
+                        onClick={() => !isEditing('owner') && setEdit({ id: p.id, field: 'owner' })}
+                      >
+                        {isEditing('owner') ? (
+                          <div className="py-1 px-2">
+                            <Select
+                              defaultOpen
+                              value={p.owner_user_id ?? ''}
+                              onValueChange={async (userId) => {
+                                const u = ownerOptions.find(o => o.id === userId);
+                                setEdit(null);
+                                if (!u) return;
+                                setProspects(prev => prev.map(x =>
+                                  x.id === p.id ? { ...x, owner: u.name, owner_user_id: u.id } : x));
+                                try {
+                                  await OutreachService.update(p.id, {
+                                    owner: u.name, owner_user_id: u.id,
+                                  } as any);
+                                } catch (err: any) {
+                                  toast({ title: 'Could not save', description: err?.message, variant: 'destructive' });
+                                  load();
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-7 text-xs focus-brand"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {ownerOptions.map(o => (
+                                  <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div className="px-2 py-1.5 text-xs text-ink-warm-700 truncate">
+                            {p.owner || <span className="text-ink-warm-300">Unassigned</span>}
+                          </div>
+                        )}
+                      </td>
 
                       {/* Notes */}
                       {textCell('notes', p.notes ?? '', { placeholder: 'Notes' })}
@@ -889,11 +940,17 @@ export default function OutreachPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label>Owner</Label>
-                <Select value={draft.owner} onValueChange={v => setDraft({ ...draft, owner: v })}>
-                  <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
+                <Select
+                  value={draft.owner_user_id}
+                  onValueChange={v => {
+                    const u = ownerOptions.find(o => o.id === v);
+                    setDraft({ ...draft, owner_user_id: v, owner: u?.name ?? '' });
+                  }}
+                >
+                  <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue placeholder="Pick an owner" /></SelectTrigger>
                   <SelectContent>
-                    {(owners.length ? owners : ['Yano']).map(o => (
-                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    {ownerOptions.map(o => (
+                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -921,7 +978,7 @@ export default function OutreachPage() {
                   <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None yet</SelectItem>
-                    {MESSAGE_TYPES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

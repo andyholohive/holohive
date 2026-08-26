@@ -66,6 +66,7 @@ export interface OutreachProspect {
   company: string;
   company_url: string | null;
   owner: string;
+  owner_user_id: string | null;
   status: OutreachStatus;
   message_type: string | null;
   date_outreached: string | null;
@@ -93,7 +94,7 @@ export type CreateProspectData = Pick<OutreachProspect, 'telegram' | 'company'> 
 const db = () => supabase as any;
 
 const COLUMNS =
-  'id, role, telegram, company, company_url, owner, status, message_type, ' +
+  'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
   'date_outreached, bumps_used, bumps_before_conversion, source, ' +
   'crm_opportunity_id, notes, created_at, updated_at';
 
@@ -258,4 +259,52 @@ export class OutreachService {
     const { error } = await db().from('outreach_prospects').delete().eq('id', id);
     if (error) throw new Error(`Failed to delete prospect: ${error.message}`);
   }
+}
+
+/**
+ * The reps who can own a prospect.
+ *
+ * Users, not free text — the old column was typed by hand, so a rename or a
+ * new starter silently orphaned the owner filter. Which users is held in
+ * app_settings (`outreach_owner_emails`, comma-separated) rather than a
+ * constant, so adding the next rep is a settings change and not a deploy.
+ * The file this replaced carried a comment warning about exactly that.
+ *
+ * Unset falls back to nobody rather than everybody: a mis-set key should
+ * shrink the dropdown, not hand the whole team someone else's book.
+ */
+export async function listOwnerOptions(): Promise<Array<{ id: string; name: string; email: string }>> {
+  const { data: setting } = await db()
+    .from('app_settings').select('value').eq('key', 'outreach_owner_emails').maybeSingle();
+  const emails = String((setting as any)?.value ?? '')
+    .split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean);
+  if (emails.length === 0) return [];
+
+  const { data } = await db()
+    .from('users').select('id, name, email').in('email', emails);
+  return ((data ?? []) as any[])
+    .map(u => ({ id: u.id, name: u.name ?? u.email, email: u.email }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Message types, editable without a deploy (field_options). */
+export async function listMessageTypes(): Promise<string[]> {
+  const { data } = await db()
+    .from('field_options')
+    .select('option_value')
+    .eq('field_name', 'outreach_message_type')
+    .eq('is_active', true)
+    .order('display_order');
+  return ((data ?? []) as any[]).map(r => r.option_value);
+}
+
+/** Add a message type from the board itself, so a new one does not need
+ *  a trip to an admin screen mid-flow. */
+export async function addMessageType(value: string): Promise<boolean> {
+  const v = value.trim();
+  if (!v) return false;
+  const { error } = await db()
+    .from('field_options')
+    .insert({ field_name: 'outreach_message_type', option_value: v, is_active: true, display_order: 99 });
+  return !error;
 }
