@@ -49,7 +49,8 @@ import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import {
   OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
-  listOwnerOptions, listMessageTypes,
+  listOwnerOptions, listMessageTypes, listStatuses, addStatus, addMessageType,
+  stageOfRow, type OutreachStatusRow,
   type OutreachProspect, type OutreachStatus, type Stage,
 } from '@/lib/outreachService';
 import { RateBreakdownDialog, type RateKey } from '@/components/crm/RateBreakdownDialog';
@@ -180,14 +181,14 @@ const NONE = '__none__';
 
 type ViewKey = 'all' | 'to_contact' | 'ready' | 'outreached' | 'engaged' | 'leads' | 'dead';
 
-const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect) => boolean }> = [
+const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect, cat?: OutreachStatusRow[] | null) => boolean }> = [
   { key: 'all',        label: 'All',           match: () => true },
-  { key: 'to_contact', label: 'To Contact',    match: p => stageOf(p.status) === 'queued' },
-  { key: 'ready',      label: 'Ready to Send', match: p => stageOf(p.status) === 'ready' },
-  { key: 'outreached', label: 'Outreached',    match: p => stageOf(p.status) === 'outreached' },
-  { key: 'engaged',    label: 'Engaged',       match: p => stageOf(p.status) === 'responded' },
-  { key: 'leads',      label: 'Leads',         match: p => stageOf(p.status) === 'lead' },
-  { key: 'dead',       label: 'Dead',          match: p => stageOf(p.status) === 'dead' },
+  { key: 'to_contact', label: 'To Contact',    match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'queued' },
+  { key: 'ready',      label: 'Ready to Send', match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'ready' },
+  { key: 'outreached', label: 'Outreached',    match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'outreached' },
+  { key: 'engaged',    label: 'Engaged',       match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'responded' },
+  { key: 'leads',      label: 'Leads',         match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'lead' },
+  { key: 'dead',       label: 'Dead',          match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'dead' },
 ];
 
 const emptyDraft = () => ({
@@ -239,10 +240,61 @@ export default function OutreachPage() {
   // until someone else assigned them something.
   const [ownerOptions, setOwnerOptions] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [messageTypes, setMessageTypes] = useState<string[]>([]);
+  // The status catalogue. Drives the dropdown, the badge label/tone, and —
+  // via stageOfRow — which funnel bucket each row counts in.
+  const [statusCatalogue, setStatusCatalogue] = useState<OutreachStatusRow[] | null>(null);
+  const [addStatusOpen, setAddStatusOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState<{ label: string; stage: Stage }>({ label: '', stage: 'queued' });
+  const [addMsgOpen, setAddMsgOpen] = useState(false);
+  const [newMsg, setNewMsg] = useState('');
+  const [savingOption, setSavingOption] = useState(false);
+
+  // Status keys to offer, catalogue first and the compiled list as the
+  // fallback while it loads.
+  const statusKeys = useMemo<string[]>(
+    () => (statusCatalogue?.length ? statusCatalogue.map(s => s.key) : OUTREACH_STATUSES),
+    [statusCatalogue],
+  );
+  const metaFor = (key: string): StatusMeta => {
+    const row = statusCatalogue?.find(r => r.key === key);
+    if (row) return { label: row.label, tone: row.tone as BadgeTone };
+    return STATUS_META[key as OutreachStatus] ?? { label: key, tone: 'neutral' };
+  };
+
+  const submitNewStatus = async () => {
+    setSavingOption(true);
+    try {
+      const res = await addStatus(newStatus);
+      if (!res.ok) {
+        toast({ title: 'Could not add status', description: res.error, variant: 'destructive' });
+        return;
+      }
+      setStatusCatalogue(await listStatuses(true));
+      setAddStatusOpen(false);
+      setNewStatus({ label: '', stage: 'queued' });
+      toast({ title: 'Status added', description: 'Available on every prospect now.' });
+    } finally { setSavingOption(false); }
+  };
+
+  const submitNewMessage = async () => {
+    setSavingOption(true);
+    try {
+      const ok = await addMessageType(newMsg);
+      if (!ok) {
+        toast({ title: 'Could not add message type', variant: 'destructive' });
+        return;
+      }
+      setMessageTypes(await listMessageTypes());
+      setAddMsgOpen(false);
+      setNewMsg('');
+      toast({ title: 'Message type added' });
+    } finally { setSavingOption(false); }
+  };
   useEffect(() => {
     let alive = true;
     listOwnerOptions().then(o => { if (alive) setOwnerOptions(o); }).catch(() => {});
     listMessageTypes().then(m => { if (alive) setMessageTypes(m); }).catch(() => {});
+    listStatuses().then(c => { if (alive) setStatusCatalogue(c); }).catch(() => {});
     return () => { alive = false; };
   }, []);
   const owners = useMemo(() => ownerOptions.map(o => o.name), [ownerOptions]);
@@ -272,10 +324,10 @@ export default function OutreachPage() {
 
   const rows = useMemo(() => {
     const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
-    return rateRows.filter(viewMatch);
-  }, [rateRows, view]);
+    return rateRows.filter(p => viewMatch(p, statusCatalogue));
+  }, [rateRows, view, statusCatalogue]);
 
-  const metrics = useMemo(() => computeRates(rateRows), [rateRows]);
+  const metrics = useMemo(() => computeRates(rateRows, statusCatalogue), [rateRows, statusCatalogue]);
 
   const activeFilter = [
     ownerFilter !== 'all' ? ownerFilter : null,
@@ -548,7 +600,7 @@ export default function OutreachPage() {
         <Tabs value={view} onValueChange={v => setView(v as ViewKey)}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             {VIEWS.map(v => {
-              const n = prospects.filter(v.match).length;
+              const n = prospects.filter(p => v.match(p, statusCatalogue)).length;
               return (
                 <TabsTrigger
                   key={v.key}
@@ -635,8 +687,8 @@ export default function OutreachPage() {
               </thead>
               <tbody>
                 {rows.map(p => {
-                  const meta = STATUS_META[p.status];
-                  const stage = stageOf(p.status);
+                  const meta = metaFor(p.status);
+                  const stage = stageOfRow(p.status, statusCatalogue);
                   const isEditing = (f: EditField) => edit?.id === p.id && edit.field === f;
 
                   /** Text/number cell: one click swaps the value for an input. */
@@ -738,8 +790,15 @@ export default function OutreachPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {OUTREACH_STATUSES.map(s => (
-                                  <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
+                                <button
+                                  type="button"
+                                  className="w-full text-left px-2 py-1.5 text-xs text-brand hover:bg-cream-50 border-b border-cream-100 mb-1"
+                                  onPointerDown={(e) => { e.preventDefault(); setEdit(null); setTimeout(() => setAddStatusOpen(true), 0); }}
+                                >
+                                  + Add status…
+                                </button>
+                                {statusKeys.map(k => (
+                                  <SelectItem key={k} value={k}>{metaFor(k).label}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -772,6 +831,13 @@ export default function OutreachPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value={NONE}>—</SelectItem>
+                                                                <button
+                                  type="button"
+                                  className="w-full text-left px-2 py-1.5 text-xs text-brand hover:bg-cream-50 border-b border-cream-100 mb-1"
+                                  onPointerDown={(e) => { e.preventDefault(); setEdit(null); setTimeout(() => setAddMsgOpen(true), 0); }}
+                                >
+                                  + Add message type…
+                                </button>
                                 {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                               </SelectContent>
                             </Select>
@@ -963,8 +1029,15 @@ export default function OutreachPage() {
                 >
                   <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {OUTREACH_STATUSES.map(s => (
-                      <SelectItem key={s} value={s}>{STATUS_META[s].label}</SelectItem>
+                    <button
+                      type="button"
+                      className="w-full text-left px-2 py-1.5 text-xs text-brand hover:bg-cream-50 border-b border-cream-100 mb-1"
+                      onPointerDown={(e) => { e.preventDefault(); setTimeout(() => setAddStatusOpen(true), 0); }}
+                    >
+                      + Add status…
+                    </button>
+                    {statusKeys.map(k => (
+                      <SelectItem key={k} value={k}>{metaFor(k).label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -977,6 +1050,13 @@ export default function OutreachPage() {
                 >
                   <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <button
+                      type="button"
+                      className="w-full text-left px-2 py-1.5 text-xs text-brand hover:bg-cream-50 border-b border-cream-100 mb-1"
+                      onPointerDown={(e) => { e.preventDefault(); setTimeout(() => setAddMsgOpen(true), 0); }}
+                    >
+                      + Add message type…
+                    </button>
                     <SelectItem value="none">None yet</SelectItem>
                     {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
@@ -1001,6 +1081,79 @@ export default function OutreachPage() {
       {/* Rate drill-down. Fed `rateRows`, the same attribute-filtered
           population the cards use — so the dialog can never disagree with the
           card that opened it. */}
+      {/* Add status — stage is required, not optional. A status with no
+          bucket would save and then be invisible to Response / Lead / Trial
+          rate, so the rates would under-count with nothing on screen saying
+          so. Asking here is what keeps them total. */}
+      <Dialog open={addStatusOpen} onOpenChange={setAddStatusOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add a status</DialogTitle>
+            <DialogDescription>
+              It appears on every prospect straight away.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Name <RequiredAsterisk /></Label>
+              <Input
+                className="h-9 focus-brand mt-1"
+                value={newStatus.label}
+                onChange={e => setNewStatus({ ...newStatus, label: e.target.value })}
+                placeholder="e.g. Awaiting intro"
+              />
+            </div>
+            <div>
+              <Label>Counts as <RequiredAsterisk /></Label>
+              <Select
+                value={newStatus.stage}
+                onValueChange={v => setNewStatus({ ...newStatus, stage: v as Stage })}
+              >
+                <SelectTrigger className="h-9 focus-brand mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(STAGE_META) as Stage[]).map(st => (
+                    <SelectItem key={st} value={st}>{STAGE_META[st].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-ink-warm-500 mt-1">
+                Which funnel bucket this status counts in. The rates above are built from these.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddStatusOpen(false)} disabled={savingOption}>Cancel</Button>
+            <Button variant="brand" onClick={submitNewStatus} disabled={savingOption || !newStatus.label.trim()}>
+              {savingOption ? 'Adding…' : 'Add status'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addMsgOpen} onOpenChange={setAddMsgOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add a message type</DialogTitle>
+            <DialogDescription>Available on every prospect straight away.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Name <RequiredAsterisk /></Label>
+            <Input
+              className="h-9 focus-brand mt-1"
+              value={newMsg}
+              onChange={e => setNewMsg(e.target.value)}
+              placeholder="e.g. Case Study v2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddMsgOpen(false)} disabled={savingOption}>Cancel</Button>
+            <Button variant="brand" onClick={submitNewMessage} disabled={savingOption || !newMsg.trim()}>
+              {savingOption ? 'Adding…' : 'Add message type'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <RateBreakdownDialog
         rateKey={rateDrill}
         rows={rateRows}

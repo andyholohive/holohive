@@ -49,6 +49,74 @@ export const BUMP_STATUSES: OutreachStatus[] = [
   'bump_3_unseen', 'bump_3_seen', 'final_bump',
 ];
 
+/**
+ * Runtime status catalogue, loaded from outreach_statuses.
+ *
+ * The hardcoded lists above stay as the compile-time shape for the 21
+ * original values, but anything added at runtime lives here — including its
+ * stage, which is what keeps the funnel rates total.
+ */
+export interface OutreachStatusRow {
+  key: string; label: string; tone: string; stage: Stage;
+  display_order: number; is_active: boolean;
+}
+
+let statusCache: OutreachStatusRow[] | null = null;
+
+export async function listStatuses(force = false): Promise<OutreachStatusRow[]> {
+  if (statusCache && !force) return statusCache;
+  const { data } = await db()
+    .from('outreach_statuses')
+    .select('key, label, tone, stage, display_order, is_active')
+    .eq('is_active', true)
+    .order('display_order');
+  statusCache = ((data ?? []) as OutreachStatusRow[]);
+  return statusCache;
+}
+
+/** Add a status. `stage` is required by the table, so a new one cannot be
+ *  created without saying which funnel bucket it counts in. */
+export async function addStatus(input: {
+  label: string; stage: Stage; tone?: string;
+}): Promise<{ ok: boolean; error?: string; key?: string }> {
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: 'Name is required.' };
+  // Key derived from the label: lower, non-alphanumerics to underscore. Keys
+  // are what the prospects table stores, so they must be stable and typo-free
+  // rather than typed by hand.
+  const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  if (!key) return { ok: false, error: 'Name needs at least one letter or number.' };
+
+  // Append at the end of the current order rather than a fixed 99, so a
+  // second and third added status don't tie and sort arbitrarily.
+  const { data: last } = await db()
+    .from('outreach_statuses')
+    .select('display_order')
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((last?.display_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await db().from('outreach_statuses').insert({
+    key, label, stage: input.stage, tone: input.tone ?? 'neutral', display_order: nextOrder,
+  });
+  if (error) {
+    return { ok: false, error: /duplicate/i.test(error.message) ? 'That status already exists.' : error.message };
+  }
+  statusCache = null;
+  return { ok: true, key };
+}
+
+/** Stage for a status key, using the loaded catalogue when it has one.
+ *  Falls back to the built-in mapping for the 21 originals so a call made
+ *  before the catalogue loads is still correct rather than defaulting
+ *  everything to 'queued'. */
+export function stageOfRow(status: string, catalogue: OutreachStatusRow[] | null): Stage {
+  const row = catalogue?.find(r => r.key === status);
+  if (row) return row.stage;
+  return stageOf(status as OutreachStatus);
+}
+
 export function stageOf(status: OutreachStatus): Stage {
   if (DEAD_STATUSES.includes(status)) return 'dead';
   if (status === 'lead' || status === 'lead_trial') return 'lead';
@@ -135,16 +203,16 @@ export interface OutreachRates {
 
 /** Did they reply at all? A denial IS a response — counting only positive
  *  replies would make response rate a synonym for interest rate. */
-export function hasResponded(p: Pick<OutreachProspect, 'status'>): boolean {
-  const st = stageOf(p.status);
+export function hasResponded(p: Pick<OutreachProspect, 'status'>, cat?: OutreachStatusRow[] | null): boolean {
+  const st = stageOfRow(p.status, cat ?? null);
   return st === 'responded' || st === 'lead'
     || p.status === 'response_denial' || p.status === 'response_not_working';
 }
 
 /** Trial OR convo OR call, per Yano. The engaged statuses are the "convo or
  *  call" half; lead / lead_trial are the closed half. */
-export function isLead(p: Pick<OutreachProspect, 'status'>): boolean {
-  const st = stageOf(p.status);
+export function isLead(p: Pick<OutreachProspect, 'status'>, cat?: OutreachStatusRow[] | null): boolean {
+  const st = stageOfRow(p.status, cat ?? null);
   return st === 'lead' || st === 'responded';
 }
 
@@ -156,12 +224,15 @@ export function isTrial(p: Pick<OutreachProspect, 'status'>): boolean {
 /** Rates over whatever set is passed — the page hands in the CURRENT view's
  *  rows, not the whole table, so "response rate" answers for the segment on
  *  screen (this owner, this message type) rather than only globally. */
-export function computeRates(rows: OutreachProspect[]): OutreachRates {
+export function computeRates(
+  rows: OutreachProspect[],
+  cat?: OutreachStatusRow[] | null,
+): OutreachRates {
   const contacted = rows.filter(p => p.date_outreached !== null).length;
-  const responded = rows.filter(hasResponded).length;
-  const leads = rows.filter(isLead).length;
+  const responded = rows.filter(p => hasResponded(p, cat)).length;
+  const leads = rows.filter(p => isLead(p, cat)).length;
   const trials = rows.filter(isTrial).length;
-  const dead = rows.filter(p => stageOf(p.status) === 'dead').length;
+  const dead = rows.filter(p => stageOfRow(p.status, cat ?? null) === 'dead').length;
 
   const pct = (n: number, d: number) => (d === 0 ? null : Math.round((n / d) * 100));
 
