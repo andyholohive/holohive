@@ -137,6 +137,9 @@ export interface OutreachProspect {
   owner_user_id: string | null;
   status: OutreachStatus;
   message_type: string | null;
+  /** The message they were replying to. message_type is whatever was sent
+   *  most recently, which after a bump is a different thing. */
+  responded_to_message: string | null;
   date_outreached: string | null;
   bumps_used: number;
   bumps_before_conversion: number | null;
@@ -176,7 +179,7 @@ const db = () => supabase as any;
 
 const COLUMNS =
   'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
-  'date_outreached, bumps_used, bumps_before_conversion, source, ' +
+  'date_outreached, bumps_used, bumps_before_conversion, source, responded_to_message, ' +
   'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason';
 
 // ── Rates ────────────────────────────────────────────────────────────

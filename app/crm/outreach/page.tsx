@@ -119,6 +119,11 @@ const COLUMNS: Array<{ label: string; width: string }> = [
   { label: 'Company',       width: 'w-[210px]' },
   { label: 'Status',        width: 'w-[150px]' },
   { label: 'Message',       width: 'w-[140px]' },
+  // [2026-08-27, Yano] Which message they were replying to. Message (above)
+  // is whatever went out LAST, so after a bump the two are different — and
+  // the bumps are most of the board, which is exactly where "which message
+  // works" stops being answerable from message_type alone.
+  { label: 'Replied To',    width: 'w-[140px]' },
   // Bumps column removed [2026-08-22, Yano]: "the bumps section isn't
   // necessary if the status part covers that". The status values ARE the
   // bump ladder (Bump 1/2/3, Final Bump), so on the board it was the same
@@ -158,7 +163,7 @@ function parseCompanyInput(input: string): { company: string; company_url: strin
 /** Every column that can be edited in place. */
 type EditField =
   | 'telegram' | 'role' | 'company'
-  | 'status' | 'message_type' | 'date_outreached'
+  | 'status' | 'message_type' | 'responded_to_message' | 'date_outreached'
   | 'owner' | 'notes';
 
 /** Radix Select forbids an empty-string value, so "no message type" needs a
@@ -499,7 +504,16 @@ export default function OutreachPage() {
     }
   }
 
+  // [2026-08-27] Delete used to fire straight off the trash icon — a
+  // hover-revealed control, one click, gone, sitting directly beside Park.
+  // 19 prospects were deleted in a single afternoon and there is no audit log
+  // on this table, so nothing about them is recoverable. The dialog names the
+  // row and offers Park, because "get it off my board" is what the click
+  // usually means and Park is the reversible way to do it.
+  const [confirmDelete, setConfirmDelete] = useState<OutreachProspect | null>(null);
+
   async function handleDelete(p: OutreachProspect) {
+    setConfirmDelete(null);
     setDeleting(true);
     try {
       await OutreachService.remove(p.id);
@@ -788,6 +802,8 @@ export default function OutreachPage() {
                   const meta = metaFor(p.status);
                   const stage = stageOfRow(p.status, statusCatalogue);
                   const isEditing = (f: EditField) => edit?.id === p.id && edit.field === f;
+                  // Only rows that actually came back need a message attributed.
+                  const hasReplied = stage === 'responded' || stage === 'lead';
 
                   /** Text/number cell: one click swaps the value for an input. */
                   const textCell = (
@@ -957,6 +973,53 @@ export default function OutreachPage() {
                       </td>
 
 
+                      {/* Replied To — same catalogue as Message. Only asks
+                          the question once there is a reply to attribute:
+                          before that the cell is empty and quiet, and after it
+                          carries a RequiredAsterisk while unfilled, per the
+                          inline-required convention in CLAUDE.md. */}
+                      <td
+                        className="border-r border-cream-200 align-middle"
+                        onClick={() => !isEditing('responded_to_message') && setEdit({ id: p.id, field: 'responded_to_message' })}
+                      >
+                        {isEditing('responded_to_message') ? (
+                          <div className="py-1 px-2">
+                            <Select
+                              defaultOpen
+                              value={p.responded_to_message ?? NONE}
+                              onValueChange={v => {
+                                setEdit(null);
+                                saveField(p, 'responded_to_message', v === NONE ? null : v);
+                              }}
+                              onOpenChange={o => { if (!o) setEdit(null); }}
+                            >
+                              <SelectTrigger className="h-8 text-xs focus-brand bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <button
+                                  type="button"
+                                  className="w-full text-left px-2 py-1.5 text-xs text-brand hover:bg-cream-50 border-b border-cream-100 mb-1"
+                                  onPointerDown={(e) => { e.preventDefault(); setEdit(null); setTimeout(() => setAddMsgOpen(true), 0); }}
+                                >
+                                  + Add message type…
+                                </button>
+                                <SelectItem value={NONE}>—</SelectItem>
+                                {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center gap-1">
+                            {p.responded_to_message
+                              ? <span className="text-xs text-ink-warm-700">{p.responded_to_message}</span>
+                              : hasReplied
+                                ? <><span className="text-xs text-ink-warm-300">—</span><RequiredAsterisk /></>
+                                : <span className="text-xs text-ink-warm-300">—</span>}
+                          </div>
+                        )}
+                      </td>
+
                       {/* Last outreach — Popover + Calendar, never a native
                           date input (CLAUDE.md). Opens straight from the click. */}
                       <td className="border-r border-cream-200 align-middle">
@@ -1059,9 +1122,9 @@ export default function OutreachPage() {
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-ink-warm-400 hover:text-rose-600"
-                          onClick={() => handleDelete(p)}
+                          onClick={() => setConfirmDelete(p)}
                           disabled={deleting}
-                          title={`Remove ${p.telegram}`}
+                          title={`Delete ${p.telegram} permanently — Park keeps it`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -1202,6 +1265,37 @@ export default function OutreachPage() {
           bucket would save and then be invisible to Response / Lead / Trial
           rate, so the rates would under-count with nothing on screen saying
           so. Asking here is what keeps them total. */}
+      <Dialog open={confirmDelete !== null} onOpenChange={o => { if (!o) setConfirmDelete(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this prospect?</DialogTitle>
+            <DialogDescription>
+              {confirmDelete?.telegram}{confirmDelete?.company ? ` · ${confirmDelete.company}` : ''} would be
+              erased — status, notes, outreach dates, all of it. There is no undo and no
+              record kept. The sales-CRM opportunity behind it is not affected.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-cream-200 bg-cream-50 p-3 text-xs text-ink-warm-600">
+            If you just want it off the board, <b>Park</b> it instead — the row keeps
+            everything and one click brings it back.
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+            <Button
+              variant="outline"
+              className="border-brand text-brand hover:bg-brand-light"
+              onClick={() => { const t = confirmDelete; setConfirmDelete(null); if (t) handlePark(t, true); }}
+              disabled={deleting}
+            >
+              <Archive className="h-4 w-4 mr-2" />Park instead
+            </Button>
+            <Button variant="destructive" onClick={() => confirmDelete && handleDelete(confirmDelete)} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete permanently'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={addStatusOpen} onOpenChange={setAddStatusOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
