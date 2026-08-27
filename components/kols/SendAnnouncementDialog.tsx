@@ -13,7 +13,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateTime } from '@/lib/dateFormat';
-import { Send, Search, Users, History, ChevronRight, RotateCcw } from 'lucide-react';
+import { Send, Search, Users, History, ChevronRight, RotateCcw, Megaphone } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { supabase } from '@/lib/supabase';
 
 /**
  * SendAnnouncementDialog — pick KOLs with linked GCs + write message + send.
@@ -35,6 +39,23 @@ import { Send, Search, Users, History, ChevronRight, RotateCcw } from 'lucide-re
  */
 
 type KolChoice = { id: string; name: string; hasGc: boolean };
+
+/** A campaign as a recipient shortcut: its roster, split by reachability. */
+type CampaignChoice = {
+  id: string;
+  name: string;
+  status: string | null;
+  /** Roster KOL ids that have a linked group chat — the ones a pick adds. */
+  reachableIds: string[];
+  /** On the roster but with no group chat. Counted so the pick can say so. */
+  unreachableCount: number;
+};
+
+/** Active first, then by name. Someone announcing to a campaign almost always
+ *  means a running one, and there are 40+ completed ones to scroll past. */
+const CAMPAIGN_STATUS_RANK: Record<string, number> = {
+  Active: 0, Planning: 1, Completed: 2,
+};
 
 /** Shape returned by GET /api/kols/announcements (History tab). */
 type AnnouncementHistoryRow = {
@@ -78,6 +99,11 @@ export function SendAnnouncementDialog({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // [2026-07-06] History tab — past sends with per-KOL receipts.
   const [tab, setTab] = useState<'compose' | 'history'>('compose');
+  // [2026-08-27] Recipients by campaign. Picking one adds its roster to the
+  // selection rather than replacing it, so two campaigns can go out in one
+  // send and the sender can still drop individuals afterwards.
+  const [campaigns, setCampaigns] = useState<CampaignChoice[] | null>(null);
+  const [campaignPick, setCampaignPick] = useState('');
   const [historyRows, setHistoryRows] = useState<AnnouncementHistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -162,6 +188,7 @@ export function SendAnnouncementDialog({
       setText('');
       setSearch('');
       setSelectedIds(new Set());
+      setCampaignPick('');
       setTab('compose');
       setExpandedId(null);
       setHistoryLoaded(false);
@@ -172,6 +199,71 @@ export function SendAnnouncementDialog({
     () => allKols.filter(k => k.hasGc).sort((a, b) => a.name.localeCompare(b.name)),
     [allKols],
   );
+
+  // Campaign rosters, loaded once per open. Reachability is resolved here
+  // against the same hasGc the picker uses, so the count on the option is
+  // exactly how many recipients the pick will add — no promise the send
+  // then fails to keep.
+  useEffect(() => {
+    if (!open || campaigns !== null) return;
+    let alive = true;
+    (async () => {
+      const gcIds = new Set(allKols.filter(k => k.hasGc).map(k => k.id));
+      const [{ data: cRows }, { data: ckRows }] = await Promise.all([
+        supabase.from('campaigns').select('id, name, status'),
+        supabase.from('campaign_kols').select('campaign_id, master_kol_id'),
+      ]);
+      if (!alive) return;
+      const byCampaign = new Map<string, { hit: string[]; miss: number }>();
+      for (const r of (ckRows ?? []) as any[]) {
+        if (!r.campaign_id || !r.master_kol_id) continue;
+        const bucket = byCampaign.get(r.campaign_id) ?? { hit: [], miss: 0 };
+        if (gcIds.has(r.master_kol_id)) bucket.hit.push(r.master_kol_id);
+        else bucket.miss++;
+        byCampaign.set(r.campaign_id, bucket);
+      }
+      const list: CampaignChoice[] = ((cRows ?? []) as any[])
+        .map(c => {
+          const b = byCampaign.get(c.id) ?? { hit: [], miss: 0 };
+          return {
+            id: c.id,
+            name: c.name as string,
+            status: c.status as string | null,
+            reachableIds: Array.from(new Set(b.hit)),
+            unreachableCount: b.miss,
+          };
+        })
+        // A campaign with nobody reachable is not a recipient shortcut, it
+        // is a dead option that reads like a bug when picking it does
+        // nothing. Left out rather than shown disabled.
+        .filter(c => c.reachableIds.length > 0)
+        .sort((a, b) =>
+          (CAMPAIGN_STATUS_RANK[a.status ?? ''] ?? 3) - (CAMPAIGN_STATUS_RANK[b.status ?? ''] ?? 3)
+          || a.name.localeCompare(b.name));
+      setCampaigns(list);
+    })().catch(() => { if (alive) setCampaigns([]); });
+    return () => { alive = false; };
+  }, [open, campaigns, allKols]);
+
+  const addCampaign = (campaignId: string) => {
+    const c = campaigns?.find(x => x.id === campaignId);
+    if (!c) return;
+    let added = 0;
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      for (const id of c.reachableIds) if (!next.has(id)) { next.add(id); added++; }
+      return next;
+    });
+    setCampaignPick('');
+    toast({
+      title: `${c.name} added`,
+      description: [
+        `${added} recipient${added === 1 ? '' : 's'} added`,
+        c.reachableIds.length - added > 0 ? `${c.reachableIds.length - added} already selected` : null,
+        c.unreachableCount > 0 ? `${c.unreachableCount} on the roster have no group chat` : null,
+      ].filter(Boolean).join(' · '),
+    });
+  };
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return reachable;
@@ -301,14 +393,42 @@ export function SendAnnouncementDialog({
                 )}
               </div>
             </div>
-            <div className="relative mb-2">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-warm-400" />
-              <Input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search KOLs with GC…"
-                className="h-9 pl-7 focus-brand"
-              />
+            {/* Campaign shortcut. Adds to the selection rather than
+                replacing it, so two campaigns can go out together and
+                individuals can still be dropped afterwards. */}
+            <div className="flex items-center gap-2 mb-2">
+              <Select value={campaignPick} onValueChange={addCampaign}>
+                <SelectTrigger className="h-9 focus-brand w-[230px] flex-shrink-0 gap-2">
+                  <Megaphone className="h-3.5 w-3.5 text-ink-warm-400 flex-shrink-0" />
+                  <SelectValue placeholder={campaigns === null ? 'Loading campaigns…' : 'Add a campaign…'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(campaigns ?? []).length === 0 ? (
+                    <div className="px-2 py-3 text-xs text-ink-warm-500">
+                      No campaign has a KOL with a linked group chat.
+                    </div>
+                  ) : (campaigns ?? []).map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="truncate">{c.name}</span>
+                        <span className="text-[11px] text-ink-warm-400 tabular-nums flex-shrink-0">
+                          {c.reachableIds.length}
+                          {c.unreachableCount > 0 && ` · ${c.unreachableCount} no GC`}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-warm-400" />
+                <Input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search KOLs with GC…"
+                  className="h-9 pl-7 focus-brand"
+                />
+              </div>
             </div>
             <div className="max-h-[220px] overflow-y-auto rounded-md border border-cream-200">
               {filtered.length === 0 ? (
