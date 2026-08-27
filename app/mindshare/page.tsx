@@ -93,6 +93,13 @@ interface MonitoredChannel {
   // any messages from this chat, so mindshare stays empty for it.
   bot_status?: string | null;
   bot_status_checked_at?: string | null;
+  // [2026-08-27] Last corpus-scrape outcome, joined from tg_channel_scan_log.
+  // Distinct from bot_status: that is @holo_hive_bot's membership, used for
+  // webhook mention counting. THIS is whether the Telethon scrape can read
+  // the channel, which is what fills the corpus.
+  scan_status?: string | null;
+  scan_detail?: string | null;
+  scan_failing_since?: string | null;
   last_message_at?: string | null;
   // [Channel metadata] Captured alongside bot status. member_count
   // lets the admin invite the bot to the highest-reach channels first;
@@ -121,6 +128,29 @@ const BOT_STATUS_TONES: Record<string, BadgeTone> = {
   kicked: 'danger',
   error: 'warning',
   unknown: 'neutral',
+};
+
+/** Corpus-scrape outcome. Separate axis from bot membership: a channel can
+ *  have the bot in it and still be unreadable by the scrape account, and vice
+ *  versa. Only non-ok statuses get a pill — a working channel needs no badge. */
+const SCAN_STATUS_TONES: Record<string, BadgeTone> = {
+  no_posts: 'neutral',
+  no_handle: 'warning',
+  not_found: 'danger',
+  private: 'warning',
+  not_channel: 'danger',
+  flood_wait: 'info',
+  error: 'danger',
+};
+
+const SCAN_STATUS_LABELS: Record<string, string> = {
+  no_posts: 'quiet',
+  no_handle: 'no handle',
+  not_found: 'not found',
+  private: 'private',
+  not_channel: 'not a channel',
+  flood_wait: 'rate-limited',
+  error: 'scrape error',
 };
 
 // 7-day activity volume: 0 hits → neutral (likely dead), 1-4 → warning
@@ -943,7 +973,21 @@ export default function MindsharePage() {
     setChannelsLoading(true);
     try {
       const { data } = await supabase.from('tg_monitored_channels').select('*').order('channel_name');
-      setChannels((data || []) as MonitoredChannel[]);
+      // Scrape outcome per channel. Kept as a separate query rather than a
+      // join so a channel with no log row (never scraped since the log
+      // shipped) reads as absent rather than dropping out of the list.
+      const { data: scanRows } = await (supabase as any)
+        .from('tg_channel_scan_log')
+        .select('monitored_channel_id, status, detail, failing_since');
+      const scanById = new Map<string, any>(
+        ((scanRows ?? []) as any[]).map(r => [r.monitored_channel_id, r]),
+      );
+      setChannels(((data || []) as MonitoredChannel[]).map(c => {
+        const sc = scanById.get(c.id);
+        return sc
+          ? { ...c, scan_status: sc.status, scan_detail: sc.detail, scan_failing_since: sc.failing_since }
+          : c;
+      }));
       // Sidecar query for last-7d mention activity per channel — gives
       // admins a signal for which channels are dead and prunable.
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -2450,6 +2494,27 @@ export default function MindsharePage() {
                               {label}
                             </StatusBadge>
                           </button>
+                        );
+                      })()}
+                      {/* Scrape outcome. Shown only when it is NOT ok, so the
+                          row stays quiet for the 118 channels that work and
+                          the handful that don't are the thing you see. */}
+                      {c.scan_status && c.scan_status !== 'ok' && (() => {
+                        const days = c.scan_failing_since
+                          ? Math.floor((Date.now() - new Date(c.scan_failing_since).getTime()) / 86_400_000)
+                          : null;
+                        return (
+                          <span
+                            title={[
+                              `Scrape: ${c.scan_status}`,
+                              c.scan_detail,
+                              days !== null ? `Failing for ${days}d` : null,
+                            ].filter(Boolean).join(' · ')}
+                          >
+                            <StatusBadge tone={SCAN_STATUS_TONES[c.scan_status] ?? 'neutral'} size="sm">
+                              {`${SCAN_STATUS_LABELS[c.scan_status] ?? c.scan_status}${days && days > 0 ? ` ${days}d` : ''}`}
+                            </StatusBadge>
+                          </span>
                         );
                       })()}
                       <Select value={c.language} onValueChange={(v) => setChannelLanguage(c, v)}>

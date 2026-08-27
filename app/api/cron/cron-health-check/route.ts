@@ -189,9 +189,20 @@ export async function GET(request: Request) {
     // So this checks the OUTPUT tables directly. `max_age_hours` is generous —
     // several times the feed's own cadence — because the point is catching a
     // dead pipeline, not a slow afternoon.
+    // [2026-08-27] Thresholds tightened after the scrape died at 26 Aug 07:02
+    // UTC and this sweep would not have said a word until 27 Aug 08:00 — 25
+    // hours later. Two things made it that slow, and both are fixed:
+    //   - a 24h threshold on a 3-hourly feed (8 misses before it counts), and
+    //   - a once-a-day sweep, which caps the alert delay at another 24h on top.
+    // The sweep is hourly now (vercel.json), so the threshold is what governs.
+    // 9h = three consecutive missed ticks: past a blip, well short of a day.
+    //
+    // The cause that time was GitHub Actions refusing to start the job over a
+    // billing failure — a class HHP cannot see directly. Watching the output
+    // table catches it anyway, which is the point of probing data rather than
+    // job status.
     const FEEDS: Array<{ table: string; column: string; maxAgeHours: number; label: string }> = [
-      // 3-hourly GHA scrape; 24h means ~8 consecutive misses before it fires.
-      { table: 'tg_channel_posts', column: 'pulled_at', maxAgeHours: 24, label: 'Mindshare channel scrape' },
+      { table: 'tg_channel_posts', column: 'pulled_at', maxAgeHours: 9, label: 'Mindshare channel scrape' },
     ];
 
     const staleFeeds: Array<{ label: string; ageHours: number; last: string | null }> = [];
@@ -301,7 +312,38 @@ export async function GET(request: Request) {
     const message = lines.join('\n');
 
     // ─── 5. Send DM ───────────────────────────────────────────────
-    const sent = await TelegramService.sendMessage(message, 'HTML');
+    //
+    // Hourly sweeps mean the same broken thing is found 24× a day. DMing every
+    // time trains you to ignore the channel, which is worse than not alerting.
+    // So the DM is keyed on WHAT is wrong, not that something is: a fingerprint
+    // of the issue set, re-sent only when it changes or after 12h of the same
+    // state. A newly-broken feed still pages immediately — that is the case
+    // this whole path exists for.
+    const fingerprint = [
+      ...(failedRuns ?? []).map((r: any) => `f:${r.agent_name}`),
+      ...(scheduleRows ?? []).map((s: any) => `s:${s.schedule_key}`),
+      ...runaways.map(r => `r:${r.agent}`),
+      ...staleFeeds.map(f => `t:${f.label}`),
+    ].sort().join('|');
+
+    const { data: lastAlert } = await (supabase as any)
+      .from('agent_runs')
+      .select('started_at, error_message')
+      .eq('agent_name', 'CRON_HEALTH_CHECK')
+      // Deliberately the last sweep of ANY kind, not the last alerting one: a
+      // healthy sweep writes no fingerprint, so recovery resets the comparison
+      // and a feed that breaks, recovers and breaks again pages both times.
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const sameAsLast = (lastAlert?.error_message ?? '') === fingerprint;
+    const hoursSinceLast = lastAlert?.started_at
+      ? (Date.now() - new Date(lastAlert.started_at).getTime()) / 3_600_000
+      : Number.POSITIVE_INFINITY;
+    const suppressed = sameAsLast && hoursSinceLast < 12;
+
+    const sent = suppressed ? false : await TelegramService.sendMessage(message, 'HTML');
 
     // agent_runs log — the watcher watches itself.
     try {
@@ -311,13 +353,18 @@ export async function GET(request: Request) {
         started_at: startedAt.toISOString(),
         completed_at: new Date().toISOString(),
         status: 'success',
-        output_summary: `${failureCount} failure(s), ${anomalyCount} anomaly(ies) flagged.`,
+        // The fingerprint lives in error_message so the next sweep can compare
+        // against it without a table of its own. Nothing reads it as prose.
+        error_message: fingerprint,
+        output_summary: `${failureCount} failure(s), ${anomalyCount} anomaly(ies)`
+          + `${suppressed ? ' — DM suppressed, unchanged since last alert' : ' — DM sent'}.`,
       });
     } catch { /* swallow */ }
 
     return NextResponse.json({
       ok: true,
       sent,
+      suppressed,
       failures: failureCount,
       anomalies: anomalyCount,
       sample_size: allRuns?.length || 0,
