@@ -51,11 +51,12 @@ type CampaignChoice = {
   unreachableCount: number;
 };
 
-/** Active first, then by name. Someone announcing to a campaign almost always
- *  means a running one, and there are 40+ completed ones to scroll past. */
-const CAMPAIGN_STATUS_RANK: Record<string, number> = {
-  Active: 0, Planning: 1, Completed: 2,
-};
+/** Active only [Andy, 2026-08-27]. Announcing to a campaign means a running
+ *  one; of 44 campaigns, 5 are Active and the other 39 are Planning,
+ *  Completed or Paused. Hiding them keeps the wrong campaign out of reach
+ *  rather than one slot away in a long list. A finished campaign's KOLs can
+ *  still be picked by hand in the list below. */
+const ANNOUNCEABLE_STATUSES = ['Active'];
 
 /** Shape returned by GET /api/kols/announcements (History tab). */
 type AnnouncementHistoryRow = {
@@ -236,10 +237,9 @@ export function SendAnnouncementDialog({
         // A campaign with nobody reachable is not a recipient shortcut, it
         // is a dead option that reads like a bug when picking it does
         // nothing. Left out rather than shown disabled.
-        .filter(c => c.reachableIds.length > 0)
-        .sort((a, b) =>
-          (CAMPAIGN_STATUS_RANK[a.status ?? ''] ?? 3) - (CAMPAIGN_STATUS_RANK[b.status ?? ''] ?? 3)
-          || a.name.localeCompare(b.name));
+        .filter(c => c.reachableIds.length > 0
+          && ANNOUNCEABLE_STATUSES.includes(c.status ?? ''))
+        .sort((a, b) => a.name.localeCompare(b.name));
       setCampaigns(list);
     })().catch(() => { if (alive) setCampaigns([]); });
     return () => { alive = false; };
@@ -405,7 +405,7 @@ export function SendAnnouncementDialog({
                 <SelectContent>
                   {(campaigns ?? []).length === 0 ? (
                     <div className="px-2 py-3 text-xs text-ink-warm-500">
-                      No campaign has a KOL with a linked group chat.
+                      No active campaign has a KOL with a linked group chat.
                     </div>
                   ) : (campaigns ?? []).map(c => (
                     <SelectItem key={c.id} value={c.id}>
