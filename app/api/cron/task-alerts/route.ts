@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { escapeHtml } from '@/lib/telegramHtml';
 import { formatDate } from '@/lib/dateFormat';
 
 export const dynamic = 'force-dynamic';
@@ -65,7 +66,7 @@ export async function GET(request: Request) {
     // 1. Get all overdue tasks (due_date < today, not complete/paused)
     const { data: overdueTasks } = await supabase
       .from('tasks')
-      .select('id, task_name, assigned_to, assigned_to_name, due_date')
+      .select('id, short_id, task_name, assigned_to, assigned_to_name, due_date, description, latest_comment, priority, client_id, task_type, link')
       .lt('due_date', today)
       .not('status', 'in', '("complete","paused")');
 
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
 
     const { data: staleCandidates } = await supabase
       .from('tasks')
-      .select('id, task_name, assigned_to, assigned_to_name, updated_at, due_date')
+      .select('id, short_id, task_name, assigned_to, assigned_to_name, due_date, description, latest_comment, priority, client_id, task_type, link, updated_at')
       .lt('updated_at', staleCutoff.toISOString())
       .not('status', 'in', '("complete","paused")');
 
@@ -101,6 +102,22 @@ export async function GET(request: Request) {
       // Has a deadline: only stale once that deadline is actually close.
       return t.due_date <= dueSoonDate;
     });
+
+    // 2b. Client names. A task line that says only "Send Button Invoice"
+    //     makes the reader go and look up which client it is and what it was
+    //     about; the row already knows, so say it.
+    const clientIds = new Set<string>();
+    for (const t of [...(overdueTasks ?? []), ...(staleTasks ?? [])] as any[]) {
+      if (t.client_id) clientIds.add(t.client_id);
+    }
+    const clientNameById = new Map<string, string>();
+    if (clientIds.size > 0) {
+      const { data: clientRows } = await (supabase as any)
+        .from('clients')
+        .select('id, name')
+        .in('id', Array.from(clientIds));
+      for (const c of ((clientRows ?? []) as any[])) clientNameById.set(c.id, c.name);
+    }
 
     // 3. Get user telegram IDs
     const userIds = new Set<string>();
@@ -144,6 +161,36 @@ export async function GET(request: Request) {
       staleByUser.set(task.assigned_to, existing);
     }
 
+    /** One task, rendered with enough context to act on without opening HQ.
+     *
+     *  [2026-08-28] Lines used to be the task name and a date. "Send Button
+     *  Invoice — due 09/10/2026" tells you nothing about which client, what it
+     *  is for, or what was last said about it, so the reader has to go and
+     *  find all of that before deciding anything — and mostly doesn't.
+     *
+     *  The short_id leads because it is the handle: /done T-839 closes it from
+     *  the same chat, so the alert carries its own action. */
+    const renderTask = (t: any, tail: string): string => {
+      const client = t.client_id ? clientNameById.get(t.client_id) : null;
+      // 'General' is the default task_type and carries no information —
+      // printing it just makes the line longer. Same for medium priority.
+      const bits = [
+        client,
+        t.task_type && t.task_type !== 'General' ? t.task_type : null,
+        t.priority && t.priority !== 'medium' ? t.priority : null,
+      ].filter(Boolean).join(' · ');
+      const head = `• <code>${t.short_id ?? '—'}</code> <b>${escapeHtml(t.task_name)}</b>`
+        + (bits ? ` — ${escapeHtml(bits)}` : '')
+        + ` — ${tail}`;
+      // Latest comment first: it is the freshest statement of where the task
+      // actually stands. Description is the fallback for a task nobody has
+      // commented on, which is most of the stale ones by definition.
+      const note = (t.latest_comment || t.description || '').replace(/\s+/g, ' ').trim();
+      const noteLine = note ? `\n   ↳ <i>${escapeHtml(note.slice(0, 160))}${note.length > 160 ? '…' : ''}</i>` : '';
+      const linkLine = t.link ? `\n   ↳ <a href="${escapeHtml(t.link)}">link</a>` : '';
+      return head + noteLine + linkLine;
+    };
+
     let notificationsSent = 0;
 
     // 6. Send notifications per user
@@ -164,7 +211,7 @@ export async function GET(request: Request) {
           const daysOverdue = Math.ceil(
             (new Date().getTime() - new Date(t.due_date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)
           );
-          message += `• ${t.task_name} — due ${formatDate(t.due_date)} (${daysOverdue}d overdue)\n`;
+          message += renderTask(t, `due ${formatDate(t.due_date)} (<b>${daysOverdue}d overdue</b>)`) + '\n';
         }
         message += '\n';
       }
@@ -175,12 +222,25 @@ export async function GET(request: Request) {
           const daysSinceUpdate = Math.ceil(
             (Date.now() - new Date(t.updated_at as string).getTime()) / (1000 * 60 * 60 * 24)
           );
-          // The due date is what tells two same-named tasks apart — Jdot
-          // saw "Send Button Invoice" twice and read it as a duplicate when
-          // they were two real rows due a month apart.
-          const due = t.due_date ? `due ${formatDate(t.due_date)}` : 'no due date';
-          message += `• ${t.task_name} — ${due} (no update in ${daysSinceUpdate}d)\n`;
+          // [2026-08-28, Jdot] "no update in 23d" was the whole line, and it
+          // reads as an accusation about a task that was created a month early
+          // and correctly not started yet. The days since it was touched is
+          // mostly the age of the row; the number that decides anything is how
+          // long is left. So lead with the deadline and keep the idle count as
+          // the aside it always was.
+          if (!t.due_date) {
+            message += renderTask(t, `no due date · <b>idle ${daysSinceUpdate}d</b>`) + '\n';
+          } else {
+            const daysLeft = Math.ceil(
+              (new Date(t.due_date + 'T00:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            );
+            message += renderTask(
+              t,
+              `due ${formatDate(t.due_date)} (<b>${daysLeft}d left</b>, not started)`,
+            ) + '\n';
+          }
         }
+        message += '\n<i>Close from here: <code>/done T-000</code></i>\n';
       }
 
       try {
