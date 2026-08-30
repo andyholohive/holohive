@@ -54,6 +54,7 @@ import {
   listOwnerOptions, listMessageTypes, listStatuses, addStatus, addMessageType,
   stageOfRow, type OutreachStatusRow,
   PARK_REASON_LABELS, type ParkReason,
+  REPLIED_STEPS, repliedStepLabel, type RepliedStep,
   type OutreachProspect, type OutreachStatus, type Stage,
 } from '@/lib/outreachService';
 import { RateBreakdownDialog, type RateKey } from '@/components/crm/RateBreakdownDialog';
@@ -123,7 +124,7 @@ const COLUMNS: Array<{ label: string; width: string }> = [
   // is whatever went out LAST, so after a bump the two are different — and
   // the bumps are most of the board, which is exactly where "which message
   // works" stops being answerable from message_type alone.
-  { label: 'Replied To',    width: 'w-[140px]' },
+  { label: 'Replied To',    width: 'w-[170px]' },
   // Bumps column removed [2026-08-22, Yano]: "the bumps section isn't
   // necessary if the status part covers that". The status values ARE the
   // bump ladder (Bump 1/2/3, Final Bump), so on the board it was the same
@@ -163,7 +164,7 @@ function parseCompanyInput(input: string): { company: string; company_url: strin
 /** Every column that can be edited in place. */
 type EditField =
   | 'telegram' | 'role' | 'company'
-  | 'status' | 'message_type' | 'responded_to_message' | 'date_outreached'
+  | 'status' | 'message_type' | 'responded_to_step' | 'date_outreached'
   | 'owner' | 'notes';
 
 /** Radix Select forbids an empty-string value, so "no message type" needs a
@@ -973,23 +974,26 @@ export default function OutreachPage() {
                       </td>
 
 
-                      {/* Replied To — same catalogue as Message. Only asks
-                          the question once there is a reply to attribute:
-                          before that the cell is empty and quiet, and after it
-                          carries a RequiredAsterisk while unfilled, per the
-                          inline-required convention in CLAUDE.md. */}
+                      {/* Replied To — WHICH TOUCH got the reply, composed
+                          with the template into "Bump 1 of Scan (Gap)". The
+                          template is already the Message column; repeating it
+                          here would say nothing new. The ladder is fixed
+                          (Contacted → Bump 1/2/3 → Final Bump), so unlike
+                          message types it has no + Add. Asks only once there
+                          is a reply to attribute, per the inline-required
+                          convention. */}
                       <td
                         className="border-r border-cream-200 align-middle"
-                        onClick={() => !isEditing('responded_to_message') && setEdit({ id: p.id, field: 'responded_to_message' })}
+                        onClick={() => !isEditing('responded_to_step') && setEdit({ id: p.id, field: 'responded_to_step' })}
                       >
-                        {isEditing('responded_to_message') ? (
+                        {isEditing('responded_to_step') ? (
                           <div className="py-1 px-2">
                             <Select
                               defaultOpen
-                              value={p.responded_to_message ?? NONE}
+                              value={p.responded_to_step ?? NONE}
                               onValueChange={v => {
                                 setEdit(null);
-                                saveField(p, 'responded_to_message', v === NONE ? null : v);
+                                saveField(p, 'responded_to_step', v === NONE ? null : v);
                               }}
                               onOpenChange={o => { if (!o) setEdit(null); }}
                             >
@@ -997,22 +1001,21 @@ export default function OutreachPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <button
-                                  type="button"
-                                  className="w-full text-left px-2 py-1.5 text-xs text-brand hover:bg-cream-50 border-b border-cream-100 mb-1"
-                                  onPointerDown={(e) => { e.preventDefault(); setEdit(null); setTimeout(() => setAddMsgOpen(true), 0); }}
-                                >
-                                  + Add message type…
-                                </button>
                                 <SelectItem value={NONE}>—</SelectItem>
-                                {messageTypes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                {REPLIED_STEPS.map(st => (
+                                  <SelectItem key={st.key} value={st.key}>
+                                    {p.message_type ? `${st.label} of ${p.message_type}` : st.label}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
                         ) : (
                           <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center gap-1">
-                            {p.responded_to_message
-                              ? <span className="text-xs text-ink-warm-700">{p.responded_to_message}</span>
+                            {p.responded_to_step
+                              ? <span className="text-xs text-ink-warm-700">
+                                  {repliedStepLabel(p.responded_to_step, p.message_type)}
+                                </span>
                               : hasReplied
                                 ? <><span className="text-xs text-ink-warm-300">—</span><RequiredAsterisk /></>
                                 : <span className="text-xs text-ink-warm-300">—</span>}

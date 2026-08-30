@@ -137,9 +137,10 @@ export interface OutreachProspect {
   owner_user_id: string | null;
   status: OutreachStatus;
   message_type: string | null;
-  /** The message they were replying to. message_type is whatever was sent
-   *  most recently, which after a bump is a different thing. */
-  responded_to_message: string | null;
+  /** Which touch got the reply. Pairs with message_type to read as
+   *  "Bump 1 of Scan (Gap)" — the template is one dimension, how many
+   *  touches it took is the other, and both are worth counting. */
+  responded_to_step: RepliedStep | null;
   date_outreached: string | null;
   bumps_used: number;
   bumps_before_conversion: number | null;
@@ -152,6 +153,30 @@ export interface OutreachProspect {
    *  reversible and the row keeps every field it had. */
   parked_at: string | null;
   parked_reason: ParkReason | null;
+}
+
+/** The outreach ladder, mirroring the bump statuses. Fixed, not a
+ *  field_options list — the sequence is the sequence. */
+export type RepliedStep = 'opener' | 'bump_1' | 'bump_2' | 'bump_3' | 'final_bump';
+
+export const REPLIED_STEPS: Array<{ key: RepliedStep; label: string }> = [
+  { key: 'opener',     label: 'Opener' },
+  { key: 'bump_1',     label: 'Bump 1' },
+  { key: 'bump_2',     label: 'Bump 2' },
+  { key: 'bump_3',     label: 'Bump 3' },
+  { key: 'final_bump', label: 'Final Bump' },
+];
+
+export const REPLIED_STEP_LABELS: Record<RepliedStep, string> =
+  Object.fromEntries(REPLIED_STEPS.map(s => [s.key, s.label])) as Record<RepliedStep, string>;
+
+/** "Bump 1 of Scan (Gap)", or just "Bump 1" when no template is recorded. */
+export function repliedStepLabel(
+  step: RepliedStep | null, messageType: string | null,
+): string | null {
+  if (!step) return null;
+  const base = REPLIED_STEP_LABELS[step] ?? step;
+  return messageType ? `${base} of ${messageType}` : base;
 }
 
 export type ParkReason = 'no_handle' | 'duplicate' | 'terminal' | 'stale_no_reply';
@@ -179,7 +204,7 @@ const db = () => supabase as any;
 
 const COLUMNS =
   'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
-  'date_outreached, bumps_used, bumps_before_conversion, source, responded_to_message, ' +
+  'date_outreached, bumps_used, bumps_before_conversion, source, responded_to_step, ' +
   'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason';
 
 // ── Rates ────────────────────────────────────────────────────────────
