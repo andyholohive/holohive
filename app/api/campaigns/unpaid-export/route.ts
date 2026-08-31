@@ -93,22 +93,29 @@ export async function GET() {
     'Zero Amount', 'Category', 'Wallet', 'Notes', 'Created', 'In Rollup Scope', 'Payment ID',
   ];
 
-  // [2026-08-25, Andy] Archived clients are dropped entirely, unlike merely
-  // inactive ones which stay and are flagged out-of-scope.
+  // [2026-08-31, Andy] Inactive clients are dropped too, not just archived.
   //
-  // The distinction is whether the row is chaseable. An inactive client —
-  // Altura, Impossible, X1 — is a real engagement that ended, and money may
-  // genuinely still be owed. An archived one is a deleted record: test data
-  // and internal placeholders nobody will ever invoice. Those were 15 of the
-  // 95 rows and are noise even after filtering on In Rollup Scope.
+  // The 08-25 version kept them and flagged them out-of-scope in a column, on
+  // the reasoning that an ended engagement can still owe money. Andy has now
+  // asked twice for them out of the CSV: the export is a chase list, and a
+  // chase list nobody acts on is worse than a shorter one.
   //
-  // Deliberately narrower than the "export everything" rule above, which
-  // exists so a finance chase never silently loses a chaseable row. An
-  // archived client has none.
+  // What this drops, measured before changing it: 52 rows across Xyber, Space,
+  // Impossible and DataHaven, carrying $2,950 unpaid — $2,700 of it Xyber.
+  // That money does not stop existing, it stops appearing here. It is still on
+  // the client's own budget page, and the In Rollup Scope column is now
+  // redundant for this purpose since everything exported is in scope.
+  //
+  // Archived stays dropped for the original reason: those are deleted records,
+  // test data and internal placeholders nobody will ever invoice.
   const visibleRows = rows.filter(p => {
     const campaign = p.campaign_id ? campaignById.get(p.campaign_id) : null;
     const client = campaign?.client_id ? clientById.get(campaign.client_id) : null;
-    return !client?.archived_at;
+    // No client at all is kept deliberately: an orphaned payment is exactly
+    // the kind of row a chase must not lose, and there is nothing to judge it
+    // inactive by.
+    if (!client) return true;
+    return !client.archived_at && client.is_active;
   });
 
   const body = visibleRows.map(p => {
