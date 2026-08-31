@@ -303,7 +303,7 @@ export default function Sidebar({ children }: SidebarProps) {
       pinned:      ['/tasks', '/dashboard'],
       clients:     ['/clients', '/campaigns', '/delivery-logs'],
       kols:        ['/kols', '/lists', '/repost-deals'],
-      crm:         ['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
+      crm:         ['/crm/sales-pipeline', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
       measurement: ['/mindshare', '/intelligence/client-watch', '/wallets'],
       logistics:   ['/crm/submissions', '/crm/telegram', '/intelligence/telegram', '/forms'],
@@ -795,12 +795,17 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Sales / CRM Section — pipeline + relationship
                   surfaces only. Submissions / Meetings / TG Chats
                   moved to Logistics per the 2026-06-19 reorg. */}
-              {!guestHideSection(['/crm/sales-pipeline', '/crm/outreach', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
+              {!guestHideSection(['/crm/sales-pipeline', '/crm/outreach', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
                 <CollapsibleSection id="crm" icon={DollarSign}>
                   {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
                   {/* TG Outreach — cold-prospecting funnel ported from Yano's
                       Notion. Mockup as of 2026-08-07, no data layer yet. */}
                   {!guestHide('/crm/outreach') && <NavItem href="/crm/outreach" icon={Send} label="Outreach" />}
+                  {/* [2026-08-31] Sits directly under Outreach because that is
+                      the order the work happens in: a prospect becomes a lead
+                      on the Outreach board and lands here. "Sales" above is the
+                      legacy v2 board, kept until this one has proved itself. */}
+                  {!guestHide('/crm/pipeline') && <NavItem href="/crm/pipeline" icon={Target} label="Pipeline" />}
                   {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
                   {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
                   {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}

@@ -91,6 +91,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // Sales / CRM — pipeline + relationship surfaces only.
   { href: '/crm/sales-pipeline', label: 'Sales', icon: Target, section: 'Sales / CRM', pageKey: '/crm/sales-pipeline' },
   { href: '/crm/outreach', label: 'Outreach', icon: Send, section: 'Sales / CRM', pageKey: '/crm/outreach' },
+  { href: '/crm/pipeline', label: 'Pipeline', icon: Target, section: 'Sales / CRM', pageKey: '/crm/pipeline' },
   { href: '/crm/network', label: 'Network', icon: Handshake, section: 'Sales / CRM', pageKey: '/crm/network' },
   { href: '/crm/contacts', label: 'Contacts', icon: UserPlus, section: 'Sales / CRM', pageKey: '/crm/contacts' },
   { href: '/intelligence', label: 'Intelligence', icon: Radar, section: 'Sales / CRM', pageKey: '/intelligence' },
