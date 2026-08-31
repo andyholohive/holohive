@@ -51,12 +51,30 @@ export const STAGE_WIN_PCT: Record<PipelineStage, number> = {
   negotiation: 75, contract: 90, closed_won: 100, closed_lost: 0, orbit: 0,
 };
 
+/** Sub-reasons under Fit.
+ *
+ *  [Andy, 2026-09-01] "Fit" alone says the deal was wrong for us without
+ *  saying which way, and those are different lessons — targeting, timing and
+ *  pricing all show up as "fit" otherwise. Required when Fit is picked, so the
+ *  cheapest reason to reach for is no longer the least informative one. */
+export const FIT_SUB_REASONS: Array<{ key: string; label: string }> = [
+  { key: 'unqualified', label: 'Unqualified' },
+  { key: 'not_korea', label: 'Not targeting Korea' },
+  { key: 'too_early', label: 'Too early — pre-token / pre-product' },
+  { key: 'budget_too_small', label: 'Budget below our floor' },
+  { key: 'wrong_service', label: 'Needs a service we do not offer' },
+];
+
 /** Loss reasons. The two flagged `orbit` prompt to park rather than close —
- *  a deal lost on timing is not lost on merit and comes back. */
-export const LOSS_REASONS: Array<{ key: string; label: string; orbit?: boolean }> = [
+ *  a deal lost on timing is not lost on merit and comes back. `subReasons`
+ *  makes a second dropdown appear and be required. */
+export const LOSS_REASONS: Array<{
+  key: string; label: string; orbit?: boolean;
+  subReasons?: Array<{ key: string; label: string }>;
+}> = [
   { key: 'price', label: 'Price' },
   { key: 'timing', label: 'Timing', orbit: true },
-  { key: 'fit', label: 'Fit' },
+  { key: 'fit', label: 'Fit', subReasons: FIT_SUB_REASONS },
   { key: 'competitor', label: 'Competitor' },
   { key: 'no_decision', label: 'No decision' },
   { key: 'ghosted', label: 'Ghosted' },
@@ -151,14 +169,20 @@ export const PipelineV13Service = {
   /** Close a deal. A loss always carries a reason — an unexplained loss
    *  teaches nobody anything, which is the whole point of recording it. */
   async close(
-    id: string, outcome: 'closed_won' | 'closed_lost' | 'orbit', reason?: string,
+    id: string, outcome: 'closed_won' | 'closed_lost' | 'orbit',
+    reason?: string, subReason?: string,
   ): Promise<void> {
     const patch: Record<string, unknown> = {
       pipeline_stage: outcome,
       closed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    if (outcome === 'closed_lost') patch.closed_lost_reason = reason ?? null;
+    if (outcome === 'closed_lost') {
+      patch.closed_lost_reason = reason ?? null;
+      // Always written, including null: re-closing under a reason with no
+      // detail must clear whatever detail a previous close left behind.
+      patch.closed_lost_sub_reason = subReason ?? null;
+    }
     if (outcome === 'orbit') patch.orbit_reason = reason ?? null;
     const { error } = await (supabase as any)
       .from('crm_opportunities').update(patch).eq('id', id);

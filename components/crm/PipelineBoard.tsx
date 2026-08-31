@@ -36,6 +36,7 @@ import { formatDate } from '@/lib/dateFormat';
 import { Target, Send, ChevronsLeftRight } from 'lucide-react';
 import {
   PipelineV13Service, BOARD_STAGES, STAGE_LABELS, STAGE_WIN_PCT, LOSS_REASONS,
+  FIT_SUB_REASONS,
   daysIdle, isStalled, type PipelineDeal, type PipelineStage,
 } from '@/lib/pipelineV13Service';
 
@@ -135,7 +136,11 @@ function DraggableCard({ deal }: { deal: PipelineDeal }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
+      /* select-none / touch-none: without them a press-and-move selects the
+         card's text instead of starting the drag — the pointer sensor never
+         activates and the card just highlights. touch-none is what makes drag
+         work at all on a trackpad-less touch screen. */
+      className={`cursor-grab active:cursor-grabbing select-none touch-none ${isDragging ? 'opacity-40' : ''}`}
     >
       <DealCard deal={deal} />
     </div>
@@ -230,6 +235,8 @@ export default function PipelineBoard() {
    *  rather than closing the deal immediately. */
   const [lossFor, setLossFor] = useState<PipelineDeal | null>(null);
   const [lossReason, setLossReason] = useState('');
+  /** Second level, shown only for reasons that carry sub-reasons (Fit). */
+  const [lossSubReason, setLossSubReason] = useState('');
   const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(
@@ -292,7 +299,9 @@ export default function PipelineBoard() {
     const deal = (deals ?? []).find(d => d.id === id);
     if (!deal) return;
 
-    if (target === 'zone-lost') { setLossFor(deal); setLossReason(''); return; }
+    if (target === 'zone-lost') {
+      setLossFor(deal); setLossReason(''); setLossSubReason(''); return;
+    }
 
     const next: PipelineStage | 'closed_won' =
       target === 'zone-won' ? 'closed_won' : (target as PipelineStage);
@@ -315,18 +324,25 @@ export default function PipelineBoard() {
   async function confirmLoss() {
     if (!lossFor || !lossReason) return;
     const reason = LOSS_REASONS.find(r => r.key === lossReason);
+    // A reason that carries sub-reasons is not recorded without one — the
+    // whole point is that "Fit" on its own says nothing.
+    if (reason?.subReasons && !lossSubReason) return;
     setSaving(true);
     try {
       // Timing and internal priority are not verdicts on the deal, so they park
       // it in Orbit instead of closing it — it comes back when the reason does.
       await PipelineV13Service.close(
-        lossFor.id, reason?.orbit ? 'orbit' : 'closed_lost', lossReason);
+        lossFor.id, reason?.orbit ? 'orbit' : 'closed_lost',
+        lossReason, lossSubReason || undefined);
       setDeals(prev => (prev ?? []).filter(d => d.id !== lossFor.id));
       toast({
         title: reason?.orbit ? 'Moved to Orbit' : 'Closed lost',
         description: reason?.orbit
           ? `${lossFor.name} — ${reason.label} is a reason to revisit, not to close.`
-          : `${lossFor.name} — ${reason?.label}`,
+          : `${lossFor.name} — ${reason?.label}`
+            + (lossSubReason
+              ? ` · ${FIT_SUB_REASONS.find(x => x.key === lossSubReason)?.label ?? lossSubReason}`
+              : ''),
       });
       setLossFor(null);
     } catch (err: any) {
@@ -434,7 +450,10 @@ export default function PipelineBoard() {
           </DialogHeader>
           <div>
             <Label>Reason <span className="text-rose-600">*</span></Label>
-            <Select value={lossReason} onValueChange={setLossReason}>
+            <Select
+              value={lossReason}
+              onValueChange={v => { setLossReason(v); setLossSubReason(''); }}
+            >
               <SelectTrigger className="h-9 focus-brand mt-1">
                 <SelectValue placeholder="Pick a reason" />
               </SelectTrigger>
@@ -450,9 +469,34 @@ export default function PipelineBoard() {
               Timing and internal priority park the deal in Orbit instead of closing it.
             </p>
           </div>
+
+          {/* Only for reasons that carry a second level. Today that is Fit,
+              which on its own does not say which way the deal was wrong. */}
+          {LOSS_REASONS.find(r => r.key === lossReason)?.subReasons && (
+            <div>
+              <Label>Which way? <span className="text-rose-600">*</span></Label>
+              <Select value={lossSubReason} onValueChange={setLossSubReason}>
+                <SelectTrigger className="h-9 focus-brand mt-1">
+                  <SelectValue placeholder="Pick a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(LOSS_REASONS.find(r => r.key === lossReason)?.subReasons ?? []).map(sr => (
+                    <SelectItem key={sr.key} value={sr.key}>{sr.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setLossFor(null)} disabled={saving}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmLoss} disabled={saving || !lossReason}>
+            <Button
+              variant="destructive"
+              onClick={confirmLoss}
+              disabled={
+                saving || !lossReason
+                || (!!LOSS_REASONS.find(r => r.key === lossReason)?.subReasons && !lossSubReason)
+              }
+            >
               {saving ? 'Saving…' : 'Record'}
             </Button>
           </DialogFooter>
