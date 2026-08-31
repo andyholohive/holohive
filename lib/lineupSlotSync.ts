@@ -65,12 +65,29 @@ export async function markLineupSlotPosted(
     const angleIds = ((angles as any[]) ?? []).map(a => a.id);
     if (angleIds.length === 0) return { updated: 0 };
 
+    // [2026-08-31, Jdot] 'missed' is included deliberately, not just 'pending'.
+    //
+    // markCompletedIfWeekEnded flips every still-pending slot to 'missed' when
+    // the week closes. Content logged after that — a KOL who posted on the
+    // Wednesday but whose link only reached us the following Monday — found
+    // its slot already 'missed' and this update matched nothing, so the slot
+    // stayed missed forever and the post belonged to no week at all.
+    //
+    // Umia Wk 6 is the case: Gorochi posted 08-26, inside the week; the link
+    // was logged 08-31, five hours after the cron closed the week. He read as
+    // a no-show against a post that exists.
+    //
+    // A post that happened inside the week is not a miss, whenever it was
+    // logged. Correcting that is not a judgement call, it is fixing a record
+    // that is factually wrong. The week bucketing above already guarantees the
+    // date falls inside this lineup's week, so this cannot credit a slot for a
+    // post from some other week.
     const { data: updatedRows } = await (supabase as any)
       .from('lineup_slots')
       .update({ status: 'posted' })
       .in('angle_id', angleIds)
       .eq('kol_id', kolId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'missed'])
       .select('id');
     return { updated: ((updatedRows as any[]) ?? []).length };
   } catch (err) {
