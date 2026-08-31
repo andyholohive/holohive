@@ -1032,7 +1032,21 @@ export default function LineupsTab({
             whole week rather than any one angle, and the swap list is the
             thing nobody could see: one Fogo week had 8 KOLs removed with
             nothing on the page saying so. */}
-        {lineup && <LineupChangesAndNotes lineup={lineup} service={service} />}
+        {lineup && (
+          <LineupChangesAndNotes
+            lineup={lineup}
+            service={service}
+            /* Refetch trigger. The effect below cannot key on `lineup` alone:
+               refreshLineup() replaces the object on every edit, but id and
+               notes are unchanged by a swap, so the changes list never
+               refetched — [Jdot] "swapped quite a few, nothing updating".
+               A fingerprint of who is actually in the roster does change. */
+            rosterKey={lineup.angles
+              .flatMap(a => a.slots.map(sl => sl.id))
+              .sort()
+              .join(',')}
+          />
+        )}
 
         {/* ─── Body ─── */}
         {!lineup ? (
@@ -1802,9 +1816,12 @@ function SummaryView({
 function LineupChangesAndNotes({
   lineup,
   service,
+  rosterKey,
 }: {
   lineup: { id: string; notes?: string | null };
   service: LineupManagerService;
+  /** Changes whenever a slot is added or removed — see the call site. */
+  rosterKey: string;
 }) {
   const { toast } = useToast();
   const [changes, setChanges] = useState<{
@@ -1825,7 +1842,7 @@ function LineupChangesAndNotes({
       .then(c => { if (alive) setChanges(c); })
       .catch(() => { if (alive) setChanges({ out: [], in_: [] }); });
     return () => { alive = false; };
-  }, [lineup.id, lineup.notes, service]);
+  }, [lineup.id, lineup.notes, rosterKey, service]);
 
   const saveNotes = async () => {
     setSaving(true);

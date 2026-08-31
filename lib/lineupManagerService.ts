@@ -821,24 +821,53 @@ export class LineupManagerService {
    * counts as a swap-in only if it happened after the first removal. A week
    * with no removals has no swaps, which is the correct answer.
    */
+  /**
+   * What changed between PROPOSED and now — the review diff, not the build log.
+   *
+   * [2026-08-31, Jdot] "this is supposed to be proposed -> confirmed changes /
+   * all i see are changes that happened before it was proposed."
+   *
+   * He was right. The first version anchored on the first removal in the log,
+   * on the theory that everything before it was the initial build. That falls
+   * apart the moment anyone churns while drafting: on Venice Wk 17 he added
+   * Degen Guy and Gorochi, removed them, re-added — all before proposing — and
+   * that early removal then promoted every later build addition into the
+   * "swapped in" list. Potato and Loopy showed as changes when they were part
+   * of the original proposal.
+   *
+   * The lineup already records exactly the right anchor: proposed_at. Only
+   * events after it are changes to a thing anyone has seen. Before that it is
+   * just someone building a draft, and nobody needs a diff of that.
+   *
+   * A KOL removed and re-added after the proposal nets out and is listed on
+   * neither side — last event per name decides, so the two cancel.
+   */
   async getRosterChanges(lineupId: string): Promise<{
     out: Array<{ name: string; ts: string; actor: string | null }>;
     in_: Array<{ name: string; ts: string; actor: string | null }>;
   }> {
+    const { data: lineupRow } = await (this.supabase as any)
+      .from('campaign_lineups')
+      .select('proposed_at')
+      .eq('id', lineupId)
+      .maybeSingle();
+
+    // Still a draft: there is no proposal to diff against, so there are no
+    // changes yet. Empty is the honest answer, not the whole build history.
+    const proposedAt: string | null = (lineupRow as any)?.proposed_at ?? null;
+    if (!proposedAt) return { out: [], in_: [] };
+
     const { data, error } = await (this.supabase as any)
       .from('lineup_activity_log')
       .select('action, details, ts, actor_user:users!lineup_activity_log_actor_fkey(name)')
       .eq('lineup_id', lineupId)
       .in('action', ['kol_added', 'kol_removed'])
+      .gt('ts', proposedAt)
       .order('ts', { ascending: true });
     if (error) throw error;
 
-    const rows = (data || []) as any[];
-    const firstRemoval = rows.find(r => r.action === 'kol_removed')?.ts ?? null;
-
-    // Last event per KOL name decides which side they land on.
     const last = new Map<string, { action: string; ts: string; actor: string | null }>();
-    for (const r of rows) {
+    for (const r of ((data || []) as any[])) {
       const name = (r.details || '').trim();
       if (!name) continue;
       last.set(name, { action: r.action, ts: r.ts, actor: r.actor_user?.name ?? null });
@@ -847,11 +876,7 @@ export class LineupManagerService {
     const out: Array<{ name: string; ts: string; actor: string | null }> = [];
     const in_: Array<{ name: string; ts: string; actor: string | null }> = [];
     for (const [name, e] of last) {
-      if (e.action === 'kol_removed') {
-        out.push({ name, ts: e.ts, actor: e.actor });
-      } else if (firstRemoval && e.ts > firstRemoval) {
-        in_.push({ name, ts: e.ts, actor: e.actor });
-      }
+      (e.action === 'kol_removed' ? out : in_).push({ name, ts: e.ts, actor: e.actor });
     }
     const byTs = (a: { ts: string }, b: { ts: string }) => (a.ts < b.ts ? 1 : -1);
     return { out: out.sort(byTs), in_: in_.sort(byTs) };
