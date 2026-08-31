@@ -48,10 +48,37 @@ const SOURCE_TONES: Record<string, BadgeTone> = {
   event: 'info', discovery: 'brand',
 };
 
+/** Written-out labels rather than the stored key. The column holds
+ *  'cold_outbound'; nobody should read that on a card. Anything not listed
+ *  falls back to Title Case so a new source value still reads properly
+ *  instead of showing up as snake_case. */
+const SOURCE_LABELS: Record<string, string> = {
+  cold_outbound: 'Cold Outbound',
+  referral: 'Referral',
+  inbound: 'Inbound',
+  event: 'Event',
+  discovery: 'Discovery',
+};
+
+const titleCase = (v: string) =>
+  v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+const sourceLabel = (v: string) => SOURCE_LABELS[v] ?? titleCase(v);
+
+/** Where this deal stands on the Outreach board. Its own vocabulary, shortened
+ *  to fit a card — the full status lives on /crm/outreach. */
+const OUTREACH_CHIP: Record<string, string> = {
+  lead: 'Lead',
+  lead_trial: 'Trial',
+  response_interested: 'Interested',
+  response_referred: 'Referred',
+  team_engaged: 'Team Engaged',
+};
+
 function OutreachChip({ status }: { status: string }) {
   return (
     <StatusBadge tone="brand" size="sm">
-      {status === 'lead_trial' ? 'Trial' : status === 'lead' ? 'Lead' : 'Outreach'}
+      {OUTREACH_CHIP[status] ?? titleCase(status)}
     </StatusBadge>
   );
 }
@@ -63,7 +90,7 @@ function DealCard({ deal, dragging }: { deal: PipelineDeal; dragging?: boolean }
     <div
       className={`rounded-lg border bg-white p-3 space-y-2 ${
         stalled ? 'border-rose-300' : 'border-cream-200'
-      } ${dragging ? 'shadow-lg rotate-1' : 'shadow-sm hover:shadow-card'} transition-shadow`}
+      } ${dragging ? 'shadow-card rotate-1' : 'hover:shadow-card'} transition-shadow`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-ink-warm-900 truncate">{deal.name}</span>
@@ -81,7 +108,7 @@ function DealCard({ deal, dragging }: { deal: PipelineDeal; dragging?: boolean }
       <div className="flex items-center gap-1.5 flex-wrap">
         {deal.source && (
           <StatusBadge tone={SOURCE_TONES[deal.source] ?? 'neutral'} size="sm">
-            {deal.source.replace(/_/g, ' ')}
+            {sourceLabel(deal.source)}
           </StatusBadge>
         )}
         {deal.outreach_status && <OutreachChip status={deal.outreach_status} />}
@@ -147,20 +174,20 @@ function Column({
     <div
       ref={setNodeRef}
       className={`rounded-lg border flex flex-col min-h-[200px] ${
-        isOver ? 'border-brand bg-brand-light/40' : 'border-cream-200 bg-cream-50/60'
+        isOver ? 'border-brand bg-brand-light/40' : 'border-cream-200 bg-cream-50/40'
       } transition-colors`}
     >
       <button
         type="button"
         onClick={onToggle}
-        className="px-3 py-2.5 text-left border-b border-cream-200 hover:bg-cream-100/60 rounded-t-lg"
+        className="group px-3 py-2.5 text-left border-b border-cream-200 bg-cream-50 hover:bg-cream-100/70 rounded-t-lg transition-colors"
         title="Collapse this column"
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-600">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
             {STAGE_LABELS[stage]}
           </span>
-          <ChevronsLeftRight className="h-3 w-3 text-ink-warm-300" />
+          <ChevronsLeftRight className="h-3 w-3 text-ink-warm-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
         <div className="text-[11px] text-ink-warm-500 tabular-nums mt-0.5">
           {deals.length} · {money(value)} · {STAGE_WIN_PCT[stage]}%
@@ -326,8 +353,10 @@ export default function PipelineBoard() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
+    <Card className="border-cream-200 overflow-hidden">
+      {/* Filters inside the Card with a border-b separator, per the
+          filter-bar convention in CLAUDE.md — not a floating row above it. */}
+      <div className="p-4 border-b border-cream-200 bg-cream-50/60 flex items-center gap-3 flex-wrap">
         <Select value={ownerFilter} onValueChange={setOwnerFilter}>
           <SelectTrigger className="h-9 w-[160px] focus-brand"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -340,7 +369,7 @@ export default function PipelineBoard() {
           <SelectContent>
             <SelectItem value="all">All sources</SelectItem>
             {sources.map(s => (
-              <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+              <SelectItem key={s} value={s}>{sourceLabel(s)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -349,11 +378,13 @@ export default function PipelineBoard() {
             Expand all ({collapsed.size})
           </Button>
         )}
-        <div className="ml-auto text-xs text-ink-warm-500 tabular-nums">
+        <div className="ml-auto text-[11px] uppercase tracking-[0.14em] text-ink-warm-500 tabular-nums">
           {visible.length} deals · {money(totals.total)} · {money(Math.round(totals.weighted))} weighted
-          {totals.stalled > 0 && <span className="text-rose-600 font-medium"> · {totals.stalled} stalled</span>}
+          {totals.stalled > 0 && <span className="text-rose-600 font-semibold"> · {totals.stalled} stalled</span>}
         </div>
       </div>
+
+      <div className="p-4 space-y-4">
 
       <DndContext
         sensors={sensors}
@@ -390,6 +421,7 @@ export default function PipelineBoard() {
 
         <DragOverlay>{dragged ? <DealCard deal={dragged} dragging /> : null}</DragOverlay>
       </DndContext>
+      </div>
 
       <Dialog open={lossFor !== null} onOpenChange={o => { if (!o) setLossFor(null); }}>
         <DialogContent className="sm:max-w-md">
@@ -426,6 +458,6 @@ export default function PipelineBoard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Card>
   );
 }
