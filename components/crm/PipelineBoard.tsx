@@ -84,52 +84,139 @@ function OutreachChip({ status }: { status: string }) {
   );
 }
 
-function DealCard({ deal, dragging }: { deal: PipelineDeal; dragging?: boolean }) {
+/** Initials for the owner dot. Local helper, not a shadow of the shared
+ *  Avatar primitive — see CLAUDE.md. */
+function ownerInitials(name: string | null): string {
+  if (!name) return '?';
+  return name.split(' ').map(w => w.charAt(0).toUpperCase()).join('').slice(0, 2);
+}
+
+function DealCard({
+  deal, dragging, onSaveValue,
+}: {
+  deal: PipelineDeal;
+  dragging?: boolean;
+  /** Absent in the drag overlay, where editing makes no sense. */
+  onSaveValue?: (id: string, value: number | null) => Promise<void>;
+}) {
   const idle = daysIdle(deal);
   const stalled = isStalled(deal);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const commit = async () => {
+    setEditing(false);
+    if (!onSaveValue) return;
+    const raw = draft.trim();
+    const next = raw === '' ? null : Number(raw.replace(/[$,]/g, ''));
+    if (next !== null && !Number.isFinite(next)) return;
+    if (next === deal.deal_value) return;
+    await onSaveValue(deal.id, next);
+  };
+
   return (
     <div
-      className={`rounded-lg border bg-white p-3 space-y-2 ${
-        stalled ? 'border-rose-300' : 'border-cream-200'
-      } ${dragging ? 'shadow-card rotate-1' : 'hover:shadow-card'} transition-shadow`}
+      className={`group/card rounded-lg border bg-white transition-all ${
+        stalled ? 'border-rose-200' : 'border-cream-200'
+      } ${dragging ? 'shadow-card rotate-1' : 'hover:border-cream-300 hover:shadow-card'}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-ink-warm-900 truncate">{deal.name}</span>
-        <span className={`text-[11px] tabular-nums flex-shrink-0 ${stalled ? 'text-rose-600 font-semibold' : 'text-ink-warm-400'}`}>
-          {stalled ? '● ' : ''}{idle}d
-        </span>
-      </div>
+      {/* A hairline in the stage's own colour, so a card that has been dragged
+          out of its column is obvious before you read anything on it. */}
+      <div className={`h-0.5 rounded-t-lg ${stalled ? 'bg-rose-300' : 'bg-brand/30'}`} />
 
-      {/* $0 is called out rather than shown as a number: a deal with no value
-          cannot be weighted, so the pipeline total silently under-reports. */}
-      <div className={`text-base font-bold tabular-nums ${deal.deal_value ? 'text-ink-warm-900' : 'text-amber-600'}`}>
-        {deal.deal_value ? money(deal.deal_value) : '⚠ no value'}
-      </div>
-
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {deal.source && (
-          <StatusBadge tone={SOURCE_TONES[deal.source] ?? 'neutral'} size="sm">
-            {sourceLabel(deal.source)}
-          </StatusBadge>
-        )}
-        {deal.outreach_status && <OutreachChip status={deal.outreach_status} />}
-      </div>
-
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="text-[11px] text-ink-warm-500 truncate">
-          {deal.owner_name ?? 'Unassigned'}
-        </span>
-        {deal.next_action_at && (
-          <span className="text-[11px] text-ink-warm-400 flex-shrink-0">
-            next {formatDate(deal.next_action_at)}
+      <div className="p-3 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-sm font-semibold text-ink-warm-900 leading-snug break-words">
+            {deal.name}
           </span>
+          <span
+            className={`text-[10px] tabular-nums flex-shrink-0 mt-0.5 ${
+              stalled ? 'text-rose-600 font-semibold' : 'text-ink-warm-300'
+            }`}
+            title={stalled ? `No activity for ${idle} days` : `Last activity ${idle} days ago`}
+          >
+            {idle}d
+          </span>
+        </div>
+
+        {/* Value is editable in place. It was the loudest thing on every card
+            while being the one field nobody had filled — a warning you cannot
+            act on from where you are reading it is just noise, so it is now a
+            quiet prompt that turns into an input. */}
+        {editing ? (
+          <Input
+            autoFocus
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); void commit(); }
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            onPointerDown={e => e.stopPropagation()}
+            className="h-7 text-sm focus-brand"
+            placeholder="0"
+          />
+        ) : (
+          <button
+            type="button"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={() => {
+              if (!onSaveValue) return;
+              setDraft(deal.deal_value ? String(deal.deal_value) : '');
+              setEditing(true);
+            }}
+            className="text-left w-full"
+          >
+            {deal.deal_value ? (
+              <span className="text-base font-bold tabular-nums text-ink-warm-900">
+                {money(deal.deal_value)}
+              </span>
+            ) : (
+              <span className="text-xs text-ink-warm-300 group-hover/card:text-brand transition-colors">
+                + Add value
+              </span>
+            )}
+          </button>
         )}
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {deal.source && (
+            <StatusBadge tone={SOURCE_TONES[deal.source] ?? 'neutral'} size="sm">
+              {sourceLabel(deal.source)}
+            </StatusBadge>
+          )}
+          {deal.outreach_status && <OutreachChip status={deal.outreach_status} />}
+        </div>
+
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-cream-100">
+          <span className="flex items-center gap-1.5 min-w-0" title={deal.owner_name ?? 'Unassigned'}>
+            <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
+              deal.owner_name ? 'bg-brand-light text-brand' : 'bg-cream-100 text-ink-warm-300'
+            }`}>
+              {ownerInitials(deal.owner_name)}
+            </span>
+            <span className="text-[11px] text-ink-warm-500 truncate">
+              {deal.owner_name ?? 'Unassigned'}
+            </span>
+          </span>
+          {deal.next_action_at && (
+            <span className="text-[10px] text-ink-warm-400 flex-shrink-0 tabular-nums">
+              {formatDate(deal.next_action_at)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function DraggableCard({ deal }: { deal: PipelineDeal }) {
+function DraggableCard({
+  deal, onSaveValue,
+}: {
+  deal: PipelineDeal;
+  onSaveValue: (id: string, value: number | null) => Promise<void>;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id });
   return (
     <div
@@ -142,18 +229,19 @@ function DraggableCard({ deal }: { deal: PipelineDeal }) {
          work at all on a trackpad-less touch screen. */
       className={`cursor-grab active:cursor-grabbing select-none touch-none ${isDragging ? 'opacity-40' : ''}`}
     >
-      <DealCard deal={deal} />
+      <DealCard deal={deal} onSaveValue={onSaveValue} />
     </div>
   );
 }
 
 function Column({
-  stage, deals, collapsed, onToggle,
+  stage, deals, collapsed, onToggle, onSaveValue,
 }: {
   stage: PipelineStage;
   deals: PipelineDeal[];
   collapsed: boolean;
   onToggle: () => void;
+  onSaveValue: (id: string, value: number | null) => Promise<void>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const value = deals.reduce((s, d) => s + (d.deal_value ?? 0), 0);
@@ -192,14 +280,23 @@ function Column({
           <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
             {STAGE_LABELS[stage]}
           </span>
-          <ChevronsLeftRight className="h-3 w-3 text-ink-warm-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold tabular-nums text-ink-warm-700 bg-cream-100 rounded-full px-1.5">
+              {deals.length}
+            </span>
+            <ChevronsLeftRight className="h-3 w-3 text-ink-warm-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </span>
         </div>
-        <div className="text-[11px] text-ink-warm-500 tabular-nums mt-0.5">
-          {deals.length} · {money(value)} · {STAGE_WIN_PCT[stage]}%
+        <div className="text-[11px] text-ink-warm-500 tabular-nums mt-0.5 flex items-center gap-1.5">
+          <span className={value > 0 ? 'font-semibold text-ink-warm-700' : 'text-ink-warm-300'}>
+            {value > 0 ? money(value) : 'no value yet'}
+          </span>
+          <span className="text-ink-warm-300">·</span>
+          <span>{STAGE_WIN_PCT[stage]}%</span>
         </div>
       </button>
       <div className="p-2 space-y-2 flex-1">
-        {deals.map(d => <DraggableCard key={d.id} deal={d} />)}
+        {deals.map(d => <DraggableCard key={d.id} deal={d} onSaveValue={onSaveValue} />)}
       </div>
     </div>
   );
@@ -286,10 +383,27 @@ export default function PipelineBoard() {
     const total = visible.reduce((s, d) => s + (d.deal_value ?? 0), 0);
     const weighted = visible.reduce(
       (s, d) => s + (d.deal_value ?? 0) * STAGE_WIN_PCT[d.pipeline_stage] / 100, 0);
-    return { total, weighted, stalled: visible.filter(isStalled).length };
+    return {
+      total, weighted,
+      stalled: visible.filter(isStalled).length,
+      // Counted here rather than shouted on each card: it is one fact about
+      // the board, not a property of every deal on it.
+      noValue: visible.filter(d => !d.deal_value).length,
+    };
   }, [visible]);
 
   const dragged = dragId ? (deals ?? []).find(d => d.id === dragId) ?? null : null;
+
+  const saveValue = useCallback(async (id: string, value: number | null) => {
+    const before = deals ?? [];
+    setDeals(before.map(d => (d.id === id ? { ...d, deal_value: value } : d)));
+    try {
+      await PipelineV13Service.setValue(id, value);
+    } catch (err: any) {
+      setDeals(before);
+      toast({ title: 'Could not save the value', description: err?.message, variant: 'destructive' });
+    }
+  }, [deals, toast]);
 
   async function onDragEnd(e: DragEndEvent) {
     setDragId(null);
@@ -396,6 +510,9 @@ export default function PipelineBoard() {
         )}
         <div className="ml-auto text-[11px] uppercase tracking-[0.14em] text-ink-warm-500 tabular-nums">
           {visible.length} deals · {money(totals.total)} · {money(Math.round(totals.weighted))} weighted
+          {totals.noValue > 0 && (
+            <span className="text-amber-600 font-semibold"> · {totals.noValue} without a value</span>
+          )}
           {totals.stalled > 0 && <span className="text-rose-600 font-semibold"> · {totals.stalled} stalled</span>}
         </div>
       </div>
@@ -421,6 +538,7 @@ export default function PipelineBoard() {
               stage={s}
               deals={byStage.get(s) ?? []}
               collapsed={collapsed.has(s)}
+              onSaveValue={saveValue}
               onToggle={() => setCollapsed(prev => {
                 const next = new Set(prev);
                 if (next.has(s)) next.delete(s); else next.add(s);
