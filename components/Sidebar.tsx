@@ -773,6 +773,14 @@ export default function Sidebar({ children }: SidebarProps) {
               {!guestHideSection(['/clients', '/campaigns', '/delivery-logs']) && (
                 <CollapsibleSection id="clients" icon={Users}>
                   {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
+                  {/* Sub-entry, not its own section: LTV answers a question
+                      about the clients above it. Admin-gated because it is the
+                      only page showing what we bill, as opposed to what the
+                      client's budget was. */}
+                  {(roleView === 'admin' || roleView === 'super_admin')
+                    && !guestHide('/clients') && (
+                    <NavItem href="/clients/ltv" icon={DollarSign} label="Lifetime Value" />
+                  )}
                   {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
                   {!guestHide('/campaigns/overview') && <NavItem href="/campaigns/overview" icon={BarChart3} label="Campaign Overview" />}
                   {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
