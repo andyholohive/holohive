@@ -99,6 +99,9 @@ export interface PipelineDeal {
   last_contacted_at: string | null;
   updated_at: string;
   tg_handle: string | null;
+  /** Off the working board but still readable. Not an outcome. */
+  archived_at: string | null;
+  archived_reason: string | null;
   /** Set when this deal came from a TG Outreach prospect. */
   outreach_id: string | null;
   outreach_status: string | null;
@@ -115,16 +118,24 @@ export function isStalled(d: PipelineDeal): boolean {
 }
 
 export const PipelineV13Service = {
-  /** Board rows. Outcomes are excluded — the board shows deals in flight. */
-  async listBoard(): Promise<PipelineDeal[]> {
-    const { data, error } = await (supabase as any)
+  /** Board rows. Outcomes are excluded — the board shows deals in flight.
+   *  Archived rows are excluded by default and fetched on request, so the
+   *  board is what is being worked rather than everything ever entered. */
+  async listBoard(opts?: { archived?: boolean }): Promise<PipelineDeal[]> {
+    let query = (supabase as any)
       .from('crm_opportunities')
       .select(
         'id, name, pipeline_stage, deal_value, source, owner_id, temperature_score, '
         + 'next_action_at, next_action_notes, last_contacted_at, updated_at, tg_handle, '
+        + 'archived_at, archived_reason, '
         + 'outreach:outreach_prospects!outreach_prospects_crm_opportunity_id_fkey(id, status)',
       )
       .in('pipeline_stage', BOARD_STAGES);
+
+    if (opts?.archived) query = query.not('archived_at', 'is', null);
+    else query = query.is('archived_at', null);
+
+    const { data, error } = await query;
     if (error) throw new Error(`Failed to load pipeline: ${error.message}`);
 
     // Owner names are a separate lookup, not an embed: crm_opportunities.owner_id
@@ -153,6 +164,8 @@ export const PipelineV13Service = {
       last_contacted_at: r.last_contacted_at,
       updated_at: r.updated_at,
       tg_handle: r.tg_handle,
+      archived_at: r.archived_at ?? null,
+      archived_reason: r.archived_reason ?? null,
       outreach_id: r.outreach?.[0]?.id ?? null,
       outreach_status: r.outreach?.[0]?.status ?? null,
     }));
@@ -187,6 +200,18 @@ export const PipelineV13Service = {
     const { error } = await (supabase as any)
       .from('crm_opportunities').update(patch).eq('id', id);
     if (error) throw new Error(`Could not close the deal: ${error.message}`);
+  },
+
+  /** Archiving says only "this predates how we work now" — it is not a
+   *  verdict on the deal, and unarchiving restores it untouched. */
+  async setArchived(id: string, archived: boolean, reason?: string): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('crm_opportunities')
+      .update(archived
+        ? { archived_at: new Date().toISOString(), archived_reason: reason ?? 'Archived from the board.' }
+        : { archived_at: null, archived_reason: null })
+      .eq('id', id);
+    if (error) throw new Error(`Could not archive: ${error.message}`);
   },
 
   async setValue(id: string, value: number | null): Promise<void> {

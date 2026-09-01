@@ -805,7 +805,12 @@ export default function Sidebar({ children }: SidebarProps) {
                   moved to Logistics per the 2026-06-19 reorg. */}
               {!guestHideSection(['/crm/sales-pipeline', '/crm/outreach', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
                 <CollapsibleSection id="crm" icon={DollarSign}>
-                  {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
+                  {/* [2026-09-01] The legacy v2 board is no longer a top-level
+                      peer of the thing replacing it — two entries called Sales
+                      and Pipeline, side by side, over the same rows, is how
+                      people end up working the wrong one. It nests under
+                      Pipeline and only appears while you are in that section,
+                      so it stays reachable without inviting a wrong turn. */}
                   {/* TG Outreach — cold-prospecting funnel ported from Yano's
                       Notion. Mockup as of 2026-08-07, no data layer yet. */}
                   {!guestHide('/crm/outreach') && <NavItem href="/crm/outreach" icon={Send} label="Outreach" />}
@@ -814,6 +819,14 @@ export default function Sidebar({ children }: SidebarProps) {
                       on the Outreach board and lands here. "Sales" above is the
                       legacy v2 board, kept until this one has proved itself. */}
                   {!guestHide('/crm/pipeline') && <NavItem href="/crm/pipeline" icon={Target} label="Pipeline" />}
+                  {!isSidebarCollapsed
+                    && (pathname.startsWith('/crm/pipeline') || pathname.startsWith('/crm/sales-pipeline'))
+                    && !guestHide('/crm/sales-pipeline') && (
+                    <div className="pl-6 space-y-0.5">
+                      <SubNavItem href="/crm/pipeline" icon={Target} label="Board" exact />
+                      <SubNavItem href="/crm/sales-pipeline" icon={Archive} label="Legacy Sales" />
+                    </div>
+                  )}
                   {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
                   {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
                   {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}

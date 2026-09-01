@@ -33,7 +33,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
-import { Target, Send, ChevronsLeftRight } from 'lucide-react';
+import { Target, Send, ChevronsLeftRight, Archive } from 'lucide-react';
 import {
   PipelineV13Service, BOARD_STAGES, STAGE_LABELS, STAGE_WIN_PCT, LOSS_REASONS,
   FIT_SUB_REASONS,
@@ -327,6 +327,10 @@ export default function PipelineBoard() {
   const [collapsed, setCollapsed] = useState<Set<PipelineStage>>(new Set());
   const [dragId, setDragId] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState('all');
+  /** Archived deals are a different question — "what did we used to have" —
+   *  so they get their own view rather than a row on the working board. */
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedCount, setArchivedCount] = useState(0);
   const [sourceFilter, setSourceFilter] = useState('all');
   /** A loss needs a reason before it can be recorded, so the drop opens this
    *  rather than closing the deal immediately. */
@@ -344,12 +348,16 @@ export default function PipelineBoard() {
 
   const load = useCallback(async () => {
     try {
-      setDeals(await PipelineV13Service.listBoard());
+      setDeals(await PipelineV13Service.listBoard({ archived: showArchived }));
+      if (!showArchived) {
+        const arch = await PipelineV13Service.listBoard({ archived: true });
+        setArchivedCount(arch.length);
+      }
     } catch (err: any) {
       toast({ title: 'Could not load the pipeline', description: err?.message, variant: 'destructive' });
       setDeals([]);
     }
-  }, [toast]);
+  }, [toast, showArchived]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -508,6 +516,16 @@ export default function PipelineBoard() {
             Expand all ({collapsed.size})
           </Button>
         )}
+        {(showArchived || archivedCount > 0) && (
+          <Button
+            variant={showArchived ? 'brand' : 'outline'}
+            size="sm"
+            onClick={() => setShowArchived(v => !v)}
+          >
+            <Archive className="h-3.5 w-3.5 mr-1.5" />
+            {showArchived ? 'Back to live deals' : `Archived (${archivedCount})`}
+          </Button>
+        )}
         <div className="ml-auto text-[11px] uppercase tracking-[0.14em] text-ink-warm-500 tabular-nums">
           {visible.length} deals · {money(totals.total)} · {money(Math.round(totals.weighted))} weighted
           {totals.noValue > 0 && (
@@ -518,6 +536,13 @@ export default function PipelineBoard() {
       </div>
 
       <div className="p-4 space-y-4">
+        {showArchived && (
+          <div className="rounded-md border border-cream-200 bg-cream-50 px-3 py-2 text-xs text-ink-warm-600">
+            <b>Archived deals.</b> Kept for reference, not being worked. Their stage is
+            whatever it was when work stopped — it is not a claim about where they stand
+            now. The legacy Sales board still shows every one of them.
+          </div>
+        )}
 
       <DndContext
         sensors={sensors}
