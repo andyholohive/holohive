@@ -49,6 +49,10 @@ export interface MasterKOL {
   profile_picture_synced_at?: string | null;
   /** Telegram @handle (without '@') used by the Telethon scanner and bot lookup. Per TGB.1. */
   telegram_id?: string | null;
+  /** Personal @handle, no @. Who to mention in their chat. */
+  telegram_username?: string | null;
+  /** Public channel handle, no @ — t.me/<this>. Not a mentionable account. */
+  telegram_channel?: string | null;
   /** Standard per-content rate (USD). Source of truth for the budget. */
   standard_rate?: number | null;
   /** Per-KOL repost rate (USD). Defaults to 50% of standard_rate on first-time confirm. Per REPOST-RATE.1. */
@@ -127,6 +131,8 @@ export interface UpdateKOLData {
   wallet?: string | null;
   projects_worked_together?: string[] | null;
   kol_category?: 'Web2' | 'Web3' | null;
+  telegram_username?: string | null;
+  telegram_channel?: string | null;
 }
 
 export class KOLService {

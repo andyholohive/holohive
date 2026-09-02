@@ -71,7 +71,7 @@ export class KolAnnouncementService {
     const sb: any = this.supabase;
     const { data: kolRows, error: kolErr } = await sb
       .from('master_kols')
-      .select('id, name')
+      .select('id, name, telegram_username')
       .in('id', input.kolIds);
     if (kolErr) throw kolErr;
     const kolNameById = new Map<string, string>();
@@ -89,44 +89,17 @@ export class KolAnnouncementService {
 
     // Telegram handles, for {handle}.
     //
-    // Derived from who actually speaks in each KOL's own linked chat, NOT from
-    // master_kols.telegram_id: an audit on 2026-09-02 found 15 of those wrong
-    // (ten carry @holo_hive_bot's id, two a team member's, nine hold a handle
-    // typed into a numeric column). The chat is the reliable source — in a
-    // "KOL <> Holo Hive" group the only non-team speaker is the KOL.
+    // [2026-09-03] From master_kols.telegram_username, which is now a real
+    // column editable on /kols. It replaces deriving the handle from message
+    // history on every send: the roster is the record, someone owns it, and a
+    // correction made in the table is correct everywhere at once.
     //
-    // Best-effort: any failure leaves the map empty and {handle} falls back to
-    // the name. A personalisation token must never be able to stop a send.
+    // NOT telegram_id — that column still holds three different things (a
+    // channel handle for 56 rows, a real numeric id for ~25, our own bot's id
+    // for 12) and cannot be read as an identity.
     const handleByKol = new Map<string, string>();
-    try {
-      const { data: teamRows } = await sb.from('users').select('telegram_id').not('telegram_id', 'is', null);
-      const notKol = new Set<string>([
-        ...((teamRows ?? []) as any[]).map((r: any) => String(r.telegram_id)),
-        '7996189688',   // @holo_hive_bot
-        '7111416066',   // @jeremyin — team, but missing from users.telegram_id
-      ]);
-      const chatByKolId = new Map<string, string>();
-      for (const [kolId, chatId] of chatIdByKol) chatByKolId.set(kolId, chatId);
-      const chatIds = Array.from(chatByKolId.values());
-      if (chatIds.length > 0) {
-        const { data: msgs } = await sb
-          .from('telegram_messages')
-          .select('chat_id, from_user_id, from_username, message_date')
-          .in('chat_id', chatIds)
-          .not('from_username', 'is', null)
-          .order('message_date', { ascending: false });
-        const handleByChat = new Map<string, string>();
-        for (const m of ((msgs ?? []) as any[])) {
-          if (notKol.has(String(m.from_user_id))) continue;
-          if (!handleByChat.has(String(m.chat_id))) handleByChat.set(String(m.chat_id), m.from_username);
-        }
-        for (const [kolId, chatId] of chatByKolId) {
-          const h = handleByChat.get(chatId);
-          if (h) handleByKol.set(kolId, h);
-        }
-      }
-    } catch (err) {
-      console.warn('[announcement] handle lookup failed; {handle} falls back to name', err);
+    for (const k of (kolRows ?? []) as any[]) {
+      if (k.telegram_username) handleByKol.set(k.id, k.telegram_username);
     }
 
     // Look up sender name for the announcement audit row.

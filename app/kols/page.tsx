@@ -133,6 +133,11 @@ export default function KOLsPage() {
   const defaultVisibleColumns = {
     name: true,
     link: true,
+    // [2026-09-03] Their personal @handle, kept apart from `link`, which is
+    // the CHANNEL. Every one of the 56 rows that had a handle in telegram_id
+    // held the channel copied out of the link — the two are never the same
+    // account, so one column could not carry both.
+    telegram_username: true,
     platform: true,
     followers: true,
     region: true,
@@ -2815,6 +2820,7 @@ export default function KOLsPage() {
                   {Object.entries({
                     name: 'Name',
                     link: 'Link',
+                    telegram_username: 'TG Handle',
                     platform: 'Platform',
                     followers: 'Followers',
                     region: 'Region',
@@ -2864,6 +2870,7 @@ export default function KOLsPage() {
               <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
               {visibleColumns.name && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
               {visibleColumns.link && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">Link</TableHead>}
+              {visibleColumns.telegram_username && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">TG Handle</TableHead>}
               {visibleColumns.platform && (
                 <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">
                   <div className="flex items-center gap-1 cursor-pointer group">
@@ -3502,6 +3509,11 @@ export default function KOLsPage() {
                   {visibleColumns.link && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                       <div className="truncate">{renderEditableCell(kol.link, 'link', kol.id, 'text')}</div>
+                  </TableCell>
+                  )}
+                  {visibleColumns.telegram_username && (
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
+                      <div className="truncate">{renderEditableCell(kol.telegram_username, 'telegram_username', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.platform && (
@@ -4190,6 +4202,7 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
             {visibleColumns.name && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
             {visibleColumns.link && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">Link</TableHead>}
+              {visibleColumns.telegram_username && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">TG Handle</TableHead>}
             {visibleColumns.platform && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">Platform</TableHead>}
             {visibleColumns.followers && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Followers</TableHead>}
             {visibleColumns.region && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Region</TableHead>}

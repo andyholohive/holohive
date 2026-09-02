@@ -229,42 +229,16 @@ export function SendAnnouncementDialog({
     (async () => {
       const ids = allKols.filter(k => k.hasGc).map(k => k.id);
       if (ids.length === 0) return;
+      // Reads the stored column now, not message history.
+      //
+      // [2026-09-03] master_kols.telegram_username exists and is editable on
+      // /kols, so the handle is roster data with an owner rather than
+      // something reconstructed from whoever last spoke in a chat. Anyone can
+      // correct it in the table and it is correct everywhere.
       const [{ data: chats }, { data: kolRows }] = await Promise.all([
         supabase.from('telegram_chats').select('master_kol_id, title').in('master_kol_id', ids),
-        supabase.from('master_kols').select('id, telegram_id').in('id', ids),
+        supabase.from('master_kols').select('id, telegram_username').in('id', ids),
       ]);
-      // Drop ids that are not the KOL's.
-      //
-      // [2026-09-02] Twelve roster rows carry a telegram_id belonging to us:
-      // ten hold @holo_hive_bot's id and two hold a team member's. Rendering
-      // those would print "@holo_hive_bot" beside ten KOLs in the one dialog
-      // whose job is telling recipients apart — a confident wrong answer,
-      // which is worse than the blank it replaced.
-      //
-      // The underlying data still needs correcting; this only stops the
-      // display asserting something false in the meantime.
-      const { data: teamRows } = await supabase.from('users').select('telegram_id').not('telegram_id', 'is', null);
-      const notTheirs = new Set<string>([
-        ...((teamRows ?? []) as any[]).map(r => String(r.telegram_id)),
-        '7996189688',   // @holo_hive_bot
-      ]);
-      const tgIds = ((kolRows ?? []) as any[])
-        .map(r => r.telegram_id)
-        .filter(id => id && !notTheirs.has(String(id)));
-      // Newest message per sender wins — a handle can change, and the last one
-      // the bot saw is the one that is current.
-      const { data: msgs } = tgIds.length
-        ? await (supabase as any)
-            .from('telegram_messages')
-            .select('from_user_id, from_username, message_date')
-            .in('from_user_id', tgIds)
-            .not('from_username', 'is', null)
-            .order('message_date', { ascending: false })
-        : { data: [] };
-      const handleByTgId = new Map<string, string>();
-      for (const m of ((msgs ?? []) as any[])) {
-        if (!handleByTgId.has(m.from_user_id)) handleByTgId.set(m.from_user_id, m.from_username);
-      }
       const chatByKol = new Map<string, string>();
       for (const c of ((chats ?? []) as any[])) {
         if (c.master_kol_id && !chatByKol.has(c.master_kol_id)) chatByKol.set(c.master_kol_id, c.title);
@@ -272,9 +246,7 @@ export function SendAnnouncementDialog({
       const next = new Map<string, { handle: string | null; chat: string | null }>();
       for (const r of ((kolRows ?? []) as any[])) {
         next.set(r.id, {
-          handle: r.telegram_id && !notTheirs.has(String(r.telegram_id))
-            ? (handleByTgId.get(r.telegram_id) ?? null)
-            : null,
+          handle: r.telegram_username || null,
           chat: chatByKol.get(r.id) ?? null,
         });
       }
