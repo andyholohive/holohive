@@ -80,6 +80,10 @@ type AnnouncementHistoryRow = {
 /** Insertable per-recipient placeholders. Server substitutes at send. */
 const VARIABLES: Array<{ token: string; description: string }> = [
   { token: '{name}', description: 'Replaced with each KOL\'s name at send time.' },
+  {
+    token: '{handle}',
+    description: 'Their Telegram @handle. Falls back to their name when we do not have one.',
+  },
 ];
 
 export function SendAnnouncementDialog({
@@ -352,7 +356,27 @@ export function SendAnnouncementDialog({
     for (const k of reachable) if (selectedIds.has(k.id)) return k.name;
     return 'KOL';
   }, [reachable, selectedIds]);
-  const previewText = text.replace(/\{name\}/gi, firstSelectedName);
+  /** The first selected KOL, so the preview shows a real substitution rather
+   *  than a placeholder. */
+  const firstSelectedId = useMemo(() => {
+    for (const k of reachable) if (selectedIds.has(k.id)) return k.id;
+    return null;
+  }, [reachable, selectedIds]);
+  const firstSelectedHandle = firstSelectedId ? identity.get(firstSelectedId)?.handle ?? null : null;
+
+  const previewText = text
+    .replace(/\{name\}/gi, firstSelectedName)
+    .replace(/\{handle\}/gi, firstSelectedHandle ? `@${firstSelectedHandle}` : firstSelectedName);
+
+  /** Selected recipients we have no handle for. Only matters once {handle} is
+   *  actually used — those people receive their name instead, and the sender
+   *  should know how many before pressing send, not after. */
+  const missingHandles = useMemo(() => {
+    if (!/\{handle\}/i.test(text)) return [] as string[];
+    return reachable
+      .filter(k => selectedIds.has(k.id) && !identity.get(k.id)?.handle)
+      .map(k => k.name);
+  }, [text, reachable, selectedIds, identity]);
 
   const toggle = (id: string) => {
     setSelectedIds(prev => {
@@ -595,6 +619,15 @@ export function SendAnnouncementDialog({
                 <div className="text-[10px] text-ink-warm-400">plain text · no formatting</div>
               </div>
               <pre className="text-sm text-ink-warm-800 whitespace-pre-wrap font-sans">{previewText}</pre>
+            </div>
+          )}
+
+          {missingHandles.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-800">
+              <b>{missingHandles.length} of the selected have no handle on record</b> — they get
+              their name where <code>{'{handle}'}</code> appears, not a blank.
+              {' '}{missingHandles.slice(0, 4).join(', ')}
+              {missingHandles.length > 4 && ` +${missingHandles.length - 4} more`}
             </div>
           )}
         </div>

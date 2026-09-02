@@ -86,6 +86,48 @@ export class KolAnnouncementService {
       if (c.master_kol_id && c.chat_id) chatIdByKol.set(c.master_kol_id, String(c.chat_id));
     }
 
+    // Telegram handles, for {handle}.
+    //
+    // Derived from who actually speaks in each KOL's own linked chat, NOT from
+    // master_kols.telegram_id: an audit on 2026-09-02 found 15 of those wrong
+    // (ten carry @holo_hive_bot's id, two a team member's, nine hold a handle
+    // typed into a numeric column). The chat is the reliable source — in a
+    // "KOL <> Holo Hive" group the only non-team speaker is the KOL.
+    //
+    // Best-effort: any failure leaves the map empty and {handle} falls back to
+    // the name. A personalisation token must never be able to stop a send.
+    const handleByKol = new Map<string, string>();
+    try {
+      const { data: teamRows } = await sb.from('users').select('telegram_id').not('telegram_id', 'is', null);
+      const notKol = new Set<string>([
+        ...((teamRows ?? []) as any[]).map((r: any) => String(r.telegram_id)),
+        '7996189688',   // @holo_hive_bot
+        '7111416066',   // @jeremyin — team, but missing from users.telegram_id
+      ]);
+      const chatByKolId = new Map<string, string>();
+      for (const [kolId, chatId] of chatIdByKol) chatByKolId.set(kolId, chatId);
+      const chatIds = Array.from(chatByKolId.values());
+      if (chatIds.length > 0) {
+        const { data: msgs } = await sb
+          .from('telegram_messages')
+          .select('chat_id, from_user_id, from_username, message_date')
+          .in('chat_id', chatIds)
+          .not('from_username', 'is', null)
+          .order('message_date', { ascending: false });
+        const handleByChat = new Map<string, string>();
+        for (const m of ((msgs ?? []) as any[])) {
+          if (notKol.has(String(m.from_user_id))) continue;
+          if (!handleByChat.has(String(m.chat_id))) handleByChat.set(String(m.chat_id), m.from_username);
+        }
+        for (const [kolId, chatId] of chatByKolId) {
+          const h = handleByChat.get(chatId);
+          if (h) handleByKol.set(kolId, h);
+        }
+      }
+    } catch (err) {
+      console.warn('[announcement] handle lookup failed; {handle} falls back to name', err);
+    }
+
     // Look up sender name for the announcement audit row.
     let senderName: string | null = null;
     if (input.senderUserId) {
@@ -132,7 +174,7 @@ export class KolAnnouncementService {
     let failedCount = 0;
     for (let i = 0; i < targets.length; i++) {
       const t = targets[i];
-      const personalized = substituteName(bodyText, t.kolName);
+      const personalized = substituteTokens(bodyText, t.kolName, handleByKol.get(t.kolId) ?? null);
       const result = await sendPlainToChat(t.chatId, personalized);
       const sentAt = new Date().toISOString();
       await sb
@@ -173,8 +215,15 @@ export class KolAnnouncementService {
 }
 
 /** {name} → KOL name. Other {tokens} are left alone. */
-function substituteName(text: string, kolName: string): string {
-  return text.replace(/\{name\}/gi, kolName);
+function substituteTokens(
+  text: string, kolName: string, handle: string | null,
+): string {
+  return text
+    .replace(/\{name\}/gi, kolName)
+    // No handle on record → the KOL's name, so the sentence still reads. An
+    // empty substitution would send "hey , ..." to someone, which is worse
+    // than being slightly less personal.
+    .replace(/\{handle\}/gi, handle ? `@${handle}` : kolName);
 }
 
 /**
