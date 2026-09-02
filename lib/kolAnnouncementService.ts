@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatHandle } from './telegramHandle';
 
 /**
  * KOL announcements — bulk send from HHP to a set of KOL group chats.
@@ -223,7 +224,7 @@ function substituteTokens(
     // No handle on record → the KOL's name, so the sentence still reads. An
     // empty substitution would send "hey , ..." to someone, which is worse
     // than being slightly less personal.
-    .replace(/\{handle\}/gi, handle ? `@${handle}` : kolName);
+    .replace(/\{handle\}/gi, formatHandle(handle) ?? kolName);
 }
 
 /**

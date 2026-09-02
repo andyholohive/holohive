@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase';
+import { formatHandle, bareHandle } from '@/lib/telegramHandle';
 
 /**
  * SendAnnouncementDialog — pick KOLs with linked GCs + write message + send.
@@ -348,7 +349,9 @@ export function SendAnnouncementDialog({
     // type into the box is half a feature.
     return reachable.filter(k =>
       k.name.toLowerCase().includes(q)
-      || (identity.get(k.id)?.handle ?? '').toLowerCase().includes(q));
+      // Compared bare on both sides, so searching "@raoni" and "raoni" behave
+      // the same.
+      || bareHandle(identity.get(k.id)?.handle).includes(bareHandle(q)));
   }, [reachable, search, identity]);
 
   const selectedCount = selectedIds.size;
@@ -366,7 +369,7 @@ export function SendAnnouncementDialog({
 
   const previewText = text
     .replace(/\{name\}/gi, firstSelectedName)
-    .replace(/\{handle\}/gi, firstSelectedHandle ? `@${firstSelectedHandle}` : firstSelectedName);
+    .replace(/\{handle\}/gi, formatHandle(firstSelectedHandle) ?? firstSelectedName);
 
   /** Selected recipients we have no handle for. Only matters once {handle} is
    *  actually used — those people receive their name instead, and the sender
@@ -553,7 +556,7 @@ export function SendAnnouncementDialog({
                               <span className="text-sm text-ink-warm-900 truncate">{k.name}</span>
                               {identity.get(k.id)?.handle && (
                                 <span className="text-[11px] font-mono text-brand flex-shrink-0">
-                                  @{identity.get(k.id)!.handle}
+                                  {formatHandle(identity.get(k.id)!.handle)}
                                 </span>
                               )}
                             </span>
