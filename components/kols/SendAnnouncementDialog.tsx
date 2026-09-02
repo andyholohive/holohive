@@ -18,7 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase';
-import { formatHandle, bareHandle } from '@/lib/telegramHandle';
+import { formatHandle, bareHandle, collapseHandleToken } from '@/lib/telegramHandle';
 
 /**
  * SendAnnouncementDialog — pick KOLs with linked GCs + write message + send.
@@ -83,7 +83,7 @@ const VARIABLES: Array<{ token: string; description: string }> = [
   { token: '{name}', description: 'Replaced with each KOL\'s name at send time.' },
   {
     token: '{handle}',
-    description: 'Their Telegram @handle. Falls back to their name when we do not have one.',
+    description: 'Their Telegram @handle — the @ is included. Falls back to their name when we do not have one.',
   },
 ];
 
@@ -367,7 +367,9 @@ export function SendAnnouncementDialog({
   }, [reachable, selectedIds]);
   const firstSelectedHandle = firstSelectedId ? identity.get(firstSelectedId)?.handle ?? null : null;
 
-  const previewText = text
+  // Preview runs the same collapse as the send, so what you see is what
+  // arrives — including when you typed the @ yourself.
+  const previewText = collapseHandleToken(text)
     .replace(/\{name\}/gi, firstSelectedName)
     .replace(/\{handle\}/gi, formatHandle(firstSelectedHandle) ?? firstSelectedName);
 

@@ -15,6 +15,20 @@ export function formatHandle(raw: string | null | undefined): string | null {
   return bare ? `@${bare}` : null;
 }
 
+/**
+ * Collapse an @ the sender typed in front of the token.
+ *
+ * [Andy, 2026-09-03] "So I have to manually put @?" — no, {handle} already
+ * renders one. But writing "@{handle}" is the natural instinct, and it would
+ * have produced "@@dokudoku1219" in a message going to that person.
+ *
+ * Only an @ directly attached to the token is removed, so an email address or
+ * a mention elsewhere in the body is untouched.
+ */
+export function collapseHandleToken(text: string): string {
+  return text.replace(/@+\s*(\{handle\})/gi, '$1');
+}
+
 /** The bare form, for comparisons and searching. */
 export function bareHandle(raw: string | null | undefined): string {
   return (raw ?? '').trim().replace(/^@+/, '').toLowerCase();

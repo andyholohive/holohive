@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { formatHandle } from './telegramHandle';
+import { formatHandle, collapseHandleToken } from './telegramHandle';
 
 /**
  * KOL announcements — bulk send from HHP to a set of KOL group chats.
@@ -219,7 +219,7 @@ export class KolAnnouncementService {
 function substituteTokens(
   text: string, kolName: string, handle: string | null,
 ): string {
-  return text
+  return collapseHandleToken(text)
     .replace(/\{name\}/gi, kolName)
     // No handle on record → the KOL's name, so the sentence still reads. An
     // empty substitution would send "hey , ..." to someone, which is worse
