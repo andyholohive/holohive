@@ -93,6 +93,7 @@ export function BudgetTableView() {
     contents,
     payments,
     setPayments,
+    fetchPayments,
     loadingPayments,
     paymentKolNameLookup,
     kolTelegramChats,
@@ -115,7 +116,21 @@ export function BudgetTableView() {
   // only on `contents`, which a tag change never touches — so tagging a post
   // Complimentary on the Content tab did not appear here until a refresh.
   const [tagVersion, setTagVersion] = useState(0);
-  useEffect(() => onContentTagsChanged(() => setTagVersion(v => v + 1)), []);
+  useEffect(() => onContentTagsChanged(() => {
+    setTagVersion(v => v + 1);
+    // Payments too, not just the chips.
+    //
+    // [2026-09-01] Found while testing the Complimentary rule end to end on a
+    // real campaign: tagging a post rewrote the payment in the database —
+    // $100 → $0, dated as of the post — and this table went on showing $100
+    // and an Unpaid chip until a refresh. The tag chip appeared instantly,
+    // which made it look fixed and was the more misleading outcome: a row
+    // that says $100 Unpaid next to a Complimentary badge.
+    //
+    // The tag is what triggers the money to change, so anything that redraws
+    // for a tag has to redraw the money with it.
+    void fetchPayments();
+  }), [fetchPayments]);
 
   useEffect(() => {
     const ids = contents.map((c: any) => c.id).filter(Boolean);
