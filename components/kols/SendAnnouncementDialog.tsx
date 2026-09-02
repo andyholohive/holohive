@@ -228,7 +228,24 @@ export function SendAnnouncementDialog({
         supabase.from('telegram_chats').select('master_kol_id, title').in('master_kol_id', ids),
         supabase.from('master_kols').select('id, telegram_id').in('id', ids),
       ]);
-      const tgIds = ((kolRows ?? []) as any[]).map(r => r.telegram_id).filter(Boolean);
+      // Drop ids that are not the KOL's.
+      //
+      // [2026-09-02] Twelve roster rows carry a telegram_id belonging to us:
+      // ten hold @holo_hive_bot's id and two hold a team member's. Rendering
+      // those would print "@holo_hive_bot" beside ten KOLs in the one dialog
+      // whose job is telling recipients apart — a confident wrong answer,
+      // which is worse than the blank it replaced.
+      //
+      // The underlying data still needs correcting; this only stops the
+      // display asserting something false in the meantime.
+      const { data: teamRows } = await supabase.from('users').select('telegram_id').not('telegram_id', 'is', null);
+      const notTheirs = new Set<string>([
+        ...((teamRows ?? []) as any[]).map(r => String(r.telegram_id)),
+        '7996189688',   // @holo_hive_bot
+      ]);
+      const tgIds = ((kolRows ?? []) as any[])
+        .map(r => r.telegram_id)
+        .filter(id => id && !notTheirs.has(String(id)));
       // Newest message per sender wins — a handle can change, and the last one
       // the bot saw is the one that is current.
       const { data: msgs } = tgIds.length
@@ -250,7 +267,9 @@ export function SendAnnouncementDialog({
       const next = new Map<string, { handle: string | null; chat: string | null }>();
       for (const r of ((kolRows ?? []) as any[])) {
         next.set(r.id, {
-          handle: r.telegram_id ? (handleByTgId.get(r.telegram_id) ?? null) : null,
+          handle: r.telegram_id && !notTheirs.has(String(r.telegram_id))
+            ? (handleByTgId.get(r.telegram_id) ?? null)
+            : null,
           chat: chatByKol.get(r.id) ?? null,
         });
       }
