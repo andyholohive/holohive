@@ -911,6 +911,52 @@ export function ChatsManager({ view = 'chats' }: { view?: 'chats' | 'topics' | '
     setKolLinkDialogOpen(true);
   };
 
+  /**
+   * Best-guess KOL for a chat, by name.
+   *
+   * [2026-09-01, Andy] Linking meant scrolling a 450-name list for something
+   * usually sitting in the chat title. The chat is typically named after the
+   * KOL or contains their handle, so a plain comparison gets most of them.
+   *
+   * Deliberately a SUGGESTION, never an auto-link. A wrong link attributes one
+   * KOL's conversations to another, and that is not the kind of mistake to
+   * make silently to save a scroll — so it surfaces as a row you click, with
+   * the reason it matched.
+   */
+  const kolSuggestions = useMemo(() => {
+    const chat = selectedChat;
+    if (!chat || masterKOLs.length === 0) return [] as Array<{ kol: MasterKOL; why: string }>;
+
+    // Unicode-aware: keep every letter and digit in any script, strip only
+    // punctuation and spacing. An [a-z0-9가-힣] class silently deletes CJK
+    // characters, which collapsed "不二.eth" to "eth" and made it match the
+    // chat "Ethan" — a roster this international cannot afford a filter that
+    // only recognises two alphabets.
+    const norm = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const title = norm(chat.title || '');
+    const handle = norm((chat as any).username || '');
+    if (!title && !handle) return [];
+
+    const scored: Array<{ kol: MasterKOL; why: string; rank: number }> = [];
+    for (const kol of masterKOLs) {
+      const name = norm(kol.name || '');
+      // Minimum length is script-aware. Two Latin letters match half the
+      // roster; two Hangul or CJK syllables are a real name — 꿀팁 and 감자 are
+      // whole KOLs. A flat >= 3 silently excluded most of the Korean roster,
+      // which is the roster.
+      const minLen = /[^\p{Script=Latin}\p{N}]/u.test(name) ? 2 : 3;
+      if (name.length < minLen) continue;
+      if (handle && handle === name) { scored.push({ kol, why: 'handle matches exactly', rank: 0 }); continue; }
+      if (title === name) { scored.push({ kol, why: 'chat title matches exactly', rank: 1 }); continue; }
+      if (handle && handle.includes(name)) { scored.push({ kol, why: 'name appears in the handle', rank: 2 }); continue; }
+      if (title.includes(name)) { scored.push({ kol, why: 'name appears in the chat title', rank: 3 }); continue; }
+    }
+    return scored
+      .sort((a, b) => a.rank - b.rank || a.kol.name.localeCompare(b.kol.name))
+      .slice(0, 4)
+      .map(({ kol, why }) => ({ kol, why }));
+  }, [selectedChat, masterKOLs]);
+
   const handleUnlinkKol = async (chat: TelegramChat) => {
     if (!chat.master_kol_id) return;
 
@@ -3060,6 +3106,26 @@ export function ChatsManager({ view = 'chats' }: { view?: 'chats' | 'topics' | '
                 <code className="text-xs text-ink-warm-500">{selectedChat?.chat_id}</code>
               </div>
             </div>
+
+            {/* Suggestions, above the picker rather than pre-selected in it:
+                one click to accept, and a wrong guess costs nothing because
+                nothing was chosen on the operator's behalf. */}
+            {kolSuggestions.length > 0 && selectedKolId === '__none__' && (
+              <div className="space-y-1.5">
+                <Label className="text-ink-warm-500">Suggested</Label>
+                {kolSuggestions.map(({ kol, why }) => (
+                  <button
+                    key={kol.id}
+                    type="button"
+                    onClick={() => setSelectedKolId(kol.id)}
+                    className="w-full flex items-center justify-between gap-2 rounded-md border border-cream-200 bg-cream-50/60 px-3 py-2 text-left hover:border-brand hover:bg-brand-light/40 transition-colors"
+                  >
+                    <span className="text-sm font-medium text-ink-warm-900 truncate">{kol.name}</span>
+                    <span className="text-[11px] text-ink-warm-500 flex-shrink-0">{why}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="kol">KOL</Label>

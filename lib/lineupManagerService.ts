@@ -846,15 +846,42 @@ export class LineupManagerService {
     out: Array<{ name: string; ts: string; actor: string | null }>;
     in_: Array<{ name: string; ts: string; actor: string | null }>;
   }> {
-    const { data: lineupRow } = await (this.supabase as any)
-      .from('campaign_lineups')
-      .select('proposed_at')
-      .eq('id', lineupId)
+    // [2026-09-01, Quazo] Anchored on the FIRST proposal, from the activity
+    // log, not on campaign_lineups.proposed_at.
+    //
+    // propose() overwrites proposed_at with now(). So unlock → swap →
+    // re-propose moved the anchor PAST the swaps: the new change did not show,
+    // and every change from the first cycle disappeared with it. Exactly what
+    // Quazo hit — "it also wiped the log of the previous change".
+    //
+    // The activity log is append-only and keeps a row per proposal, so its
+    // earliest one is stable across any number of unlock cycles. "Changes"
+    // means changes since the thing was first put in front of anyone, which
+    // does not reset because someone reopened it.
+    const { data: firstProposal } = await (this.supabase as any)
+      .from('lineup_activity_log')
+      .select('ts')
+      .eq('lineup_id', lineupId)
+      .eq('action', 'proposed')
+      .order('ts', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
-    // Still a draft: there is no proposal to diff against, so there are no
-    // changes yet. Empty is the honest answer, not the whole build history.
-    const proposedAt: string | null = (lineupRow as any)?.proposed_at ?? null;
+    let proposedAt: string | null = (firstProposal as any)?.ts ?? null;
+
+    // Fallback for lineups proposed before the log carried the event.
+    if (!proposedAt) {
+      const { data: lineupRow } = await (this.supabase as any)
+        .from('campaign_lineups')
+        .select('proposed_at')
+        .eq('id', lineupId)
+        .maybeSingle();
+      proposedAt = (lineupRow as any)?.proposed_at ?? null;
+    }
+
+    // Still a draft, never proposed: there is nothing to diff against, so
+    // there are no changes yet. Empty is the honest answer, not the whole
+    // build history.
     if (!proposedAt) return { out: [], in_: [] };
 
     const { data, error } = await (this.supabase as any)

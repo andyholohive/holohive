@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { announceContentTagsChanged } from '@/lib/contentTagSignal';
 import { supabase } from '@/lib/supabase';
 import { Plus, X } from 'lucide-react';
 
@@ -128,6 +129,7 @@ export default function ContentTagCell({
       return;
     }
     setAssignments(prev => prev.map(a => a.id === tempId ? (data as Assignment) : a));
+    announceContentTagsChanged();
   };
 
   const removeTag = async (assignmentId: string) => {
@@ -140,7 +142,9 @@ export default function ContentTagCell({
     if (error) {
       setAssignments(prev);
       toast({ title: 'Failed to remove tag', description: error.message, variant: 'destructive' });
+      return;
     }
+    announceContentTagsChanged();
   };
 
   // ── Render ───────────────────────────────────────────────────────

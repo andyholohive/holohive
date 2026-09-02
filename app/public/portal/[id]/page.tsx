@@ -2624,11 +2624,28 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               </div>
               <Button
                 onClick={() => {
-                  // Same tab (not _blank) + a return param so the form can send
-                  // the client straight back to this portal after submitting
-                  // [Andy 2026-07-17].
-                  const ret = encodeURIComponent(window.location.pathname + window.location.search);
-                  window.location.href = `${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}&return=${ret}`;
+                  // [2026-09-01, Quazo] New tab, and the portal stays open
+                  // behind it.
+                  //
+                  // This was same-tab with a `return` param so the form could
+                  // send the client back here after submitting [Andy
+                  // 2026-07-17]. That stopped working when forms gained their
+                  // own thank-you page: the form shows its exit message
+                  // instead of redirecting, so the client ends up on a
+                  // dead-end reading "you can now close this tab" with the
+                  // portal gone from under them, and has to dig the link out
+                  // again.
+                  //
+                  // Opening a tab makes that exit message true — closing it
+                  // returns them to the portal they came from. The return
+                  // param goes with it; two mechanisms competing to decide
+                  // where the client lands is what broke this.
+                  const url = `${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}`;
+                  const opened = window.open(url, '_blank', 'noopener,noreferrer');
+                  // Popup blockers exist. Falling back to same-tab is worse
+                  // than a new tab and far better than a button that does
+                  // nothing.
+                  if (!opened) window.location.href = url;
                 }}
                 className="bg-brand hover:bg-[#2d6570] text-white px-6"
               >

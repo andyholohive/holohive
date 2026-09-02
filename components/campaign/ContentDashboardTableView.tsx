@@ -62,6 +62,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { announceContentTagsChanged } from '@/lib/contentTagSignal';
 import { supabase } from '@/lib/supabase';
 import { markLineupSlotPosted } from '@/lib/lineupSlotSync';
 import { CampaignService } from '@/lib/campaignService';
@@ -608,6 +609,7 @@ export function ContentDashboardTableView() {
       setSelectedContents([]);
       toast({ title: `Grouped as Post 1–${total} of ${total}` });
       setTagRefreshKey(k => k + 1);
+      announceContentTagsChanged();
     } catch (err) {
       console.error('Error grouping multi-post:', err);
       toast({ title: 'Grouping failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });

@@ -65,6 +65,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { onContentTagsChanged } from '@/lib/contentTagSignal';
 import { supabase } from '@/lib/supabase';
 import {
   formatDateLocal,
@@ -110,6 +111,12 @@ export function BudgetTableView() {
   // content row in this campaign (vs the per-row self-fetch pattern in
   // ContentTagCell, which would be N queries here).
   const [contentTagMap, setContentTagMap] = useState<Map<string, { label: string; color: string | null }[]>>(new Map());
+  // Bumped when a tag is added or removed anywhere. The effect below keyed
+  // only on `contents`, which a tag change never touches — so tagging a post
+  // Complimentary on the Content tab did not appear here until a refresh.
+  const [tagVersion, setTagVersion] = useState(0);
+  useEffect(() => onContentTagsChanged(() => setTagVersion(v => v + 1)), []);
+
   useEffect(() => {
     const ids = contents.map((c: any) => c.id).filter(Boolean);
     if (ids.length === 0) { setContentTagMap(new Map()); return; }
@@ -140,7 +147,7 @@ export function BudgetTableView() {
       setContentTagMap(m);
     });
     return () => { alive = false; };
-  }, [contents]);
+  }, [contents, tagVersion]);
 
   const renderContentTagChips = (contentId: string) => {
     const chips = contentTagMap.get(contentId);
