@@ -104,6 +104,19 @@ export function SendAnnouncementDialog({
   // selection rather than replacing it, so two campaigns can go out in one
   // send and the sender can still drop individuals afterwards.
   const [campaigns, setCampaigns] = useState<CampaignChoice[] | null>(null);
+  /** Who each KOL actually is on Telegram, and where the message lands.
+   *
+   *  [Andy, 2026-09-01] The list was names only. Names repeat, several are
+   *  Korean with a bracketed romanisation, and two roster rows share a
+   *  telegram_id — so "Buy LOW Sell HIGH" and "킬베로스" are indistinguishable
+   *  at the moment you press send to sixty people.
+   *
+   *  master_kols has no @username column; telegram_id is numeric. The handle
+   *  is recovered from the most recent message the bot saw from that user,
+   *  which covers 42 of the 60 reachable KOLs. The destination chat title is
+   *  shown alongside it and is always known — it is the more load-bearing of
+   *  the two, because it is literally where the text goes. */
+  const [identity, setIdentity] = useState<Map<string, { handle: string | null; chat: string | null }>>(new Map());
   const [campaignPick, setCampaignPick] = useState('');
   const [historyRows, setHistoryRows] = useState<AnnouncementHistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -206,6 +219,47 @@ export function SendAnnouncementDialog({
   // exactly how many recipients the pick will add — no promise the send
   // then fails to keep.
   useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    (async () => {
+      const ids = allKols.filter(k => k.hasGc).map(k => k.id);
+      if (ids.length === 0) return;
+      const [{ data: chats }, { data: kolRows }] = await Promise.all([
+        supabase.from('telegram_chats').select('master_kol_id, title').in('master_kol_id', ids),
+        supabase.from('master_kols').select('id, telegram_id').in('id', ids),
+      ]);
+      const tgIds = ((kolRows ?? []) as any[]).map(r => r.telegram_id).filter(Boolean);
+      // Newest message per sender wins — a handle can change, and the last one
+      // the bot saw is the one that is current.
+      const { data: msgs } = tgIds.length
+        ? await (supabase as any)
+            .from('telegram_messages')
+            .select('from_user_id, from_username, message_date')
+            .in('from_user_id', tgIds)
+            .not('from_username', 'is', null)
+            .order('message_date', { ascending: false })
+        : { data: [] };
+      const handleByTgId = new Map<string, string>();
+      for (const m of ((msgs ?? []) as any[])) {
+        if (!handleByTgId.has(m.from_user_id)) handleByTgId.set(m.from_user_id, m.from_username);
+      }
+      const chatByKol = new Map<string, string>();
+      for (const c of ((chats ?? []) as any[])) {
+        if (c.master_kol_id && !chatByKol.has(c.master_kol_id)) chatByKol.set(c.master_kol_id, c.title);
+      }
+      const next = new Map<string, { handle: string | null; chat: string | null }>();
+      for (const r of ((kolRows ?? []) as any[])) {
+        next.set(r.id, {
+          handle: r.telegram_id ? (handleByTgId.get(r.telegram_id) ?? null) : null,
+          chat: chatByKol.get(r.id) ?? null,
+        });
+      }
+      if (alive) setIdentity(next);
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [open, allKols]);
+
+  useEffect(() => {
     if (!open || campaigns !== null) return;
     let alive = true;
     (async () => {
@@ -267,8 +321,12 @@ export function SendAnnouncementDialog({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return reachable;
-    return reachable.filter(k => k.name.toLowerCase().includes(q));
-  }, [reachable, search]);
+    // Handle is searchable as well — showing an identifier you cannot then
+    // type into the box is half a feature.
+    return reachable.filter(k =>
+      k.name.toLowerCase().includes(q)
+      || (identity.get(k.id)?.handle ?? '').toLowerCase().includes(q));
+  }, [reachable, search, identity]);
 
   const selectedCount = selectedIds.size;
   const firstSelectedName = useMemo(() => {
@@ -447,7 +505,24 @@ export function SendAnnouncementDialog({
                           className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-cream-50 ${checked ? 'bg-brand-light/40' : ''}`}
                         >
                           <Checkbox checked={checked} onCheckedChange={() => toggle(k.id)} />
-                          <span className="text-sm text-ink-warm-900">{k.name}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm text-ink-warm-900 truncate">{k.name}</span>
+                              {identity.get(k.id)?.handle && (
+                                <span className="text-[11px] font-mono text-brand flex-shrink-0">
+                                  @{identity.get(k.id)!.handle}
+                                </span>
+                              )}
+                            </span>
+                            {/* The destination, not a decoration: this is the
+                                chat the text lands in, and it is the only
+                                identifier known for all of them. */}
+                            {identity.get(k.id)?.chat && (
+                              <span className="block text-[11px] text-ink-warm-400 truncate">
+                                → {identity.get(k.id)!.chat}
+                              </span>
+                            )}
+                          </span>
                         </label>
                       </li>
                     );
