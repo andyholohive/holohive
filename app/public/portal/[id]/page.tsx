@@ -2640,12 +2640,27 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   // returns them to the portal they came from. The return
                   // param goes with it; two mechanisms competing to decide
                   // where the client lands is what broke this.
+                  //
+                  // [2026-09-01] Opened via an anchor, NOT window.open + a
+                  // fallback. window.open with 'noopener' returns null even on
+                  // success — that is what the flag specifies, since the caller
+                  // is not allowed a handle on the new window. The fallback
+                  // therefore fired every time and navigated the portal tab to
+                  // the form as well, so the client ended up with the form in
+                  // both tabs and no portal at all. Worse than the same-tab
+                  // behaviour it replaced.
+                  //
+                  // A synthesised anchor click keeps noopener, is not treated
+                  // as a popup because it happens inside a real click, and has
+                  // no success value to misread.
                   const url = `${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}`;
-                  const opened = window.open(url, '_blank', 'noopener,noreferrer');
-                  // Popup blockers exist. Falling back to same-tab is worse
-                  // than a new tab and far better than a button that does
-                  // nothing.
-                  if (!opened) window.location.href = url;
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.target = '_blank';
+                  a.rel = 'noopener noreferrer';
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
                 }}
                 className="bg-brand hover:bg-[#2d6570] text-white px-6"
               >

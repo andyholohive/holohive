@@ -18,7 +18,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon, Building2, Check, ChevronsUpDown, ClipboardList, Pencil, Link2 } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon, Building2, Check, ChevronsUpDown, ChevronUp, ChevronDown, ClipboardList, Pencil, Link2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
@@ -253,6 +253,24 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
 
   const removeOption = (index: number) => {
     setEditOptions(editOptions.filter((_, i) => i !== index));
+  };
+
+  /** Move one option up or down.
+   *
+   *  [Andy, 2026-09-01] The order of `options` is the order respondents see —
+   *  the public form maps the array straight out — so until now the only way
+   *  to fix a mis-ordered list was to delete every option after the mistake
+   *  and retype them.
+   *
+   *  Buttons rather than drag: these lists are short, and a button works with
+   *  a keyboard and on a phone, where the form builder is genuinely used.
+   */
+  const moveOption = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= editOptions.length) return;
+    const next = [...editOptions];
+    [next[index], next[target]] = [next[target], next[index]];
+    setEditOptions(next);
   };
 
   // Render field as it appears in the form (public form style)
@@ -949,14 +967,34 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 <Button variant="brand" type="button" onClick={addOption} size="sm">Add</Button>
               </div>
               <div className="space-y-1">
-                {editOptions.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded">
-                    <span className="flex-1">{option}</span>
-                    <Button variant="ghost" size="sm" onClick={() => removeOption(index)} disabled={editFieldType === 'select' && isYesNoDropdown}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                {editOptions.map((option, index) => {
+                  const locked = editFieldType === 'select' && isYesNoDropdown;
+                  return (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded">
+                      <span className="text-[11px] tabular-nums text-ink-warm-300 w-4 text-right">{index + 1}</span>
+                      <span className="flex-1">{option}</span>
+                      <Button
+                        variant="ghost" size="sm" className="h-7 w-7 p-0"
+                        onClick={() => moveOption(index, -1)}
+                        disabled={locked || index === 0}
+                        title="Move up"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" className="h-7 w-7 p-0"
+                        onClick={() => moveOption(index, 1)}
+                        disabled={locked || index === editOptions.length - 1}
+                        title="Move down"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => removeOption(index)} disabled={locked} title="Remove">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
