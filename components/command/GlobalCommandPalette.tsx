@@ -75,6 +75,37 @@ interface Recent {
 }
 
 const RECENTS_KEY = 'hh:command-palette:recents';
+
+function fold(s: string) {
+  return s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/**
+ * cmdk filter: every whitespace-separated token of the query must be a
+ * substring of the item's value or one of its keywords. Score prefers a
+ * match at the start of the value, then at a word boundary, then anywhere.
+ * Returns 0 (hidden) otherwise — no subsequence matching.
+ */
+function scoreItem(value: string, search: string, keywords?: string[]): number {
+  const q = fold(search).trim();
+  if (!q) return 1;
+  const v = fold(value);
+  const haystack = [v, ...(keywords ?? []).map(fold)];
+  let score = 0;
+  for (const token of q.split(/\s+/)) {
+    let best = 0;
+    for (const h of haystack) {
+      const idx = h.indexOf(token);
+      if (idx < 0) continue;
+      const s = idx === 0 ? 3 : /\s|[·@/(]/.test(h[idx - 1]) ? 2 : 1;
+      // Matches in the primary value outrank keyword matches.
+      best = Math.max(best, h === v ? s + 3 : s);
+    }
+    if (best === 0) return 0;
+    score += best;
+  }
+  return score;
+}
 const RECENTS_MAX = 8;
 const ENTITY_LIMIT = 400;
 
@@ -236,6 +267,7 @@ export default function GlobalCommandPalette() {
   const [query, setQuery] = React.useState('');
   const [entities, setEntities] = React.useState<Entity[] | null>(null);
   const [loadingEntities, setLoadingEntities] = React.useState(false);
+  const fetchStartedRef = React.useRef(false);
   const [recents, setRecents] = React.useState<Recent[]>([]);
 
   const guestUser = isGuest || isGuestView;
@@ -258,19 +290,20 @@ export default function GlobalCommandPalette() {
     };
   }, []);
 
-  // Lazy entity load on first open; recents refresh on every open.
+  // Lazy entity load on first open (once per session, guarded by a ref so
+  // the effect's own state updates can't restart or cancel it); recents
+  // refresh on every open.
   React.useEffect(() => {
     if (!open) return;
     setRecents(readRecents());
-    if (guestUser || entities !== null || loadingEntities) return;
-    let cancelled = false;
+    if (guestUser || fetchStartedRef.current) return;
+    fetchStartedRef.current = true;
     setLoadingEntities(true);
     fetchEntities()
-      .then((rows) => { if (!cancelled) setEntities(rows); })
-      .catch(() => { if (!cancelled) setEntities([]); })
-      .finally(() => { if (!cancelled) setLoadingEntities(false); });
-    return () => { cancelled = true; };
-  }, [open, guestUser, entities, loadingEntities]);
+      .then(setEntities)
+      .catch(() => setEntities([]))
+      .finally(() => setLoadingEntities(false));
+  }, [open, guestUser]);
 
   // Reset the query when closed so reopening starts clean.
   React.useEffect(() => {
@@ -310,6 +343,7 @@ export default function GlobalCommandPalette() {
         <CommandPrimitive
           label="Search Holo Hive"
           loop
+          filter={scoreItem}
           className="flex flex-col"
         >
           {/* Input row */}
@@ -347,7 +381,8 @@ export default function GlobalCommandPalette() {
                 {recents.map((r) => (
                   <PaletteItem
                     key={`recent:${r.href}`}
-                    value={`recent ${r.label} ${r.href}`}
+                    value={r.label}
+                    keywords={['recent', r.href]}
                     onSelect={() => go(r.href, r)}
                     leading={
                       r.kind === 'page'
@@ -371,7 +406,7 @@ export default function GlobalCommandPalette() {
                   {rows.map((e) => (
                     <PaletteItem
                       key={`${e.kind}:${e.id}`}
-                      value={`${e.name} ${e.kind}`}
+                      value={e.name}
                       keywords={e.keywords}
                       onSelect={() => go(e.href, { href: e.href, label: e.name, kind: e.kind, image: e.image })}
                       leading={<Thumb image={e.image} name={e.name} icon={icon} />}
@@ -389,8 +424,8 @@ export default function GlobalCommandPalette() {
               {pages.map((p: NavItemDef) => (
                 <PaletteItem
                   key={`page:${p.href}`}
-                  value={`${p.label} ${p.section} page`}
-                  keywords={[p.href, p.section]}
+                  value={p.label}
+                  keywords={[p.href, p.section, 'page']}
                   onSelect={() => go(p.href, { href: p.href, label: p.label, kind: 'page' })}
                   leading={<IconTile icon={p.icon} />}
                   label={p.label}
