@@ -90,7 +90,7 @@ function scoreItem(value: string, search: string, keywords?: string[]): number {
   const q = fold(search).trim();
   if (!q) return 1;
   const v = fold(value);
-  const haystack = [v, ...(keywords ?? []).map(fold)];
+  const haystack = [v, ...(keywords ?? []).filter((k): k is string => typeof k === 'string').map(fold)];
   let score = 0;
   for (const token of q.split(/\s+/)) {
     let best = 0;
@@ -145,6 +145,22 @@ const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
   cancelled: 'danger',
 };
 
+/** cmdk calls .trim() on every keyword — anything that isn't a non-empty
+ *  string (arrays, numbers, null from a jsonb/text[] column) crashes the
+ *  whole React tree. Flatten and keep strings only. [2026-09-04 hotfix] */
+function kw(...parts: unknown[]): string[] {
+  const out: string[] = [];
+  for (const p of parts.flat(2)) {
+    if (typeof p === 'string' && p.trim()) out.push(p);
+    else if (typeof p === 'number') out.push(String(p));
+  }
+  return out;
+}
+
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim() ? v : undefined;
+}
+
 function titleCase(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -174,44 +190,49 @@ async function fetchEntities(): Promise<Entity[]> {
   const out: Entity[] = [];
 
   for (const c of clients.data ?? []) {
-    const status = c.engagement_status || (c.is_active ? 'active' : 'inactive');
+    const status = str(c.engagement_status) || (c.is_active ? 'active' : 'inactive');
     out.push({
       kind: 'client',
-      id: c.id,
-      name: c.name,
+      id: String(c.id),
+      name: str(c.name) || 'Untitled client',
       href: `/clients/${c.id}`,
-      meta: c.location || undefined,
+      meta: str(c.location),
       status: { label: titleCase(status), tone: CLIENT_STATUS_TONES[status] ?? 'neutral' },
-      image: c.logo_url,
-      keywords: ['client', c.location].filter(Boolean),
+      image: str(c.logo_url) ?? null,
+      keywords: kw('client', c.location),
     });
   }
 
   for (const c of campaigns.data ?? []) {
-    const clientName: string | undefined = c.clients?.name;
+    const clientName = str(c.clients?.name);
+    const region = str(c.region);
+    const status = str(c.status);
     out.push({
       kind: 'campaign',
-      id: c.id,
-      name: c.name,
+      id: String(c.id),
+      name: str(c.name) || 'Untitled campaign',
       href: `/campaigns/${c.id}`,
-      meta: [clientName, c.region].filter(Boolean).join(' · ') || undefined,
-      status: c.status
-        ? { label: titleCase(c.status), tone: CAMPAIGN_STATUS_TONES[c.status] ?? 'neutral' }
+      meta: [clientName, region].filter(Boolean).join(' · ') || undefined,
+      status: status
+        ? { label: titleCase(status), tone: CAMPAIGN_STATUS_TONES[status] ?? 'neutral' }
         : undefined,
-      keywords: ['campaign', clientName, c.region].filter(Boolean),
+      keywords: kw('campaign', clientName, region),
     });
   }
 
   for (const k of kols.data ?? []) {
+    const name = str(k.name) || 'Unnamed KOL';
     const handle = typeof k.link === 'string' ? k.link.replace(/^https?:\/\/(www\.)?(x|twitter|t)\.(com|me)\//i, '@').replace(/\/.*$/, '') : '';
+    const platform = str(k.platform) ?? (Array.isArray(k.platform) ? k.platform.filter((x: unknown) => typeof x === 'string').join(', ') : undefined);
+    const region = str(k.region);
     out.push({
       kind: 'kol',
-      id: k.id,
-      name: k.name,
-      href: `/kols?q=${encodeURIComponent(k.name)}`,
-      meta: [k.platform, k.region, handle.startsWith('@') ? handle : null].filter(Boolean).join(' · ') || undefined,
-      image: k.profile_picture_url,
-      keywords: ['kol', k.platform, k.region, k.niche, handle].filter(Boolean),
+      id: String(k.id),
+      name,
+      href: `/kols?q=${encodeURIComponent(name)}`,
+      meta: [platform, region, handle.startsWith('@') ? handle : null].filter(Boolean).join(' · ') || undefined,
+      image: str(k.profile_picture_url) ?? null,
+      keywords: kw('kol', k.platform, k.region, k.niche, handle),
     });
   }
 
@@ -257,7 +278,22 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
+class PaletteBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err: unknown) { console.error('[command-palette] disabled after error:', err); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
 export default function GlobalCommandPalette() {
+  return (
+    <PaletteBoundary>
+      <GlobalCommandPaletteInner />
+    </PaletteBoundary>
+  );
+}
+
+function GlobalCommandPaletteInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { userProfile } = useAuth();
@@ -381,8 +417,8 @@ export default function GlobalCommandPalette() {
                 {recents.map((r) => (
                   <PaletteItem
                     key={`recent:${r.href}`}
-                    value={r.label}
-                    keywords={['recent', r.href]}
+                    value={String(r.label ?? '')}
+                    keywords={kw('recent', r.href)}
                     onSelect={() => go(r.href, r)}
                     leading={
                       r.kind === 'page'
@@ -425,7 +461,7 @@ export default function GlobalCommandPalette() {
                 <PaletteItem
                   key={`page:${p.href}`}
                   value={p.label}
-                  keywords={[p.href, p.section, 'page']}
+                  keywords={kw(p.href, p.section, 'page')}
                   onSelect={() => go(p.href, { href: p.href, label: p.label, kind: 'page' })}
                   leading={<IconTile icon={p.icon} />}
                   label={p.label}
