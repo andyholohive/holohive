@@ -309,6 +309,7 @@ function GlobalCommandPaletteInner() {
   const [loadingEntities, setLoadingEntities] = React.useState(false);
   const fetchStartedRef = React.useRef(false);
   const [recents, setRecents] = React.useState<Recent[]>([]);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   const guestUser = isGuest || isGuestView;
 
@@ -348,6 +349,17 @@ function GlobalCommandPaletteInner() {
   // Reset the query when closed so reopening starts clean.
   React.useEffect(() => {
     if (!open) setQuery('');
+  }, [open]);
+
+  // Focus the input ourselves. onOpenAutoFocus is prevented (Radix's own
+  // focus lands on the dialog and scrolls the page), and React's autoFocus
+  // does not fire reliably for an input mounted inside the portal — the
+  // result was ⌘K opening with focus still on <body>, so typing went
+  // nowhere until you clicked the field. [2026-09-04]
+  React.useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   const pages = React.useMemo(() => {
@@ -390,6 +402,7 @@ function GlobalCommandPaletteInner() {
           <div className="flex items-center gap-3 px-4 h-14 border-b border-cream-200">
             <Search className="h-[18px] w-[18px] text-ink-warm-400 shrink-0" />
             <CommandPrimitive.Input
+              ref={inputRef}
               autoFocus
               value={query}
               onValueChange={setQuery}
