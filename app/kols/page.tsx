@@ -94,6 +94,13 @@ export default function KOLsPage() {
   const [error, setError] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<{kolId: string, field: string} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  // Deep link from the global command palette (⌘K): /kols?q=<name> pre-fills
+  // the roster search so the KOL is the first row. [2026-09-04]
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [editingCell, setEditingCell] = useState<{kolId: string, field: keyof MasterKOL} | null>(null);
   const [editingValue, setEditingValue] = useState<any>(null);

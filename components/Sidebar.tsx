@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet, Repeat2
-} from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet, Repeat2, Search } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
+import GlobalCommandPalette, { openCommandPalette } from '@/components/command/GlobalCommandPalette';
 import { supabase } from '@/lib/supabase';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
@@ -637,6 +637,15 @@ export default function Sidebar({ children }: SidebarProps) {
           <Image src="/images/logo.png" alt="Holo Hive logo" width={24} height={24} />
           <span className="text-sm font-semibold text-ink-warm-900 tracking-tight truncate">Holo Hive</span>
         </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto h-10 w-10 p-0"
+          onClick={openCommandPalette}
+          aria-label="Search"
+        >
+          <Search className="h-5 w-5 text-ink-warm-700" />
+        </Button>
       </div>
       <div className="flex flex-1 overflow-hidden relative">
         {/* [Mobile, May 2026] Backdrop overlay — only renders when the
@@ -695,6 +704,24 @@ export default function Sidebar({ children }: SidebarProps) {
               >
                 <X className="h-5 w-5" />
               </Button>
+            </div>
+            {/* ⌘K search trigger — looks like a field, acts like a button.
+                Collapsed sidebar shows the icon only. [2026-09-04] */}
+            <div className={`px-3 pt-3 ${isSidebarCollapsed ? 'lg:px-2' : ''}`}>
+              <button
+                type="button"
+                onClick={openCommandPalette}
+                aria-label="Search (⌘K)"
+                className={`group w-full flex items-center gap-2 rounded-lg border border-cream-200 bg-cream-50 text-ink-warm-500 hover:border-cream-300 hover:bg-white hover:text-ink-warm-700 transition-colors focus-brand ${isSidebarCollapsed ? 'lg:justify-center lg:h-9 lg:px-0 h-9 px-2.5' : 'h-9 px-2.5'}`}
+              >
+                <Search className="h-4 w-4 shrink-0" />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="text-[13px] flex-1 text-left truncate">Search…</span>
+                    <kbd className="hidden lg:inline-flex h-5 items-center rounded border border-cream-300 bg-white px-1.5 font-sans text-[10px] font-medium text-ink-warm-400 group-hover:text-ink-warm-500">⌘K</kbd>
+                  </>
+                )}
+              </button>
             </div>
             {/* Navigation */}
             <nav ref={navRef} className="p-4 space-y-4 flex-1 overflow-y-auto">
@@ -1047,6 +1074,7 @@ export default function Sidebar({ children }: SidebarProps) {
         onReset={resetCustomization}
         ctx={{ isGuest: isGuestUser, role: roleView, canView, hasMemberGrant }}
       />
+      <GlobalCommandPalette />
 
       {/* Changelog History Dialog */}
       <Dialog open={isChangelogOpen} onOpenChange={(open) => {
