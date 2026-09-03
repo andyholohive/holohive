@@ -113,7 +113,10 @@ function readRecents(): Recent[] {
   try {
     const raw = localStorage.getItem(RECENTS_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.slice(0, RECENTS_MAX) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Drop entries written by the first deploy, which pointed clients at a
+    // /clients/<id> route that does not exist.
+    return parsed.filter((r) => r && typeof r.href === 'string' && !/^\/clients\/[^/?]+$/.test(r.href)).slice(0, RECENTS_MAX);
   } catch {
     return [];
   }
@@ -195,7 +198,8 @@ async function fetchEntities(): Promise<Entity[]> {
       kind: 'client',
       id: String(c.id),
       name: str(c.name) || 'Untitled client',
-      href: `/clients/${c.id}`,
+      // /clients has no [id] page; the list opens a client from ?clientId=.
+      href: `/clients?clientId=${c.id}`,
       meta: str(c.location),
       status: { label: titleCase(status), tone: CLIENT_STATUS_TONES[status] ?? 'neutral' },
       image: str(c.logo_url) ?? null,
