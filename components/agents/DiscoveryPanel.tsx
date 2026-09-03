@@ -26,6 +26,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { formatDateTime, formatRelativeShort } from '@/lib/dateFormat';
 import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
@@ -329,6 +330,7 @@ function formatMoney(n: number | null | undefined): string {
 
 export default function DiscoveryPanel() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [prospects, setProspects] = useState<DiscoveryProspect[]>([]);
   // [Discovery audit fix May 2026] Schedule state from the list
   // endpoint. Banner renders when the cron is disabled OR the last
@@ -760,7 +762,7 @@ export default function DiscoveryPanel() {
     action: 'confirm' | 'delete',
   ) => {
     if (action === 'delete') {
-      const ok = window.confirm(`Remove "${pocName}" from this project's POCs?`);
+      const ok = await confirm({ title: 'Remove this POC?', description: `“${pocName}” will be removed from this project's POCs.`, confirmLabel: 'Remove' });
       if (!ok) return;
     }
     const key = `${prospectId}|${pocIndex}`;
@@ -789,10 +791,10 @@ export default function DiscoveryPanel() {
   };
 
   // Soft-delete a signal (sets is_active=false on the DB row). Used to prune
-  // obvious hallucinations without opening SQL. Requires a window.confirm
+  // obvious hallucinations without opening SQL. Gated by a confirm Dialog
   // because the UI gives no other safety net.
   const deleteSignal = async (signalId: string, headline: string) => {
-    const ok = window.confirm(`Delete this signal?\n\n"${headline}"\n\nThe DB row stays (soft delete); only marked inactive.`);
+    const ok = await confirm({ title: 'Delete this signal?', description: `“${headline}”\n\nThe DB row stays (soft delete); it is only marked inactive.` });
     if (!ok) return;
     setDeletingSignalIds(prev => {
       const next = new Set(prev);
@@ -1080,7 +1082,7 @@ export default function DiscoveryPanel() {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
     const verb = status === 'promoted' ? 'Promote' : 'Dismiss';
-    const ok = window.confirm(`${verb} ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?`);
+    const ok = await confirm({ title: `${verb} ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?`, confirmLabel: verb, tone: status === 'promoted' ? 'brand' : 'destructive' });
     if (!ok) return;
 
     setBulkBusy(true);
@@ -1155,12 +1157,15 @@ export default function DiscoveryPanel() {
     // prospect without walking `prospects`, so estimate 1 POC per prospect.
     const estMin = ids.length * 0.10;
     const estMax = ids.length * 0.44; // 2 POCs × $0.22 upper bound
-    const ok = window.confirm(
-      `Deep Dive ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?\n\n` +
-      `Rough cost: $${estMin.toFixed(2)}–$${estMax.toFixed(2)}\n` +
-      `Time: ~${Math.round(ids.length * 2)} min (sequential).\n` +
-      `Capped at ${BULK_DEEP_DIVE_MAX_POCS} total POCs across all selected projects.`
-    );
+    const ok = await confirm({
+      title: `Deep Dive ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?`,
+      description:
+        `Rough cost: $${estMin.toFixed(2)}–$${estMax.toFixed(2)}\n` +
+        `Time: ~${Math.round(ids.length * 2)} min (sequential).\n` +
+        `Capped at ${BULK_DEEP_DIVE_MAX_POCS} total POCs across all selected projects.`,
+      confirmLabel: 'Start Deep Dive',
+      tone: 'brand',
+    });
     if (!ok) return;
 
     setBulkBusy(true);
@@ -1989,11 +1994,14 @@ export default function DiscoveryPanel() {
                                     : lastDiveAgo
                                       ? `Scanned ${lastDiveAgo}. Re-run Grok deep dive on ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''}.`
                                       : `Configure and run Grok deep dive on ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''}`;
-                            const handleClick = () => {
+                            const handleClick = async () => {
                               if (isRecent) {
-                                const ok = window.confirm(
-                                  `${p.name} was deep-dived ${lastDiveAgo}. Re-scan anyway? Costs ~$${(xPocCount * 0.22).toFixed(2)}.`
-                                );
+                                const ok = await confirm({
+                                  title: 'Re-scan anyway?',
+                                  description: `${p.name} was deep-dived ${lastDiveAgo}. Re-running costs ~$${(xPocCount * 0.22).toFixed(2)}.`,
+                                  confirmLabel: 'Re-scan',
+                                  tone: 'brand',
+                                });
                                 if (!ok) return;
                               }
                               openRowDeepDive(p.id, p.name, xPocCount);

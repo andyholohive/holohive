@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ConfirmProvider } from '@/contexts/ConfirmContext';
 import { ChangelogProvider } from '@/contexts/ChangelogContext';
 import { ViewAsProvider } from '@/contexts/ViewAsContext';
 import ViewAsBanner from '@/components/ViewAsBanner';
@@ -52,6 +53,8 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-cream-50 text-ink-warm-900">
         <ChunkErrorHandler />
+        {/* Promise-based confirm() Dialog for every page — see contexts/ConfirmContext.tsx. */}
+        <ConfirmProvider>
         <AuthProvider>
           {/* ViewAsProvider sits inside AuthProvider (it reads the real
               user's role to decide who may preview) and outside everything
@@ -65,6 +68,7 @@ export default function RootLayout({
             </ChangelogProvider>
           </ViewAsProvider>
         </AuthProvider>
+        </ConfirmProvider>
         <Toaster />
       </body>
     </html>

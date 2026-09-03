@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Plus, Trash2, Calendar as CalendarIcon, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { campaignActivationService, type CampaignActivation } from '@/lib/campaignActivationService';
 import { formatDate, toIsoDate } from '@/lib/dateFormat';
 
@@ -31,6 +32,7 @@ const DELIVERABLE_TYPES = ['Post', 'Thread', 'Video', 'Repost', 'Livestream', 'N
 
 export function AddActivationDialog({ open, onOpenChange, campaignId, campaignName }: Props) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [existing, setExisting] = useState<CampaignActivation[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -103,7 +105,7 @@ export function AddActivationDialog({ open, onOpenChange, campaignId, campaignNa
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this activation?')) return;
+    if (!(await confirm({ title: 'Delete this activation?', description: 'Its snapshot and public section go with it.' }))) return;
     try {
       await campaignActivationService.remove(id);
       setExisting(prev => prev.filter(a => a.id !== id));

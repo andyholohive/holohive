@@ -4,7 +4,10 @@ import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 
+import { useComposedRefs } from '@radix-ui/react-compose-refs';
+
 import { cn } from '@/lib/utils';
+import { PortalContainerContext } from './portal-container';
 
 const Dialog = DialogPrimitive.Root;
 
@@ -50,11 +53,16 @@ const DialogContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => {
   const parentDepth = React.useContext(DialogDepthContext);
   const myDepth = parentDepth + 1;
+  // Published so a Popover opened inside this dialog portals here rather
+  // than to document.body, where the scroll lock would swallow its wheel
+  // events. See components/ui/portal-container.tsx.
+  const [el, setEl] = React.useState<HTMLElement | null>(null);
+  const composedRef = useComposedRefs(ref, setEl);
   return (
     <DialogPortal>
       <DialogOverlay nested={myDepth > 1} />
       <DialogPrimitive.Content
-        ref={ref}
+        ref={composedRef}
         className={cn(
           'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
           className
@@ -62,7 +70,9 @@ const DialogContent = React.forwardRef<
         {...props}
       >
         <DialogDepthContext.Provider value={myDepth}>
-          {children}
+          <PortalContainerContext.Provider value={el}>
+            {children}
+          </PortalContainerContext.Provider>
         </DialogDepthContext.Provider>
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
           <X className="h-4 w-4" />

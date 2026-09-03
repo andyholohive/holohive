@@ -17,6 +17,7 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Plus, Trash2, KeyRound, RefreshCw, Save, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { formatDateTime } from '@/lib/dateFormat';
 
 type Source = {
@@ -38,6 +39,7 @@ const emptyNew = { activation_key: '', display_name: '', base_url: '', activatio
 
 export default function ActivationSourcesManager({ campaignId }: { campaignId: string }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [sources, setSources] = useState<Source[]>([]);
   const [tokens, setTokens] = useState<TokenState>({});
@@ -128,7 +130,7 @@ export default function ActivationSourcesManager({ campaignId }: { campaignId: s
   };
 
   const deleteSource = async (id: string) => {
-    if (!window.confirm('Remove this activation source? Its snapshot stays until the next sync overwrites nothing.')) return;
+    if (!(await confirm({ title: 'Remove this activation source?', description: 'Its existing snapshot stays until the next sync.', confirmLabel: 'Remove' }))) return;
     setBusyId(id);
     try {
       const res = await fetch('/api/admin/activation-sources', {

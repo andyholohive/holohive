@@ -40,6 +40,7 @@ import {
   Calendar as CalendarIcon, X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { supabase } from '@/lib/supabase';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import ActivationSourcesManager from './ActivationSourcesManager';
@@ -128,6 +129,7 @@ export default function ActivationSettingsDialog({
   campaignId: string;
 }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   // ─── State ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -393,7 +395,7 @@ export default function ActivationSettingsDialog({
 
   const handleManualDelete = async () => {
     if (!latest) return;
-    if (!window.confirm('Delete this activation snapshot? The section will disappear from the public page until a new one is created.')) return;
+    if (!(await confirm({ title: 'Delete this activation snapshot?', description: 'The section will disappear from the public page until a new one is created.' }))) return;
     const { error } = await (supabase as any)
       .from('activation_snapshots')
       .delete()

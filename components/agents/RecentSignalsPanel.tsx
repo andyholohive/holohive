@@ -16,6 +16,7 @@ import {
   Activity, Download,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { formatRelativeShort } from '@/lib/dateFormat';
 
 /**
@@ -76,6 +77,7 @@ type GroupMode = 'project' | 'poc';
 
 export default function RecentSignalsPanel() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [signals, setSignals] = useState<RecentSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState<1 | 7 | 30 | 90>(7);
@@ -141,7 +143,7 @@ export default function RecentSignalsPanel() {
   useEffect(() => { fetchSignals(); }, [fetchSignals]);
 
   const deleteSignal = async (signalId: string, headline: string) => {
-    const ok = window.confirm(`Delete this signal?\n\n"${headline}"`);
+    const ok = await confirm({ title: 'Delete this signal?', description: `“${headline}”` });
     if (!ok) return;
     setDeletingIds(prev => { const n = new Set(prev); n.add(signalId); return n; });
     try {

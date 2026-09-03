@@ -20,6 +20,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { ShareCampaignDialog } from '@/components/campaign/ShareCampaignDialog';
@@ -49,6 +50,7 @@ import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 export default function CampaignsPage() {
   const { user, userProfile } = useAuth();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const clientIdParam = searchParams.get('clientId');
   const addParam = searchParams.get('add');
@@ -479,7 +481,7 @@ export default function CampaignsPage() {
     } catch (err) {
       console.error('Failed to update phase:', err);
       setCampaigns(previous);
-      alert('Failed to update phase. Try again or use the campaign detail page.');
+      toast({ title: 'Failed to update phase', description: 'Try again or use the campaign detail page.', variant: 'destructive' });
     }
   };
 

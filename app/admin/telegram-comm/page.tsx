@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
@@ -73,6 +74,7 @@ type TelegramChatRow = {
 
 export default function LineupSettingsPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { userProfile } = useAuth();
   const currentUserId = (userProfile as any)?.id as string | undefined;
 
@@ -209,7 +211,7 @@ export default function LineupSettingsPage() {
   };
 
   const handleRemoveApprover = async (row: ApproverRow) => {
-    if (!window.confirm(`Remove ${row.user?.name || row.user?.email || 'this user'} from the approver list?`)) return;
+    if (!(await confirm({ title: 'Remove approver?', description: `${row.user?.name || row.user?.email || 'this user'} will no longer be able to approve lineups.`, confirmLabel: 'Remove' }))) return;
     try {
       const { error } = await (supabase as any)
         .from('lineup_approvers')

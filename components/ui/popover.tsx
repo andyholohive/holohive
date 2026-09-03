@@ -4,6 +4,7 @@ import * as React from 'react';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 
 import { cn } from '@/lib/utils';
+import { usePortalContainer } from './portal-container';
 
 const Popover = PopoverPrimitive.Root;
 
@@ -25,8 +26,14 @@ const PopoverContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
     container?: HTMLElement | null;
   }
->(({ className, align = 'center', sideOffset = 4, container, ...props }, ref) => (
-  <PopoverPrimitive.Portal container={container ?? undefined}>
+>(({ className, align = 'center', sideOffset = 4, container, ...props }, ref) => {
+  // Inside a Dialog / Sheet / AlertDialog the modal publishes its element;
+  // default to it so the popover lands inside the scroll-lock exemption.
+  // An explicit `container` still wins. Outside a modal this is null and the
+  // portal goes to document.body exactly as before.
+  const modalContainer = usePortalContainer();
+  return (
+  <PopoverPrimitive.Portal container={container ?? modalContainer ?? undefined}>
     <PopoverPrimitive.Content
       ref={ref}
       align={align}
@@ -38,7 +45,8 @@ const PopoverContent = React.forwardRef<
       {...props}
     />
   </PopoverPrimitive.Portal>
-));
+  );
+});
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
 export { Popover, PopoverTrigger, PopoverContent };

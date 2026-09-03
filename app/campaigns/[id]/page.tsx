@@ -1512,7 +1512,7 @@ const CampaignDetailsPage = () => {
       setCampaign(updated);
       setEditMode(false);
     } catch (e) {
-      alert("Failed to save changes");
+      toast({ title: 'Failed to save changes', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
     } finally {
       setSaving(false);
     }

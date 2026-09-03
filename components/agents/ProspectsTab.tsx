@@ -256,6 +256,10 @@ export default function ProspectsTab() {
   // payload (which IDs to delete) is already in `selected`; the dialog
   // just opens, the user confirms, the existing bulk-delete loop fires.
   const [bulkDeletePending, setBulkDeletePending] = useState(false);
+  // Per-row delete, same shape: the row menu stages the id here, the
+  // confirm Dialog below fires handleDelete. Replaces the last native
+  // confirm() on this tab (2026-09-03).
+  const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
 
   // Scraper
   const [scraperOpen, setScraperOpen] = useState(false);
@@ -881,7 +885,7 @@ export default function ProspectsTab() {
                           <DropdownMenuItem onClick={() => handleDismiss(p.id)} className="text-gray-500">
                             <XCircle className="h-4 w-4 mr-2" /> Dismiss
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { if (confirm('Delete this prospect?')) handleDelete(p.id); }} className="text-rose-600">
+                          <DropdownMenuItem onClick={() => setDeletePendingId(p.id)} className="text-rose-600">
                             <Trash2 className="h-4 w-4 mr-2" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1119,6 +1123,38 @@ export default function ProspectsTab() {
             <Button variant="destructive" onClick={confirmBulkDelete} disabled={bulkActing}>
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
               {bulkActing ? 'Deleting…' : `Delete ${selected.length}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Single-row delete confirm — same Dialog as the bulk one above,
+          fed by the row menu via deletePendingId. */}
+      <Dialog open={deletePendingId !== null} onOpenChange={(open) => { if (!open) setDeletePendingId(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4 text-rose-500" />
+              Delete Prospect?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
+              This prospect will be permanently deleted. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setDeletePendingId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const id = deletePendingId;
+                setDeletePendingId(null);
+                if (id) handleDelete(id);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

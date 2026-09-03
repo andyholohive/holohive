@@ -20,6 +20,7 @@ import { RefreshCw, Pause, Play, Trash2, Repeat, ChevronDown, ChevronRight, User
 import { DeliverableService } from '@/lib/deliverableService';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import { formatDate } from '@/lib/dateFormat';
 
 const UNASSIGNED = '__unassigned__';
@@ -42,6 +43,7 @@ function AssigneesDialog({
   onSaved: (cycleId: string, assignedCount: number) => void;
 }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [steps, setSteps] = useState<Array<{
@@ -103,23 +105,28 @@ function AssigneesDialog({
     onClose();
   };
 
-  const toggleSkip = (step: { id: string; step_order: number; is_blocking: boolean }) => {
-    setSkips((prev) => {
-      if (prev[step.id] !== undefined) {
+  const toggleSkip = async (step: { id: string; step_order: number; is_blocking: boolean }) => {
+    if (skips[step.id] !== undefined) {
+      setSkips((prev) => {
         const { [step.id]: _drop, ...rest } = prev;
         return rest;
-      }
-      // Skipping a blocking step releases everything gated behind it. Say so
-      // at the point of skipping rather than letting the gate vanish quietly.
-      if (step.is_blocking) {
-        // eslint-disable-next-line no-alert
-        const ok = window.confirm(
-          `Step ${step.step_order} is a blocking step.\n\nSkipping it releases every step behind it for this client. Continue?`,
-        );
-        if (!ok) return prev;
-      }
-      return { ...prev, [step.id]: '' };
-    });
+      });
+      return;
+    }
+    // Skipping a blocking step releases everything gated behind it. Say so
+    // at the point of skipping rather than letting the gate vanish quietly.
+    // (Awaited before the state update — a confirm can't live inside a
+    // setState updater.)
+    if (step.is_blocking) {
+      const ok = await confirm({
+        title: `Step ${step.step_order} is a blocking step`,
+        description: 'Skipping it releases every step behind it for this client. Continue?',
+        confirmLabel: 'Skip step',
+        tone: 'brand',
+      });
+      if (!ok) return;
+    }
+    setSkips((prev) => ({ ...prev, [step.id]: '' }));
   };
 
   return (

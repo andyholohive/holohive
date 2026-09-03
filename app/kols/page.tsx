@@ -42,7 +42,7 @@ import { supabase } from "@/lib/supabase";
 import { KOLService, MasterKOL } from "@/lib/kolService";
 import { FieldOptionsService } from "@/lib/fieldOptionsService";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import KolActivationsDialog from './_components/KolActivationsDialog';
 
@@ -245,6 +245,9 @@ export default function KOLsPage() {
     }
   };
   const [bulkXRunning, setBulkXRunning] = useState(false);
+  // Staged by the Profile X KOLs button after the cost preview; the confirm
+  // Dialog below fires runBulkX. Replaces the native confirm() (2026-09-03).
+  const [bulkXConfirm, setBulkXConfirm] = useState<{ n: number; cost: number | string } | null>(null);
 
   // [2026-07-02 ANN.4] Send Announcement — bulk-message the selected
   // KOLs' group chats. Composer dialog gates itself on reachability.
@@ -331,6 +334,36 @@ export default function KOLsPage() {
 
   const fieldOptions = KOLService.getFieldOptions();
   const { toast } = useToast();
+
+  // The Grok bulk-profile loop, fired from the bulkXConfirm Dialog once
+  // the user has seen the eligible count + cost estimate.
+  const runBulkX = async () => {
+    setBulkXConfirm(null);
+    setBulkXRunning(true);
+    let done = 0, spent = 0, guard = 0;
+    try {
+      // Walk batches until nothing remains (guard caps runaway loops).
+      while (guard++ < 60) {
+        const res = await fetch('/api/kols/profile-x/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ execute: true, limit: 6 }),
+        });
+        const json = await res.json();
+        if (!res.ok) { toast({ title: 'Bulk profiling failed', description: json?.error || `HTTP ${res.status}`, variant: 'destructive' }); break; }
+        done += json.succeeded ?? 0;
+        spent += json.cost_usd ?? 0;
+        toast({ title: `Profiling X KOLs… ${done} done`, description: `~$${spent.toFixed(2)} spent · ${json.remaining ?? 0} left` });
+        if (!json.remaining || (json.processed ?? 0) === 0) break;
+      }
+      toast({ title: 'X profiling complete', description: `${done} KOLs tagged · ~$${spent.toFixed(2)}.` });
+      fetchKOLs();
+    } catch (err: any) {
+      toast({ title: 'Network error', description: err?.message || 'Could not reach server', variant: 'destructive' });
+    } finally {
+      setBulkXRunning(false);
+    }
+  };
 
   // Function to update URL with column visibility
   const updateColumnVisibilityInURL = (newVisibleColumns: typeof defaultVisibleColumns) => {
@@ -2060,32 +2093,7 @@ export default function KOLsPage() {
                   }
                   const n = preview.eligible ?? 0;
                   if (n === 0) { toast({ title: 'Nothing to profile', description: 'All X KOLs already have a creator type.' }); return; }
-                  if (!confirm(`Profile ${n} untagged X KOL${n === 1 ? '' : 's'} with Grok (~$${preview.est_cost_usd ?? '?'})? Runs in batches; ~30s per KOL.`)) return;
-
-                  setBulkXRunning(true);
-                  let done = 0, spent = 0, guard = 0;
-                  try {
-                    // Walk batches until nothing remains (guard caps runaway loops).
-                    while (guard++ < 60) {
-                      const res = await fetch('/api/kols/profile-x/bulk', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ execute: true, limit: 6 }),
-                      });
-                      const json = await res.json();
-                      if (!res.ok) { toast({ title: 'Bulk profiling failed', description: json?.error || `HTTP ${res.status}`, variant: 'destructive' }); break; }
-                      done += json.succeeded ?? 0;
-                      spent += json.cost_usd ?? 0;
-                      toast({ title: `Profiling X KOLs… ${done} done`, description: `~$${spent.toFixed(2)} spent · ${json.remaining ?? 0} left` });
-                      if (!json.remaining || (json.processed ?? 0) === 0) break;
-                    }
-                    toast({ title: 'X profiling complete', description: `${done} KOLs tagged · ~$${spent.toFixed(2)}.` });
-                    fetchKOLs();
-                  } catch (err: any) {
-                    toast({ title: 'Network error', description: err?.message || 'Could not reach server', variant: 'destructive' });
-                  } finally {
-                    setBulkXRunning(false);
-                  }
+                  setBulkXConfirm({ n, cost: preview.est_cost_usd ?? '?' });
                 }}
                 disabled={bulkXRunning}
               >
@@ -3870,6 +3878,25 @@ export default function KOLsPage() {
       {/* Bulk avatar refresh — scope picker. The all-roster pass costs ~2 min
           of Telegram + unavatar calls, which is wasteful when the real need is
           "the handful added since the 05:00 UTC cron". [2026-08-06 per Andy] */}
+      <Dialog open={bulkXConfirm !== null} onOpenChange={(open) => { if (!open) setBulkXConfirm(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Profile X KOLs with Grok?</DialogTitle>
+            <DialogDescription className="pt-2">
+              <strong>{bulkXConfirm?.n ?? 0}</strong> untagged X KOL{bulkXConfirm?.n === 1 ? '' : 's'} will be profiled
+              (~${bulkXConfirm?.cost ?? '?'}). Runs in batches; about 30s per KOL.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkXConfirm(null)}>Cancel</Button>
+            <Button variant="brand" onClick={runBulkX}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Start profiling
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
