@@ -355,6 +355,15 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  // Deep link from the global command palette (⌘K): /clients?q=<name>
+  // filters the grid to that client. `?clientId=` still opens the Edit
+  // dialog — that is a different intent (edit), and a search result should
+  // land on the card, not in a form. [2026-09-04]
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setSearchTerm(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
