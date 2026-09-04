@@ -176,6 +176,13 @@ function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v : undefined;
 }
 
+/** Meta lines are one truncated row; keep the source string sane too. */
+function clip(v: unknown, max = 80): string | undefined {
+  const t = str(v);
+  if (!t) return undefined;
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
 function titleCase(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -294,7 +301,7 @@ async function fetchEntities(): Promise<Entity[]> {
       id: String(l.id),
       name: str(l.name) || host || 'Untitled link',
       href: `/links?id=${l.id}`,
-      meta: [clientName, host, str(l.description)].filter(Boolean).join(' · ') || undefined,
+      meta: [clientName, host, clip(l.description)].filter(Boolean).join(' · ') || undefined,
       keywords: kw('link', clientName, host, l.url, l.description, l.link_types, l.access),
     });
   }
@@ -460,10 +467,10 @@ function GlobalCommandPaletteInner() {
           label="Search Holo Hive"
           loop
           filter={scoreItem}
-          className="flex flex-col"
+          className="flex flex-col w-full min-w-0"
         >
           {/* Input row */}
-          <div className="flex items-center gap-3 px-4 h-14 border-b border-cream-200">
+          <div className="flex items-center gap-3 px-4 h-14 border-b border-cream-200 min-w-0">
             <Search className="h-[18px] w-[18px] text-ink-warm-400 shrink-0" />
             <CommandPrimitive.Input
               ref={inputRef}
@@ -478,7 +485,7 @@ function GlobalCommandPaletteInner() {
 
           <CommandPrimitive.List
             className={cn(
-              'max-h-[min(420px,60vh)] overflow-y-auto overscroll-contain py-2',
+              'max-h-[min(420px,60vh)] w-full min-w-0 overflow-y-auto overscroll-contain py-2',
               '[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1.5',
               '[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.18em] [&_[cmdk-group-heading]]:text-ink-warm-400',
             )}
@@ -604,7 +611,7 @@ function PaletteItem({
       keywords={keywords}
       onSelect={onSelect}
       className={cn(
-        'group relative mx-2 flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer select-none outline-none',
+        'group relative mx-2 flex min-w-0 items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer select-none outline-none',
         'text-ink-warm-800 transition-colors duration-75',
         'data-[selected=true]:bg-cream-100 data-[selected=true]:text-ink-warm-900',
         'data-[selected=true]:shadow-[inset_3px_0_0_#3e8692]',

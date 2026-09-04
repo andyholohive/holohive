@@ -190,7 +190,6 @@ type CampaignKOL = {
     profile_picture_url: string | null;
     /** AI-inferred posting-style summary (Telegram scan). Surfaced on
      *  the Cards view — same "Style" field as the KOL Profile popup. */
-    style_summary: string | null;
     public_summary: string | null;
   };
 };
