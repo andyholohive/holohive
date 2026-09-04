@@ -27,10 +27,33 @@
 import { callClaude } from './claude';
 
 export const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힯]/;
+const HANGUL_G = /[ᄀ-ᇿ㄰-㆏가-힯]/g;
 
-/** True when the text carries any Korean — the trigger for a translate pass. */
+/** True when the text carries any Korean at all. */
 export function hasKorean(v: unknown): boolean {
   return typeof v === 'string' && HANGUL.test(v);
+}
+
+/** Share of the string that is Hangul, 0–1. */
+export function koreanRatio(v: unknown): number {
+  if (typeof v !== 'string' || v.length === 0) return 0;
+  return (v.match(HANGUL_G)?.length ?? 0) / v.length;
+}
+
+/**
+ * Whether a string still reads as Korean prose rather than English.
+ *
+ * [2026-09-04] The first pass tested `hasKorean` and reverted to the original
+ * whenever the translation contained any Hangul at all. That threw away 17
+ * perfectly good translations, because a faithful English rendering keeps the
+ * odd Korean proper noun — a channel called 뀨's Daily WEB3, a slang term
+ * quoted as an example. Reverting meant storing the fully-Korean original, so
+ * the guard made those rows worse than doing nothing. Density is the right
+ * test: real English prose with a few Korean tokens sits under 5%, a
+ * genuinely untranslated summary sits above 50%.
+ */
+export function isMostlyKorean(v: unknown, threshold = 0.15): boolean {
+  return koreanRatio(v) > threshold;
 }
 
 export interface NormalizeInput {
@@ -103,10 +126,10 @@ export async function normalizeKolSummaries(input: NormalizeInput): Promise<Norm
     return t ? t : null;
   };
 
-  // Belt and braces: if the model echoed Korean back, keep the original
-  // rather than storing a half-translated string, and let the caller retry.
+  // Only reject a translation that is still Korean prose — see
+  // isMostlyKorean for why presence alone is the wrong test.
   const guard = (translated: string | null, original: string | null | undefined): string | null => {
-    if (translated && HANGUL.test(translated)) return original ?? null;
+    if (translated && isMostlyKorean(translated)) return original ?? null;
     return translated ?? (original ?? null);
   };
 
@@ -116,7 +139,9 @@ export async function normalizeKolSummaries(input: NormalizeInput): Promise<Norm
     style_summary: guard(text(parsed.style_summary), input.style_summary),
     audience_summary: guard(text(parsed.audience_summary), input.audience_summary),
     brief_angle_hint: guard(text(parsed.brief_angle_hint), input.brief_angle_hint),
-    public_summary: publicSummary && !HANGUL.test(publicSummary) ? publicSummary : null,
+    // The client-facing blurb has no excuse for Korean at all beyond a proper
+    // noun, and there is no original to fall back to.
+    public_summary: publicSummary && !isMostlyKorean(publicSummary, 0.05) ? publicSummary : null,
     cost_usd: res.cost_usd,
   };
 }

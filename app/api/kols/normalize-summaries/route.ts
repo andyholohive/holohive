@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireSuperAdmin } from '@/lib/requireSuperAdmin';
-import { hasKorean, normalizeKolSummaries } from '@/lib/kolSummaryNormalize';
+import { isMostlyKorean, normalizeKolSummaries } from '@/lib/kolSummaryNormalize';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -41,8 +41,8 @@ function needsWork(row: any): boolean {
   const anyNotes = row.style_summary || row.audience_summary || row.brief_angle_hint;
   if (!anyNotes) return false;
   if (!row.public_summary) return true;
-  return hasKorean(row.style_summary) || hasKorean(row.audience_summary)
-    || hasKorean(row.brief_angle_hint) || hasKorean(row.public_summary);
+  return isMostlyKorean(row.style_summary) || isMostlyKorean(row.audience_summary)
+    || isMostlyKorean(row.brief_angle_hint) || isMostlyKorean(row.public_summary, 0.05);
 }
 
 export async function GET(request: Request) {
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   const pending = rows.filter(needsWork);
   return NextResponse.json({
     eligible: pending.length,
-    korean_notes: rows.filter((r: any) => hasKorean(r.style_summary) || hasKorean(r.audience_summary) || hasKorean(r.brief_angle_hint)).length,
+    korean_notes: rows.filter((r: any) => isMostlyKorean(r.style_summary) || isMostlyKorean(r.audience_summary) || isMostlyKorean(r.brief_angle_hint)).length,
     missing_public_summary: rows.filter((r: any) => (r.style_summary || r.audience_summary || r.brief_angle_hint) && !r.public_summary).length,
     with_notes: rows.filter((r: any) => r.style_summary || r.audience_summary || r.brief_angle_hint).length,
     est_cost_usd: Number((pending.length * EST_COST_PER_KOL).toFixed(2)),
