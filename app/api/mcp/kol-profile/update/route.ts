@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { normalizeKolSummaries } from '@/lib/kolSummaryNormalize';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -97,6 +98,34 @@ export async function POST(request: Request) {
     if (key in body) {
       const v = body[key];
       patch[key] = v == null ? null : String(v);
+    }
+  }
+
+  // The Telegram profiler reads Korean channels and used to answer in Korean,
+  // so 60 of 150 summaries landed unreadable for anyone on the team who does
+  // not read it. Translate on the way in rather than trusting the caller, and
+  // regenerate the client-safe blurb from the same pass so the public campaign
+  // page never has to fall back to these internal notes. [2026-09-04]
+  //
+  // Best-effort: if the model call fails the write still goes through with the
+  // original text — a Korean summary is worse than an English one, but losing
+  // the profile entirely is worse than both. `needsWork` in
+  // /api/kols/normalize-summaries will pick it up on the next sweep.
+  const touchesNotes = ['style_summary', 'audience_summary', 'brief_angle_hint'].some(k => k in patch);
+  if (touchesNotes) {
+    try {
+      const out = await normalizeKolSummaries({
+        name: typeof body.name === 'string' ? body.name : 'this KOL',
+        style_summary: (patch.style_summary as string | null) ?? null,
+        audience_summary: (patch.audience_summary as string | null) ?? null,
+        brief_angle_hint: (patch.brief_angle_hint as string | null) ?? null,
+      });
+      if ('style_summary' in patch) patch.style_summary = out.style_summary;
+      if ('audience_summary' in patch) patch.audience_summary = out.audience_summary;
+      if ('brief_angle_hint' in patch) patch.brief_angle_hint = out.brief_angle_hint;
+      if (out.public_summary) patch.public_summary = out.public_summary;
+    } catch (e) {
+      console.error('[kol-profile/update] summary normalisation failed, storing as supplied:', e);
     }
   }
   if ('follower_count' in body) {

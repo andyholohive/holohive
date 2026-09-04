@@ -400,9 +400,18 @@ function OverviewTab({
             </div>
           </div>
           <ProfileBlock
-            label="Style"
+            label="Style (internal)"
             body={kol.style_summary || null}
             placeholder="Posting style summary will appear after the AI scan."
+          />
+          {/* What the client actually sees on the public campaign page. Shown
+              here so the team can tell at a glance whether a KOL has a
+              client-safe blurb, and that it differs from the candid one
+              above. [2026-09-04] */}
+          <ProfileBlock
+            label="Client-facing blurb"
+            body={kol.public_summary || null}
+            placeholder="Generated with the AI scan — shown to clients on campaign pages."
           />
           <ProfileBlock
             label="Audience"

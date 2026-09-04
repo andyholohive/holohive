@@ -34,6 +34,8 @@ import {
   Clock,
   CornerDownLeft,
   Crown,
+  FileText,
+  Link2,
   Megaphone,
   Search,
 } from 'lucide-react';
@@ -52,7 +54,7 @@ export function openCommandPalette() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
 }
 
-type EntityKind = 'client' | 'campaign' | 'kol';
+type EntityKind = 'client' | 'campaign' | 'kol' | 'doc' | 'link';
 
 interface Entity {
   kind: EntityKind;
@@ -141,6 +143,14 @@ const CLIENT_STATUS_TONES: Record<string, BadgeTone> = {
   completed: 'success',
 };
 
+const DOC_STATUS_TONES: Record<string, BadgeTone> = {
+  draft: 'neutral',
+  active: 'brand',
+  shared: 'info',
+  archived: 'neutral',
+  expired: 'warning',
+};
+
 const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
   active: 'brand',
   draft: 'neutral',
@@ -171,7 +181,7 @@ function titleCase(s: string) {
 }
 
 async function fetchEntities(): Promise<Entity[]> {
-  const [clients, campaigns, kols] = await Promise.all([
+  const [clients, campaigns, kols, docs, links] = await Promise.all([
     (supabase as any)
       .from('clients')
       .select('id, name, logo_url, engagement_status, is_active, location')
@@ -190,7 +200,22 @@ async function fetchEntities(): Promise<Entity[]> {
       .is('archived_at', null)
       .order('name')
       .limit(ENTITY_LIMIT),
+    (supabase as any)
+      .from('documents')
+      .select('id, title, doc_type, status, client_id')
+      .order('updated_at', { ascending: false })
+      .limit(ENTITY_LIMIT),
+    (supabase as any)
+      .from('links')
+      .select('id, name, description, url, link_types, access, client, client_id')
+      .order('created_at', { ascending: false })
+      .limit(ENTITY_LIMIT),
   ]);
+
+  // Documents and links carry a client_id but no joined name; resolve it off
+  // the client rows we already have rather than paying for another join.
+  const clientNames = new Map<string, string>();
+  for (const c of clients.data ?? []) if (c?.id && c?.name) clientNames.set(String(c.id), String(c.name));
 
   const out: Entity[] = [];
 
@@ -243,6 +268,37 @@ async function fetchEntities(): Promise<Entity[]> {
     });
   }
 
+  for (const d of docs.data ?? []) {
+    const clientName = d.client_id ? clientNames.get(String(d.client_id)) : undefined;
+    const docType = str(d.doc_type);
+    const status = str(d.status);
+    out.push({
+      kind: 'doc',
+      id: String(d.id),
+      name: str(d.title) || 'Untitled document',
+      href: `/documents/${d.id}`,
+      meta: [clientName, docType ? titleCase(docType) : undefined].filter(Boolean).join(' · ') || undefined,
+      status: status ? { label: titleCase(status), tone: DOC_STATUS_TONES[status] ?? 'neutral' } : undefined,
+      keywords: kw('document', 'doc', 'file', clientName, d.doc_type),
+    });
+  }
+
+  for (const l of links.data ?? []) {
+    const clientName = (l.client_id ? clientNames.get(String(l.client_id)) : undefined) ?? str(l.client);
+    // The host is what people actually remember about a link ("the notion
+    // one", "that figma"), so show it and match on it.
+    let host: string | undefined;
+    try { host = l.url ? new URL(String(l.url)).hostname.replace(/^www\./, '') : undefined; } catch { host = undefined; }
+    out.push({
+      kind: 'link',
+      id: String(l.id),
+      name: str(l.name) || host || 'Untitled link',
+      href: `/links?id=${l.id}`,
+      meta: [clientName, host, str(l.description)].filter(Boolean).join(' · ') || undefined,
+      keywords: kw('link', clientName, host, l.url, l.description, l.link_types, l.access),
+    });
+  }
+
   return out;
 }
 
@@ -250,7 +306,12 @@ const KIND_META: Record<EntityKind, { heading: string; icon: React.ElementType }
   client: { heading: 'Clients', icon: Building2 },
   campaign: { heading: 'Campaigns', icon: Megaphone },
   kol: { heading: 'KOLs', icon: Crown },
+  doc: { heading: 'Documents', icon: FileText },
+  link: { heading: 'Links', icon: Link2 },
 };
+
+/** Group render order — the things people look up by name come first. */
+const KIND_ORDER: EntityKind[] = ['client', 'campaign', 'kol', 'doc', 'link'];
 
 function Thumb({ image, name, icon: Icon, className }: { image?: string | null; name: string; icon: React.ElementType; className?: string }) {
   const [broken, setBroken] = React.useState(false);
@@ -378,7 +439,7 @@ function GlobalCommandPaletteInner() {
 
   const trimmed = query.trim();
   const byKind = React.useMemo(() => {
-    const groups: Record<EntityKind, Entity[]> = { client: [], campaign: [], kol: [] };
+    const groups: Record<EntityKind, Entity[]> = { client: [], campaign: [], kol: [], doc: [], link: [] };
     for (const e of entities ?? []) groups[e.kind].push(e);
     return groups;
   }, [entities]);
@@ -453,7 +514,7 @@ function GlobalCommandPaletteInner() {
             )}
 
             {/* Entities */}
-            {!guestUser && (['client', 'campaign', 'kol'] as EntityKind[]).map((kind) => {
+            {!guestUser && KIND_ORDER.map((kind) => {
               const rows = byKind[kind];
               if (rows.length === 0) return null;
               const { heading, icon } = KIND_META[kind];

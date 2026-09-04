@@ -14,7 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown, MessageSquare, Maximize2, Activity, RefreshCw, Send } from "lucide-react";
+import {
+  Languages, Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown, MessageSquare, Maximize2, Activity, RefreshCw, Send } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
 import { SendAnnouncementDialog } from "@/components/kols/SendAnnouncementDialog";
 // [2026-06-22] Migrated off lib/kolScoringEngine (legacy May 2026 5-dim
@@ -255,6 +256,12 @@ export default function KOLsPage() {
   // Staged by the Profile X KOLs button after the cost preview; the confirm
   // Dialog below fires runBulkX. Replaces the native confirm() (2026-09-03).
   const [bulkXConfirm, setBulkXConfirm] = useState<{ n: number; cost: number | string } | null>(null);
+  // Blurb normalisation — translate Korean profiler notes to English and
+  // generate the client-safe summary the public campaign page renders.
+  const [normalizeRunning, setNormalizeRunning] = useState(false);
+  const [normalizeConfirm, setNormalizeConfirm] = useState<
+    { n: number; cost: number | string; korean: number; missing: number } | null
+  >(null);
 
   // [2026-07-02 ANN.4] Send Announcement — bulk-message the selected
   // KOLs' group chats. Composer dialog gates itself on reachability.
@@ -344,6 +351,33 @@ export default function KOLsPage() {
 
   // The Grok bulk-profile loop, fired from the bulkXConfirm Dialog once
   // the user has seen the eligible count + cost estimate.
+  const runNormalize = async () => {
+    setNormalizeConfirm(null);
+    setNormalizeRunning(true);
+    let done = 0, spent = 0, guard = 0;
+    try {
+      while (guard++ < 60) {
+        const res = await fetch('/api/kols/normalize-summaries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ execute: true, limit: 8 }),
+        });
+        const json = await res.json();
+        if (!res.ok) { toast({ title: 'Normalisation failed', description: json?.error || `HTTP ${res.status}`, variant: 'destructive' }); break; }
+        done += json.succeeded ?? 0;
+        spent += json.cost_usd ?? 0;
+        toast({ title: `Rewriting KOL notes… ${done} done`, description: `~$${spent.toFixed(2)} spent · ${json.remaining ?? 0} left` });
+        if (!json.remaining || (json.processed ?? 0) === 0) break;
+      }
+      toast({ title: 'KOL notes normalised', description: `${done} KOLs · English notes + client-facing blurbs · ~$${spent.toFixed(2)}.` });
+      fetchKOLs();
+    } catch (err: any) {
+      toast({ title: 'Network error', description: err?.message || 'Could not reach server', variant: 'destructive' });
+    } finally {
+      setNormalizeRunning(false);
+    }
+  };
+
   const runBulkX = async () => {
     setBulkXConfirm(null);
     setBulkXRunning(true);
@@ -2084,6 +2118,34 @@ export default function KOLsPage() {
             {/* Bulk X-profile backfill — Grok reads each untagged X KOL's
                 timeline to infer creator type + niche. Super_admin only;
                 walks the set in batches with a running cost tally. */}
+            {userProfile?.role === 'super_admin' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (normalizeRunning) return;
+                  let preview: { eligible?: number; est_cost_usd?: number; korean_notes?: number; missing_public_summary?: number } = {};
+                  try {
+                    preview = await (await fetch('/api/kols/normalize-summaries')).json();
+                  } catch {
+                    toast({ title: 'Preview failed', description: 'Could not reach the normaliser.', variant: 'destructive' });
+                    return;
+                  }
+                  const n = preview.eligible ?? 0;
+                  if (n === 0) { toast({ title: 'Nothing to rewrite', description: 'Every KOL note is already English with a client-facing blurb.' }); return; }
+                  setNormalizeConfirm({
+                    n,
+                    cost: preview.est_cost_usd ?? '?',
+                    korean: preview.korean_notes ?? 0,
+                    missing: preview.missing_public_summary ?? 0,
+                  });
+                }}
+                disabled={normalizeRunning}
+              >
+                <Languages className={`h-4 w-4 mr-2 ${normalizeRunning ? 'animate-pulse' : ''}`} />
+                {normalizeRunning ? 'Rewriting…' : 'Fix KOL Notes'}
+              </Button>
+            )}
             {userProfile?.role === 'super_admin' && (
               <Button
                 variant="outline"
@@ -3885,6 +3947,30 @@ export default function KOLsPage() {
       {/* Bulk avatar refresh — scope picker. The all-roster pass costs ~2 min
           of Telegram + unavatar calls, which is wasteful when the real need is
           "the handful added since the 05:00 UTC cron". [2026-08-06 per Andy] */}
+      <Dialog open={normalizeConfirm !== null} onOpenChange={(open) => { if (!open) setNormalizeConfirm(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rewrite KOL notes?</DialogTitle>
+            <DialogDescription className="pt-2">
+              <strong>{normalizeConfirm?.n ?? 0}</strong> KOL{normalizeConfirm?.n === 1 ? '' : 's'} will be processed
+              (~${normalizeConfirm?.cost ?? '?'}).
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="text-xs text-ink-warm-700 space-y-1.5 list-disc pl-4">
+            <li><strong>{normalizeConfirm?.korean ?? 0}</strong> have Korean notes — translated to English, tone kept.</li>
+            <li><strong>{normalizeConfirm?.missing ?? 0}</strong> have no client-facing blurb — one gets written.</li>
+            <li>Internal notes stay candid. Clients only ever see the new blurb.</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNormalizeConfirm(null)}>Cancel</Button>
+            <Button variant="brand" onClick={runNormalize}>
+              <Languages className="h-4 w-4 mr-2" />
+              Rewrite notes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={bulkXConfirm !== null} onOpenChange={(open) => { if (!open) setBulkXConfirm(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
