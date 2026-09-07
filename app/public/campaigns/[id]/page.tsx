@@ -1678,13 +1678,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <div className="space-y-6">
                       {/* [2026-07-06] KPI strip — now the shared KpiCard
                           primitive (matches the internal KolDashboardOverview).
-                          Combined Reach + Active This Week added before Unique
+                          Combined Reach + KOLs Active This Week added before Unique
                           Platform; Region card removed. */}
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                         <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}     accent="brand"   />
                         <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowersFmt} accent="sky"   />
                         <KpiCard icon={Signal}    label="Combined Reach" value={combinedReach} accent="purple"  />
-                        <KpiCard icon={Zap}       label="Active This Week" value={activeThisWeek} accent="amber" />
+                        <KpiCard icon={Zap}       label="KOLs Active This Week" value={activeThisWeek} accent="amber" />
                         <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'} value={platformSet.size} accent="emerald" />
                       </div>
 

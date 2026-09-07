@@ -166,13 +166,13 @@ export function KolDashboardOverview() {
     <div className="space-y-6">
       {/* KPI strip — same KpiCard primitive as /dashboard,
           /lists Access & Visits, /analytics. */}
-      {/* [2026-07-06] Combined Reach + Active This Week added before
+      {/* [2026-07-06] Combined Reach + KOLs Active This Week added before
           Unique Platform; Region card removed — per Andy. */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard icon={Users}     label="Total KOLs"     value={totalKols}     accent="brand"   />
         <KpiCard icon={BarChart3} label="Avg Followers"  value={avgFollowers}  accent="sky"     />
         <KpiCard icon={Signal}    label="Combined Reach" value={combinedReach} accent="purple"  />
-        <KpiCard icon={Zap}       label="Active This Week" value={activeThisWeek} accent="amber" />
+        <KpiCard icon={Zap}       label="KOLs Active This Week" value={activeThisWeek} accent="amber" />
         <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'} value={platformSet.size} accent="emerald" />
       </div>
 
