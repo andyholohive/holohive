@@ -133,6 +133,25 @@ function formatAmountInput(raw: string): string {
   return `${formattedInt}.${decimalDigits}`;
 }
 
+/**
+ * Supabase/PostgREST failures arrive as plain objects ({message, code, details,
+ * hint}), not Error instances, so `e instanceof Error ? e.message : fallback`
+ * threw away the only useful part and showed a bare "Save failed."
+ *
+ * [2026-09-04] That cost real debugging time: a term save on a lapsed stint
+ * was returning a CHECK violation from a downstream trigger, and all anyone
+ * could report was "can't save". Surface whatever the server actually said.
+ */
+function errMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [o.message, o.details, o.hint].filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+    if (parts.length > 0) return o.code ? `${parts[0]} (${String(o.code)})` : parts[0];
+  }
+  return fallback;
+}
+
 function parseAmount(formatted: string): number {
   const stripped = formatted.replace(/,/g, '');
   return Number(stripped);
@@ -299,7 +318,7 @@ export function EngagementTab({
         setExpandedStintIds(new Set([rows[0].id]));
       }
     } catch (e: unknown) {
-      const err = e instanceof Error ? e.message : 'Failed to load engagement.';
+      const err = errMessage(e, 'Failed to load engagement.');
       toast({ title: 'Could not load engagement', description: err, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -394,7 +413,7 @@ export function EngagementTab({
       setStintDialogOpen(false);
       await load();
     } catch (e: unknown) {
-      const err = e instanceof Error ? e.message : 'Save failed.';
+      const err = errMessage(e, 'Save failed.');
       toast({ title: 'Could not save stint', description: err, variant: 'destructive' });
     } finally {
       setSavingStint(false);
@@ -509,7 +528,7 @@ export function EngagementTab({
       setPeriodDialogOpen(false);
       await load();
     } catch (e: unknown) {
-      const err = e instanceof Error ? e.message : 'Save failed.';
+      const err = errMessage(e, 'Save failed.');
       toast({ title: 'Could not save term', description: err, variant: 'destructive' });
     } finally {
       setSavingPeriod(false);
@@ -539,7 +558,7 @@ export function EngagementTab({
       setConfirmDelete(null);
       await load();
     } catch (e: unknown) {
-      const err = e instanceof Error ? e.message : 'Delete failed.';
+      const err = errMessage(e, 'Delete failed.');
       toast({ title: 'Could not delete', description: err, variant: 'destructive' });
     }
   }
