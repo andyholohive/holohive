@@ -681,7 +681,14 @@ export default function OutreachPage() {
         <Tabs value={view} onValueChange={v => setView(v as ViewKey)}>
           <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
             {VIEWS.map(v => {
-              const n = visible
+              // [2026-09-07, Yano] Count off `rateRows`, not `visible`.
+              // `visible` is only legacy-filtered, so the tab numbers ignored
+              // owner / message type / search while the table below applied
+              // all three — filter to one owner and the rows changed but every
+              // count stayed at the whole board's total. It also made a new
+              // prospect look like it hadn't registered: filter to yourself,
+              // add a lead, and the numbers don't move.
+              const n = rateRows
                 .filter(p => (v.key === 'parked' ? true : p.parked_at === null))
                 .filter(p => v.match(p, statusCatalogue)).length;
               return (
