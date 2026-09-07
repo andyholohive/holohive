@@ -59,6 +59,47 @@ export function buildReviewCard(input: ReviewCardInput): string {
   ].filter(Boolean).join('\n');
 }
 
+export interface ListingAlertCardInput {
+  clientName: string;
+  ticker: string;
+  listedOn: string;
+  venues: string[];
+  html: string;
+  /** getChat probe of the CLIENT's own group — the only destination here. */
+  preflight: { ok: boolean; title?: string | null; error?: string | null };
+}
+
+/**
+ * The Stage-1 client listing alert, held for approval.
+ *
+ * Says plainly which client's group it would land in, because unlike the
+ * digest this goes to exactly one place and getting that wrong means telling
+ * the wrong client their token listed.
+ */
+export function buildListingAlertCard(input: ListingAlertCardInput): string {
+  const { clientName, ticker, listedOn, venues, html, preflight } = input;
+  const body = html.length > MAX_REPORT_CHARS
+    ? `${html.slice(0, MAX_REPORT_CHARS)}\n… (truncated)`
+    : html;
+
+  const where = venues.length ? venues.join(' + ') : 'unknown venue';
+  const destination = preflight.ok
+    ? `✅ Goes to <b>${escapeHtml(clientName)}</b>${preflight.title ? ` — ${escapeHtml(String(preflight.title))}` : ''}`
+    : `🚫 <b>${escapeHtml(clientName)}'s chat unreachable</b> — ${escapeHtml(preflight.error || 'no chat resolved')}\n<i>Approving will fail until this is fixed in Korea Signal settings.</i>`;
+
+  const header = `🚨 <b>Review — ${escapeHtml(ticker)} listing alert</b>\n${escapeHtml(ticker)} on ${escapeHtml(where)} · ${escapeHtml(listedOn)}. It will not send until approved.\n${destination}`;
+
+  return `${header}\n\n———\n\n${body}`;
+}
+
+/** `kra:` — client listing alert. Mirrors the digest's two-button shape. */
+export function listingAlertButtons(rowId: string): InlineButton[][] {
+  return [[
+    { text: '✅ Approve & send', callback_data: `kra:approve:${rowId}` },
+    { text: '⏭ Skip', callback_data: `kra:skip:${rowId}` },
+  ]];
+}
+
 /** Buttons carry the row id, so a decision can never be applied to the wrong
  *  week — callback_data is capped at 64 bytes and `krw:approve:<uuid>` is 48. */
 export function reviewButtons(rowId: string): InlineButton[][] {

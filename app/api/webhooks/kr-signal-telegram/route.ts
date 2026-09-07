@@ -7,6 +7,7 @@ import { buildBackdrop } from '@/lib/krSignal/weeklyReport';
 import { getWeeklyReviewById } from '@/lib/krSignal/store';
 import { approveAndSend, skipReport } from '@/lib/krSignal/reviewActions';
 import { approveAndSendDigest, skipDigest } from '@/lib/krSignal/listingDigestReview';
+import { approveAndSendAlert, skipAlert } from '@/lib/krSignal/listingAlertReview';
 import {
   fetchRecentKrwListings, fetchRecentNonKrwListings, buildListingsDigest,
   getTokenKrPriceKrw, type DigestEntry,
@@ -69,11 +70,15 @@ export async function POST(request: Request) {
     // command gate below, which exists because those commands are reachable
     // from CLIENT chats — here the surface itself is the permission.
     if (update?.callback_query) {
-      // `krd:` = listings digest, `krw:` = weekly report. Same review chat and
+      // `krd:` = listings digest, `kra:` = client listing alert, `krw:` =
+      // weekly report. Same review chat and
       // the same permission model; separate handlers because the two decide
       // over different rows.
-      if (String(update.callback_query?.data ?? '').startsWith('krd:')) {
+      const cbData = String(update.callback_query?.data ?? '');
+      if (cbData.startsWith('krd:')) {
         await handleDigestCallback(update.callback_query);
+      } else if (cbData.startsWith('kra:')) {
+        await handleAlertCallback(update.callback_query);
       } else {
         await handleReviewCallback(update.callback_query);
       }
@@ -350,6 +355,72 @@ async function handleDigestCallback(cb: any): Promise<void> {
     }
     if (action === 'skip') {
       const res = await skipDigest(supabase, rowId, actor);
+      await answerCallbackQuery(cbId,
+        res.ok ? 'Skipped — nothing sent.'
+          : res.alreadyDecided ? `Already ${res.alreadyDecided}.` : (res.error ?? 'Could not skip.'),
+        !res.ok);
+      return;
+    }
+    await answerCallbackQuery(cbId, 'Unknown action.', true);
+  } catch (e: any) {
+    await answerCallbackQuery(cbId, `Failed: ${(e && e.message) || String(e)}`, true);
+  }
+}
+
+/**
+ * Handle a tap on a Stage-1 client listing alert card (`kra:<action>:<rowId>`).
+ *
+ * Same review-chat-only gate as the other two. Separate handler because an
+ * alert targets exactly one client, so the acknowledgement names them — and
+ * because approving starts the +24h recap clock.
+ */
+async function handleAlertCallback(cb: any): Promise<void> {
+  const cbId: string = cb?.id;
+  const data: string | undefined = cb?.data;
+  const chatId = cb?.message?.chat?.id;
+  if (!cbId || !data?.startsWith('kra:')) return;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    await answerCallbackQuery(cbId, 'Server not configured.', true);
+    return;
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
+  if (!reviewChatId || String(chatId) !== String(reviewChatId)) {
+    await answerCallbackQuery(cbId, 'These buttons only work in the review chat.', true);
+    return;
+  }
+
+  const [, action, rowId] = data.split(':');
+  if (!rowId) {
+    await answerCallbackQuery(cbId, 'Malformed button.', true);
+    return;
+  }
+
+  const from = cb?.from ?? {};
+  const actorName: string =
+    [from.first_name, from.last_name].filter(Boolean).join(' ') ||
+    from.username ||
+    (from.id ? `TG ${from.id}` : 'Unknown');
+  const { data: teamUser } = from.id
+    ? await supabase.from('users').select('id').eq('telegram_id', String(from.id)).maybeSingle()
+    : { data: null };
+  const actor = { name: actorName, userId: (teamUser as any)?.id ?? null };
+
+  try {
+    if (action === 'approve') {
+      const res = await approveAndSendAlert(supabase, rowId, actor);
+      await answerCallbackQuery(cbId,
+        res.ok ? `Sent to ${res.clientName}.`
+          : res.alreadyDecided ? `Already ${res.alreadyDecided}.` : (res.error ?? 'Could not send.'),
+        !res.ok);
+      return;
+    }
+    if (action === 'skip') {
+      const res = await skipAlert(supabase, rowId, actor);
       await answerCallbackQuery(cbId,
         res.ok ? 'Skipped — nothing sent.'
           : res.alreadyDecided ? `Already ${res.alreadyDecided}.` : (res.error ?? 'Could not skip.'),

@@ -14,10 +14,11 @@ import {
   type DigestEntry,
 } from '@/lib/krSignal/listings';
 import { getUsdKrw, getTrailing7dAvgVolumeUsd, getCoinPriceAndMcapUsd, searchCoingeckoIdBySymbol, getPerVenueVolume } from '@/lib/krSignal/adapters';
-import { sendMessage, editMessageText, sendMessageWithButtons, probeChat } from '@/lib/krSignal/telegram';
+import { editMessageText, sendMessageWithButtons, probeChat } from '@/lib/krSignal/telegram';
 import { getAppSetting } from '@/lib/appSettings';
 import { saveDigestForReview, attachDigestCard } from '@/lib/krSignal/listingDigestReview';
-import { buildListingDigestCard, listingDigestButtons } from '@/lib/krSignal/reviewCard';
+import { saveAlertForReview, attachAlertCard } from '@/lib/krSignal/listingAlertReview';
+import { buildListingDigestCard, listingDigestButtons, buildListingAlertCard, listingAlertButtons } from '@/lib/krSignal/reviewCard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
     }).eq('id', runId);
   };
 
-  const summary: any = { recorded: 0, alerts: 0, edits: 0, digests: 0 };
+  const summary: any = { recorded: 0, alertsQueued: 0, edits: 0, digests: 0 };
   try {
     const now = new Date();
 
@@ -123,27 +124,53 @@ export async function GET(request: Request) {
       }
     }
 
+    // Where review cards go. Resolved once — both the alert gate below and
+    // the Saturday digest post here.
+    const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
+    const reviewThreadId = await getAppSetting(supabase, 'kr_signal_review_thread_id');
+
     // 2. Client alert (§7.C) — a client's own token just listed.
     const alertClients = clients.filter((c) => c.features?.client_listing_alert && c.resolved_chat_id);
     for (const l of detected) {
       for (const c of alertClients) {
         if (c.ticker.toUpperCase() !== l.symbol) continue;
-        const { data: existing } = await supabase
-          .from('kr_signal_alert_messages')
-          .select('id')
-          .eq('client_id', c.id).eq('ticker', c.ticker).eq('listed_on_key', l.listedOn)
-          .maybeSingle();
-        if (existing) continue;
         try {
           // §7.C — price + mkt cap lines (client tokens have a curated coingecko_id).
           const pm = c.coingecko_id
             ? await getCoinPriceAndMcapUsd(c.coingecko_id)
             : { priceUsd: null, mcapUsd: null };
-          const m = await sendMessage(c.resolved_chat_id!, buildStage1Alert(c.ticker, l, pm), c.resolved_thread_id);
-          await supabase.from('kr_signal_alert_messages').insert({
-            client_id: c.id, ticker: c.ticker, chat_id: String(c.resolved_chat_id), message_id: m.message_id,
-            stage: 1, listed_on_key: l.listedOn, edit_due_at: new Date(now.getTime() + 24 * 3600 * 1000).toISOString(),
+
+          // [2026-09-04] Held for approval instead of sent. This used to post
+          // straight into the client's group the moment the listing was
+          // detected — the only KR Signal message with no human in the loop.
+          // The card goes to the review chat; nothing reaches the client until
+          // someone taps Approve, and the +24h recap clock starts from that
+          // send, not from detection.
+          const alertHtml = buildStage1Alert(c.ticker, l, pm);
+          const preflight = await probeChat(c.resolved_chat_id!);
+          const pending = await saveAlertForReview(supabase, {
+            clientId: c.id, ticker: c.ticker, listedOn: l.listedOn,
+            alertHtml, preflight,
           });
+          if (!pending) continue; // already decided for this listing
+
+          // Card only when there isn't one — a re-run refreshes the copy on a
+          // still-pending alert without posting a second card for it.
+          if (reviewChatId && !pending.review_message_id) {
+            const card = await sendMessageWithButtons(
+              reviewChatId,
+              buildListingAlertCard({
+                clientName: c.name, ticker: c.ticker, listedOn: l.listedOn,
+                venues: l.venues, html: alertHtml, preflight,
+              }),
+              listingAlertButtons(pending.id),
+              reviewThreadId,
+            );
+            await attachAlertCard(supabase, pending.id, String(reviewChatId), card.message_id);
+          } else {
+            summary.alertWarning =
+              'kr_signal_review_chat_id is not set — the alert is queued but nobody will be asked to approve it.';
+          }
           // §6.7 — the curated client coingecko_id beats the symbol-search guess:
           // re-freeze the baseline with it and pin the id on the listing row.
           if (c.coingecko_id) {
@@ -152,7 +179,7 @@ export async function GET(request: Request) {
               .update({ coingecko_id: c.coingecko_id, ...(base > 0 ? { baseline_7d: base } : {}) })
               .eq('ticker', l.symbol).eq('listed_on', l.listedOn);
           }
-          summary.alerts++;
+          summary.alertsQueued = (summary.alertsQueued ?? 0) + 1;
         } catch (e) { /* keep sweeping */ }
       }
     }
@@ -161,7 +188,11 @@ export async function GET(request: Request) {
     const { data: dueAlerts } = await supabase
       .from('kr_signal_alert_messages')
       .select('id, ticker, chat_id, message_id, listed_on_key')
-      .eq('stage', 1).is('edited_at', null).lte('edit_due_at', now.toISOString());
+      // status='sent' — an alert still awaiting approval, or skipped, has no
+      // delivered message to edit.
+      .eq('stage', 1).eq('status', 'sent').is('edited_at', null)
+      .not('message_id', 'is', null)
+      .lte('edit_due_at', now.toISOString());
     if (dueAlerts && dueAlerts.length > 0) {
       const fx = await getUsdKrw().catch(() => 0);
       for (const a of dueAlerts as any[]) {
@@ -272,8 +303,6 @@ export async function GET(request: Request) {
         summary.digestQueued = 'already decided this week';
       } else {
         summary.digestQueued = true;
-        const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
-        const reviewThreadId = await getAppSetting(supabase, 'kr_signal_review_thread_id');
         if (reviewChatId && !row.review_message_id) {
           const card = buildListingDigestCard({
             weekLabel: weekLabelFor(now),
