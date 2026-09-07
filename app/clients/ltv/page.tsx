@@ -30,6 +30,7 @@ import {
   ClientLtvService, type ClientLtvRow, type TermRow,
 } from '@/lib/clientLtvService';
 
+const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—');
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 export default function ClientLtvPage() {
@@ -90,6 +91,8 @@ export default function ClientLtvPage() {
   const totals = useMemo(() => {
     const r = rows ?? [];
     return {
+      invoiced: r.reduce((s, x) => s + x.invoiced_total, 0),
+      toCreators: r.reduce((s, x) => s + x.creator_payouts, 0),
       revenue: r.reduce((s, x) => s + x.net_revenue, 0),
       budget: r.reduce((s, x) => s + x.budget_managed, 0),
       unspent: r.reduce((s, x) => s + x.budget_unspent, 0),
@@ -101,15 +104,15 @@ export default function ClientLtvPage() {
 
   const header = (
     <>
-      <Link href="/clients" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
-        <ArrowLeft className="h-3 w-3 mr-1" />Back to Clients
+      <Link href="/crm/pipeline" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+        <ArrowLeft className="h-3 w-3 mr-1" />Back to Pipeline
       </Link>
       <PageHeader
         icon={DollarSign}
-        kicker="Clients · Lifetime Value"
+        kicker="Sales · Lifetime Value"
         kickerDot="brand"
         title="Lifetime Value"
-        subtitle="What each relationship earned — fees, not the budgets we ran"
+        subtitle="What we invoiced each client, and where it went"
       />
     </>
   );
@@ -130,23 +133,30 @@ export default function ClientLtvPage() {
     <div className="space-y-6">
       {header}
 
-      {/* Revenue leads. Budget managed sits beside it and is never added to it. */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* [2026-09-07, Yano] Invoiced leads — it is the number he works from.
+          Creator payouts sit immediately beside it because the second question
+          is always "and how much of that went out". Our fee stays on the strip
+          so the gross number is never mistaken for earnings. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard
-          icon={TrendingUp} label="Net Revenue" value={money(totals.revenue)}
-          sub={totals.missing > 0 ? `${totals.missing} term(s) have no fee recorded` : 'fees, less commission'}
-          accent={totals.missing > 0 ? 'amber' : 'brand'}
+          icon={DollarSign} label="Revenue Invoiced" value={money(totals.invoiced)}
+          sub="budget + fee billed to clients" accent="brand"
         />
         <KpiCard
-          icon={Wallet} label="Budget Managed" value={money(totals.budget)}
-          sub="client money, not income" accent="sky"
+          icon={Users} label="To Creators" value={money(totals.toCreators)}
+          sub={`${pct(totals.toCreators, totals.invoiced)} of invoiced`} accent="sky"
+        />
+        <KpiCard
+          icon={TrendingUp} label="Our Fee (net)" value={totals.missing > 0 && totals.revenue === 0 ? 'not recorded' : money(totals.revenue)}
+          sub={totals.missing > 0 ? `${totals.missing} term(s) have no fee` : 'fees, less commission'}
+          accent={totals.missing > 0 ? 'amber' : 'emerald'}
         />
         <KpiCard
           icon={AlertTriangle} label="Unspent Budget" value={money(totals.unspent)}
           sub="refundable to clients" accent={totals.unspent > 0 ? 'amber' : 'gray'}
         />
         <KpiCard
-          icon={Users} label="Clients" value={totals.clients}
+          icon={Wallet} label="Clients" value={totals.clients}
           sub={`${totals.renewed} renewed at least once`} accent="gray"
         />
       </div>
@@ -172,7 +182,7 @@ export default function ClientLtvPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-cream-50 border-b border-cream-200">
-                  {['Client', 'Terms', 'Months', 'Budget Managed', 'Spent', 'Unspent', 'Revenue', 'Net', ''].map(h => (
+                  {['Client', 'Terms', 'Months', 'Invoiced', 'To Creators', 'Unspent', 'Our Fee', 'Net', ''].map(h => (
                     <th key={h} className="text-left py-2.5 px-4 font-semibold text-ink-warm-500 text-[10px] uppercase tracking-[0.18em] border-r border-cream-200 last:border-r-0 whitespace-nowrap">
                       {h}
                     </th>
@@ -180,7 +190,7 @@ export default function ClientLtvPage() {
                 </tr>
               </thead>
               <tbody>
-                {[...rows].sort((a, b) => b.net_revenue - a.net_revenue || b.budget_managed - a.budget_managed)
+                {[...rows].sort((a, b) => b.invoiced_total - a.invoiced_total || b.creator_payouts - a.creator_payouts)
                   .map(r => (
                   <>
                     <tr
@@ -199,11 +209,15 @@ export default function ClientLtvPage() {
                       </td>
                       <td className="py-3 px-4 border-r border-cream-200 tabular-nums">{r.terms}</td>
                       <td className="py-3 px-4 border-r border-cream-200 tabular-nums">{r.months_engaged}</td>
-                      <td className="py-3 px-4 border-r border-cream-200 tabular-nums">{money(r.budget_managed)}</td>
+                      <td className="py-3 px-4 border-r border-cream-200 tabular-nums font-semibold">
+                        {r.invoiced_total > 0
+                          ? money(r.invoiced_total)
+                          : <span className="text-amber-600 font-normal" title="No term amount recorded">not recorded</span>}
+                      </td>
                       <td className="py-3 px-4 border-r border-cream-200 tabular-nums text-ink-warm-500">
-                        {money(r.spend_settled)}
+                        {money(r.creator_payouts)}
                         {r.spend_committed > 0 && (
-                          <span className="text-[11px] text-amber-600"> +{money(r.spend_committed)} due</span>
+                          <span className="text-[11px] text-amber-600"> ({money(r.spend_committed)} unpaid)</span>
                         )}
                       </td>
                       <td className="py-3 px-4 border-r border-cream-200 tabular-nums">

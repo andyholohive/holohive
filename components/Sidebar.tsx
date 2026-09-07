@@ -303,7 +303,9 @@ export default function Sidebar({ children }: SidebarProps) {
       pinned:      ['/tasks', '/dashboard'],
       clients:     ['/clients', '/campaigns', '/delivery-logs'],
       kols:        ['/kols', '/lists', '/repost-deals'],
-      crm:         ['/crm/sales-pipeline', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics'],
+      // '/clients/ltv' lives here, not under clients — longest-prefix wins
+      // over the bare '/clients', so landing on LTV expands Sales / CRM.
+      crm:         ['/crm/sales-pipeline', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics', '/clients/ltv'],
       resources:   ['/templates', '/sops', '/initiatives', '/team', '/expenses', '/links'],
       measurement: ['/mindshare', '/intelligence/client-watch', '/wallets'],
       logistics:   ['/crm/submissions', '/crm/telegram', '/intelligence/telegram', '/forms'],
@@ -804,10 +806,6 @@ export default function Sidebar({ children }: SidebarProps) {
                       about the clients above it. Admin-gated because it is the
                       only page showing what we bill, as opposed to what the
                       client's budget was. */}
-                  {(roleView === 'admin' || roleView === 'super_admin')
-                    && !guestHide('/clients') && (
-                    <NavItem href="/clients/ltv" icon={DollarSign} label="Lifetime Value" />
-                  )}
                   {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
                   {!guestHide('/campaigns/overview') && <NavItem href="/campaigns/overview" icon={BarChart3} label="Campaign Overview" />}
                   {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
@@ -830,7 +828,7 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Sales / CRM Section — pipeline + relationship
                   surfaces only. Submissions / Meetings / TG Chats
                   moved to Logistics per the 2026-06-19 reorg. */}
-              {!guestHideSection(['/crm/sales-pipeline', '/crm/outreach', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics']) && (
+              {!guestHideSection(['/crm/sales-pipeline', '/crm/outreach', '/crm/pipeline', '/crm/network', '/crm/contacts', '/intelligence', '/analytics', '/clients/ltv']) && (
                 <CollapsibleSection id="crm" icon={DollarSign}>
                   {/* [2026-09-01] The legacy v2 board is no longer a top-level
                       peer of the thing replacing it — two entries called Sales
@@ -853,6 +851,14 @@ export default function Sidebar({ children }: SidebarProps) {
                       <SubNavItem href="/crm/pipeline" icon={Target} label="Board" exact />
                       <SubNavItem href="/crm/sales-pipeline" icon={Archive} label="Legacy Sales" />
                     </div>
+                  )}
+                  {/* [2026-09-07, Yano] "LTV should be a section in Sales since
+                      this is sales related." Moved out of Clients — it answers
+                      what a relationship is worth, which is a sales question,
+                      not an account-management one. */}
+                  {(roleView === 'admin' || roleView === 'super_admin')
+                    && !guestHide('/clients/ltv') && (
+                    <NavItem href="/clients/ltv" icon={DollarSign} label="Lifetime Value" />
                   )}
                   {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
                   {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}

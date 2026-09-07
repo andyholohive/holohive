@@ -9,6 +9,12 @@ import { supabase } from './supabase';
  * not income, and the residual between budget and spend is a debt rather than
  * a margin. Revenue is the fee alone.
  *
+ * [2026-09-07, Yano] The page leads on `invoiced_total` — budget + fee, what
+ * the client was actually billed — with `creator_payouts` underneath it, so
+ * the question "what did we invoice and where did it go" is answerable at a
+ * glance. The fee/pass-through split above is still shown beside it, because
+ * invoiced is a gross number and only the fee is ours to keep.
+ *
  * Reads the `client_ltv` view; writes fees onto the engagement period, which
  * is the row that already carries the commercial term.
  */
@@ -25,6 +31,11 @@ export interface ClientLtvRow {
   spend_settled: number;
   spend_committed: number;
   budget_unspent: number;
+  /** What the client was invoiced: managed budget + our fee on top. Yano's
+   *  headline number. NOT earnings — the budget half is a pass-through. */
+  invoiced_total: number;
+  /** How much of the invoiced total goes out to creators (settled + due). */
+  creator_payouts: number;
   revenue: number;
   affiliate_cost: number;
   attributed_expenses: number;
@@ -63,6 +74,8 @@ export const ClientLtvService = {
       spend_settled: num(r.spend_settled),
       spend_committed: num(r.spend_committed),
       budget_unspent: num(r.budget_unspent),
+      invoiced_total: num(r.invoiced_total),
+      creator_payouts: num(r.creator_payouts),
       revenue: num(r.revenue),
       affiliate_cost: num(r.affiliate_cost),
       attributed_expenses: num(r.attributed_expenses),

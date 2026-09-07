@@ -33,7 +33,15 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
-import { Target, Send, ChevronsLeftRight, Archive } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Target, Send, ChevronsLeftRight, Archive, MoreHorizontal,
+  CheckCircle2, CalendarClock, MessageCircle, UserCog,
+} from 'lucide-react';
 import {
   PipelineV13Service, BOARD_STAGES, STAGE_LABELS, STAGE_WIN_PCT, LOSS_REASONS,
   FIT_SUB_REASONS,
@@ -92,12 +100,13 @@ function ownerInitials(name: string | null): string {
 }
 
 function DealCard({
-  deal, dragging, onSaveValue,
+  deal, dragging, onSaveValue, actions,
 }: {
   deal: PipelineDeal;
   dragging?: boolean;
   /** Absent in the drag overlay, where editing makes no sense. */
   onSaveValue?: (id: string, value: number | null) => Promise<void>;
+  actions?: CardActions;
 }) {
   const idle = daysIdle(deal);
   const stalled = isStalled(deal);
@@ -129,6 +138,50 @@ function DealCard({
           <span className="text-sm font-semibold text-ink-warm-900 leading-snug break-words">
             {deal.name}
           </span>
+          {/* [2026-09-07, Yano] The card used to offer exactly two verbs: edit
+              the value and drag it. Everything else about working a deal —
+              who owns it, when you last spoke, what happens next — needed
+              another surface. These are the four that come up daily. */}
+          {actions && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Actions for ${deal.name}`}
+                  onPointerDown={e => e.stopPropagation()}
+                  className="h-6 w-6 -mr-1 -mt-0.5 rounded flex items-center justify-center text-ink-warm-300 opacity-0 group-hover/card:opacity-100 focus:opacity-100 hover:bg-cream-100 hover:text-ink-warm-700 transition-all flex-shrink-0"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => actions.onLogContact(deal)}>
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-2" />Spoke to them today
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => actions.onNextStep(deal)}>
+                  <CalendarClock className="h-3.5 w-3.5 mr-2" />
+                  {deal.next_action_notes ? 'Edit next step' : 'Set next step…'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => actions.onReassign(deal)}>
+                  <UserCog className="h-3.5 w-3.5 mr-2" />Reassign owner
+                </DropdownMenuItem>
+                {deal.tg_handle && (
+                  <DropdownMenuItem asChild>
+                    <a
+                      href={`https://t.me/${deal.tg_handle.replace(/^@/, '')}`}
+                      target="_blank" rel="noopener noreferrer"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-2" />Open {deal.tg_handle}
+                    </a>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => actions.onArchive(deal)} className="text-rose-600">
+                  <Archive className="h-3.5 w-3.5 mr-2" />Archive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <span
             className={`text-[10px] tabular-nums flex-shrink-0 mt-0.5 ${
               stalled ? 'text-rose-600 font-semibold' : 'text-ink-warm-300'
@@ -180,6 +233,17 @@ function DealCard({
           </button>
         )}
 
+        {/* The next step, shown rather than buried in a menu — it is the one
+            thing that says whether this deal is being worked. */}
+        {deal.next_action_notes && (
+          <div className="flex items-start gap-1.5 rounded bg-cream-50 border border-cream-200 px-2 py-1">
+            <CalendarClock className="h-3 w-3 text-brand mt-0.5 flex-shrink-0" />
+            <span className="text-[11px] text-ink-warm-700 leading-snug break-words">
+              {deal.next_action_notes}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center gap-1.5 flex-wrap">
           {deal.source && (
             <StatusBadge tone={SOURCE_TONES[deal.source] ?? 'neutral'} size="sm">
@@ -211,11 +275,19 @@ function DealCard({
   );
 }
 
+export interface CardActions {
+  onLogContact: (d: PipelineDeal) => void;
+  onNextStep: (d: PipelineDeal) => void;
+  onReassign: (d: PipelineDeal) => void;
+  onArchive: (d: PipelineDeal) => void;
+}
+
 function DraggableCard({
-  deal, onSaveValue,
+  deal, onSaveValue, actions,
 }: {
   deal: PipelineDeal;
   onSaveValue: (id: string, value: number | null) => Promise<void>;
+  actions?: CardActions;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id });
   return (
@@ -229,19 +301,20 @@ function DraggableCard({
          work at all on a trackpad-less touch screen. */
       className={`cursor-grab active:cursor-grabbing select-none touch-none ${isDragging ? 'opacity-40' : ''}`}
     >
-      <DealCard deal={deal} onSaveValue={onSaveValue} />
+      <DealCard deal={deal} onSaveValue={onSaveValue} actions={actions} />
     </div>
   );
 }
 
 function Column({
-  stage, deals, collapsed, onToggle, onSaveValue,
+  stage, deals, collapsed, onToggle, onSaveValue, actions,
 }: {
   stage: PipelineStage;
   deals: PipelineDeal[];
   collapsed: boolean;
   onToggle: () => void;
   onSaveValue: (id: string, value: number | null) => Promise<void>;
+  actions?: CardActions;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const value = deals.reduce((s, d) => s + (d.deal_value ?? 0), 0);
@@ -296,7 +369,7 @@ function Column({
         </div>
       </button>
       <div className="p-2 space-y-2 flex-1">
-        {deals.map(d => <DraggableCard key={d.id} deal={d} onSaveValue={onSaveValue} />)}
+        {deals.map(d => <DraggableCard key={d.id} deal={d} onSaveValue={onSaveValue} actions={actions} />)}
       </div>
     </div>
   );
@@ -401,6 +474,49 @@ export default function PipelineBoard() {
   }, [visible]);
 
   const dragged = dragId ? (deals ?? []).find(d => d.id === dragId) ?? null : null;
+
+  // ── Card actions ───────────────────────────────────────────────────────
+  const [nextStepFor, setNextStepFor] = useState<PipelineDeal | null>(null);
+  const [nextStepNotes, setNextStepNotes] = useState('');
+  const [reassignFor, setReassignFor] = useState<PipelineDeal | null>(null);
+  const [team, setTeam] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try { setTeam(await PipelineV13Service.assignableOwners()); } catch { /* menu degrades to none */ }
+    })();
+  }, []);
+
+  /** Optimistic patch + rollback, shared by every card action. */
+  const patchDeal = useCallback(async (
+    id: string, patch: Partial<PipelineDeal>, run: () => Promise<void>, failMsg: string,
+  ) => {
+    const before = deals ?? [];
+    setDeals(before.map(d => (d.id === id ? { ...d, ...patch } : d)));
+    try {
+      await run();
+    } catch (err: any) {
+      setDeals(before);
+      toast({ title: failMsg, description: err?.message, variant: 'destructive' });
+    }
+  }, [deals, toast]);
+
+  const cardActions: CardActions = useMemo(() => ({
+    onLogContact: (d) => {
+      const now = new Date().toISOString();
+      void patchDeal(d.id, { last_contacted_at: now, updated_at: now },
+        () => PipelineV13Service.logContact(d.id), 'Could not log the contact');
+      toast({ title: `Marked ${d.name} contacted today`, duration: 1500 });
+    },
+    onNextStep: (d) => { setNextStepFor(d); setNextStepNotes(d.next_action_notes ?? ''); },
+    onReassign: (d) => setReassignFor(d),
+    onArchive: (d) => {
+      void patchDeal(d.id, { archived_at: new Date().toISOString() },
+        () => PipelineV13Service.setArchived(d.id, true), 'Could not archive');
+      setArchivedCount(c => c + 1);
+      toast({ title: `${d.name} archived`, description: 'Find it under Show archived.' });
+    },
+  }), [patchDeal, toast]);
 
   const saveValue = useCallback(async (id: string, value: number | null) => {
     const before = deals ?? [];
@@ -564,6 +680,7 @@ export default function PipelineBoard() {
               deals={byStage.get(s) ?? []}
               collapsed={collapsed.has(s)}
               onSaveValue={saveValue}
+              actions={cardActions}
               onToggle={() => setCollapsed(prev => {
                 const next = new Set(prev);
                 if (next.has(s)) next.delete(s); else next.add(s);
@@ -581,6 +698,84 @@ export default function PipelineBoard() {
         <DragOverlay>{dragged ? <DealCard deal={dragged} dragging /> : null}</DragOverlay>
       </DndContext>
       </div>
+
+      <Dialog open={nextStepFor !== null} onOpenChange={o => { if (!o) setNextStepFor(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Next step for {nextStepFor?.name}</DialogTitle>
+            <DialogDescription>
+              What happens next, in your own words. It shows on the card so the
+              board says what is being worked, not just where it sits.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={nextStepNotes}
+            onChange={e => setNextStepNotes(e.target.value)}
+            placeholder="e.g. Send the Korea deck, follow up Thursday"
+            className="focus-brand min-h-[90px]"
+          />
+          <DialogFooter>
+            {nextStepFor?.next_action_notes && (
+              <Button
+                variant="outline"
+                className="mr-auto border-rose-300 text-rose-600 hover:bg-rose-50"
+                onClick={() => {
+                  const d = nextStepFor!;
+                  setNextStepFor(null);
+                  void patchDeal(d.id, { next_action_notes: null, next_action_at: null },
+                    () => PipelineV13Service.setNextAction(d.id, null, null), 'Could not clear');
+                }}
+              >
+                Clear
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setNextStepFor(null)}>Cancel</Button>
+            <Button
+              variant="brand"
+              disabled={!nextStepNotes.trim()}
+              onClick={() => {
+                const d = nextStepFor!;
+                const notes = nextStepNotes.trim();
+                setNextStepFor(null);
+                void patchDeal(d.id, { next_action_notes: notes },
+                  () => PipelineV13Service.setNextAction(d.id, notes, d.next_action_at),
+                  'Could not save the next step');
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reassignFor !== null} onOpenChange={o => { if (!o) setReassignFor(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reassign {reassignFor?.name}</DialogTitle>
+            <DialogDescription>Currently {reassignFor?.owner_name ?? 'unassigned'}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 max-h-72 overflow-y-auto">
+            {team.length === 0 && (
+              <p className="text-xs text-ink-warm-400 py-2">No assignable team members found.</p>
+            )}
+            {team.map(m => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  const d = reassignFor!;
+                  setReassignFor(null);
+                  void patchDeal(d.id, { owner_id: m.id, owner_name: m.name },
+                    () => PipelineV13Service.setOwner(d.id, m.id), 'Could not reassign');
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-cream-100 transition-colors"
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={lossFor !== null} onOpenChange={o => { if (!o) setLossFor(null); }}>
         <DialogContent className="sm:max-w-md">

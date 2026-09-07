@@ -222,6 +222,51 @@ export const PipelineV13Service = {
     if (error) throw new Error(`Could not update the value: ${error.message}`);
   },
 
+  /** Team members a deal can be assigned to. */
+  async assignableOwners(): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await (supabase as any)
+      .from('users')
+      .select('id, name, email, is_active')
+      .eq('is_active', true)
+      .order('name');
+    if (error) throw new Error(`Could not load the team: ${error.message}`);
+    return ((data ?? []) as any[]).map(u => ({ id: u.id, name: u.name || u.email || 'Unnamed' }));
+  },
+
+  /**
+   * The next step and when it is due.
+   *
+   * [2026-09-07, Yano] "Doesn't let me do much besides change price and drag."
+   * A board that only records stage tells you where a deal is and nothing
+   * about what happens next, which is the thing a rep actually holds in their
+   * head. Writing it down is also what makes the idle counter meaningful.
+   */
+  async setNextAction(
+    id: string, notes: string | null, at: string | null,
+  ): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('crm_opportunities')
+      .update({
+        next_action_notes: notes,
+        next_action_at: at,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) throw new Error(`Could not save the next step: ${error.message}`);
+  },
+
+  /** Stamp "I spoke to them today". Resets the idle/stalled counter, which
+   *  otherwise only moves when some other field is edited — so a deal being
+   *  actively worked could still show as stalled. */
+  async logContact(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await (supabase as any)
+      .from('crm_opportunities')
+      .update({ last_contacted_at: now, updated_at: now })
+      .eq('id', id);
+    if (error) throw new Error(`Could not log the contact: ${error.message}`);
+  },
+
   async setOwner(id: string, ownerId: string | null): Promise<void> {
     const { error } = await (supabase as any)
       .from('crm_opportunities')

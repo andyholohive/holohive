@@ -79,7 +79,6 @@ export const NAV_REGISTRY: NavItemDef[] = [
 
   // Clients — Clients + Campaigns + Delivery Logs.
   { href: '/clients', label: 'Clients', icon: Users, section: 'Clients', pageKey: '/clients' },
-  { href: '/clients/ltv', label: 'Lifetime Value', icon: DollarSign, section: 'Clients', pageKey: '/clients/ltv', requiredRole: 'admin' },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone, section: 'Clients', pageKey: '/campaigns' },
   { href: '/campaigns/overview', label: 'Campaign Overview', icon: BarChart3, section: 'Clients', pageKey: '/campaigns/overview' },
   { href: '/delivery-logs', label: 'Delivery Logs', icon: ClipboardList, section: 'Clients', pageKey: '/delivery-logs' },
@@ -96,6 +95,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/crm/sales-pipeline', label: 'Legacy Sales', icon: Archive, section: 'Sales / CRM', pageKey: '/crm/sales-pipeline' },
   { href: '/crm/outreach', label: 'Outreach', icon: Send, section: 'Sales / CRM', pageKey: '/crm/outreach' },
   { href: '/crm/pipeline', label: 'Pipeline', icon: Target, section: 'Sales / CRM', pageKey: '/crm/pipeline' },
+  { href: '/clients/ltv', label: 'Lifetime Value', icon: DollarSign, section: 'Sales / CRM', pageKey: '/clients/ltv', requiredRole: 'admin' },
   { href: '/crm/network', label: 'Network', icon: Handshake, section: 'Sales / CRM', pageKey: '/crm/network' },
   { href: '/crm/contacts', label: 'Contacts', icon: UserPlus, section: 'Sales / CRM', pageKey: '/crm/contacts' },
   { href: '/intelligence', label: 'Intelligence', icon: Radar, section: 'Sales / CRM', pageKey: '/intelligence' },
