@@ -147,10 +147,39 @@ export async function createApprovedContentsRow(
     // [2026-07-29] Cascade moved into lib/kolRate.ts. It now reads post_price
     // (what the UI actually writes — 189 KOLs have it with standard_rate NULL)
     // and stops treating a stored agreed_rate of 0 as a negotiated rate.
+    // [2026-09-08, Quazo/Jdot] The last amount this KOL was actually paid,
+    // used as the final fallback before 0.
+    //
+    // Loopy and Potato have been paid $150 several times but have no
+    // post_price stored, so this path resolved them to $0 while the manual
+    // add-content flow resolved the same KOL to $150 — it passes this
+    // fallback and this one did not. Worse, the Pricing column on /kols shows
+    // the last-paid amount as its primary value, so both read "$150" on
+    // screen while the bot booked $0. Same KOL, same week, two answers,
+    // depending only on which door the content came through.
+    //
+    // Best-effort: if the lookup fails we fall through to 0 exactly as before.
+    let lastPaid: number | null = null;
+    try {
+      const { data: prior } = await (admin as any)
+        .from('payments')
+        .select('amount, payment_date, campaign_kol:campaign_kols!inner(master_kol_id)')
+        .eq('campaign_kol.master_kol_id', input.kolId)
+        .not('payment_date', 'is', null)
+        .gt('amount', 0)
+        .order('payment_date', { ascending: false })
+        .limit(1);
+      const top = (prior ?? [])[0];
+      if (top?.amount != null) lastPaid = Number(top.amount);
+    } catch {
+      /* no history is not an error — the cascade just ends at 0 */
+    }
+
     const amount = resolvePaymentAmount({
       contentType: contentsType,
       agreedRate: (campaignKol as any).agreed_rate,
       kol: (campaignKol as any).master_kol,
+      fallback: lastPaid,
     });
 
     const { error: paymentErr } = await (admin as any)
