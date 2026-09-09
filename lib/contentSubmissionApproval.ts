@@ -134,7 +134,16 @@ export async function createApprovedContentsRow(
     void markLineupSlotPosted(admin, {
       campaignId: input.campaignId,
       masterKolId: input.kolId,
-      dateIso: nowIso.slice(0, 10),
+      // [2026-09-09] `activationDate`, not today. This passed the approval
+      // date, so a post made on the Wednesday but approved the following
+      // Tuesday was looked up against the wrong week — markLineupSlotPosted
+      // finds the lineup containing the date it is given, decides the date
+      // falls outside that week, and returns without flipping anything. The
+      // slot then sat pending until the close job called it a miss. Umia Wk 7
+      // is the case: four KOLs posted inside the week, all four read as
+      // no-shows. The Content Dashboard caller always passed activation_date;
+      // only this path drifted.
+      dateIso: activationDate,
     });
   }
 

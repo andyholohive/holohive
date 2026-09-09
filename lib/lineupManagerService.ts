@@ -730,14 +730,60 @@ export class LineupManagerService {
         // pending ones to missed and (b) name the no-shows in the post.
         const { data: slots } = await (this.supabase as any)
           .from('lineup_slots')
-          .select('id, status, kol:master_kols(name)')
+          .select('id, status, kol_id, kol:master_kols(name)')
           .in('angle_id', angleIds);
         const slotRows = ((slots as any[]) ?? []);
         total = slotRows.length;
-        posted = slotRows.filter(s => s.status === 'posted').length;
-        const pendingIds = slotRows.filter(s => s.status === 'pending').map(s => s.id);
+
+        // [2026-09-09] Check contents before calling anyone a no-show.
+        //
+        // This used to trust lineup_slots.status alone, which is only correct
+        // if the slot got flipped when the post was logged. Two orderings
+        // break that and neither is unusual: content logged before the lineup
+        // exists (the slot isn't there to flip), and content logged through a
+        // path that looked the post up against the wrong week. Umia Wk 7
+        // closed as 0/4 with EWL, Manbull, Degen Guy and Mincho named as
+        // misses in the ops chat while nine posts for that exact week sat in
+        // `contents`.
+        //
+        // Reading the source of truth at close time makes the outcome
+        // independent of what happened in what order. A slot is only a miss
+        // if the KOL genuinely has nothing inside the week.
+        const weekEndDate = new Date(lineup.week_of + 'T00:00:00Z');
+        weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+        const weekEndIso = weekEndDate.toISOString().slice(0, 10);
+
+        const postedKolIds = new Set<string>();
+        if (lineup.campaign?.id) {
+          const { data: postedRows } = await (this.supabase as any)
+            .from('contents')
+            .select('campaign_kol:campaign_kols!inner(master_kol_id)')
+            .eq('campaign_id', lineup.campaign.id)
+            .gte('activation_date', lineup.week_of)
+            .lte('activation_date', weekEndIso);
+          for (const r of ((postedRows as any[]) ?? [])) {
+            const id = r?.campaign_kol?.master_kol_id;
+            if (id) postedKolIds.add(id);
+          }
+        }
+
+        const reconcileIds = slotRows
+          .filter(s => s.status !== 'posted' && s.kol_id && postedKolIds.has(s.kol_id))
+          .map(s => s.id);
+        const pendingIds = slotRows
+          .filter(s => s.status === 'pending' && !(s.kol_id && postedKolIds.has(s.kol_id)))
+          .map(s => s.id);
         for (const s of slotRows) {
-          if (s.status === 'pending') missedNames.push(s.kol?.name || 'Unknown');
+          if (s.status === 'pending' && !(s.kol_id && postedKolIds.has(s.kol_id))) {
+            missedNames.push(s.kol?.name || 'Unknown');
+          }
+        }
+
+        if (reconcileIds.length > 0) {
+          await (this.supabase as any)
+            .from('lineup_slots')
+            .update({ status: 'posted' })
+            .in('id', reconcileIds);
         }
         if (pendingIds.length > 0) {
           await (this.supabase as any)
@@ -745,6 +791,12 @@ export class LineupManagerService {
             .update({ status: 'missed' })
             .in('id', pendingIds);
         }
+
+        // Counted after reconciling so the number the ops chat reports is the
+        // number the board will show.
+        posted = slotRows.filter(
+          s => s.status === 'posted' || (s.kol_id && postedKolIds.has(s.kol_id)),
+        ).length;
       }
 
       closeOuts.push({
