@@ -3,6 +3,8 @@
  * Sends notifications to Telegram chat rooms
  */
 
+import { escapeHtml } from '@/lib/telegramHtml';
+
 interface TelegramMessage {
   chat_id: string;
   text: string;
@@ -151,6 +153,13 @@ export class TelegramService {
   static async sendFormSubmissionNotification(
     formName: string,
     formId: string,
+    /**
+     * The client this submission belongs to, when the form was opened from a
+     * client's own link. [2026-09-11, Andy] Without it every onboarding
+     * submission produced an identical alert, since the onboarding form is the
+     * one form every client fills.
+     */
+    clientName?: string | null,
     submittedBy?: { name?: string; email?: string },
     responseData?: Record<string, any>
   ): Promise<boolean> {
@@ -163,7 +172,9 @@ export class TelegramService {
 
     const formUrl = `${baseUrl}/forms/${formId}`;
 
-    const message = `${formName} Form has been submitted.\n<a href="${formUrl}">View Form</a>`;
+    const message = `${formName} Form has been submitted`
+      + (clientName ? ` for ${escapeHtml(clientName)}` : '')
+      + `.\n<a href="${formUrl}">View Form</a>`;
 
     return this.sendMessage(message);
   }

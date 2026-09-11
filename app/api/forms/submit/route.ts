@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { escapeHtml } from '@/lib/telegramHtml';
 import { authorizePortalEmail } from '@/lib/portalDocAuth';
 import { fireActionBoardRule } from '@/lib/actionBoardService';
 
@@ -185,6 +186,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // [2026-09-11, Andy] Name the client in the notification. The alert read
+    // "Holo Hive Onboarding Form has been submitted." with no way to tell which
+    // client it was for — and the onboarding form is the one every client
+    // fills, so the message was the same every time. `client_id` is
+    // caller-supplied and unverified (see the milestone guard above), so this
+    // is used for the label only and never to grant anything.
+    let clientLabel: string | null = null;
+    if (client_id) {
+      try {
+        const { data: c } = await supabaseAdmin
+          .from('clients')
+          .select('name')
+          .eq('id', client_id)
+          .maybeSingle();
+        clientLabel = (c as { name?: string } | null)?.name ?? null;
+      } catch (nameErr) {
+        // A missing label must never cost us the notification itself.
+        console.error('[Form Submit] Could not resolve client name:', nameErr);
+      }
+    }
+
     console.log('[Form Submit] Sending Telegram notification for form:', {
       formId: form_id,
       formName: form?.name,
@@ -213,7 +235,9 @@ export async function POST(request: NextRequest) {
               : `https://${process.env.NEXT_PUBLIC_BASE_URL}`)
           : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
         const formUrl = `${baseUrl}/forms/${form_id}`;
-        const message = `\u{1F4E9} <b>${form?.name || 'Unknown Form'}</b> has been submitted.\n<a href="${formUrl}">View Form</a>`;
+        const message = `\u{1F4E9} <b>${form?.name || 'Unknown Form'}</b> has been submitted`
+          + (clientLabel ? ` for <b>${escapeHtml(clientLabel)}</b>` : '')
+          + `.\n<a href="${formUrl}">View Form</a>`;
         telegramSuccess = await TelegramService.sendToChat(
           (formRule as any).telegram_chat_id,
           message,
@@ -233,6 +257,7 @@ export async function POST(request: NextRequest) {
         telegramSuccess = await TelegramService.sendFormSubmissionNotification(
           form?.name || 'Unknown Form',
           form_id,
+          clientLabel,
           {
             name: submitted_by_name,
             email: submitted_by_email,
