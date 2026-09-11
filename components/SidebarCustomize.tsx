@@ -18,6 +18,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { isOwner } from '@/lib/portfolioAccess';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +33,7 @@ import {
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
   Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
   DollarSign,
-  Repeat2,
+  Repeat2, Briefcase,
 } from 'lucide-react';
 
 export type NavItemDef = {
@@ -50,6 +51,9 @@ export type NavItemDef = {
   /** Required role tier. 'admin' = admin OR super_admin; 'super_admin'
    *  = super_admin only. Mirrors existing role checks at call sites. */
   requiredRole?: 'admin' | 'super_admin';
+  /** [2026-09-12] Visible to the owner account alone. Needed because
+   *  super_admin covers four people and some surfaces are for one. */
+  ownerOnly?: boolean;
   /** Page-key for the useGuestPermissions canView() check. When present,
    *  guests who don't have view permission for this key get filtered out
    *  in the customize dialog (and from their Bookmarks render). */
@@ -79,6 +83,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
 
   // Clients — Clients + Campaigns + Delivery Logs.
   { href: '/clients', label: 'Clients', icon: Users, section: 'Clients', pageKey: '/clients' },
+  { href: '/portfolio', label: 'Portfolio', icon: Briefcase, section: 'Clients', pageKey: '/portfolio', ownerOnly: true },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone, section: 'Clients', pageKey: '/campaigns' },
   { href: '/campaigns/overview', label: 'Campaign Overview', icon: BarChart3, section: 'Clients', pageKey: '/campaigns/overview' },
   { href: '/delivery-logs', label: 'Delivery Logs', icon: ClipboardList, section: 'Clients', pageKey: '/delivery-logs' },
@@ -150,6 +155,8 @@ export type AvailabilityCtx = {
   /** From useGuestPermissions().hasMemberGrant — per-member extra-access
    *  grants (e.g. /sops). Optional so older callers stay valid. */
   hasMemberGrant?: (pageKey: string) => boolean;
+  /** Signed-in email, for owner-only entries. */
+  email?: string | null;
 };
 
 /**
@@ -163,6 +170,10 @@ export function isItemAvailable(item: NavItemDef, ctx: AvailabilityCtx): boolean
   if (item.notForGuest && ctx.isGuest) return false;
   if (item.requiredRole === 'admin' && !(ctx.role === 'admin' || ctx.role === 'super_admin' || ctx.hasMemberGrant?.(item.href))) return false;
   if (item.requiredRole === 'super_admin' && ctx.role !== 'super_admin') return false;
+  // Owner-only entries are hidden from the sidebar, the customize dialog and
+  // the command palette alike — all three run through this function, which is
+  // why the flag lives on the registry rather than at one call site.
+  if (item.ownerOnly && !isOwner({ email: ctx.email })) return false;
   // pageKey + isGuest: only block if guest user explicitly lacks access.
   // Non-guests aren't subject to canView; they see everything role-allowed.
   if (item.pageKey && ctx.isGuest && !ctx.canView(item.pageKey)) return false;

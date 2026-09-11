@@ -434,9 +434,9 @@ function GlobalCommandPaletteInner() {
   }, [open]);
 
   const pages = React.useMemo(() => {
-    const ctx = { isGuest: guestUser, role: roleView ?? userProfile?.role, canView, hasMemberGrant };
+    const ctx = { isGuest: guestUser, role: roleView ?? userProfile?.role, canView, hasMemberGrant, email: userProfile?.email };
     return NAV_REGISTRY.filter((item) => isItemAvailable(item, ctx));
-  }, [guestUser, roleView, userProfile?.role, canView, hasMemberGrant]);
+  }, [guestUser, roleView, userProfile?.role, userProfile?.email, canView, hasMemberGrant]);
 
   const go = React.useCallback((href: string, recent?: Recent) => {
     setOpen(false);

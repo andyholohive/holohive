@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet, Repeat2, Search } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
+import { canViewPortfolio } from '@/lib/portfolioAccess';
 import GlobalCommandPalette, { openCommandPalette } from '@/components/command/GlobalCommandPalette';
 import { supabase } from '@/lib/supabase';
 import { useChangelog } from '@/contexts/ChangelogContext';
@@ -301,7 +302,7 @@ export default function Sidebar({ children }: SidebarProps) {
     // `id` values + the NavItems rendered inside each section.
     const SECTION_PREFIXES: Record<string, string[]> = {
       pinned:      ['/tasks', '/dashboard'],
-      clients:     ['/clients', '/campaigns', '/delivery-logs'],
+      clients:     ['/clients', '/campaigns', '/delivery-logs', '/portfolio'],
       kols:        ['/kols', '/lists', '/repost-deals'],
       // '/clients/ltv' lives here, not under clients — longest-prefix wins
       // over the bare '/clients', so landing on LTV expands Sales / CRM.
@@ -753,6 +754,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   role: roleView,
                   canView,
                   hasMemberGrant,
+                  email: userProfile?.email,
                 };
                 const visible = bookmarkedHrefs
                   .map(href => NAV_BY_HREF[href])
@@ -799,13 +801,22 @@ export default function Sidebar({ children }: SidebarProps) {
                   Per the 2026-06-19 reorg: Campaigns moved out of the
                   KOLs section, Delivery Logs out of Documents, Team
                   out (now under Resources). */}
-              {!guestHideSection(['/clients', '/campaigns', '/delivery-logs']) && (
+              {!guestHideSection(['/clients', '/campaigns', '/delivery-logs', '/portfolio']) && (
                 <CollapsibleSection id="clients" icon={Users}>
                   {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
                   {/* Sub-entry, not its own section: LTV answers a question
                       about the clients above it. Admin-gated because it is the
                       only page showing what we bill, as opposed to what the
                       client's budget was. */}
+                  {/* [2026-09-11] Every live account in one read — the
+                      cross-client view none of the per-client pages give.
+                      [2026-09-12, Andy] Andy only, not super_admin: that role
+                      covers four people. `canViewPortfolio` is the single
+                      definition the page gate also uses, so the nav item and
+                      the page cannot disagree. */}
+                  {canViewPortfolio(userProfile) && !guestHide('/portfolio') && (
+                    <NavItem href="/portfolio" icon={Briefcase} label="Portfolio" />
+                  )}
                   {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
                   {!guestHide('/campaigns/overview') && <NavItem href="/campaigns/overview" icon={BarChart3} label="Campaign Overview" />}
                   {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
