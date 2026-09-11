@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { TelegramService } from '@/lib/telegramService';
+import { sendOperatorDm } from '@/lib/telegramDm';
 import { escapeHtml } from '@/lib/telegramHtml';
 import { formatDate } from '@/lib/dateFormat';
 
@@ -251,7 +252,10 @@ export async function GET(request: Request) {
       }
     }
 
-    // 7. Also send summary to ops chat
+    // 7. Summary to the operator's DM.
+    // [2026-09-11, Andy] Was the shared terminal chat. A count of overdue and
+    // stale tasks is a prompt for one person to act on, and in the room it
+    // read as noise rather than as anyone's job.
     const totalOverdue = overdueTasks?.length || 0;
     const totalStale = staleTasks.length;
 
@@ -265,9 +269,9 @@ export async function GET(request: Request) {
       ].join('\n');
 
       try {
-        await TelegramService.sendMessage(summary, 'HTML');
+        await sendOperatorDm(summary, 'HTML');
       } catch (err) {
-        console.error('Failed to send ops summary:', err);
+        console.error('Failed to send operator summary:', err);
       }
     }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { TelegramService } from '@/lib/telegramService';
+import { sendOperatorDm } from '@/lib/telegramDm';
 import { escapeHtml } from '@/lib/telegramHtml';
 
 export const dynamic = 'force-dynamic';
@@ -343,7 +343,8 @@ export async function GET(request: Request) {
       : Number.POSITIVE_INFINITY;
     const suppressed = sameAsLast && hoursSinceLast < 12;
 
-    const sent = suppressed ? false : await TelegramService.sendMessage(message, 'HTML');
+    // [2026-09-11, Andy] Operator DM, not the terminal chat — see lib/telegramDm.
+    const sent = suppressed ? false : await sendOperatorDm(message, 'HTML');
 
     // agent_runs log — the watcher watches itself.
     try {
@@ -373,7 +374,7 @@ export async function GET(request: Request) {
     console.error('[cron-health-check] crashed:', err);
     // Try to DM about our own crash — meta-failure
     try {
-      await TelegramService.sendMessage(
+      await sendOperatorDm(
         `🚨 <b>Cron Health Sweep CRASHED</b>\n<code>${escapeHtml(err?.message || 'unknown')}</code>`,
         'HTML',
       );
