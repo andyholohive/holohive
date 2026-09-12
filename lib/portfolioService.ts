@@ -518,9 +518,14 @@ export async function getClientHistory(months = 12): Promise<MonthPoint[]> {
 
     out.push({
       month: start.toISOString().slice(0, 10),
-      // lint-conventions: disable-next-line no-raw-toLocaleDateString — the axis needs "Sep" and the tooltip "September 2026", not mm/dd/yyyy
+      // The chart axis needs "Sep" and its tooltip "September 2026". mm/dd/yyyy
+      // would be wrong for both, so these two are a deliberate exception.
+      // The justification sits above the directive rather than after the rule
+      // id: the linter's matcher expects the id to end the line, and trailing
+      // prose silently voids the disable.
+      // lint-conventions: disable-next-line no-raw-toLocaleDateString
       label: start.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }),
-      // lint-conventions: disable-next-line no-raw-toLocaleDateString — see above
+      // lint-conventions: disable-next-line no-raw-toLocaleDateString
       longLabel: start.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
       retained: chips.length,
       clients: chips,
