@@ -202,6 +202,42 @@ export type CreateProspectData = Pick<OutreachProspect, 'telegram' | 'company'> 
  */
 const db = () => supabase as any;
 
+
+/**
+ * Explain a rejected duplicate in terms of the row that blocked it.
+ *
+ * [2026-09-12] "Already on the board" was true but unhelpful, and it is how
+ * leads appear to vanish. Two-thirds of this table is parked, and parked rows
+ * show only in the Parked view — so a prospect someone else owns and has
+ * parked is invisible everywhere, while still holding the unique key. Re-add
+ * it and the insert is refused against a row you cannot see, which reads
+ * exactly like the lead going missing.
+ *
+ * Best effort by design: if the lookup fails the caller still gets the plain
+ * message, because a worse error is better than no error.
+ */
+async function duplicateMessage(input: CreateProspectData): Promise<string> {
+  const base = `${input.telegram} is already on the board for ${input.company}.`;
+  try {
+    const { data } = await db()
+      .from('outreach_prospects')
+      .select('owner, status, parked_at')
+      .eq('telegram', input.telegram)
+      .eq('company', input.company)
+      .maybeSingle();
+    if (!data) return base;
+
+    const owner = (data.owner || '').trim();
+    const who = owner ? `owned by ${owner}` : 'unassigned';
+    const where = data.parked_at
+      ? ' It is parked, so it only shows under the Parked view.'
+      : '';
+    return `${base} That one is ${who}, status ${data.status}.${where}`;
+  } catch {
+    return base;
+  }
+}
+
 const COLUMNS =
   'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
   'date_outreached, bumps_used, bumps_before_conversion, source, responded_to_step, ' +
@@ -318,9 +354,20 @@ export class OutreachService {
   }
 
   static async create(input: CreateProspectData): Promise<OutreachProspect> {
+    // [2026-09-12] Stamp the author. `created_by` has existed on this table
+    // since it was made and was never written to — all 1,120 rows carry NULL —
+    // so when Sos reported leads missing there was no way to check whether he
+    // had added them. Authorship was only inferrable from `owner`, which is a
+    // free-text field anyone can edit.
+    const { data: auth } = await supabase.auth.getUser();
+
     const { data, error } = await db()
       .from('outreach_prospects')
-      .insert({ ...input, source: input.source ?? 'manual' })
+      .insert({
+        ...input,
+        source: input.source ?? 'manual',
+        created_by: auth?.user?.id ?? null,
+      })
       .select(COLUMNS)
       .single();
     if (error) {
@@ -328,7 +375,7 @@ export class OutreachService {
       // double-add quietly inflating every rate's denominator — say so
       // plainly rather than surfacing a constraint name.
       if (error.code === '23505') {
-        throw new Error(`${input.telegram} is already on the board for ${input.company}.`);
+        throw new Error(await duplicateMessage(input));
       }
       throw new Error(`Failed to add prospect: ${error.message}`);
     }
