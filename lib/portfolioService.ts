@@ -73,6 +73,23 @@ export interface MessageView {
   text: string;
 }
 
+/**
+ * Position against the other live accounts, 1 = highest.
+ *
+ * [2026-09-13, Andy] A number on its own does not say whether it is good. "29
+ * minutes of reading" means nothing until you know it is the most of any
+ * client and the next one manages one minute.
+ */
+export interface RankView {
+  /** How many accounts are being compared. */
+  of: number;
+  clientReadingMinutes: number;
+  portalVisits: number;
+  posts: number;
+  views: number;
+  invoiced: number;
+}
+
 export interface ClientDossier {
   id: string;
   name: string;
@@ -113,9 +130,25 @@ export interface ClientDossier {
   sentiment: Record<string, number>;
   portalExternalVisits: number;
   portalLastVisit: string | null;
+  /**
+   * Document engagement from the CLIENT only.
+   *
+   * [2026-09-13, Andy] These used to count every open, including ours. Across
+   * the whole log that is 394 internal opens and 225 with no viewer recorded
+   * against 332 genuine client reads — so roughly two thirds of what was being
+   * reported as "the client is reading our work" was us reading it, or nobody
+   * identifiable. Umia in particular read as 169 opens and looked engaged; 16
+   * of those were the client. Fogo and Venice read as engaged and are zero.
+   */
   docOpens: number;
   docReaders: number;
   docMinutes: number;
+  /** Our own team's opens, kept visible so the exclusion is auditable. */
+  docInternalOpens: number;
+  /** Opens with no viewer recorded — cannot be credited to anyone. */
+  docUnattributedOpens: number;
+  /** Where this client sits against the others. 1 is highest. */
+  rank: RankView;
 
   topPosts: { kol: string; type: string; views: number; engagements: number; date: string | null }[];
 
@@ -145,7 +178,7 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
     clientsRes, ltvRes, stintsRes, campaignsRes, ckRes, contentsRes,
     lineupsRes, anglesRes, slotsRes, logRes, paymentsRes,
     docsRes, docLogRes, chatsRes, msgsRes, ctxRes, commentsRes, visitsRes, kolNameRes,
-    milestonesRes, linksRes, deliveryRes,
+    milestonesRes, linksRes, deliveryRes, teamRes,
   ] = await Promise.all([
     // [2026-09-11] `is_ad_hoc` is excluded here for the same reason the
     // twelve-month chart excludes it, and the two must agree: without this the
@@ -177,6 +210,10 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
     (supabase as any).from('client_milestones').select('client_id, name, subtitle, status, display_order, is_visible'),
     (supabase as any).from('links').select('client_id, name, url, link_types, access, status, created_at'),
     (supabase as any).from('client_delivery_log').select('client_id, logged_at'),
+    // Our own roster, so "internal" is who we actually are rather than a guess
+    // at a domain — Jeremyin's account is a gmail address, and a domain test
+    // would have counted his reads as a client's.
+    (supabase as any).from('users').select('email'),
   ]);
 
   const clients = (clientsRes.data ?? []) as any[];
@@ -209,12 +246,39 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
     logByLineup.get(l.lineup_id)!.push(l);
   }
 
-  const docAccessBy = new Map<string, { opens: number; readers: Set<string>; ms: number }>();
+  // Anyone on the users table is us. Plus the domain, to catch a teammate who
+  // reads while signed out of HHP but signed in to the portal with work email.
+  const teamEmails = new Set(
+    ((teamRes.data ?? []) as any[])
+      .map(u => String(u.email ?? '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const isInternalViewer = (email: string | null | undefined) => {
+    const e = String(email ?? '').trim().toLowerCase();
+    if (!e) return false;
+    return teamEmails.has(e) || e.endsWith('@holohive.io');
+  };
+
+  type DocAcc = {
+    opens: number; readers: Set<string>; ms: number;
+    internalOpens: number; unattributedOpens: number;
+  };
+  const docAccessBy = new Map<string, DocAcc>();
   for (const a of (docLogRes.data ?? []) as any[]) {
-    const cur = docAccessBy.get(a.document_id) ?? { opens: 0, readers: new Set<string>(), ms: 0 };
-    cur.opens += 1;
-    if (a.viewer_email) cur.readers.add(a.viewer_email);
-    cur.ms += num(a.dwell_ms);
+    const cur = docAccessBy.get(a.document_id)
+      ?? { opens: 0, readers: new Set<string>(), ms: 0, internalOpens: 0, unattributedOpens: 0 };
+
+    if (!a.viewer_email) {
+      // No viewer recorded. It cannot be credited to the client, and calling it
+      // internal would be equally unfounded — counted apart from both.
+      cur.unattributedOpens += 1;
+    } else if (isInternalViewer(a.viewer_email)) {
+      cur.internalOpens += 1;
+    } else {
+      cur.opens += 1;
+      cur.readers.add(a.viewer_email);
+      cur.ms += num(a.dwell_ms);
+    }
     docAccessBy.set(a.document_id, cur);
   }
 
@@ -316,10 +380,11 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
     const docs = ((docsRes.data ?? []) as any[])
       .filter(d => d.client_id === cl.id)
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-    let docOpens = 0, docMs = 0;
+    let docOpens = 0, docMs = 0, docInternal = 0, docUnattributed = 0;
     const allReaders = new Set<string>();
     const docViews: DocView[] = docs.slice(0, 6).map(d => {
-      const acc = docAccessBy.get(d.id) ?? { opens: 0, readers: new Set<string>(), ms: 0 };
+      const acc = docAccessBy.get(d.id)
+        ?? { opens: 0, readers: new Set<string>(), ms: 0, internalOpens: 0, unattributedOpens: 0 };
       return {
         title: d.title, createdAt: d.created_at,
         opens: acc.opens, readers: acc.readers.size,
@@ -330,6 +395,7 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
       const acc = docAccessBy.get(d.id);
       if (!acc) continue;
       docOpens += acc.opens; docMs += acc.ms;
+      docInternal += acc.internalOpens; docUnattributed += acc.unattributedOpens;
       acc.readers.forEach(r => allReaders.add(r));
     }
 
@@ -415,6 +481,9 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
       portalExternalVisits: visits.length,
       portalLastVisit: visits.map(v => v.visited_at).sort().slice(-1)[0] ?? null,
       docOpens, docReaders: allReaders.size, docMinutes: Math.round((docMs / 60000) * 10) / 10,
+      docInternalOpens: docInternal, docUnattributedOpens: docUnattributed,
+      // Filled in once every account is built — a rank needs the whole set.
+      rank: { of: 0, clientReadingMinutes: 0, portalVisits: 0, posts: 0, views: 0, invoiced: 0 },
       topPosts,
       milestones, links, linkCount: allLinks.length,
       deliveryEntries: deliveries.length,
@@ -422,8 +491,44 @@ export async function getPortfolio(): Promise<ClientDossier[]> {
     });
   }
 
+  assignRanks(out);
+
   // Biggest relationship first — it is the one a newcomer should read first.
   return out.sort((a, b) => b.invoiced - a.invoiced);
+}
+
+/**
+ * Rank every account against the others, 1 = highest.
+ *
+ * Ties share a position and the next rank skips accordingly (1, 2, 2, 4), so
+ * two accounts on zero client reading minutes are not silently ordered by
+ * whichever came back from the database first. That matters here: three of
+ * five clients sit at zero on some of these measures.
+ */
+function assignRanks(rows: ClientDossier[]): void {
+  const of = rows.length;
+  const apply = (
+    key: keyof RankView,
+    value: (r: ClientDossier) => number,
+  ) => {
+    const sorted = [...rows].sort((a, b) => value(b) - value(a));
+    let lastValue: number | null = null;
+    let lastRank = 0;
+    sorted.forEach((r, i) => {
+      const v = value(r);
+      const rank = lastValue !== null && v === lastValue ? lastRank : i + 1;
+      lastValue = v;
+      lastRank = rank;
+      (r.rank as any)[key] = rank;
+    });
+  };
+
+  for (const r of rows) r.rank.of = of;
+  apply('clientReadingMinutes', r => r.docMinutes);
+  apply('portalVisits', r => r.portalExternalVisits);
+  apply('posts', r => r.posts);
+  apply('views', r => r.views);
+  apply('invoiced', r => r.invoiced);
 }
 
 /** Portfolio-level roll-up for the KPI strip. */

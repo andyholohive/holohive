@@ -137,7 +137,7 @@ export default function PortfolioPage() {
         out.push({
           tone: 'warning',
           title: `${r.name} has never opened their portal`,
-          detail: `${r.posts} posts delivered and ${r.docOpens} document opens, but no external portal visit on record. The weekly reporting may be landing only in Telegram.`,
+          detail: `${r.posts} posts delivered and ${r.docOpens} document open${r.docOpens === 1 ? '' : 's'} by the client, but no external portal visit on record. The weekly reporting may be landing only in Telegram.`,
         });
       }
       // Commitments read out of the client's own documents. The checks around
@@ -181,7 +181,7 @@ export default function PortfolioPage() {
   // load while the profile resolves.
   if (authLoading) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {header}
         <Skeleton className="h-52 rounded-lg" />
       </div>
@@ -190,7 +190,7 @@ export default function PortfolioPage() {
 
   if (!allowed) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {header}
         <EmptyState
           icon={Lock}
@@ -203,7 +203,7 @@ export default function PortfolioPage() {
 
   if (rows === null) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         {header}
         <Skeleton className="h-52 rounded-lg" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -216,14 +216,19 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {header}
 
       {/* ── where to start, for a first-time reader ───────────────── */}
       {rows.length > 0 && <ReadingPath rows={rows} />}
 
       {/* ── what the business is ──────────────────────────────────── */}
-      <div id="rp-anchor-orientation" className="scroll-mt-24" />
+      {/* Scroll anchors wrap their target rather than sitting beside it. As
+          empty siblings they were still flex children, so the page's gap
+          applied on both sides of a zero-height element and every anchored
+          block sat 48px from its neighbour where everything else sat 24px —
+          which is the uneven spacing, not the cards themselves. */}
+      <div id="rp-anchor-orientation" className="scroll-mt-24">
       <CollapsibleCard
         id="orientation"
         kicker="Start here"
@@ -245,20 +250,19 @@ export default function PortfolioPage() {
         </p>
       </div>
       </CollapsibleCard>
+      </div>
 
       {/* ── how the work is built, and what constrains it ─────────── */}
       {/* [2026-09-11, Andy] The compliance rail sits here rather than further
           down because it belongs with the backbone: one says how a campaign is
           assembled, the other says what may never go in it. Together they are
           the orientation a newcomer needs before any account makes sense. */}
-      <div id="rp-anchor-backbone" className="scroll-mt-24" />
-      <Backbone />
-      <div id="rp-anchor-compliance" className="scroll-mt-24" />
-      <ComplianceRail />
+      <div id="rp-anchor-backbone" className="scroll-mt-24"><Backbone /></div>
+      <div id="rp-anchor-compliance" className="scroll-mt-24"><ComplianceRail /></div>
       <Glossary />
 
       {/* ── the portfolio in one strip ────────────────────────────── */}
-      <div id="rp-anchor-book" className="scroll-mt-24" />
+      <div id="rp-anchor-book" className="scroll-mt-24">
       <CollapsibleSection
         id="book"
         label="The book of business"
@@ -279,6 +283,7 @@ export default function PortfolioPage() {
       {rows.length > 0 && <RunwayPace rows={rows} />}
       <CreatorOverlap creators={creators} clientCount={rows.length} />
       </CollapsibleSection>
+      </div>
 
       {/* ── all five side by side ─────────────────────────────────── */}
       {rows.length > 0 && (
@@ -352,12 +357,17 @@ export default function PortfolioPage() {
                     </TableCell>
                     <TableCell className="py-3 tabular-nums">{compact(r.views)}</TableCell>
                     <TableCell className="py-3">
-                      <StatusBadge
-                        tone={r.docMinutes >= 10 ? 'success' : r.docMinutes >= 3 ? 'warning' : 'danger'}
-                        size="sm"
-                      >
-                        {r.docMinutes}m · {r.portalExternalVisits} portal
-                      </StatusBadge>
+                      <span className="flex flex-col gap-1 items-start">
+                        <StatusBadge
+                          tone={r.docMinutes >= 10 ? 'success' : r.docMinutes >= 3 ? 'warning' : 'danger'}
+                          size="sm"
+                        >
+                          {r.docMinutes}m · {r.portalExternalVisits} portal
+                        </StatusBadge>
+                        <span className="text-[11px] text-ink-warm-400 tabular-nums">
+                          #{r.rank.clientReadingMinutes} of {r.rank.of} on reading
+                        </span>
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -440,7 +450,7 @@ export default function PortfolioPage() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             {rows.map(d => <ClientDossier key={d.id} d={d} focus={focus} />)}
           </div>
         </>

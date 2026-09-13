@@ -68,6 +68,24 @@ const SENTIMENT: Array<{ key: string; label: string; tone: BadgeTone }> = [
  * rendering nothing — silence would be indistinguishable from not having
  * checked.
  */
+/** "1st of 5" — a position needs its field size to mean anything. */
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function RankBadge({ place, of }: { place: number; of: number }) {
+  if (!place || !of) return null;
+  // Only the top place is worth colouring. Marking 4th of 5 in red would read
+  // as a fault where the number itself is already the message.
+  return (
+    <StatusBadge tone={place === 1 ? 'success' : 'neutral'} size="sm">
+      {ordinal(place)} of {of}
+    </StatusBadge>
+  );
+}
+
 function BackboneDelta({ findings }: { findings: BackboneFinding[] }) {
   const design = findings.filter(f => f.kind === 'design');
   const gaps = findings.filter(f => f.kind === 'gap');
@@ -741,27 +759,45 @@ export function ClientDossier({ d, focus }: { d: Dossier; focus?: { id: string; 
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-warm-500">Are they reading it</span>
+              <span className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-warm-500">
+                  Are they reading it
+                </span>
+                <StatusBadge tone="neutral" size="sm">client only</StatusBadge>
+              </span>
               <div className="grid grid-cols-3 gap-px bg-cream-200 border border-cream-200 rounded-[10px] overflow-hidden">
-                <div className="bg-white px-3 py-2.5 flex flex-col gap-0.5">
+                <div className="bg-white px-3 py-2.5 flex flex-col gap-1">
                   <span className="flex items-center gap-1.5 text-lg font-semibold tabular-nums text-ink-warm-900">
                     <FileText className="h-3.5 w-3.5 text-ink-warm-400" />{d.docMinutes}m
                   </span>
                   <span className="text-[11px] text-ink-warm-500">in documents</span>
+                  <RankBadge place={d.rank.clientReadingMinutes} of={d.rank.of} />
                 </div>
-                <div className="bg-white px-3 py-2.5 flex flex-col gap-0.5">
+                <div className="bg-white px-3 py-2.5 flex flex-col gap-1">
                   <span className="flex items-center gap-1.5 text-lg font-semibold tabular-nums text-ink-warm-900">
                     <Users className="h-3.5 w-3.5 text-ink-warm-400" />{d.docReaders}
                   </span>
                   <span className="text-[11px] text-ink-warm-500">people reading</span>
                 </div>
-                <div className="bg-white px-3 py-2.5 flex flex-col gap-0.5">
+                <div className="bg-white px-3 py-2.5 flex flex-col gap-1">
                   <span className={`flex items-center gap-1.5 text-lg font-semibold tabular-nums ${d.portalExternalVisits === 0 ? 'text-rose-600' : 'text-ink-warm-900'}`}>
                     <Monitor className="h-3.5 w-3.5 text-ink-warm-400" />{d.portalExternalVisits}
                   </span>
                   <span className="text-[11px] text-ink-warm-500">portal visits</span>
+                  <RankBadge place={d.rank.portalVisits} of={d.rank.of} />
                 </div>
               </div>
+
+              {/* What was taken out, so the headline number is auditable rather
+                  than just smaller than it used to be. */}
+              {(d.docInternalOpens > 0 || d.docUnattributedOpens > 0) && (
+                <p className="text-[11px] text-ink-warm-400 leading-relaxed">
+                  Excludes {d.docInternalOpens} open{d.docInternalOpens === 1 ? '' : 's'} by our own team
+                  {d.docUnattributedOpens > 0 && (
+                    <> and {d.docUnattributedOpens} with no viewer recorded</>
+                  )}. Only reads by the client are counted here.
+                </p>
+              )}
 
               <p className="text-[11px] text-ink-warm-400">
                 {d.deliveryEntries} work item{d.deliveryEntries === 1 ? '' : 's'} logged against this client

@@ -173,7 +173,7 @@ export function CollapsibleSection({
         </div>
         {counter && <span className="counter">{counter}</span>}
       </summary>
-      <div className="flex flex-col gap-3 pt-1">{children}</div>
+      <div className="flex flex-col gap-6 pt-2">{children}</div>
     </details>
   );
 }
