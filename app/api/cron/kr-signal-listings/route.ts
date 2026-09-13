@@ -15,7 +15,7 @@ import {
 } from '@/lib/krSignal/listings';
 import { getUsdKrw, getTrailing7dAvgVolumeUsd, getCoinPriceAndMcapUsd, searchCoingeckoIdBySymbol, getPerVenueVolume } from '@/lib/krSignal/adapters';
 import { editMessageText, sendMessageWithButtons, probeChat } from '@/lib/krSignal/telegram';
-import { getAppSetting } from '@/lib/appSettings';
+import { getAppSettingStrict } from '@/lib/appSettings';
 import { saveDigestForReview, attachDigestCard } from '@/lib/krSignal/listingDigestReview';
 import { saveAlertForReview, attachAlertCard } from '@/lib/krSignal/listingAlertReview';
 import { buildListingDigestCard, listingDigestButtons, buildListingAlertCard, listingAlertButtons } from '@/lib/krSignal/reviewCard';
@@ -126,8 +126,10 @@ export async function GET(request: Request) {
 
     // Where review cards go. Resolved once — both the alert gate below and
     // the Saturday digest post here.
-    const reviewChatId = await getAppSetting(supabase, 'kr_signal_review_chat_id');
-    const reviewThreadId = await getAppSetting(supabase, 'kr_signal_review_thread_id');
+    // Strict: a failed read here must not read as "no review chat configured".
+    // That is what stranded the Sep 12 digest — see getAppSettingStrict.
+    const reviewChatId = await getAppSettingStrict(supabase, 'kr_signal_review_chat_id');
+    const reviewThreadId = await getAppSettingStrict(supabase, 'kr_signal_review_thread_id');
 
     // 2. Client alert (§7.C) — a client's own token just listed.
     const alertClients = clients.filter((c) => c.features?.client_listing_alert && c.resolved_chat_id);
