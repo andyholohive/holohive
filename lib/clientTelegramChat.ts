@@ -59,11 +59,24 @@ export async function resolveClientChatIds(
   const ids = [...new Set(clientIds.filter(Boolean))];
   if (ids.length === 0) return out;
 
-  const { data } = await (supabase as any)
+  const { data, error } = await (supabase as any)
     .from('telegram_chats')
     .select('chat_id, client_id, is_internal, is_hidden, last_message_at')
     .in('client_id', ids)
     .or('is_hidden.is.null,is_hidden.eq.false');
+
+  // [2026-09-13, Andy] This used to discard `error`, so a failed read returned
+  // an empty map — indistinguishable from "none of these clients has a chat
+  // linked". During the Sep 12 Supabase timeouts that turned into the KR
+  // Signal digest recording every client as "No destination chat resolved" and
+  // freezing that into its preflight, when Fogo and Venice both had a linked,
+  // visible chat the whole time. A caller deciding where to send a message
+  // must not be told "nowhere" because the lookup fell over.
+  if (error) {
+    throw new Error(
+      `resolveClientChatIds: could not read telegram_chats: ${error.message ?? error}`,
+    );
+  }
 
   const rows = ((data ?? []) as ChatRow[]).filter(r => !!r.chat_id);
   for (const id of ids) {
