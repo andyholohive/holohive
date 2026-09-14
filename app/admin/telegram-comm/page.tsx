@@ -30,9 +30,10 @@ import {
   Search, Check, AlertTriangle, MessageCircle, Save, UserCheck,
   ExternalLink, Plus, X, MessagesSquare, ChevronRight, ClipboardList,
   CheckCircle2, Activity, AlarmClock, Clock, Sunrise, Radio, Newspaper, Send,
-  ListChecks, ClipboardCheck,
+  ListChecks, ClipboardCheck, FileText,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ListingDigestEditor } from '@/components/krsignal/ListingDigestEditor';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import { supabase } from '@/lib/supabase';
@@ -581,6 +582,9 @@ export default function LineupSettingsPage() {
       {/* ─── KR Signal weekly review section [2026-08-14] ─── */}
       <KrSignalReviewSection />
 
+      {/* ─── KR Signal listing digest editor [2026-09-14] ─── */}
+      <KrSignalDigestSection />
+
       {/* ─── Document Portal Alerts section [2026-07-17] ─── */}
       <DocumentPortalAlertsSection />
 
@@ -593,6 +597,34 @@ export default function LineupSettingsPage() {
   );
 }
 
+
+/**
+ * KrSignalDigestSection — edit the weekly Korea listings digest before it goes.
+ *
+ * [2026-09-14, Andy] Sits beside the weekly-report review because it is the
+ * same decision on the other message type: the digest is generated Saturday,
+ * waits for approval, and until now could only be approved or skipped as
+ * written. The editor itself lives in its own component — this page is already
+ * well past the size where adding to it is free.
+ */
+function KrSignalDigestSection() {
+  return (
+    <CollapsibleSection
+      icon={FileText}
+      title="Korea Listings Digest"
+      subtitle={(
+        <>The weekly listings round-up, editable while it waits for approval. Saving updates the review card in Telegram so whoever approves is approving what they can see.</>
+      )}
+    >
+      <WhenItSends>
+        Saturday 12:00 UTC the digest is built and posted for approval. It
+        reaches clients only once approved, and the copy sent is whatever is
+        saved here.
+      </WhenItSends>
+      <ListingDigestEditor />
+    </CollapsibleSection>
+  );
+}
 
 /**
  * KrSignalReviewSection — picker for the chat that reviews weekly KR Signal

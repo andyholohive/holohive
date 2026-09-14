@@ -361,6 +361,29 @@ async function handleDigestCallback(cb: any): Promise<void> {
         !res.ok);
       return;
     }
+    if (action === 'edit') {
+      // [2026-09-14, Andy] Same reasoning as the weekly report: the digest is
+      // a multi-line block whose column spacing carries meaning, and Telegram
+      // has no good way to hand a multi-line edit back. So editing happens in
+      // HHP and the card keeps its buttons, so the same person can approve
+      // from the chat the moment they are done.
+      await answerCallbackQuery(cbId, 'Opening in HHP — link posted below.');
+      // Label the link with the week it edits. A review chat can hold several
+      // pending cards, and a bare "edit the digest" link is ambiguous.
+      const { data: digest } = await (supabase as any)
+        .from('kr_signal_listing_digests')
+        .select('week_ending')
+        .eq('id', rowId)
+        .maybeSingle();
+      const url = `${baseUrl()}/admin/telegram-comm#korea-listings-digest`;
+      await sendMessage(
+        chatId,
+        `✏️ <b>Edit the listings digest — week ending ${escapeHtml(String(digest?.week_ending ?? ''))}</b>\n` +
+        `Edit the copy in Telegram Comms, then approve here. Saving updates this card, so you will be approving what you can see:\n` +
+        `${escapeHtml(url)}`,
+      ).catch(() => {});
+      return;
+    }
     await answerCallbackQuery(cbId, 'Unknown action.', true);
   } catch (e: any) {
     await answerCallbackQuery(cbId, `Failed: ${(e && e.message) || String(e)}`, true);

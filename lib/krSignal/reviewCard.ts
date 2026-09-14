@@ -174,6 +174,7 @@ export function buildListingDigestCard(input: ListingDigestCardInput): string {
 export function listingDigestButtons(rowId: string): InlineButton[][] {
   return [[
     { text: '✅ Approve & send', callback_data: `krd:approve:${rowId}` },
+    { text: '✏️ Edit', callback_data: `krd:edit:${rowId}` },
     { text: '⏭ Skip', callback_data: `krd:skip:${rowId}` },
   ]];
 }

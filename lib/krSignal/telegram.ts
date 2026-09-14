@@ -54,13 +54,28 @@ export async function sendMessage(
 }
 
 /** Edit a previously sent message in place — used for the Day-1 recap (Stage 2, §7.D/§8). */
-export async function editMessageText(chatId: string | number, messageId: number, html: string) {
+/**
+ * Replace a message's text.
+ *
+ * `buttons` is optional and matters more than it looks: Telegram treats an
+ * edit with no `reply_markup` as an instruction to REMOVE the keyboard. That
+ * is the right behaviour for a decided card, which is why callers that finish
+ * a review omit it — but an edit meant only to refresh the copy would silently
+ * strip Approve and Skip and leave a review nobody can action.
+ */
+export async function editMessageText(
+  chatId: string | number,
+  messageId: number,
+  html: string,
+  buttons?: InlineButton[][],
+) {
   return call("editMessageText", {
     chat_id: chatId,
     message_id: messageId,
     text: html,
     parse_mode: "HTML",
     disable_web_page_preview: true,
+    ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}),
   });
 }
 
