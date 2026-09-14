@@ -308,6 +308,12 @@ async function handleDigestCallback(cb: any): Promise<void> {
   const cbId: string = cb?.id;
   const data: string | undefined = cb?.data;
   const chatId = cb?.message?.chat?.id;
+  // [2026-09-14, Andy] The thread the card is in. Telegram posts to the
+  // General topic when message_thread_id is omitted, so a reply sent without
+  // it lands in the main chat rather than beside the card that prompted it.
+  // Taken from the callback rather than from config, so the reply follows the
+  // card wherever it was posted.
+  const threadId = cb?.message?.message_thread_id ?? null;
   if (!cbId || !data?.startsWith('krd:')) return;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -381,6 +387,7 @@ async function handleDigestCallback(cb: any): Promise<void> {
         `✏️ <b>Edit the listings digest — week ending ${escapeHtml(String(digest?.week_ending ?? ''))}</b>\n` +
         `Edit the copy in Telegram Comms, then approve here. Saving updates this card, so you will be approving what you can see:\n` +
         `${escapeHtml(url)}`,
+        threadId,
       ).catch(() => {});
       return;
     }
@@ -460,6 +467,9 @@ async function handleReviewCallback(cb: any): Promise<void> {
   const cbId: string = cb?.id;
   const data: string | undefined = cb?.data;
   const chatId = cb?.message?.chat?.id;
+  // See the note in handleDigestCallback: without this the reply goes to the
+  // group's General topic instead of the thread holding the card.
+  const threadId = cb?.message?.message_thread_id ?? null;
   if (!cbId || !data?.startsWith('krw:')) return;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -545,6 +555,7 @@ async function handleReviewCallback(cb: any): Promise<void> {
         `✏️ <b>Edit ${escapeHtml(clientName)} — week ending ${escapeHtml(row.week_ending)}</b>\n` +
         `Open Korea Signal settings to edit the copy, then approve here or send from there:\n` +
         `${escapeHtml(url)}`,
+        threadId,
       ).catch(() => {});
       return;
     }
