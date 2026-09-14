@@ -84,13 +84,34 @@ export async function GET() {
 
   const campaignById = new Map((campaigns ?? []).map(c => [c.id, c]));
   const clientById = new Map((clients ?? []).map(c => [c.id, c]));
-  const kolNameByLink = new Map(
-    (kolLinks ?? []).map(l => [l.id, (kols ?? []).find(k => k.id === l.master_kol_id)?.name ?? null]),
+  const kolByLink = new Map(
+    (kolLinks ?? []).map(l => [l.id, (kols ?? []).find(k => k.id === l.master_kol_id) ?? null]),
   );
+  const kolNameByLink = new Map(
+    [...kolByLink.entries()].map(([id, k]) => [id, k?.name ?? null]),
+  );
+
+  /**
+   * The address to pay, and where it came from.
+   *
+   * payments.wallet wins when set — it is the per-payment override, and a
+   * one-off address must not be silently replaced by the KOL's default. The
+   * KOL record is the fallback, labelled, because a finance chase needs to
+   * know whether it is paying an address recorded against this payment or the
+   * creator's standing one.
+   */
+  const walletFor = (p: { wallet: string | null; campaign_kol_id: string | null }) => {
+    const onPayment = (p.wallet ?? '').trim();
+    if (onPayment) return { wallet: onPayment, source: 'payment' };
+    const kol = p.campaign_kol_id ? kolByLink.get(p.campaign_kol_id) : null;
+    const onKol = ((kol as any)?.wallet ?? '').trim();
+    if (onKol) return { wallet: onKol, source: 'KOL record' };
+    return { wallet: '', source: '' };
+  };
 
   const header = [
     'Client', 'Campaign', 'Campaign Status', 'KOL', 'Recipient', 'Amount USD',
-    'Zero Amount', 'Category', 'Wallet', 'Notes', 'Created', 'In Rollup Scope', 'Payment ID',
+    'Zero Amount', 'Category', 'Wallet', 'Wallet Source', 'Notes', 'Created', 'In Rollup Scope', 'Payment ID',
   ];
 
   // [2026-08-31, Andy] Inactive clients are dropped too, not just archived.
@@ -119,6 +140,7 @@ export async function GET() {
   });
 
   const body = visibleRows.map(p => {
+    const pay = walletFor(p);
     const campaign = p.campaign_id ? campaignById.get(p.campaign_id) : null;
     const client = campaign?.client_id ? clientById.get(campaign.client_id) : null;
     const inScope = !!client?.is_active && !client?.is_ad_hoc;
@@ -132,7 +154,8 @@ export async function GET() {
       p.amount ?? 0,
       Number(p.amount ?? 0) === 0 ? 'yes' : '',
       p.payment_category ?? '',
-      p.wallet ?? '',
+      pay.wallet,
+      pay.source,
       p.notes ?? '',
       p.created_at ? String(p.created_at).slice(0, 10) : '',
       inScope ? 'yes' : 'no',
