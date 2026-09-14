@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
+import { isTransientAuthError } from '@/lib/authErrors';
 
 export interface SuperAdminGuardSuccess {
   ok: true;
@@ -50,16 +51,38 @@ export async function requireRole(
   }
 
   // ─── Session-based auth ────────────────────────────────────────────
+  // getUser() is a network call to Supabase Auth. "Your token is not valid"
+  // and "we could not reach the service to ask" are different answers and
+  // must not both render as Unauthorized — see lib/authErrors.
   let sessionUser: { id: string } | null = null;
+  let lookupFailure: { name?: string; status?: number; message?: string } | null = null;
   try {
     const sb = await createServerClient();
-    const { data: { user } } = await sb.auth.getUser();
+    const { data: { user }, error: authError } = await sb.auth.getUser();
+    if (authError) lookupFailure = authError;
     sessionUser = user ? { id: user.id } : null;
-  } catch (err) {
-    console.error('[requireRole] session lookup failed:', err);
+  } catch (err: any) {
+    // A throw here never reached the answer at all.
+    lookupFailure = { name: err?.name, status: err?.status, message: String(err?.message ?? err) };
+  }
+
+  if (!sessionUser && lookupFailure && isTransientAuthError(lookupFailure)) {
+    console.error('[requireRole] auth service unreachable:', lookupFailure.message);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Could not verify your session right now. Please retry.' },
+        { status: 503, headers: { 'retry-after': '2' } },
+      ),
+    };
   }
 
   if (!sessionUser) {
+    if (lookupFailure) {
+      console.error('[requireRole] session rejected:', lookupFailure.status, lookupFailure.message);
+    } else {
+      console.error('[requireRole] no session cookie on request to', new URL(request.url).pathname);
+    }
     return {
       ok: false,
       response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),

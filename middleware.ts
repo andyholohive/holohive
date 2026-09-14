@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { isTransientAuthError } from '@/lib/authErrors';
 
 /**
  * App-wide API auth gate.
@@ -276,24 +277,6 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-
-/**
- * Could not ask, as opposed to asked and was told no.
- *
- * A rejected token comes back 401/403 from the auth service. A timeout, a
- * 5xx, or a failed fetch means we never got an answer — the session may be
- * perfectly valid. Supabase's client surfaces the retryable case as
- * AuthRetryableFetchError, but it is not worth relying on the class name
- * alone when the status and message carry the same signal.
- */
-function isTransientAuthError(error: { name?: string; status?: number; message?: string }): boolean {
-  if (error?.name === 'AuthRetryableFetchError') return true;
-  const status = error?.status ?? 0;
-  if (status >= 500) return true;
-  // status 0 / absent means the request never completed.
-  if (!status && /fetch|network|timeout|gateway|aborted|ECONN/i.test(error?.message ?? '')) return true;
-  return false;
-}
 
 export const config = {
   // Run middleware on /api/* plus the one page route that needs a gate in
