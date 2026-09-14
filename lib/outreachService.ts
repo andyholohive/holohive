@@ -329,14 +329,47 @@ export function computeRates(
 // ── CRUD ─────────────────────────────────────────────────────────────
 
 export class OutreachService {
+  /**
+   * Every prospect, paged.
+   *
+   * [2026-09-14, Sos] This used to be one unbounded select, which PostgREST
+   * silently caps at 1,000 rows. The board was past that — 1,133 — so 133 rows
+   * were dropped with no error and no sign anything was missing.
+   *
+   * The truncation landed exactly where it did most damage. The sort puts rows
+   * with no `date_outreached` last, which is precisely what a just-added
+   * prospect looks like, so the newest work fell off the end first. Sos could
+   * not find @sash_mit (row 1,093) by search because it had never been loaded,
+   * and re-adding it was refused by the unique index because the row was
+   * really there. A lead that exists, cannot be seen, and cannot be re-added
+   * reads exactly like data loss.
+   *
+   * Paging in explicit windows rather than raising the cap: the board only
+   * grows, and the next silent truncation would look the same.
+   */
   static async list(): Promise<OutreachProspect[]> {
-    const { data, error } = await db()
-      .from('outreach_prospects')
-      .select(COLUMNS)
-      .order('date_outreached', { ascending: false, nullsFirst: false })
-      .order('company', { ascending: true });
-    if (error) throw new Error(`Failed to load prospects: ${error.message}`);
-    return (data ?? []) as unknown as OutreachProspect[];
+    const PAGE = 1000;
+    const out: OutreachProspect[] = [];
+
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await db()
+        .from('outreach_prospects')
+        .select(COLUMNS)
+        .order('date_outreached', { ascending: false, nullsFirst: false })
+        .order('company', { ascending: true })
+        // id breaks ties so the window boundaries are stable between requests;
+        // without it two rows sharing a date and company can swap places
+        // across pages and be returned twice or not at all.
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`Failed to load prospects: ${error.message}`);
+
+      const rows = (data ?? []) as unknown as OutreachProspect[];
+      out.push(...rows);
+      if (rows.length < PAGE) break;
+    }
+
+    return out;
   }
 
   /** Park or unpark. Nothing is deleted; the row keeps every field and
