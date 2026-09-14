@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { requireSuperAdmin } from '@/lib/requireSuperAdmin';
+import { requireRole } from '@/lib/requireSuperAdmin';
 import { digestTextToHtml, unpairedBoldMarkers } from '@/lib/krSignal/digestEdit';
 import { buildListingDigestCard, listingDigestButtons } from '@/lib/krSignal/reviewCard';
 import { editMessageText } from '@/lib/krSignal/telegram';
@@ -34,7 +34,11 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
 ) {
-  const guard = await requireSuperAdmin(request);
+  // [2026-09-14, Andy] Admins edit too, not just super_admins. Editing copy
+  // before it is approved is ordinary campaign work — Jaymz, Jeremyin and
+  // Quazo are plain admins who run these comms — and approval is a separate
+  // action, so a wider edit gate cannot ship anything on its own.
+  const guard = await requireRole(request, ['admin', 'super_admin']);
   if (!guard.ok) return guard.response;
 
   const supabase = serviceClient();

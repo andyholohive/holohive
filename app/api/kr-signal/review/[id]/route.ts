@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@/lib/supabase-server';
+import { requireRole } from '@/lib/requireSuperAdmin';
 import { saveWeeklyEdit, getWeeklyReviewById } from '@/lib/krSignal/store';
 import { buildReportHtml } from '@/lib/krSignal/reportEdit';
 import { approveAndSend, skipReport } from '@/lib/krSignal/reviewActions';
@@ -33,6 +34,15 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   const { id } = params;
+
+  // [2026-09-14] This route checked only that you were signed in — any
+  // authenticated account, guests included, could save, send or skip a
+  // client-facing weekly report. Noticed while widening the digest editor to
+  // admins: gating the digest at admin while this stayed open to everyone
+  // would be incoherent, and the hole is the more serious half. Same guard as
+  // the digest now.
+  const guard = await requireRole(request, ['admin', 'super_admin']);
+  if (!guard.ok) return guard.response;
 
   const supabaseAuth = await createServerClient();
   const { data: { user } } = await supabaseAuth.auth.getUser();
