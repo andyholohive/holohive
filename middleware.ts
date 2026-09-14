@@ -228,7 +228,37 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser();
+  // getUser() is a network call to Supabase Auth to validate the JWT, so it
+  // has two quite different failure modes that this used to collapse into one:
+  // "your token is not valid" and "we could not reach the service to ask".
+  //
+  // [2026-09-14, Andy] Short Links showed "Unauthorized" to a signed-in
+  // super_admin. Supabase has been returning Gateway Timeouts every hour or
+  // two for days — visible all over agent_runs — and a timeout here logged the
+  // user out of the request. Every /api/* call in the app goes through this,
+  // so a blip at the auth service reads to the whole app as a lost session.
+  //
+  // One retry first, because these clear in under a second. Then classify: a
+  // transient failure gets 503 and a message that says to retry, an actually
+  // invalid session still gets 401. Neither lets anything through — the
+  // request is refused either way — but only one of them is the user's fault
+  // and only one is worth signing back in over.
+  let { data: { user }, error } = await supabase.auth.getUser();
+  if (error && isTransientAuthError(error)) {
+    await new Promise(r => setTimeout(r, 250));
+    ({ data: { user }, error } = await supabase.auth.getUser());
+  }
+
+  if (error && isTransientAuthError(error)) {
+    console.error('[middleware] auth check could not reach Supabase:', error.message);
+    return new NextResponse(
+      JSON.stringify({ error: 'Could not verify your session right now. Please retry.' }),
+      {
+        status: 503,
+        headers: { 'content-type': 'application/json', 'retry-after': '2' },
+      },
+    );
+  }
 
   if (error || !user) {
     // Return JSON 401 — the routes downstream return JSON, and clients
@@ -244,6 +274,25 @@ export async function middleware(request: NextRequest) {
 
   // Authed — let it through with refreshed session cookies.
   return response;
+}
+
+
+/**
+ * Could not ask, as opposed to asked and was told no.
+ *
+ * A rejected token comes back 401/403 from the auth service. A timeout, a
+ * 5xx, or a failed fetch means we never got an answer — the session may be
+ * perfectly valid. Supabase's client surfaces the retryable case as
+ * AuthRetryableFetchError, but it is not worth relying on the class name
+ * alone when the status and message carry the same signal.
+ */
+function isTransientAuthError(error: { name?: string; status?: number; message?: string }): boolean {
+  if (error?.name === 'AuthRetryableFetchError') return true;
+  const status = error?.status ?? 0;
+  if (status >= 500) return true;
+  // status 0 / absent means the request never completed.
+  if (!status && /fetch|network|timeout|gateway|aborted|ECONN/i.test(error?.message ?? '')) return true;
+  return false;
 }
 
 export const config = {
