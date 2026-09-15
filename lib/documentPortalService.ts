@@ -225,6 +225,23 @@ export class DocumentPortalService {
   async setExpiry(documentId: string, expiresAt: string | null): Promise<void> {
     await this.patch(documentId, { expires_at: expiresAt });
   }
+  /**
+   * Rename a document [Bolt 2026-09-15]. The title was write-once: set in the
+   * upload dialog and never editable again, so a typo or a working name like
+   * "venice draft v2" was permanent — and it is the name the CLIENT sees in the
+   * portal and on any share link, not just an internal label.
+   *
+   * Renaming touches nothing else. The PDF, its versions and the whole
+   * AccessLog key off ids, so analytics gathered under the old name stay
+   * attached.
+   */
+  async renameDocument(documentId: string, title: string): Promise<string> {
+    const clean = title.trim().replace(/\s+/g, ' ');
+    if (!clean) throw new Error('Title cannot be empty');
+    if (clean.length > 200) throw new Error('Title must be 200 characters or fewer');
+    await this.patch(documentId, { title: clean });
+    return clean;
+  }
   async revoke(documentId: string): Promise<void> {
     await this.patch(documentId, { status: 'revoked' });
   }

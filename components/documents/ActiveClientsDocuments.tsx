@@ -43,7 +43,7 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw, Link2, Building2 } from 'lucide-react';
+import { FileText, Upload, Eye, Ban, BarChart3, CalendarClock, Flame, ChevronRight, ChevronDown, RotateCcw, Link2, Building2, Pencil } from 'lucide-react';
 import ShareLinkDialog from '@/components/documents/ShareLinkDialog';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
@@ -95,6 +95,12 @@ export default function ActiveClientsDocuments() {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({ client_id: '', title: '', shared: true, download: false, file: null as File | null });
+
+  // Rename [Bolt 2026-09-15]. The title is what the client sees in the portal,
+  // so it needs to be fixable after upload — not write-once.
+  const [renameDoc, setRenameDoc] = useState<DocumentRow | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   // Analytics drill-down (L2/L3).
   const [analyticsDoc, setAnalyticsDoc] = useState<DocWithClient | null>(null);
@@ -281,6 +287,23 @@ export default function ActiveClientsDocuments() {
       await load();
     } catch (e) { toast({ title: 'Restore failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }); }
   };
+  const openRename = (d: DocumentRow) => { setRenameDoc(d); setRenameTitle(d.title); };
+  const saveRename = async () => {
+    if (!renameDoc) return;
+    const previous = renameDoc.title;
+    setRenaming(true);
+    try {
+      const saved = await service.renameDocument(renameDoc.id, renameTitle);
+      // No-op rename shouldn't claim it did something.
+      if (saved === previous) toast({ title: 'Name unchanged' });
+      else toast({ title: 'Document renamed', description: `“${previous}” → “${saved}”` });
+      setRenameDoc(null);
+      await load();
+    } catch (e) {
+      toast({ title: 'Rename failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally { setRenaming(false); }
+  };
+
   const setExpiry = async (d: DocumentRow, expiresAt: string | null) => {
     try { await service.setExpiry(d.id, expiresAt); toast({ title: expiresAt ? 'Expiry set' : 'Expiry cleared' }); await load(); }
     catch (e) { toast({ title: 'Update failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }); }
@@ -383,7 +406,21 @@ export default function ActiveClientsDocuments() {
                     const expired = !!d.expires_at && new Date(d.expires_at).getTime() < Date.now();
                     return (
                       <TableRow key={d.id} className="border-cream-100">
-                        <TableCell className="py-3.5 px-5 font-medium">{d.title}</TableCell>
+                        <TableCell className="py-3.5 px-5 font-medium">
+                          <div className="group/title flex items-center gap-1.5">
+                            <span>{d.title}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 focus-brand transition-opacity"
+                              onClick={() => openRename(d)}
+                              title="Rename document"
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-ink-warm-500" />
+                              <span className="sr-only">Rename {d.title}</span>
+                            </Button>
+                          </div>
+                        </TableCell>
                         <TableCell className="py-3.5 px-5"><StatusBadge tone={STATUS_TONE[d.status] ?? 'neutral'} size="sm">{STATUS_LABEL[d.status] ?? d.status}</StatusBadge></TableCell>
                         <TableCell className="py-3.5 px-5">
                           {r && r.opens > 0 ? (
@@ -552,6 +589,43 @@ export default function ActiveClientsDocuments() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={uploading}>Cancel</Button>
             <Button variant="brand" onClick={handleUpload} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename. Deliberately its own small dialog rather than a sixth button
+          in the action row — renaming is a property of the document, not an
+          action on its delivery. */}
+      <Dialog open={!!renameDoc} onOpenChange={(o) => { if (!o && !renaming) setRenameDoc(null); }}>
+        <DialogContent className="!bg-white sm:max-w-md">
+          <DialogHeader><DialogTitle>Rename document</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="rename-title">Title <RequiredAsterisk /></Label>
+              <Input
+                id="rename-title"
+                value={renameTitle}
+                autoFocus
+                onChange={(e) => setRenameTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && renameTitle.trim()) void saveRename(); }}
+                placeholder="e.g. Week 3 Report"
+                className="h-9 focus-brand"
+              />
+            </div>
+            {/* Only warn when the client can actually reach it. A revoked doc
+                is unreachable regardless of the shared flag, so saying "the
+                client sees this name" there is just wrong. */}
+            {renameDoc?.shared && renameDoc.status === 'published' && (
+              <p className="text-xs text-ink-warm-500">
+                This document is shared — the client sees this name in the portal and on any share link.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDoc(null)} disabled={renaming}>Cancel</Button>
+            <Button variant="brand" onClick={saveRename} disabled={renaming || !renameTitle.trim()}>
+              {renaming ? 'Saving…' : 'Save'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
