@@ -378,19 +378,45 @@ export default function OutreachPage() {
     [rateRows, statusCatalogue],
   );
   /**
-   * Parked rows matching the search that this view is hiding.
+   * Search matches that exist but this user's board is hiding, and why.
    *
-   * [Sos 2026-09-16] Search only ever looked inside the current view, and
-   * every view except Parked drops parked rows — 65% of the table. So
-   * searching a parked handle returned nothing at all, which reads as "the
-   * lead was deleted" rather than "it's parked". Telling the user it exists
-   * is the whole fix; the Parked tab was always one click away, they just had
-   * no reason to believe the lead was there.
+   * [Sos 2026-09-16] "@Josephweb3 says it's already on the board but I can't
+   * find it." Two layers hid it, and both answer "no results", which reads as
+   * deleted:
+   *   - parked rows show only under the Parked view (755 of 1,163 rows), and
+   *   - rows from the pre-HHP CRM import (source !== 'manual') are stripped
+   *     entirely for anyone below admin. Sos is a guest, so for him those
+   *     rows are not on any tab at all.
+   * The uniqueness check, meanwhile, runs against the whole table — so an
+   * insert gets refused against a row the user is not allowed to see.
+   *
+   * Counted over `prospects` (everything loaded) rather than `visible`, which
+   * has already had both filters applied — the whole point is to see past them.
    */
-  const hiddenParkedMatches = useMemo(() => {
-    if (!search.trim() || view === 'parked') return 0;
-    return rateRows.filter(p => p.parked_at !== null).length;
-  }, [rateRows, search, view]);
+  const hiddenMatches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const none = { parked: 0, offBoard: 0, owners: [] as string[] };
+    if (!q) return none;
+    const shown = new Set(rows.map(r => r.id));
+    const owners = new Set<string>();
+    let parked = 0;
+    let offBoard = 0;
+    for (const p of prospects) {
+      if (shown.has(p.id)) continue;
+      if (!(p.telegram.toLowerCase().includes(q)
+        || p.company.toLowerCase().includes(q)
+        || p.role.toLowerCase().includes(q))) continue;
+      // Legacy first: for a guest it outranks parked, because no view shows it.
+      if (isLegacy(p) && (!canSeeLegacy || !showLegacy)) {
+        offBoard++;
+        const o = (p.owner || '').trim();
+        if (o) owners.add(o);
+      } else if (p.parked_at !== null && view !== 'parked') {
+        parked++;
+      }
+    }
+    return { parked, offBoard, owners: [...owners] };
+  }, [prospects, rows, search, view, canSeeLegacy, showLegacy]);
 
   const parkedCount = useMemo(() => visible.filter(p => p.parked_at !== null).length, [visible]);
   const liveCount = visible.length - parkedCount;
@@ -769,23 +795,42 @@ export default function OutreachPage() {
         </div>
       </div>
 
-      {/* A search that matches only parked rows used to come back empty, which
-          reads as "this lead was deleted". Say it exists and offer the jump. */}
-      {hiddenParkedMatches > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+      {/* A search whose only matches are hidden used to come back "No prospects
+          match", which reads as deleted. Say what exists and why it's hidden. */}
+      {(hiddenMatches.parked > 0 || hiddenMatches.offBoard > 0) && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex-wrap">
           <Archive className="h-4 w-4 text-amber-600 flex-shrink-0" />
           <span className="text-xs text-ink-warm-700">
-            {hiddenParkedMatches} parked {hiddenParkedMatches === 1 ? 'prospect matches' : 'prospects match'}{' '}
-            “{search.trim()}” and {hiddenParkedMatches === 1 ? 'is' : 'are'} hidden by this view.
+            {hiddenMatches.parked > 0 && (
+              <>
+                {hiddenMatches.parked} parked {hiddenMatches.parked === 1 ? 'prospect matches' : 'prospects match'}{' '}
+                “{search.trim()}”.
+              </>
+            )}
+            {hiddenMatches.parked > 0 && hiddenMatches.offBoard > 0 && ' '}
+            {hiddenMatches.offBoard > 0 && (
+              <>
+                {hiddenMatches.offBoard}{' '}
+                {hiddenMatches.offBoard === 1 ? 'match is' : 'matches are'} on the previous CRM board
+                {hiddenMatches.owners.length > 0 && ` (${hiddenMatches.owners.join(', ')})`}
+                {canSeeLegacy
+                  ? ', hidden by the Previous CRM switch.'
+                  : ' — not on your board, so you can\u2019t add it again. Ask them to hand it over.'}
+              </>
+            )}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 ml-auto focus-brand"
-            onClick={() => setView('parked')}
-          >
-            View parked
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            {hiddenMatches.parked > 0 && (
+              <Button variant="outline" size="sm" className="h-7 focus-brand" onClick={() => setView('parked')}>
+                View parked
+              </Button>
+            )}
+            {hiddenMatches.offBoard > 0 && canSeeLegacy && !showLegacy && (
+              <Button variant="outline" size="sm" className="h-7 focus-brand" onClick={() => setShowLegacy(true)}>
+                Show previous CRM
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
