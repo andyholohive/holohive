@@ -219,20 +219,34 @@ const db = () => supabase as any;
 async function duplicateMessage(input: CreateProspectData): Promise<string> {
   const base = `${input.telegram} is already on the board for ${input.company}.`;
   try {
-    const { data } = await db()
+    // The unique key is UNIQUE (lower(telegram), lower(company)) — case
+    // INSENSITIVE. This lookup used .eq(), which is case sensitive, so a
+    // collision on case alone (@JosephWeb3 vs @josephweb3) found nothing and
+    // fell back to the bare message — i.e. the explanation went missing in
+    // exactly the case that needs explaining most [Sos 2026-09-16].
+    // ilike without wildcards is an exact, case-insensitive match; the handle
+    // is escaped so a literal % or _ in it can't widen the match.
+    const esc = (v: string) => v.replace(/[\\%_]/g, c => `\\${c}`);
+    const { data: rows } = await db()
       .from('outreach_prospects')
-      .select('owner, status, parked_at')
-      .eq('telegram', input.telegram)
-      .eq('company', input.company)
-      .maybeSingle();
+      .select('telegram, company, owner, status, parked_at')
+      .ilike('telegram', esc(input.telegram))
+      .ilike('company', esc(input.company))
+      .limit(1);
+    const data = rows?.[0];
     if (!data) return base;
+
+    // Say which spelling is already there, or "can't find it" is the next question.
+    const stored = data.telegram === input.telegram
+      ? base
+      : `${input.telegram} is already on the board for ${input.company} — stored as ${data.telegram} (${data.company}).`;
 
     const owner = (data.owner || '').trim();
     const who = owner ? `owned by ${owner}` : 'unassigned';
     const where = data.parked_at
       ? ' It is parked, so it only shows under the Parked view.'
       : '';
-    return `${base} That one is ${who}, status ${data.status}.${where}`;
+    return `${stored} That one is ${who}, status ${data.status}.${where}`;
   } catch {
     return base;
   }

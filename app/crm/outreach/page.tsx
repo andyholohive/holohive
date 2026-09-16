@@ -377,6 +377,21 @@ export default function OutreachPage() {
     () => computeRates(rateRows.filter(p => p.parked_at === null), statusCatalogue),
     [rateRows, statusCatalogue],
   );
+  /**
+   * Parked rows matching the search that this view is hiding.
+   *
+   * [Sos 2026-09-16] Search only ever looked inside the current view, and
+   * every view except Parked drops parked rows — 65% of the table. So
+   * searching a parked handle returned nothing at all, which reads as "the
+   * lead was deleted" rather than "it's parked". Telling the user it exists
+   * is the whole fix; the Parked tab was always one click away, they just had
+   * no reason to believe the lead was there.
+   */
+  const hiddenParkedMatches = useMemo(() => {
+    if (!search.trim() || view === 'parked') return 0;
+    return rateRows.filter(p => p.parked_at !== null).length;
+  }, [rateRows, search, view]);
+
   const parkedCount = useMemo(() => visible.filter(p => p.parked_at !== null).length, [visible]);
   const liveCount = visible.length - parkedCount;
 
@@ -753,6 +768,26 @@ export default function OutreachPage() {
           )}
         </div>
       </div>
+
+      {/* A search that matches only parked rows used to come back empty, which
+          reads as "this lead was deleted". Say it exists and offer the jump. */}
+      {hiddenParkedMatches > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <Archive className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <span className="text-xs text-ink-warm-700">
+            {hiddenParkedMatches} parked {hiddenParkedMatches === 1 ? 'prospect matches' : 'prospects match'}{' '}
+            “{search.trim()}” and {hiddenParkedMatches === 1 ? 'is' : 'are'} hidden by this view.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 ml-auto focus-brand"
+            onClick={() => setView('parked')}
+          >
+            View parked
+          </Button>
+        </div>
+      )}
 
       {/* ── The board ────────────────────────────────────────────────────
           [2026-08-15, Yano] "id like to be able to edit from whereever /
