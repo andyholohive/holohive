@@ -17,6 +17,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { renderTemplate } from './messageTemplates';
 import { escapeHtml } from './telegramHtml';
+import { slotStatusFromExistingContent } from './lineupSlotSync';
 import {
   getCampaignWeek,
   mondayOfCampaignWeek as mondayOfCampaignWeekHelper,
@@ -411,9 +412,20 @@ export class LineupManagerService {
   ): Promise<LineupSlot> {
     const lineupId = await this.lineupIdForAngle(angleId);
     await this.assertEditable(lineupId);
+
+    // Don't assume a new slot is unposted. Moving a KOL between angles is
+    // remove + add, so a hardcoded 'pending' here erased a post that had
+    // already been logged [Bolt 2026-09-18]. Ask the content table instead.
+    const lineup = await this.getLineup(lineupId);
+    const status = await slotStatusFromExistingContent(this.supabase, {
+      campaignId: lineup.campaign_id,
+      kolId,
+      weekOf: lineup.week_of,
+    });
+
     const { data, error } = await (this.supabase as any)
       .from('lineup_slots')
-      .insert({ angle_id: angleId, kol_id: kolId, sort_order: sortOrder, status: 'pending' })
+      .insert({ angle_id: angleId, kol_id: kolId, sort_order: sortOrder, status })
       .select('*')
       .single();
     if (error) throw error;

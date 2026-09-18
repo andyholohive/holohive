@@ -95,3 +95,54 @@ export async function markLineupSlotPosted(
     return { updated: 0 };
   }
 }
+
+/**
+ * Does this KOL already have content logged inside this lineup's week?
+ *
+ * [Bolt 2026-09-18] Moving a KOL between angles is remove + add, and addSlot
+ * hardcoded status 'pending' — so a KOL who had already posted came back as
+ * pending, against a post that was still sitting in `contents`. Umia Wk of
+ * 09-14 is the case: Degen Guy's link was logged 09-15, Bolt rearranged the
+ * angles on 09-17 at 10:06, and his slot was recreated pending. Manbull's
+ * link landed at 12:57 the same day — after the move — so markLineupSlotPosted
+ * caught him and he stayed posted. Whether the record survived came down to
+ * the order of two unrelated actions.
+ *
+ * This is the read side of markLineupSlotPosted: that one fixes slots when
+ * content arrives, this one fixes a slot that arrives after the content.
+ *
+ * Best-effort, same as its counterpart — a slot must never fail to be added
+ * because this lookup did. Falls back to 'pending', the old behaviour.
+ */
+export async function slotStatusFromExistingContent(
+  supabase: SupabaseClient,
+  opts: { campaignId: string; kolId: string; weekOf: string },
+): Promise<'posted' | 'pending'> {
+  try {
+    const weekEnd = new Date(opts.weekOf + 'T00:00:00Z');
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+
+    // contents holds campaign_kols_id, so resolve this KOL's rows in this
+    // campaign first. A KOL can legitimately have more than one.
+    const { data: cks } = await (supabase as any)
+      .from('campaign_kols')
+      .select('id')
+      .eq('campaign_id', opts.campaignId)
+      .eq('master_kol_id', opts.kolId);
+    const ckIds = ((cks as any[]) ?? []).map(r => r.id);
+    if (ckIds.length === 0) return 'pending';
+
+    const { data: rows } = await (supabase as any)
+      .from('contents')
+      .select('id')
+      .eq('campaign_id', opts.campaignId)
+      .in('campaign_kols_id', ckIds)
+      .gte('activation_date', opts.weekOf)
+      .lte('activation_date', weekEnd.toISOString().slice(0, 10))
+      .limit(1);
+    return ((rows as any[]) ?? []).length > 0 ? 'posted' : 'pending';
+  } catch (err) {
+    console.warn('[lineupSlotSync] slotStatusFromExistingContent failed:', err);
+    return 'pending';
+  }
+}
