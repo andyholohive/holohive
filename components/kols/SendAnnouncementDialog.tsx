@@ -262,7 +262,23 @@ export function SendAnnouncementDialog({
       const gcIds = new Set(allKols.filter(k => k.hasGc).map(k => k.id));
       const [{ data: cRows }, { data: ckRows }] = await Promise.all([
         supabase.from('campaigns').select('id, name, status'),
-        supabase.from('campaign_kols').select('campaign_id, master_kol_id'),
+        // [Jdot 2026-09-19] Onboarded only, and not hidden.
+        //
+        // This pulled the whole roster, so picking a campaign queued a real
+        // Telegram message to everyone on it: 282 Curated rows across the
+        // board (evaluated, never signed), 61 Concluded (done with the
+        // campaign), 19 Contacted, and 52 hidden. Curated is the dangerous
+        // one — those people never agreed to anything, and a campaign
+        // announcement is the last thing they should receive.
+        //
+        // deleted_at is in here too, for roster rows removed but kept for
+        // history. Not what Jdot reported, but messaging someone taken off
+        // the campaign is the same mistake.
+        supabase.from('campaign_kols')
+          .select('campaign_id, master_kol_id')
+          .eq('hh_status', 'Onboarded')
+          .eq('hidden', false)
+          .is('deleted_at', null),
       ]);
       if (!alive) return;
       const byCampaign = new Map<string, { hit: string[]; miss: number }>();
