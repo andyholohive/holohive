@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/expenses
  *   Query params (all optional):
  *     user_id, expense_type, frequency, paid (true|false),
- *     from_date, to_date, include_deleted, include_templates, limit
+ *     from_date, to_date, include_deleted, include_templates, templates_only, limit
  *
  * POST /api/expenses
  *   Body: CreateExpenseInput (see lib/expenseService.ts).
@@ -23,6 +23,11 @@ export async function GET(request: NextRequest) {
 
   const sp = new URL(request.url).searchParams;
   try {
+    // templates_only drives the Recurring panel — the ledger itself never
+    // shows templates, which is why they had no management surface at all.
+    if (sp.get('templates_only') === 'true') {
+      return NextResponse.json({ expenses: await ExpenseService.listTemplates() });
+    }
     const rows = await ExpenseService.list({
       user_id: sp.get('user_id') || undefined,
       expense_type: (sp.get('expense_type') as ExpenseType) || undefined,

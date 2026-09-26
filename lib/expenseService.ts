@@ -41,6 +41,8 @@ export interface Expense {
   notes: string | null;
   recurrence_start_date: string | null;
   recurrence_end_date: string | null;
+  paused_at: string | null;
+  paused_by: string | null;
   expense_date: string | null;
   is_paid: boolean;
   paid_at: string | null;
@@ -375,6 +377,53 @@ export class ExpenseService {
     const { data, error } = await q;
     if (error) throw error;
     return (data || []) as Expense[];
+  }
+
+  /**
+   * Every recurring template, newest first.
+   *
+   * [Andy 2026-09-27] Nothing in the UI ever passed include_templates, so a
+   * template was write-once and then invisible: once created you could not
+   * see it, end it, or stop it. This is the list behind the Recurring panel.
+   */
+  static async listTemplates(): Promise<Expense[]> {
+    const sb = adminClient();
+    const { data, error } = await (sb as any)
+      .from('expenses')
+      .select('*')
+      .eq('is_template', true)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []) as Expense[];
+  }
+
+  /**
+   * Pause or resume a template. Pausing stops the cron generating new
+   * instances; it does not touch instances already generated, and it is not
+   * an end date — resuming picks the recurrence back up from the next due
+   * period. Nothing is deleted either way.
+   */
+  static async setTemplatePaused(
+    id: string, paused: boolean, actorId: string | null,
+  ): Promise<Expense> {
+    const sb = adminClient();
+    const { data: row } = await (sb as any)
+      .from('expenses').select('is_template').eq('id', id).maybeSingle();
+    if (!row) throw new Error('Expense not found');
+    // Pausing an instance is meaningless — only templates generate anything.
+    if (!(row as any).is_template) throw new Error('Only a recurring template can be paused');
+
+    const { data, error } = await (sb as any)
+      .from('expenses')
+      .update(paused
+        ? { paused_at: new Date().toISOString(), paused_by: actorId ?? null }
+        : { paused_at: null, paused_by: null })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data as Expense;
   }
 
   static async getById(id: string): Promise<Expense | null> {

@@ -48,6 +48,7 @@ import {
   CreditCard, RefreshCw, Eye, TrendingUp, Receipt,
 } from 'lucide-react';
 import { ReimbursementReviewPanel } from '@/components/expenses/ReimbursementReviewPanel';
+import { RecurringTemplatesPanel } from '@/components/expenses/RecurringTemplatesPanel';
 
 // ─── Types (mirror lib/expenseService.ts) ────────────────────────────
 type Frequency = 'one_time' | 'daily' | 'weekly' | 'monthly';
@@ -148,7 +149,7 @@ export default function ExpensesPage() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   // Expenses ledger vs Reimbursement requests review queue
-  const [view, setView] = useState<'expenses' | 'requests'>('expenses');
+  const [view, setView] = useState<'expenses' | 'recurring' | 'requests'>('expenses');
   const [pendingReqCount, setPendingReqCount] = useState(0);
 
   // ─── Fetchers ──────────────────────────────────────────────────
@@ -400,6 +401,14 @@ export default function ExpensesPage() {
         </button>
         <button
           type="button"
+          onClick={() => setView('recurring')}
+          className={`relative -mb-px px-4 py-2 text-sm font-medium transition-colors inline-flex items-center gap-2 ${view === 'recurring' ? 'text-brand border-b-2 border-brand' : 'text-ink-warm-500 hover:text-ink-warm-800'}`}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Recurring
+        </button>
+        <button
+          type="button"
           onClick={() => setView('requests')}
           className={`relative -mb-px px-4 py-2 text-sm font-medium transition-colors inline-flex items-center gap-2 ${view === 'requests' ? 'text-brand border-b-2 border-brand' : 'text-ink-warm-500 hover:text-ink-warm-800'}`}
         >
@@ -412,6 +421,10 @@ export default function ExpensesPage() {
           )}
         </button>
       </div>
+
+      {view === 'recurring' && (
+        <RecurringTemplatesPanel onChanged={fetchExpenses} />
+      )}
 
       {view === 'requests' && (
         <ReimbursementReviewPanel

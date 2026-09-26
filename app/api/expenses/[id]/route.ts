@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET    /api/expenses/[id]   — detail (includes attachments)
  * PATCH  /api/expenses/[id]   — update arbitrary fields (mark paid, edit amount, etc.)
+ *                               `paused: true|false` pauses/resumes a template.
  * DELETE /api/expenses/[id]   — soft delete (sets deleted_at)
  *
  * Reminder: editing a TEMPLATE updates future instances only — past
@@ -58,6 +59,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   try {
+    // `paused` is handled by the service, not the field whitelist: it stamps
+    // paused_by and refuses on a non-template, neither of which a raw column
+    // write would do.
+    if (typeof body.paused === 'boolean') {
+      const toggled = await ExpenseService.setTemplatePaused(
+        params.id, body.paused, guard.user?.id ?? null,
+      );
+      // A request that ONLY pauses is done here.
+      if (Object.keys(patch).length === 0) {
+        return NextResponse.json({ expense: toggled });
+      }
+    }
     const updated = await ExpenseService.update(params.id, patch);
     return NextResponse.json({ expense: updated });
   } catch (err: any) {

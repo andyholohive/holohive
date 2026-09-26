@@ -84,12 +84,16 @@ export async function GET(request: Request) {
   };
 
   try {
-    // Pull active templates (not deleted, not yet ended)
+    // Pull active templates (not deleted, not paused, not yet ended)
     const { data: templates, error: loadErr } = await (supabase as any)
       .from('expenses')
       .select('*')
       .eq('is_template', true)
       .is('deleted_at', null)
+      // Paused templates generate nothing [Andy 2026-09-27]. Distinct from
+      // recurrence_end_date, which ends a recurrence for good: a paused
+      // template is still live, just not billing this month.
+      .is('paused_at', null)
       .or(`recurrence_end_date.is.null,recurrence_end_date.gte.${todayIso}`);
 
     if (loadErr) {
