@@ -32,6 +32,8 @@ export interface BriefClientEntry {
   currentReportText: string | null;
   briefUrl: string | null;
   portalUrl: string | null;
+  /** clients.logo_url — shown in the brief's top bar, same as the portal. */
+  clientLogoUrl?: string | null;
   opens30d: number;
 }
 
@@ -137,7 +139,7 @@ function ClientPanel({ c }: { c: BriefClientEntry }) {
         <div className="grid gap-2.5">
           <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-warm-900"><BookOpenText className="h-3.5 w-3.5 text-brand" />The brief it opens</p>
           <BriefPhoneFrame label={`${c.name} Korea brief`}>
-            {s ? <KoreaBrief s={s} portalUrl={c.portalUrl} /> : <NoBrief name={c.name} />}
+            {s ? <KoreaBrief s={s} portalUrl={c.portalUrl} clientLogoUrl={c.clientLogoUrl ?? null} /> : <NoBrief name={c.name} />}
           </BriefPhoneFrame>
         </div>
       </div>

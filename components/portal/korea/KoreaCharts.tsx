@@ -9,7 +9,7 @@
  * legend box — the card title names the series.
  */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 /**
  * Two palettes. `light` is the portal's cream surface. `dark` is the client
@@ -76,10 +76,13 @@ function Tip({ tip, cls }: { tip: { x: number; y: number; html: string } | null;
   );
 }
 
-export function LineChart({ points, min, max, ticks, fmt, label, theme = 'light' }: {
+export function LineChart({ points, min, max, ticks, fmt, label, theme = 'light', animate = false }: {
   points: Point[]; min: number; max: number; ticks: number[]; fmt: (v: number) => string; label: string;
   theme?: ChartTheme;
+  /** Draw-in on reveal. Needs briefMotion's styles and a <Reveal> ancestor. */
+  animate?: boolean;
 }) {
+  const A = animate;
   const T = THEMES[theme];
   const { ref, w } = useWidth();
   const [tip, setTip] = useState<{ x: number; y: number; html: string } | null>(null);
@@ -120,14 +123,14 @@ export function LineChart({ points, min, max, ticks, fmt, label, theme = 'light'
               </filter>
             )}
           </defs>
-          {points.length > 1 && <path d={`${d}L${X(points.length - 1)},${m.t + ih}L${X(0)},${m.t + ih}Z`} fill={`url(#${gid}-fill)`} />}
-          <path d={d} fill="none" stroke={T.line} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" filter={T.glow ? `url(#${gid}-glow)` : undefined} />
+          {points.length > 1 && <path d={`${d}L${X(points.length - 1)},${m.t + ih}L${X(0)},${m.t + ih}Z`} fill={`url(#${gid}-fill)`} className={A ? 'kb-area' : undefined} />}
+          <path d={d} pathLength={A ? 1 : undefined} className={A ? 'kb-line' : undefined} fill="none" stroke={T.line} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" filter={T.glow ? `url(#${gid}-glow)` : undefined} />
           {points.map((p, i) => {
             const last = i === points.length - 1;
             return (
               <g key={`d${i}`}>
-                <circle cx={X(i)} cy={Y(p.y)} r={last ? 5.5 : 4} fill={p.hollow ? T.hollow : T.line} stroke={p.hollow ? T.line : T.ring} strokeWidth={2} />
-                {last && <text x={X(i) - 10} y={Y(p.y) - 11} textAnchor="end" fontSize={12.5} fontWeight={600} fill={T.ink} className="font-mono">{fmt(p.y)}</text>}
+                <circle className={A ? 'kb-dot' : undefined} style={A ? ({ '--i': i } as CSSProperties) : undefined} cx={X(i)} cy={Y(p.y)} r={last ? 5.5 : 4} fill={p.hollow ? T.hollow : T.line} stroke={p.hollow ? T.line : T.ring} strokeWidth={2} />
+                {last && <text className={A ? 'font-mono kb-label' : 'font-mono'} x={X(i) - 10} y={Y(p.y) - 11} textAnchor="end" fontSize={12.5} fontWeight={600} fill={T.ink}>{fmt(p.y)}</text>}
                 <rect
                   x={X(i) - colW / 2} y={m.t} width={colW} height={ih} fill="transparent" tabIndex={0}
                   aria-label={p.tip.replace(/\n/g, ', ')}
@@ -146,10 +149,13 @@ export function LineChart({ points, min, max, ticks, fmt, label, theme = 'light'
   );
 }
 
-export function ColumnChart({ points, min, max, ticks, fmt, label, theme = 'light' }: {
+export function ColumnChart({ points, min, max, ticks, fmt, label, theme = 'light', animate = false }: {
   points: Point[]; min: number; max: number; ticks: number[]; fmt: (v: number) => string; label: string;
   theme?: ChartTheme;
+  /** Draw-in on reveal. Needs briefMotion's styles and a <Reveal> ancestor. */
+  animate?: boolean;
 }) {
+  const A = animate;
   const T = THEMES[theme];
   const { ref, w } = useWidth();
   const [tip, setTip] = useState<{ x: number; y: number; html: string } | null>(null);
@@ -176,9 +182,11 @@ export function ColumnChart({ points, min, max, ticks, fmt, label, theme = 'ligh
             const showX = last || (i % step === 0 && points.length - 1 - i >= step);
             return (
               <g key={p.x}>
-                <rect x={x} y={top} width={bwid} height={h} rx={3} fill={p.y < 0 ? T.neg : T.line} opacity={hover === i ? 0.72 : 1} />
+                <rect x={x} y={top} width={bwid} height={h} rx={3} fill={p.y < 0 ? T.neg : T.line} opacity={hover === i ? 0.72 : 1}
+                  className={A ? 'kb-bar' : undefined}
+                  style={A ? ({ '--i': i, transformOrigin: p.y < 0 ? 'top' : 'bottom' } as CSSProperties) : undefined} />
                 {showX && <text x={x + bwid / 2} y={H - 6} textAnchor="middle" fontSize={10.5} fill={T.axis} className="font-mono">{p.x}</text>}
-                {last && <text x={x + bwid / 2} y={p.y < 0 ? top + h + 14 : top - 7} textAnchor="middle" fontSize={12} fontWeight={600} fill={T.ink} className="font-mono">{fmt(p.y)}</text>}
+                {last && <text className={A ? 'font-mono kb-label' : 'font-mono'} x={x + bwid / 2} y={p.y < 0 ? top + h + 14 : top - 7} textAnchor="middle" fontSize={12} fontWeight={600} fill={T.ink}>{fmt(p.y)}</text>}
                 <rect
                   x={m.l + i * bw} y={m.t} width={bw} height={ih} fill="transparent" tabIndex={0}
                   aria-label={p.tip.replace(/\n/g, ', ')} className="cursor-crosshair outline-none"

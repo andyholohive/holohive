@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PortalDocumentsCard from '@/components/documents/PortalDocumentsCard';
 import { KoreaIntelligence, KoreaTeaser } from '@/components/portal/korea/KoreaIntelligence';
+import { PortalTopBar } from '@/components/portal/PortalTopBar';
 import {
   Building2,
   Calendar,
@@ -2105,36 +2106,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           50% { box-shadow: 0 0 0 8px rgba(62,134,146,0.1); }
         }
       `}</style>
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Image
-                src="/images/logo.png"
-                alt="Holo Hive"
-                width={100}
-                height={32}
-                className="h-8 w-auto"
-              />
-              <span className="text-gray-300">|</span>
-              <span className="text-gray-600 font-medium">Client Portal</span>
-            </div>
-            <div className="flex items-center gap-3">
-              {client?.logo_url ? (
-                <img
-                  src={client.logo_url}
-                  alt={client.name}
-                  className="h-8 w-auto max-w-[100px] object-contain rounded-lg"
-                />
-              ) : (
-                <Building2 className="h-5 w-5 text-gray-400" />
-              )}
-              <span className="font-medium text-gray-900">{client?.name}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Header — shared with the weekly Korea brief. */}
+      <PortalTopBar clientName={client?.name} clientLogoUrl={client?.logo_url} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* [Portal load-together v1] Hold everything behind a centered

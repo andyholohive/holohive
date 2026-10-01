@@ -77,8 +77,8 @@ export default async function KoreaBriefPage({ params, searchParams }: { params:
       .then(() => null, () => null);
   }
 
-  const { data: c } = await (r.db as any).from('clients').select('slug').eq('id', r.clientId).maybeSingle();
+  const { data: c } = await (r.db as any).from('clients').select('slug, logo_url').eq('id', r.clientId).maybeSingle();
   const portalUrl = `/public/portal/${c?.slug || r.clientId}`;
 
-  return <KoreaBrief s={s} portalUrl={portalUrl} />;
+  return <KoreaBrief s={s} portalUrl={portalUrl} clientLogoUrl={c?.logo_url ?? null} />;
 }
