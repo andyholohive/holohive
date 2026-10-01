@@ -9,6 +9,10 @@ export interface KrSignalFeatures {
   weekly_market_report: boolean;
   korea_listings_digest: boolean;
   client_listing_alert: boolean;
+  /** Save each peer's Korea share weekly for the portal's Peers tab. Off by
+   *  default: it costs one CoinGecko call per peer, the reason peer rank was
+   *  dropped from the report on 2026-08-03. Optional so existing rows parse. */
+  peer_benchmark?: boolean;
 }
 
 export interface KrSignalThresholds {

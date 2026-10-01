@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PortalDocumentsCard from '@/components/documents/PortalDocumentsCard';
+import { KoreaIntelligence } from '@/components/portal/korea/KoreaIntelligence';
 import {
   Building2,
   Calendar,
@@ -2904,6 +2905,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {/* Milestone-based progress is rendered above */}
 
         {/* Recent Activities — rendered in floating button modal */}
+
+        {/* Korea intelligence — verdict, trend, market, Korean comments and
+            detail tabs. Self-contained (gated fetch, renders nothing for a
+            client with no Korea setup). See components/portal/korea. */}
+        <KoreaIntelligence idOrSlug={idOrSlug} email={email} className="mb-10" />
 
         {/* Korean Mindshare Tracker */}
         {mindshareEnabled && (

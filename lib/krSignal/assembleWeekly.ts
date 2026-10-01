@@ -117,15 +117,23 @@ export async function assembleWeekly(
     getBaseline(supabase, "futures_total"),
     getBaseline(supabase, "kr_cex_vol"),
   ]);
-  // Only compare KR-vol WoW when the prior was measured over the SAME window.
-  // During ramp-up (24h → Nd → 7d) the window changes week to week, and a
-  // 7d sum divided by a stored 24h reading prints a garbage +X% [Andy 2026-07-15].
+  // Only compare KR-vol WoW like-for-like. A 7d sum divided by a stored 24h
+  // reading printed a garbage +X% [Andy 2026-07-15], so mismatched windows
+  // used to be refused outright — which also froze the arrow at "⟷ +0%" for
+  // any 6d-vs-7d week, and a client read that as "no change" when Venice's
+  // Korean volume had in fact risen ~2.4× [2026-10-01]. Compare DAILY
+  // averages instead: both sides divided by their own day count, so a 6d and
+  // a 7d reading compare fairly and a 24h prior still can't fake a 7× jump.
+  const curDays = windowDays(volWindow);
+  const priorDays = krVolPriorRow ? windowDays(krVolPriorRow.window) : null;
   const krVolPrior =
-    krVolPriorRow != null && krVolPriorRow.window === volWindow ? krVolPriorRow.value : null;
+    krVolPriorRow != null && curDays && priorDays
+      ? (krVolPriorRow.value / priorDays) * curDays
+      : null;
   if (fxPrior == null || krPrior == null || krVolPriorRow == null)
     pending.push("trend arrows — no prior-week snapshot yet (flat until the 2nd weekly run persists state)");
   else if (krVolPrior == null)
-    pending.push(`KR vol WoW — prior window (${krVolPriorRow.window ?? "unknown"}) ≠ this week (${volWindow}); arrow held flat until two same-window weeks exist`);
+    pending.push(`KR vol WoW — prior window (${krVolPriorRow.window ?? "unknown"}) is unreadable; no comparison printed`);
   // Kept out of the if/else chain above — that chain's `else if` narrows
   // krVolPriorRow to non-null, and slotting a condition into the middle of it
   // silently breaks that narrowing.
@@ -193,6 +201,27 @@ export async function assembleWeekly(
   // peer_basket every week, so keeping it would have meant paying for data
   // nothing displays. calc.krVolShareRank() is left in place for reuse.
 
+  // [2026-10-01] Peer benchmark for the client portal — opt-in per client.
+  // Not rendered in the Telegram report (rank stays removed); saved so the
+  // portal's Peers tab can draw a real comparison instead of an example.
+  let peerShares: ClientWeekly["peer_shares"] = null;
+  if (cfg.features?.peer_benchmark && cfg.peer_basket.length) {
+    const rows = await Promise.all(cfg.peer_basket.map(async (id) => {
+      try {
+        const v = await adapters.getPerVenueVolume(id);
+        const total = Object.values(v).reduce((s, x) => s + (x || 0), 0);
+        if (!total) return null;
+        const kr = (v["upbit"] || 0) + (v["bithumb"] || 0);
+        return { id, name: peerName(id), kr_share: kr / total };
+      } catch {
+        return null;
+      }
+    }));
+    peerShares = rows.filter((r): r is NonNullable<typeof r> => r != null);
+    if (peerShares.length < cfg.peer_basket.length)
+      pending.push(`peer benchmark — ${cfg.peer_basket.length - peerShares.length} peer(s) failed to load`);
+  }
+
   const data: WeeklyReportData = {
     ticker: cfg.ticker,
     weekLabel: weekLabel(),
@@ -200,6 +229,8 @@ export async function assembleWeekly(
     krVolSharePct: Math.round(krVolShare * 100),
     krVol7dArrow: krVolArrow,
     krVol7dPct: Math.round(krVolPct),
+    // Without a comparable prior the line says so, instead of "⟷ +0%".
+    krVolHasPrior: krVolPrior != null,
     koreaReadLabel: calc.koreaReadLabel(kimchi, krVolTrend, th),
     byVenue,
     futuresTotalUsd: futures.total,
@@ -244,6 +275,7 @@ export async function assembleWeekly(
     // Persist the window this figure was measured over so next week's WoW can
     // refuse a cross-window comparison (7d-vs-24h during ramp-up).
     kr_token_vol_window: volWindow,
+    ...(peerShares ? { peer_shares: peerShares } : {}),
   };
 
   return {
@@ -255,6 +287,20 @@ export async function assembleWeekly(
     weekEnding,
     debug: { futuresByVenue: futures.byVenue, futuresMissing: futures.missing, krCexKrw },
   };
+}
+
+/** CoinGecko id → display name ("render-token" → "Render", "fetch-ai" → "Fetch Ai"). */
+function peerName(id: string): string {
+  return id.replace(/-(token|network|protocol)$/i, "").split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+/** "7d" → 7, "6d" → 6, "24h" → 1; null when the label can't be read. */
+function windowDays(w: string | null | undefined): number | null {
+  if (!w) return null;
+  if (w === "24h") return 1;
+  const m = /^(\d+)d$/.exec(w);
+  return m ? Number(m[1]) : null;
 }
 
 function weekLabel(): string {

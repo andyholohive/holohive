@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -26,8 +28,7 @@ import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown,
   Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
-  XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles,
-} from 'lucide-react';
+  XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles, Mail } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 import { formatDateTime } from '@/lib/dateFormat';
 
@@ -1265,6 +1266,11 @@ export default function MindsharePage() {
         subtitle="Where projects stand in Korean crypto Telegram channels."
         kicker="Measurement · Korea Signal"
         kickerDot="emerald"
+        actions={(
+          <Button asChild variant="outline" size="sm">
+            <Link href="/mindshare/korea-email"><Mail className="h-4 w-4 mr-2" />Weekly client email</Link>
+          </Button>
+        )}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>

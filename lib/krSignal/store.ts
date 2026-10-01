@@ -70,6 +70,8 @@ export interface ClientWeekly {
   /** Window kr_token_vol_usd was measured over ("24h" | "Nd" | "7d"). Lets the
    *  WoW math refuse to compare across a window change (e.g. 7d-vs-24h ramp-up). */
   kr_token_vol_window?: string | null;
+  /** Peer basket Korea shares, saved only when features.peer_benchmark is on. */
+  peer_shares?: Array<{ id: string; name: string; kr_share: number }> | null;
   /** [2026-08-03] The exact Telegram HTML that went out this week.
    *
    *  Stored because the report CANNOT be reconstructed from the other columns:

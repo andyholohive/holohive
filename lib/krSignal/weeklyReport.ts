@@ -17,6 +17,8 @@ export interface WeeklyReportData {
   volWindow?: string;
   krVolSharePct: number;
   krVol7dArrow: Arrow; krVol7dPct: number;
+  /** False when there's no comparable prior week; the line then says so. Optional so stored rows predating it still render. */
+  krVolHasPrior?: boolean;
   koreaReadLabel: string;
   byVenue: VenueVol[];
   futuresTotalUsd: number; futuresRegime: Regime; futuresArrow: Arrow;
@@ -83,7 +85,9 @@ export function buildWeeklyReport(d: WeeklyReportData): string {
     B.push(`Not yet on a Korean exchange — watching for a KR debut.`);
   } else {
     B.push(`KR vol share   ${d.krVolSharePct}% (Upbit + Bithumb)`);
-    B.push(`${pad(`KR Vol (${W})`, 15)}${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
+    B.push(d.krVolHasPrior === false
+      ? `${pad(`KR Vol (${W})`, 15)}no prior week to compare yet`
+      : `${pad(`KR Vol (${W})`, 15)}${d.krVol7dArrow} ${sign(d.krVol7dPct)} WoW`);
     B.push(d.koreaReadLabel);
   }
   B.push(HR);
