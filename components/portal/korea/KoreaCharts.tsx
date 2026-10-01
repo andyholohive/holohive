@@ -25,10 +25,20 @@ function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   useEffect(() => {
-    if (!ref.current) return;
-    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
-    ro.observe(ref.current);
-    return () => ro.disconnect();
+    const el = ref.current;
+    if (!el) return;
+    // Measure now, on resize, and once more next frame. Relying on the
+    // observer's first callback alone left a chart blank when it mounted
+    // into a container that hadn't laid out yet (a phone-preview iframe, a
+    // tab opening) — the width arrived but the callback never re-fired.
+    const view = el.ownerDocument.defaultView ?? window;
+    const measure = () => setW(Math.round(el.getBoundingClientRect().width));
+    measure();
+    const RO: typeof ResizeObserver = (view as any).ResizeObserver ?? ResizeObserver;
+    const ro = new RO(measure);
+    ro.observe(el);
+    const raf = view.requestAnimationFrame(measure);
+    return () => { ro.disconnect(); view.cancelAnimationFrame(raf); };
   }, []);
   return { ref, w };
 }

@@ -85,7 +85,9 @@ export function renderKoreaEmail(s: KoreaSummary, opts: { portalUrl: string }): 
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${C.card};border:1px solid ${C.line};border-radius:12px;overflow:hidden">
   <tr><td style="padding:16px 28px;border-bottom:1px solid ${C.line}">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="font:600 14px/1 ${FONT};color:${C.ink}">Holo Hive</td>
+      <td style="font:600 14px/1 ${FONT};color:${C.ink}">
+        <img src="${escAttr(logoUrl())}" width="20" height="20" alt="" style="display:inline-block;vertical-align:middle;margin-right:8px;border:0">Holo Hive
+      </td>
       <td align="right" style="font:500 11px/1 ${FONT};letter-spacing:.06em;color:${C.ink5}">${esc(s.client.name.toUpperCase())} · KOREA${s.week ? ` · ${esc(s.week.label.toUpperCase())}` : ''}</td>
     </tr></table>
   </td></tr>
@@ -115,6 +117,11 @@ export function renderKoreaEmail(s: KoreaSummary, opts: { portalUrl: string }): 
 </table>
 </td></tr></table>
 </body></html>`;
+}
+
+/** Email clients need an absolute URL; the portal serves the logo publicly. */
+function logoUrl() {
+  return `${(process.env.NEXT_PUBLIC_APP_URL || 'https://app.holohive.io').replace(/\/$/, '')}/images/logo.png`;
 }
 
 function previewText(s: KoreaSummary) {

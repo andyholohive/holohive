@@ -12,6 +12,7 @@
  */
 
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { Card } from '@/components/ui/card';
 import { CardHeaderEditorial } from '@/components/ui/card-header-editorial';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
@@ -37,7 +38,7 @@ export function KoreaBrief({ s, portalUrl }: { s: KoreaSummary; portalUrl: strin
       <header className="border-b border-cream-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <span className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <span className="inline-block h-5 w-5 rounded-md bg-gradient-to-b from-[#4a96a2] to-[#3a7d89]" aria-hidden />
+            <Image src="/images/logo.png" alt="" width={22} height={22} priority />
             Holo Hive
           </span>
           <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-ink-warm-500">
