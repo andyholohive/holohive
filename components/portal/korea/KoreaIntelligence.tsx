@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Activity, PieChart, Coins, PenLine, Globe, MessageSquare, MessagesSquare, Target,
-  TrendingUp, Newspaper, Megaphone, Users, Scale, Check, AlertTriangle,
+  TrendingUp, Newspaper, Megaphone, Users, Scale, Check, AlertTriangle, ChevronDown,
 } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
 import type { KoreaSummary } from '@/lib/koreaIntel/summary';
@@ -41,68 +41,100 @@ const LABEL_TONE: Record<string, BadgeTone> = {
   Questions: 'brand', Positive: 'success', Excited: 'success', Negative: 'danger', FUD: 'danger',
 };
 
-export function KoreaIntelligence({ idOrSlug, email, className }: { idOrSlug: string; email: string; className?: string }) {
-  const [summary, setSummary] = useState<KoreaSummary | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'none' | 'error'>('loading');
+type LoadState = { state: 'loading' | 'ready' | 'none' | 'error'; summary: KoreaSummary | null };
 
-  useEffect(() => {
-    if (!idOrSlug || !email) return;
-    let alive = true;
-    (async () => {
+// The teaser near the top of the portal and the full section below both need
+// the same summary. One in-flight request per portal + email, shared.
+const cache = new Map<string, Promise<LoadState>>();
+function loadKorea(idOrSlug: string, email: string): Promise<LoadState> {
+  const key = `${idOrSlug}|${email.toLowerCase()}`;
+  if (!cache.has(key)) {
+    cache.set(key, (async (): Promise<LoadState> => {
       try {
         const res = await fetch('/api/public/portal-gate/korea', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ idOrSlug, email }), cache: 'no-store',
         });
         const json = await res.json().catch(() => ({}));
-        if (!alive) return;
-        if (!res.ok || !json.ok) { setState('error'); return; }
-        if (!json.summary) { setState('none'); return; }
-        setSummary(json.summary); setState('ready');
+        if (!res.ok || !json.ok) { cache.delete(key); return { state: 'error', summary: null }; }
+        return json.summary ? { state: 'ready', summary: json.summary } : { state: 'none', summary: null };
       } catch {
-        if (alive) setState('error');
+        cache.delete(key);
+        return { state: 'error', summary: null };
       }
-    })();
+    })());
+  }
+  return cache.get(key)!;
+}
+
+function useKorea(idOrSlug: string, email: string): LoadState {
+  const [st, setSt] = useState<LoadState>({ state: 'loading', summary: null });
+  useEffect(() => {
+    if (!idOrSlug || !email) return;
+    let alive = true;
+    loadKorea(idOrSlug, email).then((r) => { if (alive) setSt(r); });
     return () => { alive = false; };
   }, [idOrSlug, email]);
+  return st;
+}
+
+/**
+ * "Korea this week" — a one-card summary placed under the campaign numbers at
+ * the top of the portal, so the verdict is visible without scrolling. Links
+ * down to the full Korea section. Renders nothing while loading or when the
+ * client has no Korea setup (no layout jump, no empty card).
+ */
+export function KoreaTeaser({ idOrSlug, email, className }: { idOrSlug: string; email: string; className?: string }) {
+  const { state, summary: s } = useKorea(idOrSlug, email);
+  if (state !== 'ready' || !s) return null;
+  return (
+    <a href="#korea" className={`group block rounded-xl border border-cream-200 bg-white shadow-lg transition-colors hover:border-brand/40 focus-brand ${className ?? ''}`}>
+      <div className="grid gap-4 p-5 sm:p-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">Korea this week</span>
+            <StatusBadge tone={STATUS_TONE[s.verdict.status] ?? 'neutral'} size="sm">{s.verdict.label}</StatusBadge>
+          </div>
+          <p className="display-serif mt-2 text-lg leading-snug text-ink-warm-900 sm:text-xl">{s.verdict.headline}</p>
+          <p className="mt-1.5 text-sm text-ink-warm-700"><span className="font-semibold text-ink-warm-900">To do:</span> {s.action.text}</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-dark group-hover:underline">
+          See the Korea report<ChevronDown className="h-4 w-4" />
+        </span>
+      </div>
+    </a>
+  );
+}
+
+export function KoreaIntelligence({ idOrSlug, email, className }: { idOrSlug: string; email: string; className?: string }) {
+  const { state, summary } = useKorea(idOrSlug, email);
 
   if (state === 'none') return null;
   if (state === 'error') {
     return (
-      <Card className={`p-5 ${className ?? ''}`}>
-        <p className="text-sm text-ink-warm-500">Korea data couldn’t load just now. Refresh the page to try again.</p>
-      </Card>
+      <Frame className={className} subtitle="Korea data couldn’t load just now. Refresh the page to try again." />
     );
   }
   if (state === 'loading' || !summary) {
     return (
-      <section className={`space-y-4 ${className ?? ''}`} aria-busy="true">
-        <Skeleton className="h-8 w-48" />
+      <Frame className={className} subtitle="Loading this week’s Korea read…" busy>
         <Skeleton className="h-32 rounded-lg" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
         <Skeleton className="h-64 rounded-lg" />
-      </section>
+      </Frame>
     );
   }
 
   const s = summary;
   const ticker = `$${s.client.ticker}`;
 
+  const stale = s.comments.latest ? (Date.now() - Date.parse(s.comments.latest)) / 86_400_000 > 21 : false;
+
   return (
-    <section className={`space-y-4 ${className ?? ''}`} aria-labelledby="korea-heading">
-      <div className="space-y-1">
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand" />{s.client.name} · Korea
-        </div>
-        <h2 id="korea-heading" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-warm-900">
-          <Activity className="h-5 w-5 text-ink-warm-700" />Korea
-        </h2>
-        <p className="text-sm text-ink-warm-500">
-          {ticker}{s.week ? ` · week of ${s.week.label}` : ''} · updated every Saturday
-        </p>
-      </div>
+    <Frame className={className}
+      subtitle={`${ticker}${s.week ? ` · week of ${s.week.label}` : ''} · updated every Saturday`}>
 
       {/* ── Verdict + one action ─────────────────────────────── */}
       <div className="crd-feature grid overflow-hidden md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -128,7 +160,7 @@ export function KoreaIntelligence({ idOrSlug, email, className }: { idOrSlug: st
           <KpiCard icon={Target} accent="sky" label="Listing readiness" value={`${s.readiness?.filter((r) => r.ok).length ?? 0} of ${s.readiness?.length ?? 0}`} sub="Checks passing" />
         )}
         {s.stats.volume ? (
-          <KpiCard icon={Coins} label={`Korean volume · ${s.stats.volume.window ?? '7d'}`} value={usd(s.stats.volume.usd)}
+          <KpiCard icon={Coins} label={`Korean volume · ${windowLabel(s.stats.volume.window)}`} value={usd(s.stats.volume.usd)}
             trend={s.stats.volume.paceRatio != null ? { delta: s.stats.volume.paceRatio - 1, label: s.stats.volume.paceRatio >= 1 ? `${s.stats.volume.paceRatio.toFixed(1)}×` : `−${Math.round((1 - s.stats.volume.paceRatio) * 100)}%` } : undefined}
             sub={s.stats.volume.paceRatio != null ? 'Daily pace vs last week' : 'No prior week to compare yet'} />
         ) : (
@@ -183,7 +215,7 @@ export function KoreaIntelligence({ idOrSlug, email, className }: { idOrSlug: st
             <div className="grid gap-4 p-5">
               <div className="grid gap-2 text-sm">
                 <MarketRow label="KOSPI" value={s.market.latest.kospi.toLocaleString('en-US')} delta={s.market.latest.kospiPct} />
-                <MarketRow label="Koreans pay" value={`${s.market.latest.kimchiPct >= 0 ? '+' : ''}${s.market.latest.kimchiPct.toFixed(1)}% vs global`}
+                <MarketRow label="Koreans pay" value={`${Math.abs(s.market.latest.kimchiPct).toFixed(1)}% ${s.market.latest.kimchiPct >= 0 ? 'more' : 'less'}`}
                   note={s.market.latest.kimchiPrev != null ? `from ${s.market.latest.kimchiPrev >= 0 ? '+' : ''}${s.market.latest.kimchiPrev.toFixed(1)}%` : undefined}
                   good={s.market.latest.kimchiPrev != null ? s.market.latest.kimchiPct >= s.market.latest.kimchiPrev : undefined} />
                 <MarketRow label="KR crypto volume" value={usd(s.market.latest.krCexUsd)} delta={s.market.latest.krCexPct} />
@@ -207,7 +239,7 @@ export function KoreaIntelligence({ idOrSlug, email, className }: { idOrSlug: st
       {/* ── What Korea is saying (top themes only) ─────────────── */}
       {s.comments.substantive > 0 && (
         <Card>
-          <CardHeaderEditorial icon={MessageSquare} title="What Korea is saying" subtitle="Top themes in Korean comments"
+          <CardHeaderEditorial icon={MessageSquare} title={stale ? 'What Korea has been saying' : 'What Korea is saying'} subtitle={stale ? 'Top themes since your campaign started' : 'Top themes in Korean comments'}
             action={s.comments.latest ? <StatusBadge tone="neutral">Through {formatDate(s.comments.latest)}</StatusBadge> : undefined} />
           <div className="grid gap-3.5 p-5">
             <div className="flex flex-wrap gap-1.5">
@@ -226,18 +258,37 @@ export function KoreaIntelligence({ idOrSlug, email, className }: { idOrSlug: st
 
       {/* ── Detail tabs ─────────────────────────────────────── */}
       <DetailTabs s={s} />
+    </Frame>
+  );
+}
+
+/** Same frame as the portal's other sections (cf. PortalDocumentsCard):
+ *  white header with a teal kicker and display title over a cream body. */
+function Frame({ className, subtitle, busy, children }: { className?: string; subtitle: string; busy?: boolean; children?: ReactNode }) {
+  return (
+    <section id="korea" aria-labelledby="korea-heading" aria-busy={busy || undefined}
+      className={`scroll-mt-24 overflow-hidden rounded-xl border border-cream-200 bg-cream-50 shadow-xl ${className ?? ''}`}>
+      <header className="border-b border-cream-200 bg-white px-5 pb-5 pt-6 sm:px-6">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">
+          <Activity className="h-3 w-3" />Korea intelligence
+        </p>
+        <h2 id="korea-heading" className="display-serif mt-1 text-2xl text-ink-warm-900">Korea</h2>
+        <p className="mt-1 text-xs text-ink-warm-500">{subtitle}</p>
+      </header>
+      {children && <div className="space-y-4 p-5 sm:p-6">{children}</div>}
     </section>
   );
 }
 
 function DetailTabs({ s }: { s: KoreaSummary }) {
+  // Comments first: it's the one thing a client can't get anywhere else.
+  // Tabs with nothing real to show are left out, News included.
   const tabs: Array<{ value: string; label: string; show: boolean }> = [
+    { value: 'comments', label: 'Comments', show: s.comments.total > 0 },
     { value: 'exchanges', label: 'Exchanges', show: s.venues.length > 0 },
     { value: 'listings', label: 'Listings', show: s.listings.length > 0 },
-    { value: 'comments', label: 'Comments', show: s.comments.total > 0 },
-    // Peers only appears once real peer values exist — never with placeholders.
     { value: 'peers', label: 'Peers', show: s.peers.rows.length > 1 },
-    { value: 'news', label: 'News', show: true },
+    { value: 'news', label: 'News', show: s.news.length > 0 },
     { value: 'creators', label: 'Creators', show: s.creators.channels > 0 },
   ];
   const visible = tabs.filter((t) => t.show);
@@ -245,11 +296,15 @@ function DetailTabs({ s }: { s: KoreaSummary }) {
   const ticker = `$${s.client.ticker}`;
 
   return (
-    <Tabs defaultValue={visible[0].value} className="space-y-4 pt-2">
+    <Tabs defaultValue={visible[0].value} className="space-y-4 border-t border-cream-200 pt-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-warm-900">The detail</p>
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-warm-500">{visible.length} views · one at a time</span>
+      </div>
       <div className="max-w-full overflow-x-auto">
         <TabsList className="h-auto border border-cream-200 bg-cream-100 p-1">
           {visible.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="text-[13px] data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card">{t.label}</TabsTrigger>
+            <TabsTrigger key={t.value} value={t.value} className="text-[13px] text-ink-warm-700 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card">{t.label}</TabsTrigger>
           ))}
         </TabsList>
       </div>
@@ -259,7 +314,7 @@ function DetailTabs({ s }: { s: KoreaSummary }) {
           <CardHeaderEditorial icon={Coins} title={`Where ${ticker} trades`} subtitle="7-day volume by exchange" />
           <div className="p-5">
             <BarList fmt={usd} rows={s.venues.map((v) => ({
-              label: <>{v.isKR && <span className="rounded bg-brand-light px-1 font-mono text-[9.5px] font-semibold text-brand">KR</span>}{v.name}</>,
+              label: <>{v.isKR && <span className="rounded bg-brand-light px-1 font-mono text-[10px] font-semibold text-brand-deep">KR</span>}{v.name}</>,
               value: v.usd, tone: v.isKR ? 'brand' : 'mute', strong: v.isKR,
             }))} />
             <p className="mt-3.5 text-xs text-ink-warm-500">{s.client.listed ? 'Korean exchanges in teal.' : 'Not on a Korean exchange yet — these are your global venues.'}</p>
@@ -309,7 +364,7 @@ function DetailTabs({ s }: { s: KoreaSummary }) {
                 <div key={i} className="rounded-lg border border-cream-200 bg-cream-50 px-3.5 py-3">
                   <p className="text-[15px] leading-snug text-ink-warm-900">{q.ko}</p>
                   {q.en && <p className="mt-0.5 text-[13.5px] text-ink-warm-500">“{q.en}”</p>}
-                  <div className="mt-2 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-wider text-ink-warm-400">
+                  <div className="mt-2 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-wider text-ink-warm-500">
                     <StatusBadge tone={LABEL_TONE[q.label] ?? 'neutral'} size="sm">{q.label}</StatusBadge>
                     {q.theme && <span className="truncate">{q.theme}</span>}
                     {q.date && <span>{formatDate(q.date)}</span>}
@@ -337,7 +392,7 @@ function DetailTabs({ s }: { s: KoreaSummary }) {
             <ul className="divide-y divide-cream-100">
               {s.news.map((n) => (
                 <li key={n.link || n.title} className="grid gap-1.5 px-5 py-4 sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:gap-4">
-                  <span className="font-mono text-[10.5px] uppercase leading-relaxed tracking-wider text-ink-warm-400">{n.source}{n.published && <><br />{formatDate(n.published)}</>}</span>
+                  <span className="font-mono text-[10.5px] uppercase leading-relaxed tracking-wider text-ink-warm-500">{n.source}{n.published && <><br />{formatDate(n.published)}</>}</span>
                   <a href={n.link} target="_blank" rel="noopener noreferrer" className="min-w-0 group">
                     <span className="block text-[15px] font-semibold leading-snug text-ink-warm-900 group-hover:text-brand">{n.titleEn ?? n.title}</span>
                     {n.titleEn && <span className="mt-0.5 block text-[13px] text-ink-warm-500">{n.title}</span>}
@@ -421,6 +476,11 @@ function compact(n: number) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
   return String(n);
+}
+function windowLabel(w: string | null) {
+  if (!w || w === '7d') return '7 days';
+  if (w === '24h') return '24 hours';
+  const m = /^(\d+)d$/.exec(w); return m ? `${m[1]} days` : w;
 }
 function signed(n: number) { return `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(1)}`; }
 function capitalize(t: string) { return t.charAt(0).toUpperCase() + t.slice(1); }

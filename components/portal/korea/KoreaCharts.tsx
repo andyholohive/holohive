@@ -15,7 +15,8 @@ const BRAND = '#3e8692';
 const BRAND_FILL = 'rgba(62,134,146,0.10)';
 const NEG = '#f59e0b';
 const GRID = '#EBE6D8';
-const AXIS = '#9A9385';
+// ink-warm-500: the lighter #9A9385 measured ~2.9:1 on white, too faint for 10.5px text.
+const AXIS = '#6B6557';
 const INK = '#16140F';
 
 export interface Point { x: string; y: number; tip: string; hollow?: boolean }

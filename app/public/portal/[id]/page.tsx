@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PortalDocumentsCard from '@/components/documents/PortalDocumentsCard';
-import { KoreaIntelligence } from '@/components/portal/korea/KoreaIntelligence';
+import { KoreaIntelligence, KoreaTeaser } from '@/components/portal/korea/KoreaIntelligence';
 import {
   Building2,
   Calendar,
@@ -2481,6 +2481,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             Edge cases: if one of them has no data, the other expands
             to fill the row via flex-1 (no awkward empty column). If
             neither has data, the whole wrapper is hidden. */}
+        {/* Korea this week — the verdict and one action, visible without
+            scrolling; links down to the full Korea section (#korea). */}
+        <KoreaTeaser idOrSlug={idOrSlug} email={email} className="mb-10" />
+
         {isCampaignLiveMode && (thisWeekItems.length > 0 || topPost) && (
           <div className="flex flex-col lg:flex-row gap-6 mb-10">
 

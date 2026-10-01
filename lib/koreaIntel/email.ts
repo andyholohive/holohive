@@ -40,9 +40,9 @@ export function renderKoreaEmail(s: KoreaSummary, opts: { portalUrl: string }): 
   const stat = (label: string, value: string, detail: string) => `
     <td width="33%" valign="top" style="padding:0 4px">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.line};border-radius:10px">
-        <tr><td style="padding:12px 14px">
+        <tr><td style="padding:12px">
           <div style="font:600 10px/1.4 ${FONT};letter-spacing:.16em;text-transform:uppercase;color:${C.ink5}">${esc(label)}</div>
-          <div style="font:600 24px/1.15 ${FONT};letter-spacing:-.03em;color:${C.ink};margin-top:6px">${value}</div>
+          <div style="font:600 22px/1.15 ${FONT};letter-spacing:-.03em;color:${C.ink};margin-top:6px;white-space:nowrap">${value}</div>
           <div style="font:400 12px/1.4 ${FONT};color:${C.ink5};margin-top:4px">${detail}</div>
         </td></tr>
       </table>
@@ -55,11 +55,12 @@ export function renderKoreaEmail(s: KoreaSummary, opts: { portalUrl: string }): 
   }
   if (s.stats.volume) {
     const r = s.stats.volume.paceRatio;
-    const d = r == null ? 'no prior week yet' : r >= 1 ? `<span style="color:${C.good}">▲ ${r.toFixed(1)}×</span> last week’s daily pace` : `<span style="color:${C.bad}">▼ ${Math.round((1 - r) * 100)}%</span> vs last week’s daily pace`;
+    // Short notes: on a phone each box is ~100px wide, and long notes wrapped to three lines.
+    const d = r == null ? 'no prior week yet' : r >= 1 ? `<span style="color:${C.good}">▲ ${r.toFixed(1)}×</span> daily pace` : `<span style="color:${C.bad}">▼ ${Math.round((1 - r) * 100)}%</span> daily pace`;
     stats.push(stat('Korean volume', usd(s.stats.volume.usd), d));
   }
   stats.push(stat('Korean posts', s.stats.posts.newThisWeek != null ? String(s.stats.posts.newThisWeek) : '—',
-    s.stats.posts.total != null ? `new this week · ${s.stats.posts.total} total` : 'new this week'));
+    s.stats.posts.total != null ? `new · ${s.stats.posts.total} total` : 'new this week'));
   if (!s.client.listed && s.readiness) {
     const ok = s.readiness.filter((r) => r.ok).length;
     stats.push(stat('Listing readiness', `${ok} of ${s.readiness.length}`, 'checks passing'));
@@ -93,7 +94,7 @@ export function renderKoreaEmail(s: KoreaSummary, opts: { portalUrl: string }): 
     <div style="font:500 22px/1.3 ${FONT};letter-spacing:-.03em;color:${C.ink};margin-top:10px">${esc(s.verdict.headline)}</div>
     ${s.verdict.sub ? `<div style="font:400 15px/1.55 ${FONT};color:${C.ink7};margin-top:8px">${esc(s.verdict.sub)}</div>` : ''}
   </td></tr>
-  ${section(`${h('This week in three numbers')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 -4px"><tr>${stats.slice(0, 3).join('')}</tr></table>`)}
+  ${section(`${h('This week in three numbers')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 -4px;table-layout:fixed"><tr>${stats.slice(0, 3).join('')}</tr></table>`)}
   ${quote ? section(`${h('What Koreans are saying')}
     <div style="background:${C.bg};border:1px solid ${C.line};border-radius:10px;padding:14px 16px">
       <div style="font:400 16px/1.45 ${FONT};color:${C.ink}">${esc(quote.ko)}</div>
