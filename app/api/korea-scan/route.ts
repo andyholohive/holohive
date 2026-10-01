@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireRole } from '@/lib/requireSuperAdmin';
 import { corpusState, loadPeerSets, runKoreaScan } from '@/lib/koreaScan/load';
+import { anglesFor } from '@/lib/koreaScan/angles';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -69,10 +70,14 @@ export async function POST(request: Request) {
   try {
     const scan = await runKoreaScan(db, { subject: { name, aliases, exclude }, peerSet, windowDays });
     const token = randomBytes(32).toString('hex');
+    // Start every saved scan on the angle that best fits its numbers; the page can change it.
+    const isClient = !!peerSet.members.find((m) => m.name.toLowerCase() === name.toLowerCase())?.isClient;
+    const best = anglesFor(scan, { client: isClient })[0];
+    const deck = { slides: best.slides, kickers: best.id === 'client-weekly' ? 'lifecycle' : 'verdict', angle: best.id };
     const { data: saved, error } = await (db as any).from('korea_scans').insert({
       token, subject_name: name, aliases, exclude, peer_set_id: peerSet.id, prepared_for: preparedFor,
-      scan, opportunity_id: opportunityId, created_by: guard.user?.id ?? null,
-    }).select('id, token, created_at').single();
+      scan, deck, opportunity_id: opportunityId, created_by: guard.user?.id ?? null,
+    }).select('id, token, created_at, deck').single();
     // A scan that ran but didn't save is still useful on screen; say so instead of failing.
     if (error) return NextResponse.json({ scan, saved: null, saveError: error.message });
     return NextResponse.json({ scan, saved });

@@ -81,6 +81,17 @@ export interface KoreaScan {
    * that haven't, with their typical readers per post. `open` carries channel
    * names: internal only, stripped before a scan is shared (see redactForShare).
    */
+  /**
+   * Share of the field's Korean coverage, quality-weighted (Yano's "same
+   * method as page 4"): each name's weighted posts over the whole field's.
+   */
+  share: {
+    rows: Array<{ name: string; weighted: number; raw: number; isSubject: boolean }>;
+    subjectRank: number | null;
+    weekly: Array<{ start: string; weighted: number; partial: boolean }>;
+  };
+  /** Channels that named the subject, most-read first. `ours` is internal (stripped on share). */
+  channels: Array<{ handle: string; title: string | null; posts: number; views: number; avgViews: number; ours: boolean }>;
   network: {
     inField: number;
     named: number;
@@ -247,6 +258,29 @@ export function computeKoreaScan(input: ScanInput): KoreaScan {
     };
   }
 
+  // Share of the conversation, quality-weighted, whole window and week by week.
+  const wAll = all.map((r) => ({ name: r.name, isSubject: r.isSubject, w: weight(r.posts), n: r.posts.length }));
+  const wTotal = wAll.reduce((n, r) => n + r.w, 0);
+  const nTotal = wAll.reduce((n, r) => n + r.n, 0);
+  const shareRows = wAll.filter((r) => r.n > 0)
+    .map((r) => ({ name: r.name, weighted: wTotal ? +((r.w / wTotal) * 100).toFixed(1) : 0, raw: nTotal ? +((r.n / nTotal) * 100).toFixed(1) : 0, isSubject: r.isSubject }))
+    .sort((a, b) => b.weighted - a.weighted);
+  const fieldByWeek = byWeek(all.flatMap((r) => r.posts));
+  const shareWeekly = weekKeys.map((k, i) => {
+    const tot = weight(fieldByWeek.get(k) ?? []);
+    return { start: k, weighted: tot ? +((weight(sw.get(k) ?? []) / tot) * 100).toFixed(1) : 0, partial: partialLast && i === weekKeys.length - 1 };
+  });
+
+  // Channels that named the subject.
+  const ourSet = new Set((input.network ?? []).map((c) => c.handle.toLowerCase()));
+  const byChannel = new Map<string, ScanPost[]>();
+  for (const p of subj) byChannel.set(p.channel, [...(byChannel.get(p.channel) ?? []), p]);
+  const channelRows = [...byChannel.entries()].map(([handle, ps]) => ({
+    handle, title: ps[0].channelTitle, posts: ps.length, views: views(ps),
+    avgViews: Math.round(views(ps) / Math.max(ps.filter((p) => p.views != null).length, 1)),
+    ours: ourSet.has(handle.toLowerCase()),
+  })).sort((a, b) => b.views - a.views);
+
   return {
     subject: input.subject.name,
     field: input.field,
@@ -265,13 +299,20 @@ export function computeKoreaScan(input: ScanInput): KoreaScan {
     room: { channels: roomChannels.size, subjectChannels: subjChannels.size, neverNamed: roomChannels.size - subjChannels.size },
     referral: { recent21: refShare(recent), recent21Posts: recent.length, whole: refShare(subj) },
     receipts,
+    share: { rows: shareRows, subjectRank: shareRows.findIndex((r) => r.isSubject) + 1 || null, weekly: shareWeekly },
+    channels: channelRows,
     network,
   };
 }
 
-/** A scan safe to send outside Holo Hive: our network's channel names removed. */
+/** A scan safe to send outside Holo Hive: our network's channel names, and which channels are ours, removed. */
 export function redactForShare(s: KoreaScan): KoreaScan {
-  return s.network ? { ...s, network: { ...s.network, open: [] } } : s;
+  return {
+    ...s,
+    network: s.network ? { ...s.network, open: [] } : null,
+    // Which channels are ours is internal too.
+    channels: (s.channels ?? []).map((c) => ({ ...c, ours: false })),
+  };
 }
 
 /** First 220 characters on one line, cut at a word. */

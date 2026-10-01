@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { KoreaScanReport } from '@/components/koreaScan/KoreaScanReport';
 import { redactForShare, type KoreaScan } from '@/lib/koreaScan/compute';
 import { scanNarrative } from '@/lib/koreaScan/narrative';
+import { cleanSlides } from '@/lib/koreaScan/angles';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +29,16 @@ function admin() {
 const load = cache(async (token: string) => {
   if (!/^[a-f0-9]{64}$/.test(token)) return null;
   const db = admin() as any;
-  const { data } = await db.from('korea_scans').select('id, prepared_for, scan').eq('token', token).is('deleted_at', null).maybeSingle();
-  return data ? { db, id: data.id as string, preparedFor: data.prepared_for as string | null, scan: redactForShare(data.scan as KoreaScan) } : null;
+  const { data } = await db.from('korea_scans').select('id, prepared_for, scan, deck').eq('token', token).is('deleted_at', null).maybeSingle();
+  if (!data) return null;
+  const scan = redactForShare(data.scan as KoreaScan);
+  // The deck sales chose; no choice saved = every slide.
+  const slides = cleanSlides(data.deck?.slides, scan);
+  return {
+    db, id: data.id as string, preparedFor: data.prepared_for as string | null, scan,
+    slides: slides.length ? slides : undefined,
+    kickers: data.deck?.kickers === 'lifecycle' ? 'lifecycle' as const : 'verdict' as const,
+  };
 });
 
 export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
@@ -56,7 +65,7 @@ export default async function KoreaScanSharePage({ params, searchParams }: { par
 
   return (
     <div className="min-h-screen bg-[#F3F0E8] px-3 py-6 sm:px-6 sm:py-10">
-      <KoreaScanReport s={hit.scan} preparedFor={hit.preparedFor} audience="shared" />
+      <KoreaScanReport s={hit.scan} preparedFor={hit.preparedFor} audience="shared" slides={hit.slides} kickers={hit.kickers} />
       <p className="mx-auto mt-6 max-w-[1100px] px-1 text-center text-xs text-[#6B6557]">
         Prepared by Holo Hive. Share internally as you like, not for publication.
       </p>

@@ -11,6 +11,8 @@ import type { MatchSpec } from './classify';
 
 export interface ScanSubject extends MatchSpec {
   name: string;
+  /** A Holo Hive client (mindshare_projects.client_id set). */
+  isClient?: boolean;
 }
 
 export interface PeerSet {
@@ -53,6 +55,7 @@ export interface TrackedProject {
   name: string;
   category: string | null;
   tracked_keywords: string[] | null;
+  client_id?: string | null;
 }
 
 /** Category sets from Korea Signal, e.g. "AI · 7 projects". */
@@ -61,7 +64,7 @@ export function categorySets(projects: TrackedProject[]): PeerSet[] {
   for (const p of projects) {
     if (!p.category || !p.tracked_keywords?.length) continue;
     const list = byCat.get(p.category) ?? [];
-    list.push({ name: p.name, aliases: p.tracked_keywords });
+    list.push({ name: p.name, aliases: p.tracked_keywords, isClient: !!p.client_id });
     byCat.set(p.category, list);
   }
   return [...byCat.entries()]

@@ -52,7 +52,7 @@ export function ShareBar({ token, id, origin, onRevoked }: { token: string; id: 
       <div className="flex flex-wrap items-center gap-3 p-4">
         <Link2 className="h-4 w-4 flex-shrink-0 text-brand" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-900">Saved. Share this link with the prospect.</p>
+          <p className="text-sm font-medium text-gray-900">Saved. The link shows the slides you pick below.</p>
           <p className="truncate font-mono text-xs text-gray-500">{url}</p>
         </div>
         <Button variant="outline" size="sm" onClick={async () => toast({ title: (await copy(url)) ? 'Link copied' : 'Copy failed, select the link instead' })}>

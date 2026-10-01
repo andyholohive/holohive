@@ -6,7 +6,7 @@
  * Korean Telegram corpus (tg_channel_posts). Admin + super-admin.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,9 +25,11 @@ import { formatDate } from '@/lib/dateFormat';
 import { KoreaScanReport } from '@/components/koreaScan/KoreaScanReport';
 import type { KoreaScan } from '@/lib/koreaScan/compute';
 import { SavedScansList, ShareBar, type SavedScanRow } from '@/components/koreaScan/SavedScans';
+import { DeckComposer, defaultDeck, type DeckChoice } from '@/components/koreaScan/DeckComposer';
+import { cleanSlides } from '@/lib/koreaScan/angles';
 
 interface PeerSetOption { id: string; label: string; field: string; members: string[] }
-interface ProjectOption { name: string; aliases: string[]; exclude?: string[]; setId: string }
+interface ProjectOption { name: string; aliases: string[]; exclude?: string[]; setId: string; isClient?: boolean }
 
 const split = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -49,6 +51,28 @@ export default function KoreaScanPage() {
   const [saved, setSaved] = useState<{ id: string; token: string } | null>(null);
   const [savedRows, setSavedRows] = useState<SavedScanRow[] | null>(null);
   const [origin, setOrigin] = useState('');
+  const [deck, setDeck] = useState<DeckChoice | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isClientName = (n: string) => !!projects.find((p) => p.name.toLowerCase() === n.toLowerCase())?.isClient;
+
+  /** A saved deck, or the scan's best-fit angle. */
+  function deckFrom(sc: KoreaScan, d: any): DeckChoice {
+    const slides = cleanSlides(d?.slides, sc);
+    return slides.length ? { slides, kickers: d?.kickers === 'lifecycle' ? 'lifecycle' : 'verdict', angle: d?.angle ?? null } : defaultDeck(sc, isClientName(sc.subject));
+  }
+
+  /** Change the deck; the shared link follows after a short pause. */
+  function changeDeck(next: DeckChoice) {
+    setDeck(next);
+    if (!saved) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const id = saved.id;
+    saveTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/korea-scan/saved?id=${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+      if (!res.ok) toast({ title: 'Slide choice not saved', description: (await res.json().catch(() => ({}))).error, variant: 'destructive' });
+    }, 600);
+  }
 
   // Opened from a CRM opportunity: /mindshare/korea-scan?opportunity=<id>&name=<project>
   const params = useSearchParams();
@@ -86,6 +110,7 @@ export default function KoreaScanPage() {
     const d = await res.json().catch(() => ({}));
     if (!res.ok) { toast({ title: 'Could not open that scan', variant: 'destructive' }); return; }
     setScan(d.scan.scan);
+    setDeck(deckFrom(d.scan.scan, d.scan.deck));
     setSaved({ id: d.scan.id, token: d.scan.token });
     setPreparedFor(d.scan.prepared_for ?? '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -110,6 +135,7 @@ export default function KoreaScanPage() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? 'Scan failed');
       setScan(d.scan);
+      setDeck(deckFrom(d.scan, d.saved?.deck));
       setSaved(d.saved ? { id: d.saved.id, token: d.saved.token } : null);
       if (d.saveError) toast({ title: 'Scan ran but was not saved', description: d.saveError, variant: 'destructive' });
       loadSaved();
@@ -227,7 +253,12 @@ export default function KoreaScanPage() {
       ) : scan ? (
         <>
           {saved && origin && <ShareBar token={saved.token} id={saved.id} origin={origin} onRevoked={() => { setSaved(null); loadSaved(); }} />}
-          <KoreaScanReport s={scan} preparedFor={preparedFor.trim() || null} />
+          <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <Card className="border-gray-200 p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+              {deck && <DeckComposer s={scan} value={deck} onChange={changeDeck} client={isClientName(scan.subject)} />}
+            </Card>
+            <KoreaScanReport s={scan} preparedFor={preparedFor.trim() || null} slides={deck?.slides} kickers={deck?.kickers} />
+          </div>
         </>
       ) : (
         <Card>

@@ -17,7 +17,7 @@ const PAGE = 1000;
 const MAX_ROWS = 20_000;
 
 export async function loadPeerSets(db: SupabaseClient): Promise<PeerSet[]> {
-  const { data } = await (db as any).from('mindshare_projects').select('name, category, tracked_keywords').eq('is_active', true);
+  const { data } = await (db as any).from('mindshare_projects').select('name, category, tracked_keywords, client_id').eq('is_active', true);
   return [...CURATED_SETS, ...categorySets((data ?? []) as TrackedProject[])];
 }
 

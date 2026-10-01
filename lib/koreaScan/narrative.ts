@@ -14,6 +14,36 @@ export const ordinal = (n: number) => ORD[n] ?? `${n}th`;
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const weeks = (days: number) => (days % 7 === 0 ? `${days / 7} weeks` : `${days} days`);
 
+export type KickerMode = 'verdict' | 'lifecycle';
+
+/**
+ * The small line above each slide title. 'verdict' reads like Yano's
+ * prospect scan (The good / The bad / The ugly / The door), decided by the
+ * numbers. 'lifecycle' uses his template tags (Use from week two...).
+ */
+export function kickerFor(id: string, s: KoreaScan, mode: KickerMode, lifecycle: string): string {
+  if (mode === 'lifecycle') return lifecycle;
+  const mv = s.movement.rows.find((r) => r.isSubject);
+  const depthRank = s.depth.findIndex((d) => d.isSubject) + 1;
+  switch (id) {
+    case 'paid': return (s.paid.share ?? 100) <= 20 ? 'The good' : 'The bad';
+    case 'depth': return depthRank > 0 && depthRank <= 3 ? 'The good' : 'The bad';
+    case 'momentum': return (s.headline.changePct ?? 0) >= 0 ? 'The good' : 'The bad';
+    case 'movement': return (mv?.pace ?? 0) >= 0 ? 'The good' : 'The bad';
+    case 'reach': {
+      const w = s.reach.weeks.filter((x) => x.perMention != null && !x.partial);
+      return w.length > 1 && w[w.length - 1].perMention! >= w[0].perMention! ? 'The good' : 'The bad';
+    }
+    case 'mix': return s.mix.subject.score >= s.mix.field.score ? 'The good'
+      : s.mix.subject.shares.farming >= s.mix.field.shares.farming + 10 ? 'The ugly' : 'The bad';
+    case 'share': return (s.share?.subjectRank ?? 99) <= 3 ? 'The good' : 'Share of voice';
+    case 'channels': return 'Who is writing';
+    case 'room': case 'network': return 'The door';
+    case 'receipts': return 'Appendix · The receipts';
+    default: return 'Korea scan';
+  }
+}
+
 export function scanNarrative(s: KoreaScan) {
   const n = s.subject;
   const h = s.headline;
@@ -78,6 +108,23 @@ export function scanNarrative(s: KoreaScan) {
       sub: s.network.openCount > 0
         ? `Together they reach about ${s.network.openReaders.toLocaleString('en-US')} readers a post. ${s.network.named} of our ${s.network.inField} channels on this subject have named ${n} already.`
         : `${s.network.named} of our ${s.network.inField} channels on this subject have named ${n}.`,
+    },
+    share: s.share && (() => {
+      const me = s.share.rows.find((r) => r.isSubject);
+      const lead = s.share.rows[0];
+      return {
+        title: me && s.share.subjectRank === 1
+          ? `${n} holds ${me.weighted}% of the ${s.field} conversation in Korea, more than anyone else.`
+          : me ? `${n} holds ${me.weighted}% of the ${s.field} conversation in Korea, ${ordinal(s.share.subjectRank ?? 0)} of ${s.share.rows.length}.`
+            : `${n} has no share of the ${s.field} conversation yet.`,
+        sub: lead && !lead.isSubject ? `${lead.name} leads with ${lead.weighted}%.` : 'Weighted so product and analysis posts count for more than airdrop chatter.',
+      };
+    })(),
+    channels: s.channels && {
+      title: s.channels.length ? `${s.channels.length} Korean channels wrote about ${n}.` : `No Korean channel wrote about ${n} in this window.`,
+      sub: s.channels.length
+        ? `The top ${Math.min(3, s.channels.length)} carried ${Math.round((s.channels.slice(0, 3).reduce((x, c) => x + c.views, 0) / Math.max(h.views, 1)) * 100)}% of all reader-views.`
+        : '',
     },
     room: {
       title: `Korea's ${s.field} conversation runs across ${s.room.channels} channels.`,

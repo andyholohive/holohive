@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireRole } from '@/lib/requireSuperAdmin';
+import { cleanSlides } from '@/lib/koreaScan/angles';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   const id = url.searchParams.get('id');
   if (id) {
     const { data, error } = await db.from('korea_scans')
-      .select('id, token, subject_name, aliases, exclude, peer_set_id, prepared_for, scan, opportunity_id, created_at')
+      .select('id, token, subject_name, aliases, exclude, peer_set_id, prepared_for, scan, deck, opportunity_id, created_at')
       .eq('id', id).is('deleted_at', null).maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -54,6 +55,28 @@ export async function GET(request: Request) {
       opens: views.get(r.id)?.n ?? 0, lastOpened: views.get(r.id)?.last ?? null,
     })),
   });
+}
+
+/**
+ * PATCH /api/korea-scan/saved?id=<scan id> — change which slides the shared
+ * link shows (admin+). Body: { slides: SlideId[], kickers, angle }.
+ */
+export async function PATCH(request: Request) {
+  const guard = await requireRole(request, ['admin', 'super_admin']);
+  if (!guard.ok) return guard.response;
+  const id = new URL(request.url).searchParams.get('id');
+  const body = await request.json().catch(() => null);
+  const slides = cleanSlides(body?.slides);
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  if (!slides.length) return NextResponse.json({ error: 'Keep at least one slide.' }, { status: 400 });
+  const deck = {
+    slides,
+    kickers: body?.kickers === 'lifecycle' ? 'lifecycle' : 'verdict',
+    angle: typeof body?.angle === 'string' ? body.angle.slice(0, 40) : null,
+  };
+  const { error } = await (admin() as any).from('korea_scans').update({ deck }).eq('id', id).is('deleted_at', null);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, deck });
 }
 
 /** DELETE /api/korea-scan/saved?id=<scan id> — revoke a scan's link (soft delete, admin+). */
