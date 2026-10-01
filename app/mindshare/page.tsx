@@ -26,7 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
-  BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown, Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2, XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles, Send,
+  BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown, Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2, XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles, Send, ScanSearch,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 import { formatDateTime } from '@/lib/dateFormat';
@@ -1266,9 +1266,14 @@ export default function MindsharePage() {
         kicker="Measurement · Korea Signal"
         kickerDot="emerald"
         actions={(
-          <Button asChild variant="outline" size="sm">
-            <Link href="/mindshare/korea-brief"><Send className="h-4 w-4 mr-2" />Weekly Korea brief</Link>
-          </Button>
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/mindshare/korea-scan"><ScanSearch className="h-4 w-4 mr-2" />Korea Scan</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/mindshare/korea-brief"><Send className="h-4 w-4 mr-2" />Weekly Korea brief</Link>
+            </Button>
+          </>
         )}
       />
 
