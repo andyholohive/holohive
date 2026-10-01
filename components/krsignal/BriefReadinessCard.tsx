@@ -7,7 +7,7 @@
  */
 
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
-import { Check, AlertTriangle } from 'lucide-react';
+import { ChevronRight, CircleAlert, CircleCheck, Hourglass } from 'lucide-react';
 import type { BriefReadiness, ReadinessCheck } from '@/lib/koreaIntel/briefReadiness';
 
 const LEVEL_TONE: Record<BriefReadiness['level'], BadgeTone> = { ready: 'success', partial: 'warning', blocked: 'danger' };
@@ -40,14 +40,15 @@ export function BriefReadinessCard({ clientName, meta, readiness }: {
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-800">All {readiness.checks.length} checks pass</p>
         )}
         {waits.length > 0 && (
-          <p className="mt-2.5 text-[12.5px] leading-snug text-ink-warm-500">
-            Then, automatically: {waits.map((c) => sentenceCase(c.label)).join(' · ')}
+          <p className="mt-3 flex items-start gap-1.5 text-[12.5px] leading-snug text-ink-warm-500">
+            <Hourglass className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Then, automatically: {waits.map((c) => sentenceCase(c.label)).join(' · ')}</span>
           </p>
         )}
         {ok.length > 0 && (
           <details className="group mt-3">
             <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-[12.5px] font-medium text-ink-warm-700 [&::-webkit-details-marker]:hidden">
-              <span className="text-[10px] transition-transform group-open:rotate-90">▸</span>
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden />
               {ok.length} of {readiness.checks.length} already in place
             </summary>
             <ul className="mt-2.5 grid gap-2.5">{ok.map((c) => <CheckRow key={c.key} c={c} />)}</ul>
@@ -61,10 +62,10 @@ export function BriefReadinessCard({ clientName, meta, readiness }: {
 function CheckRow({ c }: { c: ReadinessCheck }) {
   const good = c.state === 'ok';
   return (
-    <li className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-2.5 text-[13.5px] text-ink-warm-900">
-      <span className={`grid h-5 w-5 place-items-center rounded-md border ${good ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-        {good ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-      </span>
+    <li className="grid grid-cols-[18px_minmax(0,1fr)] items-start gap-2.5 text-[13.5px] text-ink-warm-900">
+      {good
+        ? <CircleCheck className="mt-px h-[18px] w-[18px] text-emerald-600" aria-label="In place" />
+        : <CircleAlert className="mt-px h-[18px] w-[18px] text-amber-600" aria-label="Needs fixing" />}
       <span>{c.label}<span className="block text-xs leading-snug text-ink-warm-500">{c.detail}</span></span>
     </li>
   );

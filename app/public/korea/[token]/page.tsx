@@ -55,6 +55,8 @@ export async function generateMetadata({ params }: { params: { token: string } }
     title,
     description: s.verdict.headline,
     robots: { index: false, follow: false },
+    // Matches the brief's night background, so the in-app browser bar blends in.
+    themeColor: '#05090D',
     // Telegram's preview card: the headline, and the one thing to do.
     openGraph: { title: s.verdict.headline, description: `To do: ${s.action.text}`, siteName: 'Holo Hive', type: 'article' },
   };

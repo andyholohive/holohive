@@ -9,11 +9,13 @@
  * `sm:` styles apply inside a "phone" on a laptop and the preview lies. The
  * parent page's stylesheets are copied in, so the same classes work.
  *
- * A fade + "Scroll inside" hint shows while there's more below.
+ * A fade + "Scroll inside" chip shows while there's more below; the chip
+ * is dark glass so it reads over the light Telegram view and the dark brief.
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronsDown } from 'lucide-react';
 
 export function BriefPhoneFrame({ children, label }: { children: ReactNode; label: string }) {
   const ref = useRef<HTMLIFrameElement>(null);
@@ -47,17 +49,19 @@ export function BriefPhoneFrame({ children, label }: { children: ReactNode; labe
   }, []);
 
   return (
-    <div className="relative mx-auto w-full max-w-[390px] overflow-hidden rounded-[34px] border-[8px] border-ink-warm-900 bg-white shadow-[0_18px_40px_-18px_rgba(22,20,15,.35)]">
-      <div className="flex h-[22px] items-start justify-center bg-ink-warm-900" aria-hidden>
-        <span className="h-4 w-24 rounded-b-xl bg-black" />
+    <div className="relative mx-auto w-full max-w-[390px] overflow-hidden rounded-[36px] border-[7px] border-[#0B1014] bg-[#0B1014] shadow-[0_0_0_1px_rgba(92,214,224,.22),0_24px_60px_-20px_rgba(5,9,13,.55),0_0_40px_-12px_rgba(62,134,146,.45)]">
+      <div className="flex h-[24px] items-center justify-center bg-[#0B1014]" aria-hidden>
+        <span className="h-[14px] w-[86px] rounded-full bg-black ring-1 ring-white/5" />
       </div>
       <iframe ref={ref} title={label} className="block h-[clamp(540px,calc(100vh-170px),760px)] w-full border-0 bg-white" />
       {body && createPortal(children, body)}
       <div
         aria-hidden
-        className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-14 items-end justify-center bg-gradient-to-b from-transparent to-cream-50 pb-2 text-[11px] font-medium text-ink-warm-700 transition-opacity ${more ? 'opacity-100' : 'opacity-0'}`}
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-16 items-end justify-center bg-gradient-to-b from-transparent to-black/45 pb-3 transition-opacity ${more ? 'opacity-100' : 'opacity-0'}`}
       >
-        Scroll inside ↓
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#0B1014]/85 px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white backdrop-blur">
+          <ChevronsDown className="h-3 w-3" />Scroll inside
+        </span>
       </div>
     </div>
   );

@@ -9,7 +9,8 @@
  * assessBriefReadiness on the server, see BriefClientEntry.
  */
 
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
+import { Ban, BookOpenText, CircleAlert, CircleCheck, CircleDashed, MessageCircle, PowerOff } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KoreaBrief } from '@/components/portal/korea/KoreaBrief';
 import type { KoreaSummary } from '@/lib/koreaIntel/summary';
@@ -34,7 +35,18 @@ export interface BriefClientEntry {
   opens30d: number;
 }
 
-const DOT: Record<BriefReadiness['level'], string> = { ready: 'bg-emerald-500', partial: 'bg-amber-500', blocked: 'bg-rose-500' };
+/** One icon per status, so the tab reads without relying on color. */
+const STATUS_ICON: Record<string, { icon: ComponentType<{ className?: string }>; cls: string }> = {
+  Ready: { icon: CircleCheck, cls: 'text-emerald-600' },
+  'No report': { icon: CircleAlert, cls: 'text-amber-600' },
+  'Switched off': { icon: PowerOff, cls: 'text-ink-warm-500' },
+  Blocked: { icon: Ban, cls: 'text-rose-600' },
+  'Not set up': { icon: CircleDashed, cls: 'text-ink-warm-500' },
+};
+const FALLBACK_ICON: Record<BriefReadiness['level'], { icon: ComponentType<{ className?: string }>; cls: string }> = {
+  ready: STATUS_ICON.Ready, partial: STATUS_ICON['No report'], blocked: STATUS_ICON.Blocked,
+};
+function statusIcon(r: BriefReadiness) { return STATUS_ICON[r.short] ?? FALLBACK_ICON[r.level]; }
 
 export function BriefClientTabs({ clients }: { clients: BriefClientEntry[] }) {
   if (!clients.length) return null;
@@ -53,14 +65,17 @@ export function BriefClientTabs({ clients }: { clients: BriefClientEntry[] }) {
       <Tabs defaultValue={clients[0].clientId} className="space-y-4">
         <div className="max-w-full overflow-x-auto">
           <TabsList className="h-auto border border-cream-200 bg-cream-100 p-1">
-            {clients.map((c) => (
+            {clients.map((c) => {
+              const { icon: I, cls } = statusIcon(c.readiness);
+              return (
               <TabsTrigger key={c.clientId} value={c.clientId}
                 className="gap-2 px-3.5 py-2 text-sm text-ink-warm-700 data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card">
-                <i className={`h-2 w-2 rounded-full ${DOT[c.readiness.level]}`} aria-hidden />
+                <I className={`h-3.5 w-3.5 ${cls}`} aria-hidden />
                 {c.name}
                 <span className="text-xs font-medium text-ink-warm-500">{c.readiness.short}</span>
               </TabsTrigger>
-            ))}
+              );
+            })}
           </TabsList>
         </div>
         {clients.map((c) => (
@@ -103,7 +118,7 @@ function ClientPanel({ c }: { c: BriefClientEntry }) {
       <div className="grid gap-6 md:grid-cols-2 md:gap-4">
         <div className="grid gap-2.5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-[13px] font-semibold text-ink-warm-900">In their Telegram group</p>
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-warm-900"><MessageCircle className="h-3.5 w-3.5 text-brand" />In their Telegram group</p>
             {c.currentReportText && s && (
               <div className="inline-flex gap-0.5 rounded-lg border border-cream-200 bg-cream-100 p-[3px]" role="group" aria-label="Which message">
                 {(['short', 'long'] as const).map((v) => (
@@ -120,7 +135,7 @@ function ClientPanel({ c }: { c: BriefClientEntry }) {
           </BriefPhoneFrame>
         </div>
         <div className="grid gap-2.5">
-          <p className="text-[13px] font-semibold text-ink-warm-900">The brief it opens</p>
+          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-warm-900"><BookOpenText className="h-3.5 w-3.5 text-brand" />The brief it opens</p>
           <BriefPhoneFrame label={`${c.name} Korea brief`}>
             {s ? <KoreaBrief s={s} portalUrl={c.portalUrl} /> : <NoBrief name={c.name} />}
           </BriefPhoneFrame>
@@ -132,9 +147,10 @@ function ClientPanel({ c }: { c: BriefClientEntry }) {
 
 function NoBrief({ name }: { name: string }) {
   return (
-    <div className="grid min-h-screen place-content-center gap-2 bg-cream-50 p-6 text-center">
-      <p className="text-[15px] font-semibold text-ink-warm-900">No brief yet</p>
-      <p className="mx-auto max-w-[30ch] text-[13px] text-ink-warm-700">
+    <div className="grid min-h-screen place-content-center justify-items-center gap-2 bg-[#05090D] p-6 text-center">
+      <CircleDashed className="mb-1 h-6 w-6 text-[#5CD6E0]" aria-hidden />
+      <p className="text-[15px] font-semibold text-[#EAF6F7]">No brief yet</p>
+      <p className="mx-auto max-w-[30ch] text-[13px] text-[#A9BEC1]">
         {name} needs a Korea Signal setup (ticker, CoinGecko id, venues) before a brief can be built.
       </p>
     </div>
