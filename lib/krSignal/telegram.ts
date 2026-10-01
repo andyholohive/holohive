@@ -90,7 +90,8 @@ export const setMyCommands = (commands: { command: string; description: string }
 // decision, a callback ack so Telegram stops spinning, and getChat so we can
 // prove the destination is reachable BEFORE anyone approves.
 
-export interface InlineButton { text: string; callback_data: string }
+/** A button either fires a callback to the bot or opens a URL. */
+export type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
 
 /** Send an HTML message carrying an inline keyboard (one row per array). */
 export async function sendMessageWithButtons(

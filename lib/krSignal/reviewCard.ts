@@ -102,12 +102,15 @@ export function listingAlertButtons(rowId: string): InlineButton[][] {
 
 /** Buttons carry the row id, so a decision can never be applied to the wrong
  *  week — callback_data is capped at 64 bytes and `krw:approve:<uuid>` is 48. */
-export function reviewButtons(rowId: string): InlineButton[][] {
-  return [[
+export function reviewButtons(rowId: string, briefUrl?: string | null): InlineButton[][] {
+  const rows: InlineButton[][] = [[
     { text: '✅ Approve & send', callback_data: `krw:approve:${rowId}` },
     { text: '✏️ Edit', callback_data: `krw:edit:${rowId}` },
     { text: '⏭ Skip', callback_data: `krw:skip:${rowId}` },
   ]];
+  // Lets the reviewer open exactly what the client's button will open.
+  if (briefUrl) rows.push([{ text: '👀 Preview the client’s brief', url: briefUrl }]);
+  return rows;
 }
 
 /** What the card becomes once decided — the report stays quoted for the

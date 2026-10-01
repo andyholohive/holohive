@@ -26,9 +26,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
-  BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown,
-  Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
-  XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles, Mail } from 'lucide-react';
+  BarChart3, Plus, Trash2, Radio, AlertTriangle, AlertCircle, Search, TrendingUp, TrendingDown, Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2, XCircle, HelpCircle, ShieldAlert, ArrowRight, Share2, Copy, Sparkles, Send,
+} from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 import { formatDateTime } from '@/lib/dateFormat';
 
@@ -1268,7 +1267,7 @@ export default function MindsharePage() {
         kickerDot="emerald"
         actions={(
           <Button asChild variant="outline" size="sm">
-            <Link href="/mindshare/korea-email"><Mail className="h-4 w-4 mr-2" />Weekly client email</Link>
+            <Link href="/mindshare/korea-brief"><Send className="h-4 w-4 mr-2" />Weekly Korea brief</Link>
           </Button>
         )}
       />

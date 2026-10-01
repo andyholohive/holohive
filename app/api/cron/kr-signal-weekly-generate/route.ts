@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { koreaBriefPreviewUrl, telegramSafeUrl } from '@/lib/koreaIntel/briefLink';
 import { createClient } from '@supabase/supabase-js';
 import { loadActiveClients } from '@/lib/krSignal/config';
 import { assembleWeekly } from '@/lib/krSignal/assembleWeekly';
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
             variant: 'generated',
           });
           const msg = await sendMessageWithButtons(
-            reviewChatId, card, reviewButtons(row.id), reviewThreadId,
+            reviewChatId, card, reviewButtons(row.id, telegramSafeUrl(koreaBriefPreviewUrl(c.brief_token))), reviewThreadId,
           );
           await attachReviewCard(supabase, row.id, String(reviewChatId), msg.message_id);
         }

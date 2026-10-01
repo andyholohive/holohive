@@ -14,7 +14,8 @@ import { decidedCard } from './reviewCard';
 import {
   getWeeklyReviewById, markWeeklySent, markWeeklySkipped, type WeeklyReviewRow,
 } from './store';
-import { sendMessage, editMessageAndClearButtons } from './telegram';
+import { sendMessage, sendMessageWithButtons, editMessageAndClearButtons } from './telegram';
+import { koreaBriefUrl, telegramSafeUrl } from '@/lib/koreaIntel/briefLink';
 
 export interface Actor {
   /** Display name for the audit line — a Telegram name or an HHP user name. */
@@ -63,7 +64,13 @@ export async function approveAndSend(
 
   let messageId: number;
   try {
-    const sent = await sendMessage(cfg.resolved_chat_id, html, cfg.resolved_thread_id);
+    // [2026-10-01] Clients rarely read email, so the weekly report links to a
+    // readable brief page instead. URL button under the report; left off when
+    // the URL isn't one Telegram will accept (local dev), rather than failing.
+    const briefUrl = telegramSafeUrl(koreaBriefUrl(cfg.brief_token));
+    const sent = briefUrl
+      ? await sendMessageWithButtons(cfg.resolved_chat_id, html, [[{ text: '📖 Read this week’s Korea brief', url: briefUrl }]], cfg.resolved_thread_id)
+      : await sendMessage(cfg.resolved_chat_id, html, cfg.resolved_thread_id);
     messageId = sent.message_id;
   } catch (e: any) {
     const error = String(e?.message || e);

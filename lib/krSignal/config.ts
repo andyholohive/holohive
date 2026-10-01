@@ -50,10 +50,13 @@ export interface KrSignalClient {
    *  the Weekly Content Recap [Andy 2026-07-15]. */
   resolved_chat_id?: string | null;
   resolved_thread_id?: string | null;
+  /** Token for the client's weekly Korea brief page (/public/korea/<token>),
+   *  linked from a button under the weekly report. */
+  brief_token?: string | null;
 }
 
 const COLUMNS =
-  "id, key, name, ticker, contract, chain, coingecko_id, kr_listed, kr_venues, global_venues, peer_basket, content_log_source, telegram_chat_id, telegram_thread_id, features, thresholds, is_active, client_id";
+  "id, key, name, ticker, contract, chain, coingecko_id, kr_listed, kr_venues, global_venues, peer_basket, content_log_source, telegram_chat_id, telegram_thread_id, features, thresholds, is_active, client_id, brief_token";
 
 /** All active clients (config source for the crons), each with its digest
  *  destination resolved (override → client chat). */
