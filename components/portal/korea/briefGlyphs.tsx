@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * Animated duotone icons for the weekly Korea brief. Each is a 24×24 SVG in
- * currentColor: a soft filled body plus a crisp stroked detail, with one
- * small loop of motion that says what the section is (a radar sweeps, volume
- * bars pulse, a broadcast pings). Animation classes come from briefMotion.tsx
- * and stop under prefers-reduced-motion.
+ * Duotone icons for the weekly Korea brief. Each is a 24×24 SVG in
+ * currentColor: a soft filled body plus a crisp stroked detail.
  *
- * `GlyphBadge` frames one in the brief's glass tile.
+ * Static by design [Andy 2026-10-01: "make it clean"]. The kb-* class names
+ * on some parts are inert hooks; briefMotion.tsx no longer animates them.
+ *
+ * `GlyphBadge` puts one in a quiet tinted tile.
  */
 
 import type { ReactNode } from 'react';
@@ -143,14 +143,8 @@ export function MarketGlyph(p: GlyphProps) {
   );
 }
 
-/** Glass tile with a gradient rim and inner glow. */
+/** Quiet tinted tile for an icon. */
 export function GlyphBadge({ children, size = 'md' }: { children: ReactNode; size?: 'sm' | 'md' | 'lg' }) {
-  const box = { sm: 'h-7 w-7 rounded-lg', md: 'h-9 w-9 rounded-[11px]', lg: 'h-11 w-11 rounded-[13px]' }[size];
-  return (
-    <span className={`relative grid shrink-0 place-items-center p-px ${box} bg-gradient-to-br from-[#5CD6E0]/70 via-[#5CD6E0]/15 to-[#3e8692]/50`}>
-      <span className={`grid h-full w-full place-items-center bg-[radial-gradient(circle_at_30%_25%,rgba(92,214,224,0.28),rgba(9,20,26,0.95)_70%)] text-[#7FE6EE] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ${box}`}>
-        {children}
-      </span>
-    </span>
-  );
+  const box = { sm: 'h-7 w-7 rounded-lg', md: 'h-8 w-8 rounded-lg', lg: 'h-10 w-10 rounded-xl' }[size];
+  return <span className={`grid shrink-0 place-items-center bg-[#5CD6E0]/10 text-[#5CD6E0] ${box}`}>{children}</span>;
 }

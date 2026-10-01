@@ -35,7 +35,7 @@ import {
  */
 const C = {
   bg: 'bg-[#05090D]',
-  panel: 'border border-[#5CD6E0]/[0.14] bg-[#0C161C]/80 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_12px_40px_-24px_rgba(0,0,0,0.8)]',
+  panel: 'border border-white/[0.08] bg-[#0C161C]',
   fg: 'text-[#EAF6F7]',
   sub: 'text-[#A9BEC1]',
   muted: 'text-[#7F979B]',
@@ -43,7 +43,7 @@ const C = {
   up: 'text-[#4ADE9A]',
   down: 'text-[#FB7F93]',
   warn: 'text-[#FBBF24]',
-  kicker: 'font-mono text-[10px] font-medium uppercase tracking-[0.2em]',
+  kicker: 'text-[12px] font-medium',
 };
 
 const STATUS: Record<string, { dot: string; text: string }> = {
@@ -86,27 +86,23 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
             {s.week && <p className={`${C.kicker} ${C.muted}`}>{s.week.label}</p>}
           </div>
           <div className="kb-enter" style={d(120)}>
-            <span className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] py-1 pl-2 pr-3 font-mono text-[10.5px] font-medium uppercase tracking-[0.14em] ${status.text}`}>
-              <span className="relative flex h-2 w-2">
-                <span className={`absolute inset-0 rounded-full ${status.dot} opacity-60 motion-safe:animate-ping`} />
-                <span className={`relative h-2 w-2 rounded-full ${status.dot}`} />
-              </span>
+            <span className={`inline-flex items-center gap-2 rounded-full bg-white/[0.06] py-1 pl-2.5 pr-3 text-[12.5px] font-medium ${status.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
               {s.verdict.label}
             </span>
           </div>
           <h1 id="brief-headline" style={d(220)}
-            className="kb-enter bg-gradient-to-br from-white via-[#DDF6F8] to-[#7FE0E8] bg-clip-text text-[28px] font-semibold leading-[1.14] tracking-[-0.032em] text-transparent [text-wrap:balance] sm:text-[36px]">
+            className="kb-enter text-[28px] font-semibold leading-[1.18] tracking-[-0.025em] text-[#F2FAFA] [text-wrap:balance] sm:text-[34px]">
             {s.verdict.headline}
           </h1>
           {s.verdict.sub && <p style={d(340)} className={`kb-enter max-w-[56ch] text-[15px] leading-relaxed ${C.sub}`}>{s.verdict.sub}</p>}
         </section>
 
-        {/* One thing to do — spinning light around the rim. */}
-        <section style={d(460)} className="kb-enter relative overflow-hidden rounded-2xl p-px">
-          <span aria-hidden className="absolute left-1/2 top-1/2 -ml-[320px] -mt-[320px] h-[640px] w-[640px] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(92,214,224,0.9)_40deg,transparent_110deg,transparent_200deg,rgba(62,134,146,0.7)_240deg,transparent_300deg)] motion-safe:animate-[kb-spin_6s_linear_infinite]" />
-          <div className="relative rounded-[15px] bg-[linear-gradient(140deg,#0F2A31,#0A151B_55%)] p-5">
+        {/* One thing to do */}
+        <section style={d(400)} className="kb-enter rounded-2xl border border-[#5CD6E0]/30 bg-[#5CD6E0]/[0.06] p-5">
+          <div>
             <div className="flex items-start gap-4">
-              <GlyphBadge size="lg"><TargetGlyph className="h-6 w-6" /></GlyphBadge>
+              <GlyphBadge size="lg"><TargetGlyph className="h-5 w-5" /></GlyphBadge>
               <div className="min-w-0">
                 <p className={`${C.kicker} ${C.accent}`}>One thing to do this week</p>
                 <p className="mt-1.5 text-[17px] font-semibold leading-snug">{s.action.text}</p>
@@ -119,20 +115,20 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
         {/* Three numbers */}
         <section aria-label="This week in three numbers" className="grid grid-cols-3 gap-2 sm:gap-3">
           {s.stats.share ? (
-            <Stat delay={560} glyph={<ShareGlyph className="h-4 w-4" />} label="KR share" value={`${s.stats.share.value}%`}
+            <Stat delay={500} glyph={<ShareGlyph className="h-4 w-4" />} label="Korea’s share" value={`${s.stats.share.value}%`}
               note={s.stats.share.prev != null ? <><Arrow d={s.stats.share.value - s.stats.share.prev} /> from {s.stats.share.prev}%</> : 'first week'} />
           ) : (
-            <Stat delay={560} glyph={<ShieldGlyph className="h-4 w-4" />} label="Readiness" value={`${s.readiness?.filter((r) => r.ok).length ?? 0}/${s.readiness?.length ?? 0}`} note="checks passing" />
+            <Stat delay={500} glyph={<ShieldGlyph className="h-4 w-4" />} label="Readiness" value={`${s.readiness?.filter((r) => r.ok).length ?? 0}/${s.readiness?.length ?? 0}`} note="checks passing" />
           )}
           {s.stats.volume ? (
-            <Stat delay={640} glyph={<VolumeGlyph className="h-4 w-4" />} label="KR volume" value={usd(s.stats.volume.usd)}
+            <Stat delay={560} glyph={<VolumeGlyph className="h-4 w-4" />} label="Korean volume" value={usd(s.stats.volume.usd)}
               note={s.stats.volume.paceRatio == null ? 'no prior week' : s.stats.volume.paceRatio >= 1
                 ? <><span className={C.up}>▲ {s.stats.volume.paceRatio.toFixed(1)}×</span> daily pace</>
                 : <><span className={C.down}>▼ {Math.round((1 - s.stats.volume.paceRatio) * 100)}%</span> daily pace</>} />
           ) : (
-            <Stat delay={640} glyph={<VolumeGlyph className="h-4 w-4" />} label="Exchanges" value={String(s.venues.length || '—')} note="global, with volume" />
+            <Stat delay={560} glyph={<VolumeGlyph className="h-4 w-4" />} label="Exchanges" value={String(s.venues.length || '—')} note="global, with volume" />
           )}
-          <Stat delay={720} glyph={<BroadcastGlyph className="h-4 w-4" />} label="KR posts" value={s.stats.posts.newThisWeek != null ? String(s.stats.posts.newThisWeek) : '—'}
+          <Stat delay={620} glyph={<BroadcastGlyph className="h-4 w-4" />} label="Korean posts" value={s.stats.posts.newThisWeek != null ? String(s.stats.posts.newThisWeek) : '—'}
             note={s.stats.posts.total != null ? `new · ${s.stats.posts.total} total` : 'new this week'} />
         </section>
 
@@ -152,14 +148,14 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
           </Panel>
         ) : s.readiness ? (
           <Panel glyph={<ShieldGlyph className="h-[18px] w-[18px]" />} title="Path to a Korean listing" subtitle="Checked automatically">
-            <ul className="divide-y divide-[#5CD6E0]/10 px-4 py-1 sm:px-5">
+            <ul className="divide-y divide-white/[0.06] px-4 py-1 sm:px-5">
               {s.readiness.map((r, i) => (
                 <li key={r.label} style={d(200 + i * 90)} className="kb-item grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-3 py-3">
                   {r.ok
                     ? <CircleCheck className={`h-[18px] w-[18px] ${C.up}`} aria-label="Done" />
-                    : <CircleDashed className={`h-[18px] w-[18px] ${C.warn} motion-safe:animate-[kb-spin_8s_linear_infinite]`} aria-label="Not yet" />}
+                    : <CircleDashed className={`h-[18px] w-[18px] ${C.warn}`} aria-label="Not yet" />}
                   <span className="min-w-0 text-sm">{r.label}<span className={`block text-xs ${C.muted}`}>{r.detail}</span></span>
-                  <span className={`rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-medium tabular-nums ${r.ok ? `border-[#4ADE9A]/25 ${C.up}` : `border-[#FBBF24]/25 ${C.warn}`}`}>{r.value}</span>
+                  <span className={`text-[12px] font-medium tabular-nums ${r.ok ? C.up : C.warn}`}>{r.value}</span>
                 </li>
               ))}
             </ul>
@@ -171,13 +167,11 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
           <Panel glyph={<VoiceGlyph className="h-[18px] w-[18px]" />} title={stale ? 'What Koreans have been saying' : 'What Koreans are saying'}
             subtitle={stale ? 'From your campaign posts' : 'This week, translated'}>
             <div className="space-y-5 p-4 sm:p-5">
-              <figure className="relative overflow-hidden rounded-xl border border-[#5CD6E0]/12 bg-[linear-gradient(135deg,rgba(92,214,224,0.08),rgba(92,214,224,0)_60%)] py-4 pl-5 pr-4">
-                <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r bg-gradient-to-b from-[#5CD6E0] to-[#3e8692] shadow-[0_0_12px_rgba(92,214,224,0.7)]" />
-                <span aria-hidden className="absolute -right-1 -top-4 select-none font-serif text-[88px] leading-none text-[#5CD6E0]/10">”</span>
+              <figure className="relative border-l-2 border-[#5CD6E0] pl-4">
                 <blockquote className="relative text-[17px] leading-snug">{quote.ko}</blockquote>
                 {quote.en && <figcaption className={`relative mt-2 text-[15px] leading-snug ${C.sub}`}>“{quote.en}”</figcaption>}
                 <p className={`relative mt-3 inline-flex items-center gap-1.5 ${C.kicker} ${LABEL_TEXT[quote.label] ?? C.sub}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />{quote.label}
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />{quote.label}
                 </p>
               </figure>
               {s.comments.themes.length > 0 && (
@@ -223,13 +217,11 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
 
         {/* Way into the detail */}
         {portalUrl && (
-          <Reveal as="section" className={`relative overflow-hidden rounded-2xl p-5 ${C.panel}`}>
-            <span aria-hidden className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#5CD6E0]/15 blur-3xl" />
-            <p className="relative text-[15px] font-semibold">Want the detail?</p>
+          <Reveal as="section" className={`relative rounded-2xl p-5 ${C.panel}`}>
+            <p className="text-[15px] font-semibold">Want the detail?</p>
             <p className={`relative mt-1 text-sm ${C.sub}`}>Exchanges, every Korean comment, listings and creators are in the Korea section of your portal.</p>
             <a href={`${portalUrl}#korea`}
-              className="group relative mt-4 inline-flex items-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-[#3e8692] to-[#5CD6E0] px-4 py-2.5 text-sm font-semibold text-[#03171B] shadow-[0_0_24px_rgba(92,214,224,0.4)] transition-shadow hover:shadow-[0_0_36px_rgba(92,214,224,0.65)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5CD6E0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#05090D]">
-              <span aria-hidden className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/60 to-transparent motion-safe:animate-[kb-shimmer_3.2s_ease-in-out_infinite]" />
+              className="group relative mt-4 inline-flex items-center gap-2 rounded-lg bg-[#5CD6E0] px-4 py-2.5 text-sm font-semibold text-[#03171B] transition-colors hover:bg-[#7FE0E8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5CD6E0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#05090D]">
               <span className="relative">Open the full Korea report</span>
               <ArrowUpRight className="relative h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </a>
@@ -237,7 +229,7 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
           </Reveal>
         )}
 
-        <p className={`pt-4 text-center font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] ${C.muted}`}>
+        <p className={`pt-4 text-center text-xs leading-relaxed ${C.muted}`}>
           Prepared by your Holo Hive account team · updated every Saturday<br />
           Figures cover Upbit and Bithumb{s.week ? `, ${s.week.label}` : ''}
         </p>
@@ -246,25 +238,17 @@ export function KoreaBrief({ s, portalUrl, clientLogoUrl = null }: {
   );
 }
 
-/** Drifting aurora + slowly panning grid + one scan line, fixed behind the page. */
+/** One soft teal glow behind the top of the page. */
 function Backdrop() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div className="absolute -left-1/4 -top-40 h-[520px] w-[520px] rounded-full bg-[#3e8692]/45 blur-[110px] motion-safe:animate-[kb-drift-a_18s_ease-in-out_infinite]" />
-      <div className="absolute -right-1/4 top-24 h-[420px] w-[420px] rounded-full bg-[#1d4ed8]/20 blur-[110px] motion-safe:animate-[kb-drift-b_22s_ease-in-out_infinite]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(148,210,218,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(148,210,218,0.06)_1px,transparent_1px)] bg-[size:28px_28px] [mask-image:radial-gradient(ellipse_90%_70%_at_50%_0%,black,transparent)] motion-safe:animate-[kb-pan_6s_linear_infinite]" />
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-[#5CD6E0]/[0.07] to-transparent motion-safe:animate-[kb-scan_7s_ease-in-out_infinite] motion-reduce:hidden" />
-    </div>
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[480px] bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(62,134,146,0.35),transparent_70%)]" />
   );
 }
 
 function Panel({ glyph, title, subtitle, children }: { glyph: ReactNode; title: string; subtitle: string; children: ReactNode }) {
   return (
     <Reveal as="section" className={`relative overflow-hidden rounded-2xl ${C.panel}`}>
-      <span aria-hidden className="absolute inset-x-0 top-0 h-px overflow-hidden">
-        <span className="block h-px w-full bg-gradient-to-r from-transparent via-[#5CD6E0]/80 to-transparent motion-safe:animate-[kb-sweep_4.5s_ease-in-out_infinite]" />
-      </span>
-      <div className="flex items-center gap-3 border-b border-[#5CD6E0]/10 px-4 py-3.5 sm:px-5">
+      <div className="flex items-center gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
         <GlyphBadge>{glyph}</GlyphBadge>
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold leading-tight">{title}</h2>
@@ -279,12 +263,9 @@ function Panel({ glyph, title, subtitle, children }: { glyph: ReactNode; title: 
 function Stat({ glyph, label, value, note, delay }: { glyph: ReactNode; label: string; value: string; note: ReactNode; delay: number }) {
   return (
     <div style={d(delay)} className={`kb-enter relative min-w-0 overflow-hidden rounded-xl p-3 sm:p-4 ${C.panel}`}>
-      <span aria-hidden className="absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-[#5CD6E0]/70 to-transparent" />
-      <div className="flex items-center justify-between gap-1">
-        <p className={`truncate font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] ${C.muted}`}>{label}</p>
-        <span className={C.accent}>{glyph}</span>
-      </div>
-      <p className="mt-2.5 font-mono text-[21px] font-semibold leading-none tracking-tight tabular-nums [text-shadow:0_0_18px_rgba(92,214,224,0.45)] sm:text-[26px]">
+      <span className={C.accent}>{glyph}</span>
+      <p className={`mt-3 text-[11.5px] font-medium leading-tight ${C.muted}`}>{label}</p>
+      <p className="mt-1 text-[22px] font-semibold leading-none tracking-tight tabular-nums sm:text-[26px]">
         <CountUp value={value} delay={delay} />
       </p>
       <p className={`mt-2 text-[11.5px] leading-snug ${C.muted}`}>{note}</p>
@@ -294,9 +275,9 @@ function Stat({ glyph, label, value, note, delay }: { glyph: ReactNode; label: s
 
 function MiniStat({ label, value, delta, good }: { label: string; value: string; delta: string; good: boolean | null }) {
   return (
-    <div className="rounded-xl border border-[#5CD6E0]/10 bg-white/[0.02] px-3 py-2.5">
-      <p className={`${C.kicker} ${C.muted} tracking-[0.14em]`}>{label}</p>
-      <p className="mt-1 font-mono text-[17px] font-semibold tabular-nums"><CountUp value={value} /></p>
+    <div className="rounded-xl bg-white/[0.04] px-3 py-2.5">
+      <p className={`${C.kicker} ${C.muted}`}>{label}</p>
+      <p className="mt-1 text-[17px] font-semibold tabular-nums"><CountUp value={value} /></p>
       <p className={`mt-0.5 text-[11.5px] ${good == null ? C.muted : good ? C.up : C.down}`}>{delta}</p>
     </div>
   );
@@ -310,9 +291,9 @@ function ThemeBars({ themes }: { themes: Array<{ theme: string; count: number }>
       {themes.map((t, i) => (
         <li key={t.theme} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
           <span className={`truncate text-[13px] ${C.sub}`}>{capitalize(t.theme)}</span>
-          <span className={`font-mono text-[12px] font-semibold tabular-nums ${C.accent}`}>{t.count}</span>
+          <span className={`text-[12.5px] font-semibold tabular-nums ${C.fg}`}>{t.count}</span>
           <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
-            <span className="kb-bar-x block h-full rounded-full bg-gradient-to-r from-[#3e8692] to-[#5CD6E0] shadow-[0_0_10px_rgba(92,214,224,0.6)]"
+            <span className="kb-bar-x block h-full rounded-full bg-[#5CD6E0]"
               style={{ width: `${Math.max((t.count / max) * 100, 6)}%`, '--i': i } as CSSProperties} />
           </span>
         </li>

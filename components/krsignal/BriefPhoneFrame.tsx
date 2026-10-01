@@ -59,7 +59,7 @@ export function BriefPhoneFrame({ children, label }: { children: ReactNode; labe
         aria-hidden
         className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-16 items-end justify-center bg-gradient-to-b from-transparent to-black/45 pb-3 transition-opacity ${more ? 'opacity-100' : 'opacity-0'}`}
       >
-        <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#0B1014]/85 px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-white backdrop-blur">
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#0B1014]/85 px-2.5 py-1 text-[11.5px] font-medium text-white backdrop-blur">
           <ChevronsDown className="h-3 w-3" />Scroll inside
         </span>
       </div>

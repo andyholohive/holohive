@@ -36,15 +36,6 @@ const CSS = `
 @keyframes kb-scan { 0% { transform: translateY(-100%); opacity: 0 } 10% { opacity: 1 } 90% { opacity: 1 } 100% { transform: translateY(560px); opacity: 0 } }
 @keyframes kb-sweep { 0% { transform: translateX(-100%) } 100% { transform: translateX(100%) } }
 
-.kb-root .kb-spin   { animation: kb-spin 3.2s linear infinite; transform-origin: 12px 12px; transform-box: view-box }
-.kb-root .kb-spin-slow { animation: kb-spin 14s linear infinite; transform-origin: 12px 12px; transform-box: view-box }
-.kb-root .kb-ping   { animation: kb-ping 2.2s cubic-bezier(.2,.6,.3,1) infinite; transform-origin: 12px 12px; transform-box: view-box }
-.kb-root .kb-ping-2 { animation-delay: 1.1s }
-.kb-root .kb-eq     { animation: kb-eq 1.3s ease-in-out infinite; transform-origin: 50% 100%; transform-box: fill-box }
-.kb-root .kb-bob    { animation: kb-bob 2.4s ease-in-out infinite; transform-box: fill-box }
-.kb-root .kb-blink  { animation: kb-blink 1.4s ease-in-out infinite }
-.kb-root .kb-loop-draw { stroke-dasharray: 1; animation: kb-draw 2.6s cubic-bezier(.6,0,.2,1) infinite alternate }
-
 /* Hero entrance: staggered via --d. */
 .kb-root .kb-enter { animation: kb-rise .8s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms) }
 
