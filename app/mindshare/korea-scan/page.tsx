@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
@@ -19,10 +20,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, ArrowLeft, Loader2, Lock, Radar, ScanSearch } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Briefcase, Loader2, Lock, Radar, ScanSearch } from 'lucide-react';
 import { formatDate } from '@/lib/dateFormat';
 import { KoreaScanReport } from '@/components/koreaScan/KoreaScanReport';
 import type { KoreaScan } from '@/lib/koreaScan/compute';
+import { SavedScansList, ShareBar, type SavedScanRow } from '@/components/koreaScan/SavedScans';
 
 interface PeerSetOption { id: string; label: string; field: string; members: string[] }
 interface ProjectOption { name: string; aliases: string[]; exclude?: string[]; setId: string }
@@ -44,6 +46,16 @@ export default function KoreaScanPage() {
   const [preparedFor, setPreparedFor] = useState('');
   const [running, setRunning] = useState(false);
   const [scan, setScan] = useState<KoreaScan | null>(null);
+  const [saved, setSaved] = useState<{ id: string; token: string } | null>(null);
+  const [savedRows, setSavedRows] = useState<SavedScanRow[] | null>(null);
+  const [origin, setOrigin] = useState('');
+
+  // Opened from a CRM opportunity: /mindshare/korea-scan?opportunity=<id>&name=<project>
+  const params = useSearchParams();
+  const opportunityId = params.get('opportunity');
+  const opportunityName = params.get('name');
+
+  useEffect(() => { setOrigin(window.location.origin); }, []);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -51,8 +63,33 @@ export default function KoreaScanPage() {
       setSets(d.peerSets ?? []);
       setProjects(d.projects ?? []);
       setCorpus(d.corpus ?? null);
+      // Prefill from the opportunity's name when Korea Signal already tracks it.
+      if (opportunityName) {
+        const hit = (d.projects ?? []).find((p: ProjectOption) => p.name.toLowerCase() === opportunityName.toLowerCase());
+        if (hit) { setName(hit.name); setAliases(hit.aliases.join(', ')); setExclude((hit.exclude ?? []).join(', ')); setPeerSetId(hit.setId); }
+        else setName(opportunityName);
+        setPreparedFor(opportunityName);
+      }
     }).catch(() => setSets([]));
+    loadSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  async function loadSaved() {
+    const res = await fetch(`/api/korea-scan/saved${opportunityId ? `?opportunity=${opportunityId}` : ''}`);
+    const d = await res.json().catch(() => ({}));
+    setSavedRows(d.scans ?? []);
+  }
+
+  async function openSaved(id: string) {
+    const res = await fetch(`/api/korea-scan/saved?id=${id}`);
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { toast({ title: 'Could not open that scan', variant: 'destructive' }); return; }
+    setScan(d.scan.scan);
+    setSaved({ id: d.scan.id, token: d.scan.token });
+    setPreparedFor(d.scan.prepared_for ?? '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   function prefill(projectName: string) {
     const p = projects.find((x) => x.name === projectName);
@@ -68,11 +105,14 @@ export default function KoreaScanPage() {
     try {
       const res = await fetch('/api/korea-scan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, aliases: split(aliases), exclude: split(exclude), peerSetId }),
+        body: JSON.stringify({ name, aliases: split(aliases), exclude: split(exclude), peerSetId, preparedFor, opportunityId }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? 'Scan failed');
       setScan(d.scan);
+      setSaved(d.saved ? { id: d.saved.id, token: d.saved.token } : null);
+      if (d.saveError) toast({ title: 'Scan ran but was not saved', description: d.saveError, variant: 'destructive' });
+      loadSaved();
     } catch (e: any) {
       toast({ title: 'Scan failed', description: e.message, variant: 'destructive' });
     } finally {
@@ -105,6 +145,13 @@ export default function KoreaScanPage() {
   return (
     <div className="space-y-6">
       {header}
+
+      {opportunityId && (
+        <div className="flex items-center gap-2 rounded-lg border border-brand/20 bg-brand-light px-4 py-2.5 text-sm text-gray-800">
+          <Briefcase className="h-4 w-4 text-brand" />
+          Scans run here are attached to the opportunity <b className="font-semibold">{opportunityName ?? 'from the sales pipeline'}</b>.
+        </div>
+      )}
 
       {staleDays != null && staleDays > 7 && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -178,12 +225,20 @@ export default function KoreaScanPage() {
           <Skeleton className="h-64 rounded-xl" />
         </div>
       ) : scan ? (
-        <KoreaScanReport s={scan} preparedFor={preparedFor.trim() || null} />
+        <>
+          {saved && origin && <ShareBar token={saved.token} id={saved.id} origin={origin} onRevoked={() => { setSaved(null); loadSaved(); }} />}
+          <KoreaScanReport s={scan} preparedFor={preparedFor.trim() || null} />
+        </>
       ) : (
         <Card>
           <EmptyState icon={ScanSearch} title="Scan any project"
-            description="Pick a tracked project or type a name and its Korean spellings, choose its field, and run. Nothing is saved." />
+            description="Pick a tracked project or type a name and its Korean spellings, choose its field, and run. Each run is saved with a private link you can send." />
         </Card>
+      )}
+
+      {savedRows === null ? <Skeleton className="h-40 rounded-lg" /> : (
+        <SavedScansList rows={savedRows} origin={origin} onOpen={openSaved}
+          title={opportunityId ? `Scans for ${opportunityName ?? 'this opportunity'}` : 'Saved scans'} />
       )}
     </div>
   );

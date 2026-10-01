@@ -39,6 +39,8 @@ export interface ScanInput {
   /** asOf: when the scan was run, so staleness is measured against today. */
   corpus: { trackedChannels: number; lastPostAt: string | null; asOf: string };
   method: { aliases: string[]; exclude: string[] };
+  /** Channels Holo Hive has worked with (tg_monitored_channels.is_hired). Handles compared case-insensitively. */
+  network?: Array<{ handle: string; title: string | null }>;
 }
 
 type Mix = Record<CoverageType, number>;
@@ -73,6 +75,20 @@ export interface KoreaScan {
   room: { channels: number; subjectChannels: number; neverNamed: number };
   referral: { recent21: number | null; recent21Posts: number; whole: number | null };
   receipts: Array<{ channel: string; channelTitle: string | null; url: string | null; date: string; views: number | null; text: string; type: CoverageType }>;
+  /**
+   * Holo Hive's network against this field: channels we've worked with that
+   * write about the field, how many already named the subject, and the ones
+   * that haven't, with their typical readers per post. `open` carries channel
+   * names: internal only, stripped before a scan is shared (see redactForShare).
+   */
+  network: {
+    inField: number;
+    named: number;
+    openCount: number;
+    /** Sum of each open channel's average readers per post on this field. */
+    openReaders: number;
+    open: Array<{ handle: string; title: string | null; fieldPosts: number; avgViews: number }>;
+  } | null;
 }
 
 interface Bucket { posts: number; channels: number; views: number }
@@ -211,6 +227,26 @@ export function computeKoreaScan(input: ScanInput): KoreaScan {
 
   const staleDays = input.corpus.lastPostAt ? Math.floor((Date.parse(input.corpus.asOf) - Date.parse(input.corpus.lastPostAt)) / DAY) : null;
 
+  // Our network: which of our channels write about the field, and which never named the subject.
+  let network: KoreaScan['network'] = null;
+  if (input.network?.length) {
+    const ours = new Map(input.network.map((c) => [c.handle.toLowerCase(), c.title]));
+    const byCh = new Map<string, ScanPost[]>();
+    for (const r of all) for (const p of r.posts) {
+      const k = p.channel.toLowerCase();
+      if (ours.has(k)) byCh.set(k, [...(byCh.get(k) ?? []), p]);
+    }
+    const namedSet = new Set(subj.map((p) => p.channel.toLowerCase()));
+    const open = [...byCh.entries()].filter(([k]) => !namedSet.has(k)).map(([k, ps]) => ({
+      handle: ps[0].channel, title: ours.get(k) ?? ps[0].channelTitle, fieldPosts: ps.length,
+      avgViews: Math.round(views(ps) / Math.max(ps.filter((p) => p.views != null).length, 1)),
+    })).sort((a, b) => b.avgViews - a.avgViews);
+    network = {
+      inField: byCh.size, named: [...byCh.keys()].filter((k) => namedSet.has(k)).length,
+      openCount: open.length, openReaders: open.reduce((n, c) => n + c.avgViews, 0), open,
+    };
+  }
+
   return {
     subject: input.subject.name,
     field: input.field,
@@ -229,7 +265,13 @@ export function computeKoreaScan(input: ScanInput): KoreaScan {
     room: { channels: roomChannels.size, subjectChannels: subjChannels.size, neverNamed: roomChannels.size - subjChannels.size },
     referral: { recent21: refShare(recent), recent21Posts: recent.length, whole: refShare(subj) },
     receipts,
+    network,
   };
+}
+
+/** A scan safe to send outside Holo Hive: our network's channel names removed. */
+export function redactForShare(s: KoreaScan): KoreaScan {
+  return s.network ? { ...s, network: { ...s.network, open: [] } } : s;
 }
 
 /** First 220 characters on one line, cut at a word. */

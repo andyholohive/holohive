@@ -109,6 +109,7 @@ import { DealSection } from '@/components/crm/sales-pipeline/slideovers/sections
 import { OrbitTrackingSection } from '@/components/crm/sales-pipeline/slideovers/sections/OrbitTrackingSection';
 import { PostProposalTrackingSection } from '@/components/crm/sales-pipeline/slideovers/sections/PostProposalTrackingSection';
 import { ActivityTimelineSection } from '@/components/crm/sales-pipeline/slideovers/sections/ActivityTimelineSection';
+import { KoreaScanSection } from '@/components/crm/sales-pipeline/slideovers/sections/KoreaScanSection';
 
 // ───────────────────────────────────────────────────────────────────
 // Local utilities — kept inline because they're only used in this
@@ -622,6 +623,8 @@ export function OpportunitySlideOver() {
             <OrbitTrackingSection opp={opp} />
 
             <PostProposalTrackingSection opp={opp} />
+
+            <KoreaScanSection opp={opp} />
 
             <ActivityTimelineSection />
           </div>

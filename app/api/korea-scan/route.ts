@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireRole } from '@/lib/requireSuperAdmin';
@@ -35,8 +36,12 @@ const clean = (v: unknown, max: number, len: number) =>
   (Array.isArray(v) ? v : []).map((x) => String(x ?? '').trim()).filter((x) => x.length > 0 && x.length <= len).slice(0, max);
 
 /**
- * POST /api/korea-scan — run a scan for any project (admin+).
- * Body: { name, aliases[], exclude?[], peerSetId, windowDays? }
+ * POST /api/korea-scan — run a scan for any project (admin+) and save it.
+ * Body: { name, aliases[], exclude?[], peerSetId, windowDays?, preparedFor?, opportunityId? }
+ *
+ * Every run is saved as a frozen snapshot with its own private share link,
+ * so what a prospect opens is exactly what sales looked at, and a later run
+ * on the same opportunity gives a before-and-after.
  */
 export async function POST(request: Request) {
   const guard = await requireRole(request, ['admin', 'super_admin']);
@@ -55,9 +60,22 @@ export async function POST(request: Request) {
   const sets = await loadPeerSets(db);
   const peerSet = sets.find((s) => s.id === body?.peerSetId);
   if (!peerSet) return NextResponse.json({ error: 'Pick a field to compare against.' }, { status: 400 });
+  const preparedFor = String(body?.preparedFor ?? '').trim().slice(0, 80) || null;
+  const opportunityId = typeof body?.opportunityId === 'string' && /^[0-9a-f-]{36}$/i.test(body.opportunityId) ? body.opportunityId : null;
+  if (opportunityId) {
+    const { data: opp } = await (db as any).from('crm_opportunities').select('id').eq('id', opportunityId).maybeSingle();
+    if (!opp) return NextResponse.json({ error: 'That opportunity no longer exists.' }, { status: 400 });
+  }
   try {
     const scan = await runKoreaScan(db, { subject: { name, aliases, exclude }, peerSet, windowDays });
-    return NextResponse.json({ scan });
+    const token = randomBytes(32).toString('hex');
+    const { data: saved, error } = await (db as any).from('korea_scans').insert({
+      token, subject_name: name, aliases, exclude, peer_set_id: peerSet.id, prepared_for: preparedFor,
+      scan, opportunity_id: opportunityId, created_by: guard.user?.id ?? null,
+    }).select('id, token, created_at').single();
+    // A scan that ran but didn't save is still useful on screen; say so instead of failing.
+    if (error) return NextResponse.json({ scan, saved: null, saveError: error.message });
+    return NextResponse.json({ scan, saved });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Scan failed' }, { status: 500 });
   }

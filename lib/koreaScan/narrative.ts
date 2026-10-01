@@ -71,6 +71,14 @@ export function scanNarrative(s: KoreaScan) {
       sub: `The field ${fieldGrew ? 'grew' : 'shrank'} ${Math.abs(s.movement.fieldPace ?? 0)} percent. ${mv ? (going ? `${n} is gaining with it.` : `${n} is one of ${shrinking} names going backwards.`) : `${n} has no coverage to compare.`}`,
       read: `Quality-weighted Korean coverage. Change compares the last ${weeks(s.periods.movementShort)} against each project's own pace over ${weeks(s.periods.movementLong)}.`,
     },
+    network: s.network && {
+      title: s.network.openCount > 0
+        ? `${s.network.openCount} channels in Holo Hive's network write about ${s.field} and have not covered ${n}.`
+        : `Every channel in Holo Hive's network that covers ${s.field} has already written ${n}.`,
+      sub: s.network.openCount > 0
+        ? `Together they reach about ${s.network.openReaders.toLocaleString('en-US')} readers a post. ${s.network.named} of our ${s.network.inField} channels on this subject have named ${n} already.`
+        : `${s.network.named} of our ${s.network.inField} channels on this subject have named ${n}.`,
+    },
     room: {
       title: `Korea's ${s.field} conversation runs across ${s.room.channels} channels.`,
       sub: `${s.room.neverNamed} of them have never written ${n}.`,

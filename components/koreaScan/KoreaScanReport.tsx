@@ -29,7 +29,12 @@ const SEG: Record<CoverageType, { bg: string; fg: string }> = {
   calendar: { bg: G[4], fg: '#16140F' },
 };
 
-export function KoreaScanReport({ s, preparedFor }: { s: KoreaScan; preparedFor?: string | null }) {
+export function KoreaScanReport({ s, preparedFor, audience = 'internal' }: {
+  s: KoreaScan;
+  preparedFor?: string | null;
+  /** 'shared' hides our network's channel names (the server also strips them). */
+  audience?: 'internal' | 'shared';
+}) {
   const t = scanNarrative(s);
   const span = `${formatDate(s.window.start)} to ${formatDate(s.window.end)}`;
   const source = `${s.room.channels} Korean Telegram channels writing about ${s.field}, ${s.window.weeks} whole weeks, ${span}.`;
@@ -146,6 +151,39 @@ export function KoreaScanReport({ s, preparedFor }: { s: KoreaScan; preparedFor?
             note={`${share(s.room.subjectChannels, s.room.channels)}% of the room. The other ${s.room.neverNamed} publish on the same subject and have not typed the name.`} />
         </div>
       </Slide>
+
+      {/* Our network: who could carry the name next */}
+      {s.network && t.network && (
+        <Slide kicker="Where Holo Hive comes in" title={t.network.title} sub={t.network.sub}
+          footer={`Holo Hive network = channels we have worked with, as tracked in our Telegram registry. Readers a post = average views on ${s.field} posts in this window. ${source}`}>
+          <div className="grid gap-6 sm:grid-cols-3">
+            <Big value={String(s.network.openCount)} label={`of our channels cover ${s.field} and have not named ${s.subject}`} />
+            <Big value={compact(s.network.openReaders)} label="combined readers a post across them" />
+            <Big value={`${s.network.named}/${s.network.inField}`} label={`of our channels on this subject already name ${s.subject}`} />
+          </div>
+          {audience === 'internal' && s.network.open.length > 0 && (
+            <div className="mt-7">
+              <p className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-amber-800">
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10.5px] uppercase tracking-[0.1em]">Internal</span>
+                Channel names never appear on a shared link.
+              </p>
+              <ScanTable head={['Channel', `Posts on ${s.field}`, 'Readers a post']}>
+                {s.network.open.slice(0, 12).map((c) => (
+                  <TableRow key={c.handle} className="border-[#EFEBE1] hover:bg-transparent">
+                    <TableCell className="p-0 py-2.5 pl-3 pr-4">
+                      <span className="font-medium">{c.title ?? c.handle}</span>
+                      <span className="ml-2 text-xs text-[#6B6557]">@{c.handle}</span>
+                    </TableCell>
+                    <TableCell className="p-0 py-2.5 pr-4 text-right tabular-nums">{c.fieldPosts}</TableCell>
+                    <TableCell className="p-0 py-2.5 pr-3 text-right tabular-nums">{c.avgViews.toLocaleString('en-US')}</TableCell>
+                  </TableRow>
+                ))}
+              </ScanTable>
+              {s.network.open.length > 12 && <p className="mt-2 text-xs text-[#6B6557]">And {s.network.open.length - 12} more.</p>}
+            </div>
+          )}
+        </Slide>
+      )}
 
       {/* Receipts */}
       {s.receipts.length > 0 && (

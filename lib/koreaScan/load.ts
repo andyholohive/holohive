@@ -113,6 +113,8 @@ export async function runKoreaScan(db: SupabaseClient, req: ScanRequest): Promis
   const since = new Date(Math.max(end.getTime() - windowDays * DAY, coverage.coverageStart ? Date.parse(coverage.coverageStart) : 0)).toISOString();
   const until = end.toISOString();
   const peers = peersFor(req.peerSet, req.subject.name);
+  const { data: hired } = await (db as any).from('tg_monitored_channels').select('channel_username, channel_name').eq('is_hired', true).eq('is_active', true);
+  const network = (hired ?? []).filter((c: any) => c.channel_username).map((c: any) => ({ handle: c.channel_username as string, title: (c.channel_name as string) ?? null }));
   const [subjectPosts, ...peerPosts] = await inBatches([req.subject, ...peers], 4, (s) => fetchMatches(db, s, since, until));
   return computeKoreaScan({
     subject: { name: req.subject.name, posts: subjectPosts },
@@ -123,5 +125,6 @@ export async function runKoreaScan(db: SupabaseClient, req: ScanRequest): Promis
     coverageStart: coverage.coverageStart,
     corpus: { ...corpus, asOf: new Date().toISOString() },
     method: { aliases: req.subject.aliases, exclude: req.subject.exclude ?? [] },
+    network,
   });
 }
