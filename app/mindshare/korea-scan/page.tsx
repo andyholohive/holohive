@@ -22,7 +22,6 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, ArrowLeft, Briefcase, Loader2, Lock, Radar, RefreshCw, ScanSearch } from 'lucide-react';
 import { formatDate, formatRelativeShort, formatTime } from '@/lib/dateFormat';
-import { pickQuery } from '@/lib/koreaScan/telegram';
 import { KoreaScanReport } from '@/components/koreaScan/KoreaScanReport';
 import type { KoreaScan } from '@/lib/koreaScan/compute';
 import { SavedScansList, ShareBar, type SavedScanRow } from '@/components/koreaScan/SavedScans';
@@ -102,7 +101,7 @@ export default function KoreaScanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
-  // Live Telegram search through the MCP: start it, then follow the run until it finishes.
+  // Run the Telegram MCP crawl now, then follow the run until it finishes.
   async function loadTgRun() {
     const d = await fetch('/api/korea-scan/refresh').then((r) => r.json()).catch(() => null);
     setTgRun(d?.run ?? null);
@@ -113,7 +112,7 @@ export default function KoreaScanPage() {
     if (!tgRun || tgRun.status === 'completed') return;
     const t = setInterval(async () => {
       const r = await loadTgRun();
-      if (r?.status === 'completed') toast({ title: r.conclusion === 'success' ? 'Telegram search finished' : 'Telegram search failed', description: r.conclusion === 'success' ? 'Run the scan again to include what it found.' : 'Check the coverage-scan run in the kol-telegram-mcp repo.', variant: r.conclusion === 'success' ? undefined : 'destructive' });
+      if (r?.status === 'completed') toast({ title: r.conclusion === 'success' ? 'Telegram crawl finished' : 'Telegram crawl failed', description: r.conclusion === 'success' ? 'Run the scan again to include the new posts.' : 'Check the mindshare scrape run in the kol-telegram-mcp repo.', variant: r.conclusion === 'success' ? undefined : 'destructive' });
     }, 30_000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,14 +123,15 @@ export default function KoreaScanPage() {
     try {
       const res = await fetch('/api/korea-scan/refresh', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, aliases: split(aliases), scanId: saved?.id }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? 'Could not start');
-      toast({ title: `Searching Telegram for “${d.query}”`, description: 'About 15 minutes. It waits behind any crawl already running.' });
+      toast(d.started
+        ? { title: 'Telegram crawl started', description: 'About 15 minutes across every channel. Run the scan again after.' }
+        : { title: 'No new crawl needed', description: d.reason });
       setTimeout(loadTgRun, 4000);
     } catch (e: any) {
-      toast({ title: 'Telegram search not started', description: e.message, variant: 'destructive' });
+      toast({ title: 'Telegram crawl not started', description: e.message, variant: 'destructive' });
     } finally {
       setRefreshing(false);
     }
@@ -277,7 +277,7 @@ export default function KoreaScanPage() {
                 {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
                 {running ? 'Scanning…' : 'Run scan'}
               </Button>
-              <Button variant="outline" onClick={refreshFromTelegram} disabled={refreshing || !pickQuery(split(aliases)) || (!!tgRun && tgRun.status !== 'completed')}>
+              <Button variant="outline" onClick={refreshFromTelegram} disabled={refreshing || (!!tgRun && tgRun.status !== 'completed')}>
                 {refreshing || (tgRun && tgRun.status !== 'completed') ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                 Refresh from Telegram
               </Button>
@@ -285,9 +285,9 @@ export default function KoreaScanPage() {
             <p className="text-xs text-gray-500">
               Data comes from our Telegram MCP: {corpus?.trackedChannels ?? '…'} channels crawled every 6 hours
               {corpus?.lastPulledAt && <>, last pulled {formatRelativeShort(corpus.lastPulledAt)}</>}.
-              {pickQuery(split(aliases)) && <> Refresh searches Telegram live for “{pickQuery(split(aliases))}” across our roster channels (about 15 minutes).</>}
-              {tgRun && tgRun.status !== 'completed' && <> A live search is running, started {formatTime(tgRun.createdAt)}.</>}
-              {tgRun && tgRun.status === 'completed' && <> Last live search {tgRun.conclusion === 'success' ? 'finished' : 'failed'} {formatRelativeShort(tgRun.updatedAt)}.</>}
+              {' '}Refresh runs the crawl now instead of waiting for the next one (about 15 minutes).
+              {tgRun && tgRun.status !== 'completed' && <> A crawl is running, started {formatTime(tgRun.createdAt)}.</>}
+              {tgRun && tgRun.status === 'completed' && tgRun.conclusion !== 'success' && <> <span className="text-rose-600">The last crawl failed {formatRelativeShort(tgRun.updatedAt)}.</span></>}
             </p>
           </div>
         )}
