@@ -23,11 +23,13 @@ export async function loadPeerSets(db: SupabaseClient): Promise<PeerSet[]> {
 
 /** Newest post in the corpus and the number of channels being tracked. */
 export async function corpusState(db: SupabaseClient) {
-  const [{ data: last }, { count }] = await Promise.all([
+  const [{ data: last }, { data: pulled }, { count }] = await Promise.all([
     (db as any).from('tg_channel_posts').select('posted_at').order('posted_at', { ascending: false }).limit(1).maybeSingle(),
+    (db as any).from('tg_channel_posts').select('pulled_at').order('pulled_at', { ascending: false }).limit(1).maybeSingle(),
     (db as any).from('tg_monitored_channels').select('id', { count: 'exact', head: true }).eq('is_active', true),
   ]);
-  return { lastPostAt: (last?.posted_at as string) ?? null, trackedChannels: count ?? 0 };
+  // lastPulledAt = when the Telegram MCP last wrote anything (crawl or live search).
+  return { lastPostAt: (last?.posted_at as string) ?? null, lastPulledAt: (pulled?.pulled_at as string) ?? null, trackedChannels: count ?? 0 };
 }
 
 const DAY = 86_400_000;
@@ -123,7 +125,7 @@ export async function runKoreaScan(db: SupabaseClient, req: ScanRequest): Promis
     windowEnd: until,
     windowDays,
     coverageStart: coverage.coverageStart,
-    corpus: { ...corpus, asOf: new Date().toISOString() },
+    corpus: { trackedChannels: corpus.trackedChannels, lastPostAt: corpus.lastPostAt, asOf: new Date().toISOString() },
     method: { aliases: req.subject.aliases, exclude: req.subject.exclude ?? [] },
     network,
   });

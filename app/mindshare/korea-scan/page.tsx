@@ -20,8 +20,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, ArrowLeft, Briefcase, Loader2, Lock, Radar, ScanSearch } from 'lucide-react';
-import { formatDate } from '@/lib/dateFormat';
+import { AlertTriangle, ArrowLeft, Briefcase, Loader2, Lock, Radar, RefreshCw, ScanSearch } from 'lucide-react';
+import { formatDate, formatRelativeShort, formatTime } from '@/lib/dateFormat';
+import { pickQuery } from '@/lib/koreaScan/telegram';
 import { KoreaScanReport } from '@/components/koreaScan/KoreaScanReport';
 import type { KoreaScan } from '@/lib/koreaScan/compute';
 import { SavedScansList, ShareBar, type SavedScanRow } from '@/components/koreaScan/SavedScans';
@@ -40,7 +41,9 @@ export default function KoreaScanPage() {
 
   const [sets, setSets] = useState<PeerSetOption[] | null>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [corpus, setCorpus] = useState<{ lastPostAt: string | null; trackedChannels: number } | null>(null);
+  const [corpus, setCorpus] = useState<{ lastPostAt: string | null; lastPulledAt: string | null; trackedChannels: number } | null>(null);
+  const [tgRun, setTgRun] = useState<{ status: string; conclusion: string | null; createdAt: string; updatedAt: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [name, setName] = useState('');
   const [aliases, setAliases] = useState('');
   const [exclude, setExclude] = useState('');
@@ -98,6 +101,41 @@ export default function KoreaScanPage() {
     loadSaved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  // Live Telegram search through the MCP: start it, then follow the run until it finishes.
+  async function loadTgRun() {
+    const d = await fetch('/api/korea-scan/refresh').then((r) => r.json()).catch(() => null);
+    setTgRun(d?.run ?? null);
+    return d?.run ?? null;
+  }
+  useEffect(() => { if (isAdmin) loadTgRun(); }, [isAdmin]);
+  useEffect(() => {
+    if (!tgRun || tgRun.status === 'completed') return;
+    const t = setInterval(async () => {
+      const r = await loadTgRun();
+      if (r?.status === 'completed') toast({ title: r.conclusion === 'success' ? 'Telegram search finished' : 'Telegram search failed', description: r.conclusion === 'success' ? 'Run the scan again to include what it found.' : 'Check the coverage-scan run in the kol-telegram-mcp repo.', variant: r.conclusion === 'success' ? undefined : 'destructive' });
+    }, 30_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tgRun?.status]);
+
+  async function refreshFromTelegram() {
+    setRefreshing(true);
+    try {
+      const res = await fetch('/api/korea-scan/refresh', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, aliases: split(aliases), scanId: saved?.id }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? 'Could not start');
+      toast({ title: `Searching Telegram for “${d.query}”`, description: 'About 15 minutes. It waits behind any crawl already running.' });
+      setTimeout(loadTgRun, 4000);
+    } catch (e: any) {
+      toast({ title: 'Telegram search not started', description: e.message, variant: 'destructive' });
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function loadSaved() {
     const res = await fetch(`/api/korea-scan/saved${opportunityId ? `?opportunity=${opportunityId}` : ''}`);
@@ -239,8 +277,18 @@ export default function KoreaScanPage() {
                 {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
                 {running ? 'Scanning…' : 'Run scan'}
               </Button>
-              <span className="text-xs text-gray-500">Reads {corpus?.trackedChannels ?? '…'} tracked channels. Takes about 15 seconds.</span>
+              <Button variant="outline" onClick={refreshFromTelegram} disabled={refreshing || !pickQuery(split(aliases)) || (!!tgRun && tgRun.status !== 'completed')}>
+                {refreshing || (tgRun && tgRun.status !== 'completed') ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Refresh from Telegram
+              </Button>
             </div>
+            <p className="text-xs text-gray-500">
+              Data comes from our Telegram MCP: {corpus?.trackedChannels ?? '…'} channels crawled every 6 hours
+              {corpus?.lastPulledAt && <>, last pulled {formatRelativeShort(corpus.lastPulledAt)}</>}.
+              {pickQuery(split(aliases)) && <> Refresh searches Telegram live for “{pickQuery(split(aliases))}” across our roster channels (about 15 minutes).</>}
+              {tgRun && tgRun.status !== 'completed' && <> A live search is running, started {formatTime(tgRun.createdAt)}.</>}
+              {tgRun && tgRun.status === 'completed' && <> Last live search {tgRun.conclusion === 'success' ? 'finished' : 'failed'} {formatRelativeShort(tgRun.updatedAt)}.</>}
+            </p>
           </div>
         )}
       </Card>
