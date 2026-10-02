@@ -4,9 +4,8 @@
  * Doc 2 Q7b — 30-day niche drift suggestion cron.
  *
  * Daily at 04:30 UTC. Finds TG-platform KOLs whose channel snapshot is
- * either missing or >30 days old, then dispatches the kol-telegram-mcp
- * scan-one.yml workflow for each (rate-limited to avoid blasting GitHub
- * Actions and our own runner minutes). The scan re-runs the AI niche
+ * either missing or >30 days old, then dispatches ONE kol-telegram-mcp
+ * scan-one.yml run for the whole batch (up to 25 handles, comma-separated). The scan re-runs the AI niche
  * inference step in scripts/scan_joined.py → if the model now thinks
  * a KOL is e.g. "DeFi + Trading" instead of just "DeFi" it lands as a
  * direct update to master_kols.niche_tags via /api/mcp/kol-profile/update.
@@ -36,12 +35,8 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const STALENESS_DAYS = 30;
+/** KOLs per daily batch. All go in one scan-one run (see the dispatch below). */
 const MAX_DISPATCHES_PER_RUN = 25;
-// Brief pause between dispatches so we're not slamming the GH API.
-// Each dispatch is a small POST; ~100ms is enough to be polite.
-const DELAY_MS = 100;
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET) {
@@ -119,11 +114,20 @@ export async function GET(request: Request) {
       .sort((a, b) => (a.latest?.getTime() ?? 0) - (b.latest?.getTime() ?? 0))
       .slice(0, MAX_DISPATCHES_PER_RUN);
 
+    // One dispatch for the whole batch (scan-one accepts comma-separated
+    // handles). It used to be one dispatch per KOL — up to 25 GitHub runs
+    // at once, all logged into Telegram with the same session from
+    // different runner IPs. Telegram revokes a session it sees used from
+    // two IPs at once; that is what took every Telegram workflow down on
+    // 2026-09-07 (AuthKeyDuplicatedError). The workflows now share a
+    // concurrency group too, which only keeps one run waiting — so 25
+    // separate dispatches would mostly be cancelled. One batch is both
+    // safe and complete.
     let dispatched = 0;
     let failed = 0;
     const failures: Array<{ name: string; error: string }> = [];
 
-    for (const c of candidates) {
+    if (candidates.length) {
       try {
         const resp = await fetch(
           `https://api.github.com/repos/${ghRepo}/actions/workflows/${ghWorkflow}/dispatches`,
@@ -137,21 +141,20 @@ export async function GET(request: Request) {
             },
             body: JSON.stringify({
               ref: 'main',
-              inputs: { handle: `@${c.handle}` },
+              inputs: { handle: candidates.map(c => `@${c.handle}`).join(',') },
             }),
           },
         );
         if (resp.status === 204) {
-          dispatched++;
+          dispatched = candidates.length;
         } else {
-          failed++;
-          failures.push({ name: c.kol.name, error: `HTTP ${resp.status}` });
+          failed = candidates.length;
+          failures.push({ name: `${candidates.length} KOLs (one batch)`, error: `HTTP ${resp.status}` });
         }
       } catch (err: any) {
-        failed++;
-        failures.push({ name: c.kol.name, error: err?.message ?? 'unknown' });
+        failed = candidates.length;
+        failures.push({ name: `${candidates.length} KOLs (one batch)`, error: err?.message ?? 'unknown' });
       }
-      await sleep(DELAY_MS);
     }
 
     const output = {
