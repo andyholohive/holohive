@@ -325,21 +325,25 @@ export class ExpenseService {
       .single();
     if (loadErr) throw loadErr;
 
-    // Soft-delete the row itself
-    await (sb as any)
+    // Soft-delete the row itself. Errors are checked: an unchecked update
+    // that fails reads as "deleted" in the UI while the template keeps
+    // generating.
+    const { error: delErr } = await (sb as any)
       .from('expenses')
       .update({ deleted_at: now })
       .eq('id', id);
+    if (delErr) throw delErr;
 
     // If it was a template, also soft-delete its FUTURE instances.
     // Past instances stay so monthly reports keep their data.
     if (row.is_template) {
-      await (sb as any)
+      const { error: futErr } = await (sb as any)
         .from('expenses')
         .update({ deleted_at: now })
         .eq('template_id', id)
         .gte('expense_date', today)
         .is('deleted_at', null);
+      if (futErr) throw futErr;
     }
     // Suppress unused arg warning — kept for future audit logging
     void deletedByUserId;

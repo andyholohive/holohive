@@ -26,7 +26,11 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/dateFormat';
-import { RefreshCw, Pause, Play } from 'lucide-react';
+import { RefreshCw, Pause, Play, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Template = {
   id: string;
@@ -95,6 +99,26 @@ export function RecurringTemplatesPanel({ onChanged }: { onChanged?: () => void 
     }
   };
 
+  // Delete = stop for good. The service soft-deletes the template and its
+  // upcoming copies; past expenses stay so reports keep their numbers.
+  const [confirmDelete, setConfirmDelete] = useState<Template | null>(null);
+  const remove = async (t: Template) => {
+    setBusyId(t.id);
+    try {
+      const res = await fetch(`/api/expenses/${t.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      toast({ title: 'Recurring expense deleted', description: `${t.description} won't generate again. Past expenses are kept.` });
+      await load();
+      onChanged?.();
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    } finally {
+      setBusyId(null);
+      setConfirmDelete(null);
+    }
+  };
+
   const activeCount = (rows ?? []).filter(r => !r.paused_at && !ended(r)).length;
 
   return (
@@ -158,21 +182,31 @@ export function RecurringTemplatesPanel({ onChanged }: { onChanged?: () => void 
                         {/* An ended recurrence has nothing to pause — the end
                             date already stopped it, and offering Pause there
                             would imply resuming could restart it. */}
-                        {isEnded ? (
-                          <span className="text-xs text-ink-warm-400">—</span>
-                        ) : (
+                        <div className="inline-flex items-center gap-1.5">
+                          {!isEnded && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 focus-brand"
+                              disabled={busyId === t.id}
+                              onClick={() => togglePause(t)}
+                            >
+                              {isPaused
+                                ? <><Play className="h-3.5 w-3.5 mr-1" />Resume</>
+                                : <><Pause className="h-3.5 w-3.5 mr-1" />Pause</>}
+                            </Button>
+                          )}
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="h-7 focus-brand"
+                            className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            aria-label={`Delete ${t.description}`}
                             disabled={busyId === t.id}
-                            onClick={() => togglePause(t)}
+                            onClick={() => setConfirmDelete(t)}
                           >
-                            {isPaused
-                              ? <><Play className="h-3.5 w-3.5 mr-1" />Resume</>
-                              : <><Pause className="h-3.5 w-3.5 mr-1" />Pause</>}
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -182,6 +216,27 @@ export function RecurringTemplatesPanel({ onChanged }: { onChanged?: () => void 
           </div>
         </Card>
       )}
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{confirmDelete?.description}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It stops for good and removes any upcoming copies. Expenses it already created stay, so past months don’t change.
+              To stop it for a while instead, use Pause.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); if (confirmDelete) void remove(confirmDelete); }}
+            >
+              Delete recurring expense
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
