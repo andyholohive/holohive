@@ -15,6 +15,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { addWeeks, canStartLineup, lineupWeekEnded } from './lineupDeadline';
 import { renderTemplate } from './messageTemplates';
 import { escapeHtml } from './telegramHtml';
 import { slotStatusFromExistingContent } from './lineupSlotSync';
@@ -313,6 +314,11 @@ export class LineupManagerService {
       .maybeSingle();
     if (existing) return existing as CampaignLineup;
 
+    // Tuesday deadline: no new lineups for a week past its Tuesday (KST),
+    // and none for weeks that have ended. The DB trigger enforces the same.
+    const allowed = canStartLineup(weekOf, weekNumber);
+    if (!allowed.ok) throw new Error(allowed.reason);
+
     const { data, error } = await (this.supabase as any)
       .from('campaign_lineups')
       .insert({
@@ -585,6 +591,9 @@ export class LineupManagerService {
     if (lineup.status !== 'confirmed') {
       throw new Error(`Can only unlock a confirmed lineup. Current status: ${lineup.status}.`);
     }
+    if (lineupWeekEnded(lineup.week_of)) {
+      throw new Error(`Week ${lineup.week_number} has ended, so its lineup can't be reopened.`);
+    }
     const { error } = await (this.supabase as any)
       .from('campaign_lineups')
       .update({ status: 'draft', confirmed_by: null, confirmed_at: null })
@@ -606,15 +615,18 @@ export class LineupManagerService {
     const source = await this.getLineupFull(lineupId);
     if (!source) throw new Error('Source lineup not found.');
 
-    // Compute next week's metadata.
-    const nextWeekNumber = source.week_number + 1;
-    const nextWeekOf = (() => {
-      const d = new Date(source.week_of + 'T00:00:00Z');
-      d.setUTCDate(d.getUTCDate() + 7);
-      return d.toISOString().slice(0, 10);
-    })();
+    // Target: the next week still open for a new lineup. A week past its
+    // Tuesday deadline is skipped rather than filled after the fact — that
+    // is how Umia got a lineup for a week that had already ended.
+    let offset = 1;
+    while (!canStartLineup(addWeeks(source.week_of, offset), source.week_number + offset).ok) offset++;
+    const nextWeekNumber = source.week_number + offset;
+    const nextWeekOf = addWeeks(source.week_of, offset);
+    const skipped = offset > 1
+      ? ` Skipped Week${offset > 2 ? 's' : ''} ${Array.from({ length: offset - 1 }, (_, i) => source.week_number + 1 + i).join(', ')}, past the Tuesday deadline.`
+      : '';
 
-    // Refuse if next week already has content (don't silently
+    // Refuse if that week already has content (don't silently
     // overwrite). The caller can delete the existing one first
     // if a fresh duplicate is wanted.
     const { data: existing } = await (this.supabase as any)
@@ -669,7 +681,7 @@ export class LineupManagerService {
       newLineup.id,
       'duplicated',
       actorId,
-      `Duplicated from Week ${source.week_number}.`,
+      `Duplicated from Week ${source.week_number}.${skipped}`,
     );
     return newLineup as CampaignLineup;
   }
@@ -1214,6 +1226,9 @@ export class LineupManagerService {
     const lineup = await this.getLineup(lineupId);
     if (lineup.status === 'confirmed' || lineup.status === 'completed') {
       throw new Error(`Cannot edit a ${lineup.status} lineup. Unlock first.`);
+    }
+    if (lineupWeekEnded(lineup.week_of)) {
+      throw new Error(`Week ${lineup.week_number} has ended, so its lineup can't change.`);
     }
   }
 

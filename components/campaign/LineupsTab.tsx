@@ -85,6 +85,7 @@ import {
   mondayOfCampaignWeek,
   currentWeekNumber,
 } from '@/lib/lineupManagerService';
+import { addWeeks, canStartLineup, deadlineLabel, lineupWeekEnded } from '@/lib/lineupDeadline';
 import { KolBriefService } from '@/lib/kolBriefService';
 import { getCampaignWeekState } from '@/lib/campaignWeekHelpers';
 
@@ -1001,16 +1002,27 @@ export default function LineupsTab({
                 Confirm
               </Button>
             )}
-            {lineup.status === 'confirmed' && (
+            {lineup.status === 'confirmed' && !lineupWeekEnded(lineup.week_of) && (
               <Button size="sm" variant="outline" onClick={handleUnlock} disabled={busy}>
                 <Unlock className="h-3.5 w-3.5 mr-1" />
                 Unlock
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={handleDuplicate} disabled={busy} title="Copy this week's lineup as next week's draft">
-              <Copy className="h-3.5 w-3.5 mr-1" />
-              Duplicate to next week
-            </Button>
+            {(() => {
+              // Same target the service picks: the next week still open for a new lineup.
+              let offset = 1;
+              while (!canStartLineup(addWeeks(lineup.week_of, offset), lineup.week_number + offset).ok) offset++;
+              const target = lineup.week_number + offset;
+              return (
+                <Button size="sm" variant="ghost" onClick={handleDuplicate} disabled={busy}
+                  title={offset > 1
+                    ? `Copies this lineup to Week ${target}. Earlier weeks are past their Tuesday deadline.`
+                    : `Copies this lineup to Week ${target} as a draft.`}>
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  Duplicate to Week {target}
+                </Button>
+              );
+            })()}
             <AuditLogButton lineupId={lineup.id} service={service} />
             <div className="ml-auto">
               <Button
@@ -1049,21 +1061,31 @@ export default function LineupsTab({
         )}
 
         {/* ─── Body ─── */}
-        {!lineup ? (
-          <div className="border border-cream-200 rounded-lg bg-white">
-            <EmptyState
-              icon={ListChecks}
-              title={`No lineup for Week ${selectedWeek} yet`}
-              description="Start a draft, pick KOLs from the roster, propose for review."
-              className="py-12"
-            >
-              <Button variant="brand" onClick={handleStartLineup} disabled={busy}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                Start lineup for Week {selectedWeek}
-              </Button>
-            </EmptyState>
-          </div>
-        ) : isReadOnlySummary ? (
+        {!lineup ? (() => {
+          // Tuesday deadline [Bolt 2026-10-06]: say it before anyone hits it.
+          const weekOf = mondayOfCampaignWeek(campaignStartDate, selectedWeek);
+          const allowed = canStartLineup(weekOf, selectedWeek);
+          const thisWeekStarted = Date.now() >= Date.parse(`${weekOf}T00:00:00+09:00`);
+          return (
+            <div className="border border-cream-200 rounded-lg bg-white">
+              <EmptyState
+                icon={ListChecks}
+                title={allowed.ok ? `No lineup for Week ${selectedWeek} yet` : `No lineup for Week ${selectedWeek}`}
+                description={allowed.ok
+                  ? `Start a draft, pick KOLs from the roster, propose for review.${thisWeekStarted ? ` Set it up by ${deadlineLabel(weekOf)} (Korea time).` : ''}`
+                  : allowed.reason}
+                className="py-12"
+              >
+                {allowed.ok && (
+                  <Button variant="brand" onClick={handleStartLineup} disabled={busy}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Start lineup for Week {selectedWeek}
+                  </Button>
+                )}
+              </EmptyState>
+            </div>
+          );
+        })() : isReadOnlySummary ? (
           <>
             <SummaryView lineup={lineup} rosterById={rosterById} />
             {lineup.status === 'confirmed' && (
