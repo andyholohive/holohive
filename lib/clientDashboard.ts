@@ -28,6 +28,24 @@ export interface ClientDashboardData {
     angles: Array<{ name: string; slots: Array<{ kol: string; status: string }> }>;
     previous: { weekNumber: number; angles: Array<{ name: string; slots: Array<{ kol: string; status: string }> }> } | null;
   } | null;
+  /** Where the client sits among every project Korea Signal tracks in Korean Telegram. */
+  placement: {
+    windowDays: number;
+    category: string | null;
+    mentions: number;
+    sharePct: number;
+    sharePrevPct: number | null;
+    rank: number;
+    of: number;
+    categoryRank: number | null;
+    categoryOf: number | null;
+    /** The category table, or the client's neighbours in the overall table when it has no category. */
+    peers: Array<{ name: string; mentions: number; sharePct: number; rank: number; isClient: boolean }>;
+    peersLabel: string;
+    krVenues: string[];
+  } | null;
+  /** Money out on this client's campaigns. Admin roles only — the route strips it for members. */
+  spend: { total: number; kol: number; byCategory: Array<{ category: string; amount: number }>; payments: number } | null;
 }
 
 const DAY = 86_400_000;
@@ -222,12 +240,84 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
 
     return lineup;
   })();
-  // The four sections above are independent; run them together.
-  const [sentiment, market, buzz, lineup] = await Promise.all([sentimentTask, marketTask, buzzTask, lineupTask]);
+  const placementTask = (async (): Promise<ClientDashboardData['placement']> => {
+  // ── Placement: share of all tracked Korean Telegram mentions ──────────
+  // Shares, not raw counts: crawl coverage varies (09/07–10/01 was thin),
+  // and a share of the same corpus stays comparable across that.
+  const WINDOW = 30;
+  const [{ data: projects }, { data: krc }] = await Promise.all([
+    sb.from('mindshare_projects').select('id, name, category, client_id').eq('is_active', true),
+    sb.from('kr_signal_clients').select('kr_venues').or(`client_id.eq.${clientId},content_log_source.eq.hhp:${clientId}`).limit(1).maybeSingle(),
+  ]);
+  const projs = (projects ?? []) as any[];
+  const me = projs.find((p) => p.client_id === clientId);
+  if (!me) return null;
+  const since = new Date(Date.now() - 2 * WINDOW * DAY).toISOString().slice(0, 10);
+  const cut = new Date(Date.now() - WINDOW * DAY).toISOString().slice(0, 10);
+  const days: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb.from('mindshare_daily').select('project_id, day, mention_count').gte('day', since).range(from, from + 999);
+    days.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  const now = new Map<string, number>(), before = new Map<string, number>();
+  for (const d of days) {
+    const m = d.day > cut ? now : before;
+    m.set(d.project_id, (m.get(d.project_id) ?? 0) + (d.mention_count ?? 0));
+  }
+  const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+  const totalNow = sum(now), totalBefore = sum(before);
+  if (!totalNow) return null;
+  const table = projs.map((p) => ({ id: p.id, name: p.name, category: p.category, mentions: now.get(p.id) ?? 0 }))
+    .sort((a, b) => b.mentions - a.mentions);
+  const rankOf = (rows: typeof table, id: string) => {
+    const v = rows.find((r) => r.id === id)!.mentions;
+    return rows.filter((r) => r.mentions > v).length + 1; // ties share a rank
+  };
+  const share = (n: number, of: number) => +((n / of) * 100).toFixed(1);
+  const cat = me.category ? table.filter((r) => r.category === me.category) : null;
+  let peerRows: typeof table;
+  if (cat && cat.length > 1) peerRows = cat.slice(0, 8);
+  else {
+    const i = table.findIndex((r) => r.id === me.id);
+    peerRows = table.slice(Math.max(0, i - 3), Math.max(0, i - 3) + 7);
+  }
+  if (!peerRows.some((r) => r.id === me.id)) peerRows = [...peerRows.slice(0, 7), table.find((r) => r.id === me.id)!];
+  return {
+    windowDays: WINDOW,
+    category: me.category ?? null,
+    mentions: now.get(me.id) ?? 0,
+    sharePct: share(now.get(me.id) ?? 0, totalNow),
+    sharePrevPct: totalBefore ? share(before.get(me.id) ?? 0, totalBefore) : null,
+    rank: rankOf(table, me.id),
+    of: table.length,
+    categoryRank: cat && cat.length > 1 ? rankOf(cat, me.id) : null,
+    categoryOf: cat && cat.length > 1 ? cat.length : null,
+    peers: peerRows.map((r) => ({ name: r.name, mentions: r.mentions, sharePct: share(r.mentions, totalNow), rank: rankOf(table, r.id), isClient: r.id === me.id })),
+    peersLabel: cat && cat.length > 1 ? `${me.category} projects` : 'Nearest in the overall table',
+    krVenues: (krc?.kr_venues ?? []) as string[],
+  };
+  })();
+  const spendTask = (async (): Promise<ClientDashboardData['spend']> => {
+  if (!campIds.length) return null;
+  const { data: pays } = await sb.from('payments').select('amount, payment_category').in('campaign_id', campIds);
+  const rows = (pays ?? []) as any[];
+  if (!rows.length) return null;
+  const by = new Map<string, number>();
+  for (const r of rows) by.set(r.payment_category ?? 'other', (by.get(r.payment_category ?? 'other') ?? 0) + Number(r.amount ?? 0));
+  return {
+    total: rows.reduce((n, r) => n + Number(r.amount ?? 0), 0),
+    kol: by.get('kol') ?? 0,
+    byCategory: [...by.entries()].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount),
+    payments: rows.length,
+  };
+  })();
+  // The sections above are independent; run them together.
+  const [sentiment, market, buzz, lineup, placement, spend] = await Promise.all([sentimentTask, marketTask, buzzTask, lineupTask, placementTask, spendTask]);
   return {
     client: { id: client.id, name: client.name, logoUrl: client.logo_url ?? null, isActive: !!client.is_active },
     campaigns: camps.map((c) => ({ id: c.id, name: c.name, status: c.status ?? null })),
     week, startDate,
-    totals, weekly, creators, sentiment, market, buzz, lineup,
+    totals, weekly, creators, sentiment, market, buzz, lineup, placement, spend,
   };
 }

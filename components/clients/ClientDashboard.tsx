@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { LineChart, ColumnChart, BarList } from '@/components/portal/korea/KoreaCharts';
 import {
   Eye, FileText, Heart, Radio, TrendingUp, PieChart, Users, MessageSquare, ListChecks, Quote, CalendarClock,
+  Trophy, Gauge, Megaphone, Wallet, ArrowLeftRight, Activity,
 } from 'lucide-react';
 import type { ClientDashboardData } from '@/lib/clientDashboard';
 
@@ -75,6 +76,199 @@ function Panel({ icon, title, subtitle, action, children }: {
 
 function Empty({ icon, title, description }: { icon: ComponentType<{ className?: string }>; title: string; description: string }) {
   return <EmptyState icon={icon} title={title} description={description} className="py-10" />;
+}
+
+type Verdict = 'strong' | 'steady' | 'watch' | 'info';
+const VERDICT: Record<Verdict, { label: string; tone: BadgeTone }> = {
+  strong: { label: 'Strong', tone: 'success' },
+  steady: { label: 'Steady', tone: 'neutral' },
+  watch: { label: 'Watch', tone: 'warning' },
+  info: { label: 'Info', tone: 'slate' },
+};
+interface Signal { key: string; icon: ComponentType<{ className?: string }>; label: string; value: string; detail: string; verdict: Verdict }
+
+/** Change over the last 4 complete weeks against the 4 before. */
+function fourWeek(done: ClientDashboardData['weekly'], f: (w: ClientDashboardData['weekly'][number]) => number) {
+  if (done.length < 8) return null;
+  const a = done.slice(-4).reduce((n, w) => n + f(w), 0);
+  const b = done.slice(-8, -4).reduce((n, w) => n + f(w), 0);
+  return b ? Math.round(((a - b) / b) * 100) : null;
+}
+const byChange = (c: number | null, band = 15): Verdict => (c === null ? 'info' : c > band ? 'strong' : c < -band ? 'watch' : 'steady');
+const signed = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
+
+/**
+ * The evaluation read: one line per signal, each with a verdict and the
+ * evidence behind it. Thresholds are deliberately simple and stated in the
+ * detail line so nobody has to guess why something says Watch.
+ */
+function signalsFor(d: ClientDashboardData): Signal[] {
+  const out: Signal[] = [];
+  const done = d.weekly.filter((w) => !w.partial);
+  const p = d.placement;
+  if (p) {
+    const r = p.categoryRank ?? p.rank, of = p.categoryOf ?? p.of;
+    const pctile = r / of;
+    out.push({
+      key: 'mindshare', icon: Trophy, label: 'Korean mindshare',
+      value: `#${r} of ${of}`,
+      detail: p.categoryRank ? `In ${p.category} · #${p.rank} of ${p.of} overall, last ${p.windowDays} days` : `Of every tracked project, last ${p.windowDays} days`,
+      verdict: pctile <= 0.25 ? 'strong' : pctile <= 0.6 ? 'steady' : 'watch',
+    });
+    if (p.sharePrevPct !== null) {
+      const ratio = p.sharePrevPct ? p.sharePct / p.sharePrevPct : p.sharePct > 0 ? 2 : 1;
+      out.push({
+        key: 'sov', icon: Megaphone, label: 'Share of voice',
+        value: `${p.sharePct}%`,
+        detail: `Of all tracked mentions, from ${p.sharePrevPct}% the ${p.windowDays} days before`,
+        verdict: ratio >= 1.2 ? 'strong' : ratio <= 0.8 ? 'watch' : 'steady',
+      });
+    }
+  }
+  const reach = fourWeek(done, (w) => w.reads);
+  if (reach !== null) out.push({ key: 'reach', icon: TrendingUp, label: 'Reach momentum', value: signed(reach), detail: 'Reads, last 4 weeks vs the 4 before', verdict: byChange(reach) });
+  const pace = fourWeek(done, (w) => w.posts);
+  if (pace !== null) {
+    const last4 = done.slice(-4).reduce((n, w) => n + w.posts, 0);
+    out.push({ key: 'pace', icon: Activity, label: 'Delivery pace', value: `${last4} posts`, detail: `Last 4 weeks, ${signed(pace)} vs the 4 before`, verdict: byChange(pace) });
+  }
+  if (d.sentiment && d.sentiment.counted >= 10) {
+    const c = (l: string[]) => d.sentiment!.byLabel.filter((s) => l.includes(s.label)).reduce((n, s) => n + s.count, 0);
+    const good = Math.round((c(['positive', 'hype']) / d.sentiment.counted) * 100);
+    const bad = Math.round((c(['negative', 'fud']) / d.sentiment.counted) * 100);
+    out.push({
+      key: 'community', icon: MessageSquare, label: 'Community', value: `${good}% positive`,
+      detail: `${bad}% negative or FUD, ${d.sentiment.counted} comments`,
+      verdict: bad >= 20 ? 'watch' : good >= 40 ? 'strong' : 'steady',
+    });
+  }
+  if (d.market && d.market.weeks.length >= 4) {
+    const w = d.market.weeks, last = w[w.length - 1];
+    const avg = w.slice(0, -1).reduce((n, x) => n + x.sharePct, 0) / (w.length - 1);
+    const c = avg ? Math.round(((last.sharePct - avg) / avg) * 100) : null;
+    out.push({ key: 'trading', icon: ArrowLeftRight, label: 'Korean trading', value: `${last.sharePct}%`, detail: `Korea's share last week · ${avg.toFixed(1)}% average before`, verdict: byChange(c, 20) });
+  }
+  if (d.spend && d.totals?.reads) {
+    const cpm = (d.spend.kol / d.totals.reads) * 1000;
+    out.push({ key: 'cost', icon: Wallet, label: 'KOL cost / 1K reads', value: `$${cpm.toFixed(2)}`, detail: `${usd(d.spend.kol)} to KOLs · ${usd(d.spend.total)} spent in all`, verdict: 'info' });
+  }
+  return out;
+}
+
+function Scorecard({ d }: { d: ClientDashboardData }) {
+  const sig = signalsFor(d);
+  if (!sig.length) return null;
+  const n = (v: Verdict) => sig.filter((x) => x.verdict === v).length;
+  const strong = n('strong'), watch = n('watch');
+  const headline = watch === 0 && strong >= 2 ? 'Strong position' : watch > strong ? 'Needs attention' : 'Holding steady';
+  return (
+    <Card className="overflow-hidden border-cream-200">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cream-100 px-5 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-light bg-brand-soft text-brand-deep"><Gauge className="h-4 w-4" /></div>
+          <div>
+            <p className={KICKER}>Evaluation</p>
+            <p className="text-[15px] font-semibold text-ink-warm-900">{headline}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-ink-warm-500">
+          {strong > 0 && <StatusBadge tone="success" size="sm">{strong} strong</StatusBadge>}
+          {n('steady') > 0 && <StatusBadge tone="neutral" size="sm">{n('steady')} steady</StatusBadge>}
+          {watch > 0 && <StatusBadge tone="warning" size="sm">{watch} to watch</StatusBadge>}
+        </div>
+      </div>
+      {/* gap-px over a cream ground draws the hairlines between tiles at every breakpoint. */}
+      <div className="grid grid-cols-1 gap-px bg-cream-100 sm:grid-cols-2 lg:grid-cols-4">
+        {sig.map((x) => (
+          <div key={x.key} className="bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
+                <x.icon className="h-3 w-3" />{x.label}
+              </p>
+              <StatusBadge tone={VERDICT[x.verdict].tone} size="sm">{VERDICT[x.verdict].label}</StatusBadge>
+            </div>
+            <p className="mt-2 text-[22px] font-semibold leading-none text-ink-warm-900 tabular-nums" style={{ letterSpacing: '-0.02em' }}>{x.value}</p>
+            <p className="mt-1.5 text-xs text-ink-warm-500">{x.detail}</p>
+          </div>
+        ))}
+        {Array.from({ length: (4 - (sig.length % 4)) % 4 }).map((_, i) => <div key={`fill${i}`} className="hidden bg-white lg:block" aria-hidden />)}
+      </div>
+    </Card>
+  );
+}
+
+/** Where the client sits in Korean Telegram, against its category or its neighbours. */
+function Placement({ d }: { d: ClientDashboardData }) {
+  const p = d.placement;
+  if (!p) {
+    return (
+      <Card className="border-cream-200">
+        <Empty icon={Trophy} title="Not tracked in Korea Signal" description="Add this client as a Korea Signal project to rank it against the Korean market." />
+      </Card>
+    );
+  }
+  const top = Math.max(...p.peers.map((r) => r.sharePct), 0.1);
+  const tiles = [
+    p.categoryRank ? { k: `Rank in ${p.category}`, v: `#${p.categoryRank}`, s: `of ${p.categoryOf} projects` } : null,
+    { k: 'Overall rank', v: `#${p.rank}`, s: `of ${p.of} tracked projects` },
+    { k: 'Share of voice', v: `${p.sharePct}%`, s: p.sharePrevPct !== null ? `from ${p.sharePrevPct}% the ${p.windowDays} days before` : 'of all tracked mentions' },
+    { k: 'Mentions', v: num(p.mentions), s: `Korean Telegram, last ${p.windowDays} days` },
+  ].filter(Boolean) as Array<{ k: string; v: string; s: string }>;
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+      <div className="crd-feature p-5">
+        <p className={`${KICKER} flex items-center gap-2`}><span className="inline-block h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />Korean market position</p>
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
+          {tiles.map((t) => (
+            <div key={t.k}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">{t.k}</p>
+              <p className="mt-1 display-serif text-[30px] leading-none text-ink-warm-900 tabular-nums">{t.v}</p>
+              <p className="mt-1 text-xs text-ink-warm-500">{t.s}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 border-t border-brand-light/70 pt-3 text-xs text-ink-warm-700">
+          {p.krVenues.length
+            ? <>Listed in Korea on <span className="font-medium text-ink-warm-900">{p.krVenues.map(cap).join(', ')}</span></>
+            : 'Not listed on a Korean exchange'}
+        </div>
+      </div>
+      <Panel icon={Trophy} title="Against the field" subtitle={`${p.peersLabel} · share of Korean Telegram mentions, last ${p.windowDays} days`}>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                <TableHead className={`${HEAD} w-12`}>#</TableHead>
+                <TableHead className={HEAD}>Project</TableHead>
+                <TableHead className={`${HEAD} w-[40%]`}>Share of voice</TableHead>
+                <TableHead className={`${HEAD} text-right`}>Mentions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {p.peers.map((r) => (
+                <TableRow key={r.name} className={r.isClient ? 'border-gray-100 bg-brand-soft/60 hover:bg-brand-soft/80' : 'border-gray-100'}>
+                  <TableCell className="py-3 font-mono text-xs text-ink-warm-500">{r.rank}</TableCell>
+                  <TableCell className="py-3">
+                    <span className={r.isClient ? 'font-semibold text-brand-deep' : 'font-medium text-ink-warm-900'}>{r.name}</span>
+                    {r.isClient && <StatusBadge tone="brand" size="sm" className="ml-2">Client</StatusBadge>}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-cream-100">
+                        <div className={`h-full rounded-full ${r.isClient ? 'bg-brand' : 'bg-ink-warm-300'}`} style={{ width: `${Math.max((r.sharePct / top) * 100, 2)}%` }} />
+                      </div>
+                      <span className="w-12 text-right font-medium tabular-nums text-ink-warm-900">{r.sharePct}%</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 text-right tabular-nums text-ink-warm-700">{num(r.mentions)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Panel>
+    </div>
+  );
 }
 
 /** The featured card: total reads as the headline, the weekly trend under it. */
@@ -204,6 +398,8 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
 
   return (
     <div className="space-y-6">
+      <Scorecard d={d} />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <ReachHero d={d} />
         <ThisWeek d={d} />
@@ -229,9 +425,10 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
         </div>
       )}
 
-      <Tabs defaultValue="market" className="space-y-5">
+      <Tabs defaultValue="placement" className="space-y-5">
         <TabsList className={TAB_LIST}>
-          <TabsTrigger value="market" className={TAB}>Korean market</TabsTrigger>
+          <TabsTrigger value="placement" className={TAB}>Market placement</TabsTrigger>
+          <TabsTrigger value="market" className={TAB}>Trading &amp; buzz</TabsTrigger>
           <TabsTrigger value="creators" className={TAB}>
             Creators{d.creators.length > 0 && <span className="ml-1.5 rounded-full bg-brand-light px-1.5 text-[10px] font-semibold text-brand tabular-nums">{t?.creators ?? d.creators.length}</span>}
           </TabsTrigger>
@@ -239,6 +436,10 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
             Community{d.sentiment && <span className="ml-1.5 rounded-full bg-brand-light px-1.5 text-[10px] font-semibold text-brand tabular-nums">{d.sentiment.counted}</span>}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="placement" className="mt-0">
+          <Placement d={d} />
+        </TabsContent>
 
         <TabsContent value="market" className="mt-0">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
