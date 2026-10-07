@@ -394,7 +394,10 @@ function OutcomeZone({ id, label, tone }: { id: string; label: string; tone: 'wo
   );
 }
 
-export default function PipelineBoard() {
+export default function PipelineBoard({ onOutcome }: {
+  /** Called after a deal is closed or parked, so the page can refresh its Orbit list. */
+  onOutcome?: () => void;
+} = {}) {
   const { toast } = useToast();
   const [deals, setDeals] = useState<PipelineDeal[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<PipelineStage>>(new Set());
@@ -573,6 +576,7 @@ export default function PipelineBoard() {
         lossFor.id, reason?.orbit ? 'orbit' : 'closed_lost',
         lossReason, lossSubReason || undefined);
       setDeals(prev => (prev ?? []).filter(d => d.id !== lossFor.id));
+      onOutcome?.();
       toast({
         title: reason?.orbit ? 'Moved to Orbit' : 'Closed lost',
         description: reason?.orbit

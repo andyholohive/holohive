@@ -117,6 +117,13 @@ export function isStalled(d: PipelineDeal): boolean {
   return daysIdle(d) >= STALLED_DAYS;
 }
 
+/** The old Sales board's value for each outcome, written alongside pipeline_stage. */
+const LEGACY_OUTCOME_STAGE: Record<'closed_won' | 'closed_lost' | 'orbit', string> = {
+  closed_won: 'v2_closed_won',
+  closed_lost: 'v2_closed_lost',
+  orbit: 'orbit',
+};
+
 export const PipelineV13Service = {
   /** Board rows. Outcomes are excluded — the board shows deals in flight.
    *  Archived rows are excluded by default and fetched on request, so the
@@ -187,6 +194,10 @@ export const PipelineV13Service = {
   ): Promise<void> {
     const patch: Record<string, unknown> = {
       pipeline_stage: outcome,
+      // The old Sales board reads `stage`. Without this, a deal closed or
+      // orbited here stayed "warm" over there and never reached its Orbit
+      // tab [Yano 2026-10-07: "where do orbits go?"].
+      stage: LEGACY_OUTCOME_STAGE[outcome],
       closed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -200,6 +211,37 @@ export const PipelineV13Service = {
     const { error } = await (supabase as any)
       .from('crm_opportunities').update(patch).eq('id', id);
     if (error) throw new Error(`Could not close the deal: ${error.message}`);
+  },
+
+  /** Deals parked in Orbit, most recently parked first. */
+  async listOrbit(): Promise<Array<{ id: string; name: string; orbit_reason: string | null; owner_name: string | null; parked_at: string | null; tg_handle: string | null }>> {
+    const { data, error } = await (supabase as any)
+      .from('crm_opportunities')
+      .select('id, name, orbit_reason, owner_id, closed_at, updated_at, tg_handle')
+      .eq('pipeline_stage', 'orbit')
+      .is('archived_at', null)
+      .order('closed_at', { ascending: false, nullsFirst: false });
+    if (error) throw new Error(`Failed to load Orbit: ${error.message}`);
+    const ownerIds = Array.from(new Set(((data ?? []) as any[]).map(r => r.owner_id).filter(Boolean)));
+    const names = new Map<string, string>();
+    if (ownerIds.length) {
+      const { data: owners } = await (supabase as any).from('users').select('id, name').in('id', ownerIds);
+      for (const u of (owners ?? []) as any[]) names.set(u.id, u.name);
+    }
+    return ((data ?? []) as any[]).map(r => ({
+      id: r.id, name: r.name ?? 'Untitled', orbit_reason: r.orbit_reason ?? null,
+      owner_name: r.owner_id ? names.get(r.owner_id) ?? null : null,
+      parked_at: r.closed_at ?? r.updated_at ?? null, tg_handle: r.tg_handle ?? null,
+    }));
+  },
+
+  /** Bring a deal back from Orbit onto the board, as a new lead. */
+  async reopenFromOrbit(id: string): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('crm_opportunities')
+      .update({ pipeline_stage: 'new_lead', stage: 'warm', closed_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(`Could not bring the deal back: ${error.message}`);
   },
 
   /** Archiving says only "this predates how we work now" — it is not a

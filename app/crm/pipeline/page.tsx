@@ -12,18 +12,26 @@
  * moves forward so this board is never stale; it does not write back, because
  * that direction is lossy. See lib/pipelineV13Service.ts.
  *
- * Deals arrive here on their own: reaching Lead on the Outreach board creates
- * the opportunity if it does not exist (trg_outreach_lead_to_pipeline).
+ * Deals arrive here on their own: reaching Lead or Lead — Trial on the
+ * Outreach board creates the opportunity, or attaches the prospect to the
+ * company's open deal (trg_outreach_lead_to_pipeline). Replies alone
+ * (Interested, Referred, Team Engaged) stay on Outreach [Yano 2026-10-07].
  */
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Button } from '@/components/ui/button';
 import { Target, Send } from 'lucide-react';
 import PipelineBoard from '@/components/crm/PipelineBoard';
+import OrbitList from '@/components/crm/OrbitList';
 
 export default function PipelinePage() {
+  // Remount keys: a deal parked from the board shows up in Orbit, and one
+  // brought back from Orbit shows up on the board, without a reload.
+  const [boardKey, setBoardKey] = useState(0);
+  const [orbitKey, setOrbitKey] = useState(0);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -48,7 +56,15 @@ export default function PipelinePage() {
         first
       />
 
-      <PipelineBoard />
+      <PipelineBoard key={boardKey} onOutcome={() => setOrbitKey(k => k + 1)} />
+
+      <SectionHeader
+        label="Orbit"
+        dot="amber"
+        counter="02 — parked on timing or internal priority, not lost"
+      />
+
+      <OrbitList key={orbitKey} onReopened={() => setBoardKey(k => k + 1)} />
     </div>
   );
 }
