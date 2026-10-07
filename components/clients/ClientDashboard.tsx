@@ -25,6 +25,7 @@ import {
   Trophy, Gauge, Megaphone, Wallet, ArrowLeftRight, Activity,
 } from 'lucide-react';
 import type { ClientDashboardData } from '@/lib/clientDashboard';
+import { ordinal } from '@/lib/koreaScan/narrative';
 
 const HEAD = 'h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500';
 const KICKER = 'text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500';
@@ -148,9 +149,36 @@ function signalsFor(d: ClientDashboardData): Signal[] {
     const c = avg ? Math.round(((last.sharePct - avg) / avg) * 100) : null;
     out.push({ key: 'trading', icon: ArrowLeftRight, label: 'Korean trading', value: `${last.sharePct}%`, detail: `Korea's share last week · ${avg.toFixed(1)}% average before`, verdict: byChange(c, 20) });
   }
-  if (d.spend && d.totals?.reads) {
-    const cpm = (d.spend.kol / d.totals.reads) * 1000;
-    out.push({ key: 'cost', icon: Wallet, label: 'KOL cost / 1K reads', value: `$${cpm.toFixed(2)}`, detail: `${usd(d.spend.kol)} to KOLs · ${usd(d.spend.total)} spent in all`, verdict: 'info' });
+  // Against the roster: within 20% of the median is Steady, either side of it Strong / Watch.
+  const b = d.benchmarks, t = d.totals;
+  const vsMedian = (v: number, m: number, lowIsBest = false): Verdict => {
+    const r = lowIsBest ? m / v : v / m;
+    return r >= 1.2 ? 'strong' : r <= 0.8 ? 'watch' : 'steady';
+  };
+  const place = (rank: number | null, label: string) => (rank ? ` · ${ordinal(rank)} ${label} of ${b!.clients}` : '');
+  if (b && t?.posts && t.reads) {
+    const rpp = t.reads / t.posts;
+    out.push({
+      key: 'rpp', icon: Eye, label: 'Reads per post', value: compact(Math.round(rpp)),
+      detail: `Roster median ${compact(Math.round(b.readsPerPost.median))}${place(b.readsPerPost.rank, 'highest')}`,
+      verdict: vsMedian(rpp, b.readsPerPost.median),
+    });
+    const er = (t.engagements / t.reads) * 100;
+    out.push({
+      key: 'er', icon: Heart, label: 'Engagement rate', value: `${er.toFixed(2)}%`,
+      detail: `Roster median ${b.engRate.median.toFixed(2)}%${place(b.engRate.rank, 'highest')}`,
+      verdict: vsMedian(er, b.engRate.median),
+    });
+  }
+  if (d.spend && t?.reads) {
+    const cpm = (d.spend.kol / t.reads) * 1000;
+    out.push({
+      key: 'cost', icon: Wallet, label: 'KOL cost / 1K reads', value: `$${cpm.toFixed(2)}`,
+      detail: b?.cpm
+        ? `Roster median $${b.cpm.median.toFixed(2)}${place(b.cpm.rank, 'lowest')} · ${usd(d.spend.kol)} to KOLs`
+        : `${usd(d.spend.kol)} to KOLs · ${usd(d.spend.total)} spent in all`,
+      verdict: b?.cpm && cpm > 0 ? vsMedian(cpm, b.cpm.median, true) : 'info',
+    });
   }
   return out;
 }
@@ -160,6 +188,8 @@ function Scorecard({ d }: { d: ClientDashboardData }) {
   if (!sig.length) return null;
   const n = (v: Verdict) => sig.filter((x) => x.verdict === v).length;
   const strong = n('strong'), watch = n('watch');
+  // Whichever column count leaves no gap: 9 tiles read as 3×3, not 4+4+1.
+  const cols = sig.length % 4 !== 0 && sig.length % 3 === 0 ? 3 : 4;
   const headline = watch === 0 && strong >= 2 ? 'Strong position' : watch > strong ? 'Needs attention' : 'Holding steady';
   return (
     <Card className="overflow-hidden border-cream-200">
@@ -178,7 +208,7 @@ function Scorecard({ d }: { d: ClientDashboardData }) {
         </div>
       </div>
       {/* gap-px over a cream ground draws the hairlines between tiles at every breakpoint. */}
-      <div className="grid grid-cols-1 gap-px bg-cream-100 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid grid-cols-1 gap-px bg-cream-100 sm:grid-cols-2 ${cols === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
         {sig.map((x) => (
           <div key={x.key} className="bg-white p-4">
             <div className="flex items-center justify-between gap-2">
@@ -191,7 +221,7 @@ function Scorecard({ d }: { d: ClientDashboardData }) {
             <p className="mt-1.5 text-xs text-ink-warm-500">{x.detail}</p>
           </div>
         ))}
-        {Array.from({ length: (4 - (sig.length % 4)) % 4 }).map((_, i) => <div key={`fill${i}`} className="hidden bg-white lg:block" aria-hidden />)}
+        {Array.from({ length: (cols - (sig.length % cols)) % cols }).map((_, i) => <div key={`fill${i}`} className="hidden bg-white lg:block" aria-hidden />)}
       </div>
     </Card>
   );

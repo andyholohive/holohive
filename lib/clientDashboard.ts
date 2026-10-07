@@ -46,6 +46,17 @@ export interface ClientDashboardData {
   } | null;
   /** Money out on this client's campaigns. Admin roles only — the route strips it for members. */
   spend: { total: number; kol: number; byCategory: Array<{ category: string; amount: number }>; payments: number } | null;
+  /**
+   * This client against the roster: medians across active clients with 10+
+   * posts, and where this client ranks (1 = best). Cost fields are admin-only
+   * — the route nulls them for members, same as `spend`.
+   */
+  benchmarks: {
+    clients: number;
+    readsPerPost: { median: number; rank: number | null };
+    engRate: { median: number; rank: number | null };
+    cpm: { median: number; rank: number | null } | null;
+  } | null;
 }
 
 const DAY = 86_400_000;
@@ -312,12 +323,35 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
     payments: rows.length,
   };
   })();
+  const benchTask = (async (): Promise<ClientDashboardData['benchmarks']> => {
+  const { data, error } = await sb.rpc('client_benchmarks');
+  if (error || !data) return null;
+  // Under 10 posts a client is still ramping; its ratios would skew the medians.
+  const rows = (data as any[]).filter((r) => Number(r.posts) >= 10 && Number(r.reads) > 0).map((r) => ({
+    id: r.client_id as string,
+    rpp: Number(r.reads) / Number(r.posts),
+    er: (Number(r.engagements) / Number(r.reads)) * 100,
+    cpm: r.kol_spend ? (Number(r.kol_spend) / Number(r.reads)) * 1000 : null,
+  }));
+  if (rows.length < 3) return null;
+  const median = (v: number[]) => { const a = [...v].sort((x, y) => x - y); const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+  const me = rows.find((r) => r.id === clientId);
+  const rank = (v: number | null | undefined, all: number[], lowIsBest = false) =>
+    v == null ? null : all.filter((x) => (lowIsBest ? x < v : x > v)).length + 1;
+  const cpms = rows.map((r) => r.cpm).filter((x): x is number => x !== null);
+  return {
+    clients: rows.length,
+    readsPerPost: { median: median(rows.map((r) => r.rpp)), rank: rank(me?.rpp, rows.map((r) => r.rpp)) },
+    engRate: { median: median(rows.map((r) => r.er)), rank: rank(me?.er, rows.map((r) => r.er)) },
+    cpm: cpms.length >= 3 ? { median: median(cpms), rank: rank(me?.cpm, cpms, true) } : null,
+  };
+  })();
   // The sections above are independent; run them together.
-  const [sentiment, market, buzz, lineup, placement, spend] = await Promise.all([sentimentTask, marketTask, buzzTask, lineupTask, placementTask, spendTask]);
+  const [sentiment, market, buzz, lineup, placement, spend, benchmarks] = await Promise.all([sentimentTask, marketTask, buzzTask, lineupTask, placementTask, spendTask, benchTask]);
   return {
     client: { id: client.id, name: client.name, logoUrl: client.logo_url ?? null, isActive: !!client.is_active },
     campaigns: camps.map((c) => ({ id: c.id, name: c.name, status: c.status ?? null })),
     week, startDate,
-    totals, weekly, creators, sentiment, market, buzz, lineup, placement, spend,
+    totals, weekly, creators, sentiment, market, buzz, lineup, placement, spend, benchmarks,
   };
 }

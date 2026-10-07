@@ -17,7 +17,10 @@ export async function GET(request: Request, { params }: { params: { clientId: st
     const data = await loadClientDashboard(db, params.clientId);
     if (!data) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     // Spend is money: admins only, like /expenses and the payments views.
-    if (!guard.user || !['admin', 'super_admin'].includes(guard.user.role)) data.spend = null;
+    if (!guard.user || !['admin', 'super_admin'].includes(guard.user.role)) {
+      data.spend = null;
+      if (data.benchmarks) data.benchmarks.cpm = null;
+    }
     return NextResponse.json(data);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Could not load the dashboard' }, { status: 500 });
