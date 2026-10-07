@@ -33,7 +33,7 @@ import {
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
   Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
   DollarSign,
-  Repeat2, Briefcase,
+  Repeat2, Briefcase, AlertTriangle,
 } from 'lucide-react';
 
 export type NavItemDef = {
@@ -80,6 +80,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // (2026-06-19 reorg).
   { href: '/tasks', label: 'HQ', icon: ListTodo, section: 'Pinned', notForGuest: true },
   { href: '/dashboard', label: 'Dashboard', icon: Compass, section: 'Pinned', notForGuest: true },
+  { href: '/attention', label: 'Needs Attention', icon: AlertTriangle, section: 'Pinned', notForGuest: true },
 
   // Clients — Clients + Campaigns + Delivery Logs.
   { href: '/clients', label: 'Clients', icon: Users, section: 'Clients', pageKey: '/clients' },
