@@ -4905,7 +4905,23 @@ export default function ClientsPage() {
             filteredClients.map((client) => {
               const clientWithStatus = client as ClientWithStatus;
               return (
-                <Card key={client.id} className="crd-hover group flex flex-col h-full">
+                <Card
+                  key={client.id}
+                  className="crd-hover group flex flex-col h-full cursor-pointer focus-brand"
+                  // [2026-10-07] Clicking a card opens the client dashboard at
+                  // /clients/[id]. Clicks on the card's own controls (edit,
+                  // share, badges, View Portal…) keep doing what they did.
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Open ${client.name} dashboard`}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('button, a, input, [role="button"], [role="menuitem"]')) return;
+                    router.push(`/clients/${client.id}`);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.target === e.currentTarget) router.push(`/clients/${client.id}`);
+                  }}
+                >
                   <CardHeader className="pb-2">
                     <div>
                       {/* [Responsive cleanup, May 2026] flex-wrap + min-w-0
@@ -4936,7 +4952,8 @@ export default function ClientsPage() {
                                 key={account.id}
                                 variant="outline"
                                 className="text-xs cursor-pointer hover:bg-cream-100 max-w-full"
-                                onClick={() => router.push('/crm/sales-pipeline?tab=accounts')}
+                                // A badge, not a button: stop the click reaching the card's open-dashboard handler.
+                                onClick={(e) => { e.stopPropagation(); router.push('/crm/sales-pipeline?tab=accounts'); }}
                               >
                                 <LinkIcon className="h-3 w-3 mr-1 flex-shrink-0" />
                                 <span className="font-semibold truncate">{account.name}</span>
