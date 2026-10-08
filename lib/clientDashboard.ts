@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getCampaignWeekState, type CampaignWeekState } from '@/lib/campaignWeekHelpers';
+import { loadPosition, type Placement, type PositionSeries, type ChannelNode } from '@/lib/clientPosition';
 
 export interface WeekPoint { week: string; reads: number; posts: number; engagements: number; partial: boolean }
 
@@ -29,21 +30,19 @@ export interface ClientDashboardData {
     previous: { weekNumber: number; angles: Array<{ name: string; slots: Array<{ kol: string; status: string }> }> } | null;
   } | null;
   /** Where the client sits among every project Korea Signal tracks in Korean Telegram. */
-  placement: {
-    windowDays: number;
-    category: string | null;
-    mentions: number;
-    sharePct: number;
-    sharePrevPct: number | null;
-    rank: number;
-    of: number;
-    categoryRank: number | null;
-    categoryOf: number | null;
-    /** The category table, or the client's neighbours in the overall table when it has no category. */
-    peers: Array<{ name: string; mentions: number; sharePct: number; rank: number; isClient: boolean }>;
-    peersLabel: string;
-    krVenues: string[];
-  } | null;
+  placement: Placement | null;
+  /** 12 weeks of rolling share + momentum for the client and its peers (position map, rank race). */
+  position: PositionSeries | null;
+  /** Korean channels mentioning the client vs its peers, last 28 days. Team-only. */
+  channels: ChannelNode[] | null;
+  /** The engagement on one line: kickoff to term end, and what happened along the way. */
+  journey: {
+    start: string | null; end: string | null; today: string; firstPost: string | null;
+    lineups: Array<{ weekOf: string; weekNumber: number; status: string; posted: number; total: number }>;
+    bestWeek: { week: string; reads: number } | null;
+    topPost: { kol: string; platform: string; reads: number; url: string | null; date: string } | null;
+    listings: Array<{ date: string; venues: string[] }>;
+  };
   /** Money out on this client's campaigns. Admin roles only — the route strips it for members. */
   spend: { total: number; kol: number; byCategory: Array<{ category: string; amount: number }>; payments: number } | null;
   /**
@@ -105,7 +104,7 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
         const rows: any[] = [];
         for (let from = 0; ; from += 1000) {
           const { data, error } = await sb.from('contents')
-            .select('id, activation_date, platform, impressions, likes, retweets, comments, bookmarks, campaign_kols(master_kols(name))')
+            .select('id, activation_date, platform, content_link, impressions, likes, retweets, comments, bookmarks, campaign_kols(master_kols(name))')
             .in('campaign_id', ids).not('activation_date', 'is', null).range(from, from + 999);
           if (error) throw new Error(`contents read failed: ${error.message}`);
           rows.push(...(data ?? []));
@@ -251,62 +250,35 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
 
     return lineup;
   })();
-  const placementTask = (async (): Promise<ClientDashboardData['placement']> => {
-  // ── Placement: share of all tracked Korean Telegram mentions ──────────
-  // Shares, not raw counts: crawl coverage varies (09/07–10/01 was thin),
-  // and a share of the same corpus stays comparable across that.
-  const WINDOW = 30;
-  const [{ data: projects }, { data: krc }] = await Promise.all([
-    sb.from('mindshare_projects').select('id, name, category, client_id').eq('is_active', true),
-    sb.from('kr_signal_clients').select('kr_venues').or(`client_id.eq.${clientId},content_log_source.eq.hhp:${clientId}`).limit(1).maybeSingle(),
+  const positionTask = loadPosition(db, clientId);
+  const journeyTask = (async (): Promise<ClientDashboardData['journey']> => {
+  // ── Journey: every lineup week, the best week, the top post, KR listings ──
+  const today = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+  const [{ data: lus }, { data: krc }] = await Promise.all([
+    campIds.length
+      ? sb.from('campaign_lineups').select('week_number, week_of, status, lineup_angles(lineup_slots(status))').in('campaign_id', campIds).order('week_of')
+      : Promise.resolve({ data: [] }),
+    sb.from('kr_signal_clients').select('coingecko_id').or(`client_id.eq.${clientId},content_log_source.eq.hhp:${clientId}`).limit(1).maybeSingle(),
   ]);
-  const projs = (projects ?? []) as any[];
-  const me = projs.find((p) => p.client_id === clientId);
-  if (!me) return null;
-  const since = new Date(Date.now() - 2 * WINDOW * DAY).toISOString().slice(0, 10);
-  const cut = new Date(Date.now() - WINDOW * DAY).toISOString().slice(0, 10);
-  const days: any[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data } = await sb.from('mindshare_daily').select('project_id, day, mention_count').gte('day', since).range(from, from + 999);
-    days.push(...(data ?? []));
-    if (!data || data.length < 1000) break;
-  }
-  const now = new Map<string, number>(), before = new Map<string, number>();
-  for (const d of days) {
-    const m = d.day > cut ? now : before;
-    m.set(d.project_id, (m.get(d.project_id) ?? 0) + (d.mention_count ?? 0));
-  }
-  const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
-  const totalNow = sum(now), totalBefore = sum(before);
-  if (!totalNow) return null;
-  const table = projs.map((p) => ({ id: p.id, name: p.name, category: p.category, mentions: now.get(p.id) ?? 0 }))
-    .sort((a, b) => b.mentions - a.mentions);
-  const rankOf = (rows: typeof table, id: string) => {
-    const v = rows.find((r) => r.id === id)!.mentions;
-    return rows.filter((r) => r.mentions > v).length + 1; // ties share a rank
-  };
-  const share = (n: number, of: number) => +((n / of) * 100).toFixed(1);
-  const cat = me.category ? table.filter((r) => r.category === me.category) : null;
-  let peerRows: typeof table;
-  if (cat && cat.length > 1) peerRows = cat.slice(0, 8);
-  else {
-    const i = table.findIndex((r) => r.id === me.id);
-    peerRows = table.slice(Math.max(0, i - 3), Math.max(0, i - 3) + 7);
-  }
-  if (!peerRows.some((r) => r.id === me.id)) peerRows = [...peerRows.slice(0, 7), table.find((r) => r.id === me.id)!];
+  const { data: lst } = krc?.coingecko_id
+    ? await sb.from('kr_signal_listings').select('listed_on, venues').eq('coingecko_id', krc.coingecko_id).order('listed_on')
+    : { data: [] };
+  const done = weekly.filter((w) => !w.partial);
+  const best = done.reduce<WeekPoint | null>((b, w) => (!b || w.reads > b.reads ? w : b), null);
+  const top = contents.reduce<any>((b: any, c: any) => (!b || (c.impressions ?? 0) > (b.impressions ?? 0) ? c : b), null);
+  const dates = contents.map((c: any) => c.activation_date as string).sort();
   return {
-    windowDays: WINDOW,
-    category: me.category ?? null,
-    mentions: now.get(me.id) ?? 0,
-    sharePct: share(now.get(me.id) ?? 0, totalNow),
-    sharePrevPct: totalBefore ? share(before.get(me.id) ?? 0, totalBefore) : null,
-    rank: rankOf(table, me.id),
-    of: table.length,
-    categoryRank: cat && cat.length > 1 ? rankOf(cat, me.id) : null,
-    categoryOf: cat && cat.length > 1 ? cat.length : null,
-    peers: peerRows.map((r) => ({ name: r.name, mentions: r.mentions, sharePct: share(r.mentions, totalNow), rank: rankOf(table, r.id), isClient: r.id === me.id })),
-    peersLabel: cat && cat.length > 1 ? `${me.category} projects` : 'Nearest in the overall table',
-    krVenues: (krc?.kr_venues ?? []) as string[],
+    start: startDate, end: termEnd, today, firstPost: dates[0] ?? null,
+    lineups: ((lus ?? []) as any[]).map((l) => {
+      const slots = ((l.lineup_angles ?? []) as any[]).flatMap((a) => (a.lineup_slots ?? []) as any[]);
+      return { weekOf: l.week_of, weekNumber: l.week_number, status: l.status, posted: slots.filter((x) => x.status === 'posted').length, total: slots.length };
+    }),
+    bestWeek: best && best.reads > 0 ? { week: best.week, reads: best.reads } : null,
+    topPost: top && top.impressions ? {
+      kol: top.campaign_kols?.master_kols?.name ?? 'Unknown', platform: top.platform ?? '', reads: top.impressions,
+      url: top.content_link ?? null, date: top.activation_date,
+    } : null,
+    listings: ((lst ?? []) as any[]).map((x) => ({ date: x.listed_on, venues: x.venues ?? [] })),
   };
   })();
   const spendTask = (async (): Promise<ClientDashboardData['spend']> => {
@@ -347,11 +319,11 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
   };
   })();
   // The sections above are independent; run them together.
-  const [sentiment, market, buzz, lineup, placement, spend, benchmarks] = await Promise.all([sentimentTask, marketTask, buzzTask, lineupTask, placementTask, spendTask, benchTask]);
+  const [sentiment, market, buzz, lineup, { placement, position, channels }, spend, benchmarks, journey] = await Promise.all([sentimentTask, marketTask, buzzTask, lineupTask, positionTask, spendTask, benchTask, journeyTask]);
   return {
     client: { id: client.id, name: client.name, logoUrl: client.logo_url ?? null, isActive: !!client.is_active },
     campaigns: camps.map((c) => ({ id: c.id, name: c.name, status: c.status ?? null })),
     week, startDate,
-    totals, weekly, creators, sentiment, market, buzz, lineup, placement, spend, benchmarks,
+    totals, weekly, creators, sentiment, market, buzz, lineup, placement, position, channels, journey, spend, benchmarks,
   };
 }

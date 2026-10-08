@@ -26,10 +26,16 @@ import {
 } from 'lucide-react';
 import type { ClientDashboardData } from '@/lib/clientDashboard';
 import { ordinal } from '@/lib/koreaScan/narrative';
+import { computeMomentum } from '@/lib/clientMomentum';
+import { PositionStudio } from '@/components/clients/position/PositionStudio';
+import { JourneyTimeline } from '@/components/clients/position/JourneyTimeline';
+import { ChannelMap } from '@/components/clients/position/ChannelMap';
+import { MomentumCard } from '@/components/clients/position/MomentumCard';
 
 const HEAD = 'h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500';
 const KICKER = 'text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500';
-const TAB_LIST = 'w-full justify-start gap-0.5 bg-transparent p-0 h-auto rounded-none border-b border-cream-200';
+// min-w-full + w-max inside an overflow-x-auto wrapper: five tabs scroll sideways on a phone instead of widening the page.
+const TAB_LIST = 'w-max min-w-full justify-start gap-0.5 bg-transparent p-0 h-auto rounded-none border-b border-cream-200';
 const TAB = 'relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t';
 const SLOT: Record<string, { label: string; tone: BadgeTone }> = {
   pending: { label: 'Due', tone: 'warning' },
@@ -80,6 +86,9 @@ function Empty({ icon, title, description }: { icon: ComponentType<{ className?:
 }
 
 type Verdict = 'strong' | 'steady' | 'watch' | 'info';
+export type Audience = 'team' | 'client';
+/** Client-facing labels say the same thing without "Watch" on a client's own page. */
+const CLIENT_LABEL: Record<Verdict, string> = { strong: 'Ahead', steady: 'On track', watch: 'Focus area', info: 'Info' };
 const VERDICT: Record<Verdict, { label: string; tone: BadgeTone }> = {
   strong: { label: 'Strong', tone: 'success' },
   steady: { label: 'Steady', tone: 'neutral' },
@@ -103,7 +112,8 @@ const signed = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
  * evidence behind it. Thresholds are deliberately simple and stated in the
  * detail line so nobody has to guess why something says Watch.
  */
-function signalsFor(d: ClientDashboardData): Signal[] {
+function signalsFor(d: ClientDashboardData, audience: Audience = 'team'): Signal[] {
+  const median = audience === 'client' ? 'Typical HoloHive campaign' : 'Roster median';
   const out: Signal[] = [];
   const done = d.weekly.filter((w) => !w.partial);
   const p = d.placement;
@@ -160,17 +170,18 @@ function signalsFor(d: ClientDashboardData): Signal[] {
     const rpp = t.reads / t.posts;
     out.push({
       key: 'rpp', icon: Eye, label: 'Reads per post', value: compact(Math.round(rpp)),
-      detail: `Roster median ${compact(Math.round(b.readsPerPost.median))}${place(b.readsPerPost.rank, 'highest')}`,
+      detail: `${median} ${compact(Math.round(b.readsPerPost.median))}${audience === 'team' ? place(b.readsPerPost.rank, 'highest') : ''}`,
       verdict: vsMedian(rpp, b.readsPerPost.median),
     });
     const er = (t.engagements / t.reads) * 100;
     out.push({
       key: 'er', icon: Heart, label: 'Engagement rate', value: `${er.toFixed(2)}%`,
-      detail: `Roster median ${b.engRate.median.toFixed(2)}%${place(b.engRate.rank, 'highest')}`,
+      detail: `${median} ${b.engRate.median.toFixed(2)}%${audience === 'team' ? place(b.engRate.rank, 'highest') : ''}`,
       verdict: vsMedian(er, b.engRate.median),
     });
   }
-  if (d.spend && t?.reads) {
+  // Spend never reaches a client view, whatever the payload carries.
+  if (audience === 'team' && d.spend && t?.reads) {
     const cpm = (d.spend.kol / t.reads) * 1000;
     out.push({
       key: 'cost', icon: Wallet, label: 'KOL cost / 1K reads', value: `$${cpm.toFixed(2)}`,
@@ -183,28 +194,31 @@ function signalsFor(d: ClientDashboardData): Signal[] {
   return out;
 }
 
-function Scorecard({ d }: { d: ClientDashboardData }) {
-  const sig = signalsFor(d);
+export function Scorecard({ d, audience = 'team' }: { d: ClientDashboardData; audience?: Audience }) {
+  const sig = signalsFor(d, audience);
+  const label = (v: Verdict) => (audience === 'client' ? CLIENT_LABEL[v] : VERDICT[v].label);
   if (!sig.length) return null;
   const n = (v: Verdict) => sig.filter((x) => x.verdict === v).length;
   const strong = n('strong'), watch = n('watch');
   // Whichever column count leaves no gap: 9 tiles read as 3×3, not 4+4+1.
   const cols = sig.length % 4 !== 0 && sig.length % 3 === 0 ? 3 : 4;
-  const headline = watch === 0 && strong >= 2 ? 'Strong position' : watch > strong ? 'Needs attention' : 'Holding steady';
+  const headline = audience === 'client'
+    ? (watch === 0 && strong >= 2 ? 'Ahead of plan' : watch > strong ? 'Room to grow' : 'On track')
+    : (watch === 0 && strong >= 2 ? 'Strong position' : watch > strong ? 'Needs attention' : 'Holding steady');
   return (
     <Card className="overflow-hidden border-cream-200">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cream-100 px-5 py-3.5">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-light bg-brand-soft text-brand-deep"><Gauge className="h-4 w-4" /></div>
           <div>
-            <p className={KICKER}>Evaluation</p>
+            <p className={KICKER}>{audience === 'client' ? 'Campaign health' : 'Evaluation'}</p>
             <p className="text-[15px] font-semibold text-ink-warm-900">{headline}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-ink-warm-500">
-          {strong > 0 && <StatusBadge tone="success" size="sm">{strong} strong</StatusBadge>}
-          {n('steady') > 0 && <StatusBadge tone="neutral" size="sm">{n('steady')} steady</StatusBadge>}
-          {watch > 0 && <StatusBadge tone="warning" size="sm">{watch} to watch</StatusBadge>}
+          {strong > 0 && <StatusBadge tone="success" size="sm">{strong} {label('strong').toLowerCase()}</StatusBadge>}
+          {n('steady') > 0 && <StatusBadge tone="neutral" size="sm">{n('steady')} {label('steady').toLowerCase()}</StatusBadge>}
+          {watch > 0 && <StatusBadge tone="warning" size="sm">{watch} {audience === 'client' ? `focus area${watch === 1 ? '' : 's'}` : 'to watch'}</StatusBadge>}
         </div>
       </div>
       {/* gap-px over a cream ground draws the hairlines between tiles at every breakpoint. */}
@@ -215,7 +229,7 @@ function Scorecard({ d }: { d: ClientDashboardData }) {
               <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">
                 <x.icon className="h-3 w-3" />{x.label}
               </p>
-              <StatusBadge tone={VERDICT[x.verdict].tone} size="sm">{VERDICT[x.verdict].label}</StatusBadge>
+              <StatusBadge tone={VERDICT[x.verdict].tone} size="sm">{label(x.verdict)}</StatusBadge>
             </div>
             <p className="mt-2 text-[22px] font-semibold leading-none text-ink-warm-900 tabular-nums" style={{ letterSpacing: '-0.02em' }}>{x.value}</p>
             <p className="mt-1.5 text-xs text-ink-warm-500">{x.detail}</p>
@@ -228,7 +242,7 @@ function Scorecard({ d }: { d: ClientDashboardData }) {
 }
 
 /** Where the client sits in Korean Telegram, against its category or its neighbours. */
-function Placement({ d }: { d: ClientDashboardData }) {
+export function Placement({ d, audience = 'team' }: { d: ClientDashboardData; audience?: Audience }) {
   const p = d.placement;
   if (!p) {
     return (
@@ -280,7 +294,7 @@ function Placement({ d }: { d: ClientDashboardData }) {
                   <TableCell className="py-3 font-mono text-xs text-ink-warm-500">{r.rank}</TableCell>
                   <TableCell className="py-3">
                     <span className={r.isClient ? 'font-semibold text-brand-deep' : 'font-medium text-ink-warm-900'}>{r.name}</span>
-                    {r.isClient && <StatusBadge tone="brand" size="sm" className="ml-2">Client</StatusBadge>}
+                    {r.isClient && <StatusBadge tone="brand" size="sm" className="ml-2">{audience === 'client' ? 'You' : 'Client'}</StatusBadge>}
                   </TableCell>
                   <TableCell className="py-3">
                     <div className="flex items-center gap-3">
@@ -430,6 +444,11 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
     <div className="space-y-6">
       <Scorecard d={d} />
 
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)]">
+        <MomentumCard d={d} m={computeMomentum(d)} />
+        <JourneyTimeline d={d} />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <ReachHero d={d} />
         <ThisWeek d={d} />
@@ -456,8 +475,10 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
       )}
 
       <Tabs defaultValue="placement" className="space-y-5">
+        <div className="overflow-x-auto">
         <TabsList className={TAB_LIST}>
-          <TabsTrigger value="placement" className={TAB}>Market placement</TabsTrigger>
+          <TabsTrigger value="placement" className={TAB}>Position</TabsTrigger>
+          <TabsTrigger value="channels" className={TAB}>Channels</TabsTrigger>
           <TabsTrigger value="market" className={TAB}>Trading &amp; buzz</TabsTrigger>
           <TabsTrigger value="creators" className={TAB}>
             Creators{d.creators.length > 0 && <span className="ml-1.5 rounded-full bg-brand-light px-1.5 text-[10px] font-semibold text-brand tabular-nums">{t?.creators ?? d.creators.length}</span>}
@@ -466,9 +487,15 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
             Community{d.sentiment && <span className="ml-1.5 rounded-full bg-brand-light px-1.5 text-[10px] font-semibold text-brand tabular-nums">{d.sentiment.counted}</span>}
           </TabsTrigger>
         </TabsList>
+        </div>
 
-        <TabsContent value="placement" className="mt-0">
+        <TabsContent value="placement" className="mt-0 space-y-4">
+          {d.position && <PositionStudio s={d.position} />}
           <Placement d={d} />
+        </TabsContent>
+
+        <TabsContent value="channels" className="mt-0">
+          <ChannelMap channels={d.channels} clientName={d.client.name} />
         </TabsContent>
 
         <TabsContent value="market" className="mt-0">

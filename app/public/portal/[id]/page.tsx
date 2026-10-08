@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PortalDocumentsCard from '@/components/documents/PortalDocumentsCard';
 import { KoreaIntelligence, KoreaTeaser } from '@/components/portal/korea/KoreaIntelligence';
 import { PortalTopBar } from '@/components/portal/PortalTopBar';
+import { TeamPreview } from '@/components/portal/TeamPreview';
 import {
   Building2,
   Calendar,
@@ -2886,6 +2887,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {/* Korea intelligence — verdict, trend, market, Korean comments and
             detail tabs. Self-contained (gated fetch, renders nothing for a
             client with no Korea setup). See components/portal/korea. */}
+        {/* Team-only preview of the scorecard + market placement. Renders
+            nothing for clients (needs a signed-in HHP team session). */}
+        <TeamPreview clientId={client?.id ?? null} className="mb-10" />
+
         <KoreaIntelligence idOrSlug={idOrSlug} email={email} className="mb-10" />
 
         {/* Korean Mindshare Tracker */}

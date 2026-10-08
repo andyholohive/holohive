@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Clock, Info, ListChecks, Radio, RefreshCw, Users, FileText, UserX } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Clock, Info, ListChecks, Radio, RefreshCw, Users, FileText, UserX, TrendingDown } from 'lucide-react';
 import type { AttentionItem, AttentionKind, AttentionSeverity } from '@/lib/attention';
 
 const HEAD = 'h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500';
@@ -33,6 +33,7 @@ const KIND_ICON: Record<AttentionKind, React.ComponentType<{ className?: string 
   slots: UserX,
   delivery: FileText,
   report: Radio,
+  momentum: TrendingDown,
 };
 type Filter = 'all' | AttentionSeverity;
 
@@ -65,6 +66,14 @@ export default function AttentionPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? 'Could not load the list');
       setItems(d.items);
+      // Momentum alerts load every client's dashboard, so they arrive second
+      // and slot in by priority. A failure here just leaves them out.
+      fetch('/api/attention?part=momentum').then((x) => (x.ok ? x.json() : null)).then((m) => {
+        if (!m?.items?.length) return;
+        const order: Record<AttentionSeverity, number> = { urgent: 0, soon: 1, fyi: 2 };
+        setItems((prev) => [...(prev ?? []).filter((i) => i.kind !== 'momentum'), ...(m.items as AttentionItem[])]
+          .sort((a, b) => order[a.severity] - order[b.severity] || a.clientName.localeCompare(b.clientName)));
+      }).catch(() => {});
     } catch (e: any) {
       toast({ title: 'Could not load', description: e.message, variant: 'destructive' });
       setItems((prev) => prev ?? []);

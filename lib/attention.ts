@@ -15,14 +15,18 @@
  *    draft = soon. Slots missed last week = soon.
  *  - Delivery-log drafts (client_delivery_log.pending_review) = soon.
  *  - Korea Signal weekly reports awaiting approval, from the last 8 days = soon.
+ *  - Momentum (loadMomentumAlerts, fetched separately because it loads every
+ *    client's dashboard): down 15+ points in 3 weeks, or under 35 = soon.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { formatDate } from '@/lib/dateFormat';
 import { lineupSetupDeadline, deadlineLabel, addWeeks } from '@/lib/lineupDeadline';
+import { loadClientDashboard } from '@/lib/clientDashboard';
+import { computeMomentum } from '@/lib/clientMomentum';
 
 export type AttentionSeverity = 'urgent' | 'soon' | 'fyi';
-export type AttentionKind = 'engagement' | 'lineup' | 'slots' | 'delivery' | 'report';
+export type AttentionKind = 'engagement' | 'lineup' | 'slots' | 'delivery' | 'report' | 'momentum';
 
 export interface AttentionItem {
   id: string;
@@ -217,4 +221,39 @@ export async function loadAttention(db: SupabaseClient): Promise<AttentionItem[]
 
   const order: Record<AttentionSeverity, number> = { urgent: 0, soon: 1, fyi: 2 };
   return items.sort((a, b) => order[a.severity] - order[b.severity] || a.clientName.localeCompare(b.clientName));
+}
+
+/**
+ * Momentum alerts — a client sliding before anyone notices. Separate from
+ * loadAttention because it loads each active client's full dashboard (~2s
+ * each, in parallel), so the page shows the main list first and adds these.
+ */
+export async function loadMomentumAlerts(db: SupabaseClient): Promise<AttentionItem[]> {
+  const sb = db as any;
+  const { data: clientRows } = await sb.from('clients').select('id, name, logo_url').eq('is_active', true).is('archived_at', null);
+  const results = await Promise.all(((clientRows ?? []) as any[]).map(async (c) => {
+    try {
+      const d = await loadClientDashboard(db, c.id);
+      if (!d || !d.totals) return null;
+      const m = computeMomentum(d);
+      if (!m) return null;
+      const falling = m.change3w !== null && m.change3w <= -15;
+      if (!falling && m.score >= 35) return null;
+      const weakest = [...m.parts].sort((a, b) => a.score - b.score)[0];
+      const item: AttentionItem = {
+        id: `momentum:${c.id}`,
+        severity: 'soon',
+        kind: 'momentum',
+        clientId: c.id, clientName: c.name, logoUrl: c.logo_url ?? null,
+        title: falling ? `Momentum down ${Math.abs(m.change3w!)} points in 3 weeks` : `Momentum low at ${m.score}`,
+        detail: `Now ${m.score}/100${weakest ? `, weakest on ${weakest.label.toLowerCase()} (${weakest.score})` : ''}.`,
+        href: `/clients/${c.id}`,
+        hrefLabel: 'Open dashboard',
+      };
+      return item;
+    } catch {
+      return null; // one client's bad data shouldn't sink the list
+    }
+  }));
+  return results.filter((x): x is AttentionItem => x !== null);
 }

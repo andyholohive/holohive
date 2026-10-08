@@ -35,7 +35,7 @@ export type ChartTheme = keyof typeof THEMES;
 
 export interface Point { x: string; y: number; tip: string; hollow?: boolean }
 
-function useWidth() {
+export function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   useEffect(() => {
