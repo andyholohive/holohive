@@ -14,7 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Building2, ExternalLink, ListChecks, Megaphone } from 'lucide-react';
+import { ArrowLeft, Building2, ExternalLink, ListChecks, Megaphone, Presentation } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { RenewalPackDialog } from '@/components/clients/RenewalPackDialog';
 import { formatDate } from '@/lib/dateFormat';
 import { ClientDashboard } from '@/components/clients/ClientDashboard';
 import type { ClientDashboardData } from '@/lib/clientDashboard';
@@ -24,6 +26,10 @@ export default function ClientDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<ClientDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [packOpen, setPackOpen] = useState(false);
+  const { userProfile } = useAuth();
+  // Renewal packs are client-facing links: admin+, matching the API.
+  const canShare = ['admin', 'super_admin'].includes((userProfile as any)?.role ?? '');
 
   useEffect(() => {
     let live = true;
@@ -48,6 +54,11 @@ export default function ClientDashboardPage() {
       <Button variant="outline" size="sm" onClick={() => router.push(`/clients/${id}/delivery-log`)}>
         <ListChecks className="h-4 w-4 mr-2" />Delivery Log
       </Button>
+      {canShare && data && (
+        <Button variant="outline" size="sm" onClick={() => setPackOpen(true)}>
+          <Presentation className="h-4 w-4 mr-2" />Renewal Pack
+        </Button>
+      )}
       <Button variant="brand" size="sm" onClick={() => window.open(`/public/portal/${id}`, '_blank', 'noopener,noreferrer')}>
         <ExternalLink className="h-4 w-4 mr-2" />View Portal
       </Button>
@@ -155,6 +166,7 @@ export default function ClientDashboardPage() {
     <div className="space-y-6">
       {header}
       <ClientDashboard d={data} />
+      {canShare && <RenewalPackDialog clientId={id} clientName={data.client.name} open={packOpen} onOpenChange={setPackOpen} />}
     </div>
   );
 }

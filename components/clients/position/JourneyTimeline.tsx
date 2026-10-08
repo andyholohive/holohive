@@ -27,7 +27,7 @@ const TONE = {
   sky: 'bg-sky-500 text-white ring-sky-500/25',
 };
 
-export function JourneyTimeline({ d }: { d: ClientDashboardData }) {
+export function JourneyTimeline({ d, audience = 'team' }: { d: ClientDashboardData; audience?: 'team' | 'client' }) {
   const j = d.journey;
   const startIso = j.start ?? j.firstPost ?? j.lineups[0]?.weekOf;
   if (!startIso) return null;
@@ -91,8 +91,9 @@ export function JourneyTimeline({ d }: { d: ClientDashboardData }) {
       `}</style>
       <CardHeaderEditorial icon={Route} title="Journey" subtitle={j.end ? `${formatDate(startIso)} to ${formatDate(j.end)}` : `Since ${formatDate(startIso)} · no term end on file`}
         action={j.end ? (
-          <StatusBadge tone={daysLeft < 0 ? 'danger' : ending ? 'warning' : 'neutral'} size="sm">
-            {daysLeft < 0 ? 'Term ended' : daysLeft === 0 ? 'Ends today' : `${daysLeft} days left`}
+          // A finished term is an ops alarm for the team, a milestone for the client.
+          <StatusBadge tone={audience === 'client' ? (daysLeft < 0 ? 'success' : 'neutral') : daysLeft < 0 ? 'danger' : ending ? 'warning' : 'neutral'} size="sm">
+            {daysLeft < 0 ? (audience === 'client' ? 'Term complete' : 'Term ended') : daysLeft === 0 ? 'Ends today' : `${daysLeft} days left`}
           </StatusBadge>
         ) : undefined} />
       <div className="overflow-x-auto px-6 pb-5 pt-2">

@@ -316,7 +316,7 @@ export function Placement({ d, audience = 'team' }: { d: ClientDashboardData; au
 }
 
 /** The featured card: total reads as the headline, the weekly trend under it. */
-function ReachHero({ d }: { d: ClientDashboardData }) {
+export function ReachHero({ d, audience = 'team' }: { d: ClientDashboardData; audience?: Audience }) {
   const t = d.totals;
   // Leave the running week out of the trend until its views are in.
   const done = d.weekly.filter((w) => !w.partial);
@@ -339,7 +339,8 @@ function ReachHero({ d }: { d: ClientDashboardData }) {
             <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="display-serif text-[44px] leading-none text-ink-warm-900 tabular-nums">{num(t.reads)}</span>
               <span className="text-sm text-ink-warm-500">reads</span>
-              {change !== null && (
+              {/* Week-over-week is an ops signal; a client-facing term summary leaves it out. */}
+              {audience === 'team' && change !== null && (
                 <span className={`text-xs font-medium tabular-nums ${change > 0 ? 'text-emerald-600' : change < 0 ? 'text-rose-600' : 'text-ink-warm-400'}`}>
                   {change > 0 ? '↑' : change < 0 ? '↓' : '→'} {Math.abs(change)}% last week vs 4-wk avg
                 </span>

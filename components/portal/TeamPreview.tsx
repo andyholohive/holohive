@@ -54,7 +54,7 @@ export function TeamPreview({ clientId, className = '' }: { clientId: string | n
       </div>
       <div className="space-y-4">
         <Scorecard d={data} audience="client" />
-        <JourneyTimeline d={data} />
+        <JourneyTimeline d={data} audience="client" />
         {data.position && <PositionStudio s={data.position} />}
         <Placement d={data} audience="client" />
       </div>
