@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ExclusionsEditor } from '@/components/mindshare/ExclusionsEditor';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,7 @@ interface MindshareProject {
   name: string;
   client_id: string | null;
   tracked_keywords: string[];
+  exclude_keywords?: string[];
   category: string | null;
   is_pre_tge: boolean;
   twitter_handle: string | null;
@@ -830,10 +832,12 @@ export default function MindsharePage() {
       const res = await fetch('/api/mindshare/projects', {
         method: isCreate ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        // exclude_keywords saves only through ExclusionsEditor (dry run →
+        // apply, which also reconciles past mentions), never here.
+        body: JSON.stringify((({ exclude_keywords: _ex, ...rest }) => ({
           ...(isCreate ? {} : { id: editingProject?.id }),
-          ...projectForm,
-        }),
+          ...rest,
+        }))(projectForm as any)),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
@@ -2055,6 +2059,10 @@ export default function MindsharePage() {
                         </p>
                       );
                     })()}
+                  </div>
+                  <div className="col-span-2">
+                    <ExclusionsEditor key={editingProject?.id || 'new'} projectId={editingProject?.id || null}
+                      initial={editingProject?.exclude_keywords ?? []} onApplied={loadProjects} />
                   </div>
                   <div className="col-span-2 flex items-center gap-3">
                     <Switch checked={!!projectForm.is_pre_tge} onCheckedChange={(v) => setProjectForm(f => ({ ...f, is_pre_tge: v }))} />

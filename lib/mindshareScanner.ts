@@ -129,6 +129,26 @@ export function matchesKeyword(loweredText: string, keyword: string): boolean {
 }
 
 /**
+ * Blank out a project's excluded phrases before matching, so "jump crypto"
+ * can't satisfy the keyword JUMP. Case-insensitive; replaced with a space so
+ * the words either side don't fuse into a new match. [2026-10-08]
+ */
+export function stripExcluded(loweredText: string, lowerExcludes: string[]): string {
+  let t = loweredText;
+  for (const x of lowerExcludes) if (x) t = t.split(x).join(' ');
+  return t;
+}
+
+/** The keyword a post matches for one project after exclusions, or undefined. */
+export function matchProject(text: string, lowerKeywords: string[], lowerExcludes: string[]): string | undefined {
+  const lowered = stripExcluded(text.toLowerCase(), lowerExcludes);
+  return lowerKeywords.find((kw) => matchesKeyword(lowered, kw));
+}
+
+export const lowerList = (raw: unknown): string[] =>
+  (Array.isArray(raw) ? raw : []).map((k) => (typeof k === 'string' ? k.toLowerCase().trim() : '')).filter(Boolean);
+
+/**
  * Is this keyword short enough that it will match ordinary language?
  *
  * One or two Hangul syllables is where the false-positive problem lives
@@ -167,7 +187,7 @@ export async function runMindshareScan(
   //    keyword lists — nothing to match.
   let projectQuery = (supabase as any)
     .from('mindshare_projects')
-    .select('id, name, client_id, tracked_keywords')
+    .select('id, name, client_id, tracked_keywords, exclude_keywords')
     .eq('is_active', true);
   if (scoped) projectQuery = projectQuery.in('id', opts.projectIds as string[]);
   const { data: projectRows } = await projectQuery;
@@ -255,9 +275,8 @@ export async function runMindshareScan(
     id: p.id,
     name: p.name,
     client_id: p.client_id,
-    lowerKeywords: p.tracked_keywords
-      .map(k => (typeof k === 'string' ? k.toLowerCase().trim() : ''))
-      .filter(Boolean),
+    lowerKeywords: lowerList(p.tracked_keywords),
+    lowerExcludes: lowerList((p as any).exclude_keywords),
   }));
 
   // 6. Walk messages. For each: skip if not from a Korean channel, then
@@ -284,11 +303,10 @@ export async function runMindshareScan(
     if (koreanChannelIds.size > 0 && (!normChatId || !koreanChannelIds.has(normChatId))) continue;
     eligible += 1;
 
-    const lowered = m.text.toLowerCase();
     for (const p of compiledProjects) {
       // First matching keyword wins (don't double-count one message
       // for one project even if multiple of its keywords appear).
-      const matched = p.lowerKeywords.find(kw => matchesKeyword(lowered, kw));
+      const matched = matchProject(m.text, p.lowerKeywords, p.lowerExcludes);
       if (!matched) continue;
       hits.push({
         project_id: p.id,

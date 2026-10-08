@@ -55,6 +55,7 @@ export interface TrackedProject {
   name: string;
   category: string | null;
   tracked_keywords: string[] | null;
+  exclude_keywords?: string[] | null;
   client_id?: string | null;
 }
 
@@ -64,7 +65,7 @@ export function categorySets(projects: TrackedProject[]): PeerSet[] {
   for (const p of projects) {
     if (!p.category || !p.tracked_keywords?.length) continue;
     const list = byCat.get(p.category) ?? [];
-    list.push({ name: p.name, aliases: p.tracked_keywords, isClient: !!p.client_id });
+    list.push({ name: p.name, aliases: p.tracked_keywords, exclude: p.exclude_keywords ?? [], isClient: !!p.client_id });
     byCat.set(p.category, list);
   }
   return [...byCat.entries()]
