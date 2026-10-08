@@ -13,6 +13,11 @@
  */
 
 import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { useToast } from '@/hooks/use-toast';
+import { CampaignKOLService } from '@/lib/campaignKolService';
+import { ExternalLink, Loader2, UserPlus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { CardHeaderEditorial } from '@/components/ui/card-header-editorial';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -22,9 +27,31 @@ import type { ChannelNode } from '@/lib/clientPosition';
 
 const COLORS = { hired: '#3e8692', organic: '#0EA5E9', gap: '#C7C0AF' };
 
-export function ChannelMap({ channels, clientName }: { channels: ChannelNode[] | null; clientName: string }) {
+export function ChannelMap({ channels, clientName, campaign }: {
+  channels: ChannelNode[] | null; clientName: string;
+  /** The client's live campaign, where "Add to campaign" puts a roster KOL. Omit to hide the action. */
+  campaign?: { id: string; name: string } | null;
+}) {
   const { ref, w } = useWidth();
+  const { toast } = useToast();
   const [hover, setHover] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+
+  // Same path as the campaign's Add KOLs dialog: status Curated. Only offered
+  // for KOLs not already on a live campaign of this client — the service
+  // upserts, so re-adding an active KOL would reset their status.
+  async function addToCampaign(kolId: string, kolName: string) {
+    if (!campaign) return;
+    setAdding(kolId);
+    try {
+      await CampaignKOLService.addCampaignKOL(campaign.id, kolId, 'Curated', `Added from the ${clientName} channel map (covers peers, not ${clientName} yet).`);
+      setAdded((s) => new Set(s).add(kolId));
+      toast({ title: `${kolName} added`, description: `Curated on ${campaign.name}.` });
+    } catch (e: any) {
+      toast({ title: 'Could not add', description: e.message, variant: 'destructive' });
+    } finally { setAdding(null); }
+  }
   const layout = useMemo(() => {
     if (!channels?.length) return null;
     const inner = channels.filter((c) => c.client > 0);
@@ -135,11 +162,29 @@ export function ChannelMap({ channels, clientName }: { channels: ChannelNode[] |
           {gaps.length > 0 && (
             <div className="rounded-lg border border-cream-200 bg-cream-50/60 p-3">
               <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500"><Target className="h-3 w-3" />Reach next</p>
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 {gaps.map((g) => (
                   <li key={g.id} className="flex items-center justify-between gap-2 text-[13px]">
-                    <span className="truncate font-medium text-ink-warm-900">{g.name}</span>
-                    <span className="shrink-0 text-xs tabular-nums text-ink-warm-500">{g.peers} peer mention{g.peers === 1 ? '' : 's'}</span>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink-warm-900">{g.name}</p>
+                      <p className="text-xs tabular-nums text-ink-warm-500">{g.peers} peer mention{g.peers === 1 ? '' : 's'}{g.kolId ? ' · in roster' : ''}</p>
+                    </div>
+                    {g.kolId && added.has(g.kolId) ? (
+                      <StatusBadge tone="brand" size="sm">Added</StatusBadge>
+                    ) : g.kolId && g.onCampaign ? (
+                      // On the campaign yet in the gap list: booked, but hasn't
+                      // mentioned the client in 28 days. Worth a nudge.
+                      <StatusBadge tone="warning" size="sm">Booked, quiet</StatusBadge>
+                    ) : g.kolId && campaign ? (
+                      <Button variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs" disabled={adding === g.kolId}
+                        onClick={() => addToCampaign(g.kolId!, g.kolName ?? g.name)} title={`Add to ${campaign.name} as Curated`}>
+                        {adding === g.kolId ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <UserPlus className="h-3 w-3 mr-1" />}Add
+                      </Button>
+                    ) : g.username ? (
+                      <Button asChild variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs text-brand">
+                        <a href={`https://t.me/${g.username}`} target="_blank" rel="noopener noreferrer">Open<ExternalLink className="h-3 w-3 ml-1" /></a>
+                      </Button>
+                    ) : null}
                   </li>
                 ))}
               </ul>

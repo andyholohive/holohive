@@ -50,6 +50,12 @@ export interface PositionSeries {
 
 export interface ChannelNode {
   id: string; name: string; members: number | null; hired: boolean;
+  /** Telegram handle, for an "open the channel" link. */
+  username: string | null;
+  /** The roster KOL who runs this channel (master_kols.telegram_channel), if any. */
+  kolId: string | null; kolName: string | null;
+  /** That KOL is already on one of this client's live campaigns. */
+  onCampaign: boolean;
   /** Mentions of the client / of its peers in this channel, last 28 days. */
   client: number; peers: number;
 }
@@ -72,7 +78,7 @@ const thisMondayKst = () => mondayOf(new Date(Date.now() + 9 * 3_600_000).toISOS
 const addWeeks = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 7 * DAY).toISOString().slice(0, 10);
 const round = (n: number, p = 2) => +n.toFixed(p);
 
-export async function loadPosition(db: SupabaseClient, clientId: string): Promise<{
+export async function loadPosition(db: SupabaseClient, clientId: string, campaignIds: string[] = []): Promise<{
   placement: Placement | null; position: PositionSeries | null; channels: ChannelNode[] | null;
 }> {
   const sb = db as any;
@@ -210,12 +216,28 @@ export async function loadPosition(db: SupabaseClient, clientId: string): Promis
   if (byCh.size) {
     // Every channel that mentioned the client, then the busiest peer-only ones — 48 nodes at most.
     const ranked = [...byCh.entries()].sort((a, b) => (b[1].client - a[1].client) || (b[1].peers - a[1].peers)).slice(0, 48);
-    const { data: chRows } = await sb.from('tg_monitored_channels').select('id, channel_name, member_count, is_hired').in('id', ranked.map(([id]) => id));
+    const { data: chRows } = await sb.from('tg_monitored_channels').select('id, channel_name, channel_username, member_count, is_hired').in('id', ranked.map(([id]) => id));
     const info = new Map(((chRows ?? []) as any[]).map((c) => [c.id, c]));
-    channels = ranked.map(([id, v]) => ({
-      id, name: info.get(id)?.channel_name ?? 'Unknown channel',
-      members: info.get(id)?.member_count ?? null, hired: !!info.get(id)?.is_hired, ...v,
-    }));
+    // Which channels a roster KOL runs, and which of those KOLs are already
+    // on this client's campaigns — so "Reach next" can offer the right action.
+    const handles = ((chRows ?? []) as any[]).map((c) => c.channel_username).filter(Boolean) as string[];
+    const norm = (h: string | null | undefined) => (h ?? '').trim().replace(/^@/, '').replace(/^https?:\/\/t\.me\//i, '').toLowerCase();
+    const [{ data: kols }, { data: onCamp }] = await Promise.all([
+      handles.length ? sb.from('master_kols').select('id, name, telegram_channel').not('telegram_channel', 'is', null).is('archived_at', null) : Promise.resolve({ data: [] }),
+      campaignIds.length ? sb.from('campaign_kols').select('master_kol_id').in('campaign_id', campaignIds).is('deleted_at', null) : Promise.resolve({ data: [] }),
+    ]);
+    const byHandle = new Map(((kols ?? []) as any[]).map((k) => [norm(k.telegram_channel), k]));
+    const booked = new Set(((onCamp ?? []) as any[]).map((r) => r.master_kol_id));
+    channels = ranked.map(([id, v]) => {
+      const c = info.get(id);
+      const kol = c?.channel_username ? byHandle.get(norm(c.channel_username)) : undefined;
+      return {
+        id, name: c?.channel_name ?? 'Unknown channel', username: c?.channel_username ?? null,
+        members: c?.member_count ?? null, hired: !!c?.is_hired,
+        kolId: kol?.id ?? null, kolName: kol?.name ?? null, onCampaign: !!kol && booked.has(kol.id),
+        ...v,
+      };
+    });
   }
 
   return { placement, position, channels };

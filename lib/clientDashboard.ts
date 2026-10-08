@@ -250,7 +250,7 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
 
     return lineup;
   })();
-  const positionTask = loadPosition(db, clientId);
+  const positionTask = loadPosition(db, clientId, campIds);
   const journeyTask = (async (): Promise<ClientDashboardData['journey']> => {
   // ── Journey: every lineup week, the best week, the top post, KR listings ──
   const today = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);

@@ -496,7 +496,8 @@ export function ClientDashboard({ d }: { d: ClientDashboardData }) {
         </TabsContent>
 
         <TabsContent value="channels" className="mt-0">
-          <ChannelMap channels={d.channels} clientName={d.client.name} />
+          <ChannelMap channels={d.channels} clientName={d.client.name}
+            campaign={d.campaigns.find((c) => c.status !== 'Completed') ?? null} />
         </TabsContent>
 
         <TabsContent value="market" className="mt-0">
