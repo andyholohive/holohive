@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PERIODS, inPeriod, periodLabel, type PeriodKey } from '@/lib/periodFilter';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -203,6 +204,24 @@ const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect, c
   { key: 'parked',     label: 'Parked',        match: p => p.parked_at !== null },
 ];
 
+type SortKey = 'newest' | 'oldest' | 'updated' | 'company' | 'bumps';
+const SORTS: Array<{ key: SortKey; label: string }> = [
+  { key: 'newest', label: 'Newest outreach' },
+  { key: 'oldest', label: 'Oldest outreach' },
+  { key: 'updated', label: 'Recently updated' },
+  { key: 'company', label: 'Company A–Z' },
+  { key: 'bumps', label: 'Most bumps' },
+];
+const when = (p: OutreachProspect) => p.date_outreached ?? p.created_at.slice(0, 10);
+const SORTERS: Record<SortKey, (a: OutreachProspect, b: OutreachProspect) => number> = {
+  // Undated rows sink to the bottom in both date orders.
+  newest: (a, b) => (b.date_outreached ? 1 : 0) - (a.date_outreached ? 1 : 0) || when(b).localeCompare(when(a)) || a.company.localeCompare(b.company),
+  oldest: (a, b) => (b.date_outreached ? 1 : 0) - (a.date_outreached ? 1 : 0) || when(a).localeCompare(when(b)) || a.company.localeCompare(b.company),
+  updated: (a, b) => b.updated_at.localeCompare(a.updated_at),
+  company: (a, b) => a.company.localeCompare(b.company) || when(b).localeCompare(when(a)),
+  bumps: (a, b) => (b.bumps_used ?? 0) - (a.bumps_used ?? 0) || when(b).localeCompare(when(a)),
+};
+
 const emptyDraft = () => ({
   telegram: '', company: '', role: '',
   owner: '', owner_user_id: '', status: 'to_contact' as OutreachStatus, message_type: '',
@@ -238,6 +257,12 @@ export default function OutreachPage() {
   const [search, setSearch] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [msgFilter, setMsgFilter] = useState<string>('all');
+  // [2026-10-18, Andy] "What's been done this week / month / quarter." The
+  // period is keyed on date_outreached — the day the message went out — and
+  // falls back to created_at for rows never stamped. Like owner and message
+  // type it slices WHO was contacted, so the rate cards follow it too.
+  const [period, setPeriod] = useState<PeriodKey>('all');
+  const [sort, setSort] = useState<SortKey>('newest');
 
   // Which cell is open for editing, and the uncommitted text in it. One cell
   // at a time: opening another commits or discards the first, which is what
@@ -355,17 +380,18 @@ export default function OutreachPage() {
     return visible
       .filter(p => ownerFilter === 'all' || p.owner === ownerFilter)
       .filter(p => msgFilter === 'all' || p.message_type === msgFilter)
+      .filter(p => inPeriod(p.date_outreached ?? p.created_at, period))
       .filter(p => !q
         || p.telegram.toLowerCase().includes(q)
         || p.company.toLowerCase().includes(q)
         || p.role.toLowerCase().includes(q));
-  }, [visible, search, ownerFilter, msgFilter]);
+  }, [visible, search, ownerFilter, msgFilter, period]);
 
   const rows = useMemo(() => {
     const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
     const live = view === 'parked' ? rateRows : rateRows.filter(p => p.parked_at === null);
-    return live.filter(p => viewMatch(p, statusCatalogue));
-  }, [rateRows, view, statusCatalogue]);
+    return live.filter(p => viewMatch(p, statusCatalogue)).sort(SORTERS[sort]);
+  }, [rateRows, view, statusCatalogue, sort]);
 
   const metrics = useMemo(() => computeRates(rateRows, statusCatalogue), [rateRows, statusCatalogue]);
 
@@ -422,6 +448,7 @@ export default function OutreachPage() {
   const liveCount = visible.length - parkedCount;
 
   const activeFilter = [
+    period !== 'all' ? periodLabel(period).toLowerCase() : null,
     ownerFilter !== 'all' ? ownerFilter : null,
     msgFilter !== 'all' ? msgFilter : null,
     search.trim() ? `"${search.trim()}"` : null,
@@ -759,6 +786,22 @@ export default function OutreachPage() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <Select value={period} onValueChange={v => setPeriod(v as PeriodKey)}>
+            <SelectTrigger className="h-9 w-[140px] focus-brand" aria-label="Period">
+              <SelectValue placeholder="Period" />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={sort} onValueChange={v => setSort(v as SortKey)}>
+            <SelectTrigger className="h-9 w-[160px] focus-brand" aria-label="Sort">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map(o => <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
             <SelectTrigger className="h-9 w-[130px] focus-brand">
               <SelectValue placeholder="Owner" />

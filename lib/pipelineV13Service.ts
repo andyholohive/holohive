@@ -98,6 +98,7 @@ export interface PipelineDeal {
   next_action_notes: string | null;
   last_contacted_at: string | null;
   updated_at: string;
+  created_at: string;
   tg_handle: string | null;
   /** Off the working board but still readable. Not an outcome. */
   archived_at: string | null;
@@ -133,7 +134,7 @@ export const PipelineV13Service = {
       .from('crm_opportunities')
       .select(
         'id, name, pipeline_stage, deal_value, source, owner_id, temperature_score, '
-        + 'next_action_at, next_action_notes, last_contacted_at, updated_at, tg_handle, '
+        + 'next_action_at, next_action_notes, last_contacted_at, updated_at, created_at, tg_handle, '
         + 'archived_at, archived_reason, '
         + 'outreach:outreach_prospects!outreach_prospects_crm_opportunity_id_fkey(id, status)',
       )
@@ -170,6 +171,7 @@ export const PipelineV13Service = {
       next_action_notes: r.next_action_notes,
       last_contacted_at: r.last_contacted_at,
       updated_at: r.updated_at,
+      created_at: r.created_at,
       tg_handle: r.tg_handle,
       archived_at: r.archived_at ?? null,
       archived_reason: r.archived_reason ?? null,

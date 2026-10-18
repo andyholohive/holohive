@@ -11,6 +11,7 @@
  * vocabularies live side by side during the changeover.
  */
 
+import { PERIODS, inPeriod, periodLabel, type PeriodKey } from '@/lib/periodFilter';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext, DragOverlay, closestCorners, PointerSensor,
@@ -394,6 +395,15 @@ function OutcomeZone({ id, label, tone }: { id: string; label: string; tone: 'wo
   );
 }
 
+type BoardSort = 'weighted' | 'updated' | 'newest' | 'contacted' | 'stalled';
+const BOARD_SORTS: Array<{ key: BoardSort; label: string }> = [
+  { key: 'weighted', label: 'Weighted value' },
+  { key: 'updated', label: 'Recently updated' },
+  { key: 'newest', label: 'Newest deals' },
+  { key: 'contacted', label: 'Last contacted' },
+  { key: 'stalled', label: 'Stalled first' },
+];
+
 export default function PipelineBoard({ onOutcome }: {
   /** Called after a deal is closed or parked, so the page can refresh its Orbit list. */
   onOutcome?: () => void;
@@ -408,6 +418,11 @@ export default function PipelineBoard({ onOutcome }: {
   const [showArchived, setShowArchived] = useState(false);
   const [archivedCount, setArchivedCount] = useState(0);
   const [sourceFilter, setSourceFilter] = useState('all');
+  // [2026-10-18, Andy] Period = deals with activity in the window (any change
+  // bumps updated_at: a stage move, a contact, a note). Sort replaces the
+  // fixed weighted-value order when someone wants "what moved latest".
+  const [period, setPeriod] = useState<PeriodKey>('all');
+  const [sort, setSort] = useState<BoardSort>('weighted');
   /** A loss needs a reason before it can be recorded, so the drop opens this
    *  rather than closing the deal immediately. */
   const [lossFor, setLossFor] = useState<PipelineDeal | null>(null);
@@ -447,21 +462,27 @@ export default function PipelineBoard({ onOutcome }: {
   const visible = useMemo(() => (deals ?? []).filter(d =>
     (ownerFilter === 'all' || d.owner_name === ownerFilter)
     && (sourceFilter === 'all' || d.source === sourceFilter)
-  ), [deals, ownerFilter, sourceFilter]);
+    && inPeriod(d.updated_at, period)
+  ), [deals, ownerFilter, sourceFilter, period]);
 
   const byStage = useMemo(() => {
     const m = new Map<PipelineStage, PipelineDeal[]>();
     for (const s of BOARD_STAGES) m.set(s, []);
     for (const d of visible) m.get(d.pipeline_stage)?.push(d);
-    // Highest weighted value first — the board should lead with the deal worth
-    // the most attention, not the one entered most recently.
-    for (const [, list] of m) {
-      list.sort((a, b) =>
-        (b.deal_value ?? 0) * STAGE_WIN_PCT[b.pipeline_stage]
-        - (a.deal_value ?? 0) * STAGE_WIN_PCT[a.pipeline_stage]);
-    }
+    // Default: highest weighted value first — the board should lead with the
+    // deal worth the most attention, not the one entered most recently.
+    const weighted = (d: PipelineDeal) => (d.deal_value ?? 0) * STAGE_WIN_PCT[d.pipeline_stage];
+    const t = (v: string | null) => (v ? Date.parse(v) : 0);
+    const by: Record<BoardSort, (a: PipelineDeal, b: PipelineDeal) => number> = {
+      weighted: (a, b) => weighted(b) - weighted(a),
+      updated: (a, b) => t(b.updated_at) - t(a.updated_at),
+      newest: (a, b) => t(b.created_at) - t(a.created_at),
+      contacted: (a, b) => t(b.last_contacted_at) - t(a.last_contacted_at) || weighted(b) - weighted(a),
+      stalled: (a, b) => Number(isStalled(b)) - Number(isStalled(a)) || t(a.updated_at) - t(b.updated_at),
+    };
+    for (const [, list] of m) list.sort(by[sort]);
     return m;
-  }, [visible]);
+  }, [visible, sort]);
 
   const totals = useMemo(() => {
     const total = visible.reduce((s, d) => s + (d.deal_value ?? 0), 0);
@@ -631,6 +652,21 @@ export default function PipelineBoard({ onOutcome }: {
             ))}
           </SelectContent>
         </Select>
+        <Select value={period} onValueChange={v => setPeriod(v as PeriodKey)}>
+          <SelectTrigger className="h-9 w-[150px] focus-brand" aria-label="Activity period"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PERIODS.map(p => <SelectItem key={p.key} value={p.key}>{p.key === 'all' ? 'Any activity' : `Active ${p.label.toLowerCase()}`}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={sort} onValueChange={v => setSort(v as BoardSort)}>
+          <SelectTrigger className="h-9 w-[160px] focus-brand" aria-label="Sort"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {BOARD_SORTS.map(o => <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {period !== 'all' && (
+          <span className="text-xs text-ink-warm-500">{visible.length} active {periodLabel(period).toLowerCase()}</span>
+        )}
         {collapsed.size > 0 && (
           <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set())}>
             Expand all ({collapsed.size})
