@@ -136,14 +136,16 @@ export async function GET(request: Request) {
     // swapped. The platform column is deliberately not trusted — the
     // 2026-05-27 audit found 3 of 274 rows whose platform disagrees
     // with their URL, so the link is the source of truth.
-    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    // [2026-10-19] Gate on the post date, not the log date — see the Telegram
+    // cron for why. Date-only because activation_date is a date column.
+    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data: rows, error: loadErr } = await (supabase as any)
       .from('contents')
       .select('id, content_link, impressions, likes, retweets, comments')
       .eq('status', 'posted')
       .or('content_link.ilike.%x.com/%,content_link.ilike.%twitter.com/%')
       .in('campaign_id', activeCampaignIds)
-      .lte('created_at', cutoff48h)
+      .lte('activation_date', cutoff48h)
       .gte('activation_date', METRICS_AUTOFILL_CUTOFF);
 
     if (loadErr) {

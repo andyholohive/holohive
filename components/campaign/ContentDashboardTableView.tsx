@@ -290,6 +290,28 @@ export function ContentDashboardTableView() {
     }
   };
 
+  // [2026-10-19] The moment a Telegram link lands on a row, pull its views +
+  // reactions and show them — ops were typing these by hand because the daily
+  // cron's first pass came ~2 days later. Server applies the same monotonic
+  // guard as the cron, so a higher number already typed in is kept.
+  const autoFetchMetrics = async (contentId: string, link: string | null | undefined) => {
+    if (!link || !/t\.me\/[A-Za-z0-9_]+\/\d+/i.test(link)) return;
+    try {
+      const r = await fetch(`/api/contents/${contentId}/fetch-metrics`, { method: 'POST' });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.ok) return;
+      const upd = d.updated ?? {};
+      if (Object.keys(upd).length) setContents((prev: any[]) => prev.map(c => c.id === contentId ? { ...c, ...upd } : c));
+      const fmt = (n: number) => n.toLocaleString('en-US');
+      toast({
+        title: 'Metrics fetched from Telegram',
+        description: [d.views !== null ? `${fmt(d.views)} views` : null, d.reactions !== null ? `${fmt(d.reactions)} reactions` : null].filter(Boolean).join(' · ')
+          + (Object.keys(upd).length ? '' : ' — stored numbers already higher, kept.'),
+        duration: 3500,
+      });
+    } catch { /* the daily cron catches it */ }
+  };
+
   // ── Inline cell save (writes to supabase + local state) ───────
   const handleContentCellSaveImmediate = async (content: any, field: string, newValue: any) => {
     // Update local state immediately for responsiveness.
@@ -328,6 +350,7 @@ export function ContentDashboardTableView() {
             isNew: false,
           };
           setContents((prev: any[]) => prev.map(c => c.id === content.id ? contentWithKol : c));
+          void autoFetchMetrics(newContent.id, newContent.content_link);
           // [2026-07-06] Best-effort: mark this KOL's slot in the current
           // week's lineup as posted (feeds the Thursday deadline ping).
           if (campaign?.id && newContent.campaign_kols_id) {
@@ -344,6 +367,7 @@ export function ContentDashboardTableView() {
     } else {
       try {
         await supabase.from('contents').update({ [field]: newValue } as any).eq('id', content.id);
+        if (field === 'content_link') void autoFetchMetrics(content.id, newValue);
       } catch (err) {
         console.error('Error updating content:', err);
       }

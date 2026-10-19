@@ -13,6 +13,7 @@
  * accepts. We map here so the CHECK constraints pass.
  */
 
+import { applyTelegramMetrics } from '@/lib/telegramPostMetrics';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { markLineupSlotPosted } from './lineupSlotSync';
 import { KOL_RATE_COLUMNS, resolvePaymentAmount } from './kolRate';
@@ -127,6 +128,11 @@ export async function createApprovedContentsRow(
   }
 
   const contentId = (contentRow as any)?.id ?? null;
+
+  // [2026-10-19] Pull views + reactions straight away for Telegram posts, so
+  // the row lands with numbers instead of waiting ~2 days for the cron. Best
+  // effort: a miss here is picked up by the daily pass.
+  if (contentId) void applyTelegramMetrics(admin as any, contentId).catch(() => null);
 
   // [2026-07-06] Flip this KOL's slot in the current week's lineup to
   // 'posted' (best-effort — powers the Thursday "not all posted" ping).

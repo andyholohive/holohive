@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { TG_URL_REGEX, fetchTelegramMetrics } from '@/lib/telegramPostMetrics';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -66,81 +67,7 @@ export const maxDuration = 300;
  */
 const METRICS_AUTOFILL_CUTOFF = '2026-07-10';
 
-const TG_URL_REGEX = /t\.me\/([A-Za-z0-9_]+)\/(\d+)/i;
 const FETCH_THROTTLE_MS = 200;        // politeness between Telegram fetches
-const FETCH_TIMEOUT_MS = 8000;        // per-request timeout
-const USER_AGENT =
-  'Mozilla/5.0 (compatible; Holo Hive-MetricsBot/1.0; +https://app.holohive.io)';
-
-/**
- * Parse Telegram's display format: "1.2K", "5.4M", "847", "12,345".
- * Returns null on unparseable input.
- */
-function parseCount(text: string | null | undefined): number | null {
-  if (!text) return null;
-  const trimmed = text.trim().replace(/[,\s]/g, '');
-  if (!trimmed) return null;
-  const match = trimmed.match(/^([\d.]+)([KkMmBb])?$/);
-  if (!match) return null;
-  const num = parseFloat(match[1]);
-  if (!Number.isFinite(num)) return null;
-  const suffix = match[2]?.toUpperCase();
-  if (suffix === 'K') return Math.round(num * 1_000);
-  if (suffix === 'M') return Math.round(num * 1_000_000);
-  if (suffix === 'B') return Math.round(num * 1_000_000_000);
-  return Math.round(num);
-}
-
-/**
- * Fetches Telegram's embed HTML for a single post and parses view + reaction counts.
- * Returns null if the URL is malformed, the fetch fails, or the page returns no metrics.
- */
-async function fetchTelegramMetrics(
-  url: string,
-): Promise<{ views: number | null; reactions: number | null } | null> {
-  const match = url.match(TG_URL_REGEX);
-  if (!match) return null;
-  const [, channel, msgId] = match;
-  const embedUrl = `https://t.me/${channel}/${msgId}?embed=1&mode=tme`;
-
-  // Manual timeout because fetch doesn't have a built-in option that
-  // works reliably across Node versions
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  try {
-    const res = await fetch(embedUrl, {
-      headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html' },
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-
-    // View count: rendered inside `<span class="tgme_widget_message_views">1.2K</span>`
-    const viewsMatch = html.match(
-      /<span[^>]*class="[^"]*tgme_widget_message_views[^"]*"[^>]*>([^<]+)<\/span>/i,
-    );
-    const views = viewsMatch ? parseCount(viewsMatch[1]) : null;
-
-    // Reactions: sum across all emoji buttons.
-    // Each appears as `<span class="...tgme_reaction_count...">N</span>`.
-    let reactions: number | null = null;
-    const reactionRegex =
-      /<span[^>]*class="[^"]*tgme_reaction_count[^"]*"[^>]*>([^<]+)<\/span>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = reactionRegex.exec(html)) !== null) {
-      const n = parseCount(m[1]);
-      if (n !== null) reactions = (reactions ?? 0) + n;
-    }
-
-    return { views, reactions };
-  } catch {
-    // Network error, timeout, abort, etc.
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 export async function GET(request: Request) {
   const startedAt = new Date();
@@ -230,7 +157,7 @@ export async function GET(request: Request) {
     //   - status = 'posted'                  → exclude pending/scheduled
     //   - content_link ILIKE '%t.me/%'       → Telegram URLs only
     //   - campaign_id IN (active campaigns)  → active clients only
-    //   - created_at <= now - 48h            → give post time to ramp
+    //   - activation_date <= today - 2d     → give post time to ramp (by post date, not log date)
     //   - activation_date >= go-live cutoff  → never touch manual numbers
     //
     // We don't trust the platform column (audit: 3 of 274 rows
@@ -247,14 +174,19 @@ export async function GET(request: Request) {
     // higher than what ops recorded). Rows with a null
     // activation_date are excluded by .gte, which is the behaviour we
     // want: if we can't prove a post is post-cutoff, don't touch it.
-    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    // [2026-10-19] The 48h gate is measured from the day the post went LIVE
+    // (activation_date), not from when it was logged. Posts are logged ~17h
+    // after going live and the gate used to count from there, so the first
+    // automatic pass reached a post ~65h in — after ops had typed the numbers
+    // by hand (150 of 184 manual metric edits in the Sept–Oct audit).
+    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data: rows, error: loadErr } = await (supabase as any)
       .from('contents')
       .select('id, content_link, impressions, likes')
       .eq('status', 'posted')
       .ilike('content_link', '%t.me/%')
       .in('campaign_id', activeCampaignIds)
-      .lte('created_at', cutoff48h)
+      .lte('activation_date', cutoff48h)
       .gte('activation_date', METRICS_AUTOFILL_CUTOFF);
 
     if (loadErr) {
