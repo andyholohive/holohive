@@ -153,6 +153,8 @@ export interface OutreachProspect {
    *  reversible and the row keeps every field it had. */
   parked_at: string | null;
   parked_reason: ParkReason | null;
+  /** Last move to a bump status; drives the follow-up queue (lib/outreachFollowUp). */
+  last_bumped_at: string | null;
 }
 
 /** The outreach ladder, mirroring the bump statuses. Fixed, not a
@@ -255,7 +257,7 @@ async function duplicateMessage(input: CreateProspectData): Promise<string> {
 const COLUMNS =
   'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
   'date_outreached, bumps_used, bumps_before_conversion, source, responded_to_step, ' +
-  'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason';
+  'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason, last_bumped_at';
 
 // ── Rates ────────────────────────────────────────────────────────────
 //
@@ -464,6 +466,9 @@ export class OutreachService {
     if (bumpIndex >= 0) {
       // bump_1_* → 1, bump_2_* → 2, bump_3_* → 3, final_bump → 4
       updates.bumps_used = Math.min(4, Math.floor(bumpIndex / 2) + 1);
+      // A new rung is a new send; the follow-up clock restarts from it.
+      // (seen ↔ unseen on the same rung is not a send.)
+      if (updates.bumps_used !== p.bumps_used) (updates as any).last_bumped_at = new Date().toISOString();
     }
 
     // On conversion, freeze how many bumps it took — the whole point of

@@ -28,6 +28,8 @@ import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PERIODS, inPeriod, periodLabel, type PeriodKey } from '@/lib/periodFilter';
+import { followUpFor, isDue, dueLabel, BUMP_LABEL, PARK_AFTER_FINAL_DAYS } from '@/lib/outreachFollowUp';
+const PARK_AFTER_FINAL_LABEL = `${PARK_AFTER_FINAL_DAYS} days`;
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -189,13 +191,17 @@ const NONE = '__none__';
 // board, so both are treated as bugs: Outreached means "messaged, no answer
 // yet" (bumps included) and Dead means every terminal-negative status.
 
-type ViewKey = 'all' | 'to_contact' | 'ready' | 'outreached' | 'engaged' | 'leads' | 'dead' | 'parked';
+type ViewKey = 'all' | 'to_contact' | 'ready' | 'outreached' | 'due' | 'engaged' | 'leads' | 'dead' | 'parked';
 
 const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect, cat?: OutreachStatusRow[] | null) => boolean }> = [
   { key: 'all',        label: 'All',           match: () => true },
   { key: 'to_contact', label: 'To Contact',    match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'queued' },
   { key: 'ready',      label: 'Ready to Send', match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'ready' },
   { key: 'outreached', label: 'Outreached',    match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'outreached' },
+  // [2026-10-19] The follow-up queue: on the bump ladder and past the cadence
+  // for the next rung (or past the final bump, so due a park). See
+  // lib/outreachFollowUp for the clock.
+  { key: 'due',        label: 'Follow up',     match: p => isDue(followUpFor(p)) },
   { key: 'engaged',    label: 'Engaged',       match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'responded' },
   { key: 'leads',      label: 'Leads',         match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'lead' },
   { key: 'dead',       label: 'Dead',          match: (p, cat) => stageOfRow(p.status, cat ?? null) === 'dead' },
@@ -390,7 +396,11 @@ export default function OutreachPage() {
   const rows = useMemo(() => {
     const viewMatch = VIEWS.find(v => v.key === view)?.match ?? (() => true);
     const live = view === 'parked' ? rateRows : rateRows.filter(p => p.parked_at === null);
-    return live.filter(p => viewMatch(p, statusCatalogue)).sort(SORTERS[sort]);
+    const matched = live.filter(p => viewMatch(p, statusCatalogue));
+    // Follow-up queue: most recently due first. The freshest conversations
+    // are the ones a bump can still rescue; a 60-day-old silence can wait.
+    if (view === 'due') return matched.sort((a, b) => (followUpFor(b)?.dueAt ?? 0) - (followUpFor(a)?.dueAt ?? 0));
+    return matched.sort(SORTERS[sort]);
   }, [rateRows, view, statusCatalogue, sort]);
 
   const metrics = useMemo(() => computeRates(rateRows, statusCatalogue), [rateRows, statusCatalogue]);
@@ -468,6 +478,21 @@ export default function OutreachPage() {
       setProspects(prev => prev.map(x => (x.id === updated.id ? updated : x)));
     } catch (err: any) {
       toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Park a prospect that finished the ladder with no reply. Rates still count it. */
+  async function parkStale(p: OutreachProspect) {
+    setSaving(true);
+    try {
+      await OutreachService.setParked(p.id, true, 'stale_no_reply');
+      const now = new Date().toISOString();
+      setProspects(prev => prev.map(x => (x.id === p.id ? { ...x, parked_at: now, parked_reason: 'stale_no_reply' } : x)));
+      toast({ title: `${p.telegram} parked`, description: 'No reply after the final bump. Find it under Parked.', duration: 2500 });
+    } catch (err: any) {
+      toast({ title: 'Could not park', description: err?.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -1056,8 +1081,40 @@ export default function OutreachPage() {
                             </Select>
                           </div>
                         ) : (
-                          <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center">
+                          <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center gap-2 flex-wrap">
                             <StatusBadge tone={meta.tone} size="sm">{meta.label}</StatusBadge>
+                            {(() => {
+                              // One click moves the prospect up the ladder (or parks it
+                              // after the final bump). Only shown once the cadence says
+                              // it's time, so quiet rows stay quiet.
+                              const f = followUpFor(p);
+                              if (!f || !isDue(f)) return null;
+                              const overdue = f.overdueDays >= 3;
+                              return (
+                                <span className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                  {f.kind === 'bump' && f.next ? (
+                                    <Button
+                                      variant="outline" size="sm" disabled={saving}
+                                      className={`h-6 px-2 text-[11px] ${overdue ? 'border-amber-300 text-amber-800 hover:bg-amber-50' : 'border-brand/40 text-brand hover:bg-brand-light'}`}
+                                      title={`Send ${BUMP_LABEL[f.next] ?? 'the next bump'} · ${dueLabel(f)}`}
+                                      onClick={() => changeStatus(p, f.next!)}
+                                    >
+                                      <Repeat2 className="h-3 w-3 mr-1" />{BUMP_LABEL[f.next] ?? 'Bump'}
+                                    </Button>
+                                  ) : f.kind === 'park' ? (
+                                    <Button
+                                      variant="outline" size="sm" disabled={saving}
+                                      className="h-6 px-2 text-[11px] border-cream-300 text-ink-warm-600 hover:bg-cream-100"
+                                      title={`No reply ${PARK_AFTER_FINAL_LABEL} after the final bump · park it`}
+                                      onClick={() => parkStale(p)}
+                                    >
+                                      Park
+                                    </Button>
+                                  ) : null}
+                                  <span className={`text-[10px] tabular-nums ${overdue ? 'text-amber-700' : 'text-ink-warm-400'}`}>{dueLabel(f)}</span>
+                                </span>
+                              );
+                            })()}
                           </div>
                         )}
                       </td>
