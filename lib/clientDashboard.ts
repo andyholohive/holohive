@@ -18,7 +18,7 @@ export interface ClientDashboardData {
   campaigns: Array<{ id: string; name: string; status: string | null }>;
   week: CampaignWeekState | null;
   startDate: string | null;
-  totals: { reads: number; posts: number; engagements: number; creators: number; byPlatform: Array<{ platform: string; posts: number; reads: number }> } | null;
+  totals: { reads: number; posts: number; engagements: number; creators: number; byPlatform: Array<{ platform: string; posts: number; reads: number }>; web2: { posts: number; reads: number; creators: number } } | null;
   weekly: WeekPoint[];
   creators: Array<{ name: string; posts: number; reads: number; best: number; engagements: number }>;
   sentiment: { counted: number; filtered: number; byLabel: Array<{ label: string; count: number }>; quotes: Array<{ ko: string; en: string; label: string }> } | null;
@@ -104,7 +104,7 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
         const rows: any[] = [];
         for (let from = 0; ; from += 1000) {
           const { data, error } = await sb.from('contents')
-            .select('id, activation_date, platform, content_link, impressions, likes, retweets, comments, bookmarks, campaign_kols(master_kols(name))')
+            .select('id, activation_date, platform, content_link, impressions, likes, retweets, comments, bookmarks, campaign_kols(master_kols(name, kol_category))')
             .in('campaign_id', ids).not('activation_date', 'is', null).range(from, from + 999);
           if (error) throw new Error(`contents read failed: ${error.message}`);
           rows.push(...(data ?? []));
@@ -133,7 +133,9 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
       const ww = byWeek.get(w) ?? { reads: 0, posts: 0, engagements: 0 };
       ww.reads += reads; ww.posts++; ww.engagements += eng(c); byWeek.set(w, ww);
     }
+    const web2 = contents.filter((c: any) => c.campaign_kols?.master_kols?.kol_category === 'Web2');
     totals = {
+      web2: { posts: web2.length, reads: web2.reduce((n: number, c: any) => n + (c.impressions ?? 0), 0), creators: new Set(web2.map((c: any) => c.campaign_kols?.master_kols?.name)).size },
       reads: contents.reduce((n: number, c: any) => n + (c.impressions ?? 0), 0),
       posts: contents.length,
       engagements: contents.reduce((n: number, c: any) => n + eng(c), 0),

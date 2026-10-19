@@ -352,6 +352,14 @@ export function ReachHero({ d, audience = 'team' }: { d: ClientDashboardData; au
         </div>
         {t && t.byPlatform.length > 0 && (
           <div className="flex flex-wrap gap-2">
+            {t.web2.posts > 0 && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50/70 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-purple-700">Web2 creators</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink-warm-900">
+                  {compact(t.web2.reads)} <span className="font-normal text-ink-warm-500">· {t.web2.posts} posts · {t.web2.creators} creator{t.web2.creators === 1 ? '' : 's'}</span>
+                </p>
+              </div>
+            )}
             {t.byPlatform.map((p) => (
               <div key={p.platform} className="rounded-lg border border-brand-light/70 bg-white/70 px-3 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">{p.platform}</p>

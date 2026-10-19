@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -149,6 +150,9 @@ export function ContentDashboardTableView() {
   // ── Filter / sort / selection state ─────────────────────────────
   const [contentFilters, setContentFilters] = useState({
     kol_ids: [] as string[],
+    // [2026-10-19, Bolt] Web2 / Web3 — derived from the KOL's category, not
+    // stored per post, so marking a KOL once flags every post they make.
+    kol_types: [] as string[],
     platforms: [] as string[],
     types: [] as string[],
     statuses: [] as string[],
@@ -221,6 +225,10 @@ export function ContentDashboardTableView() {
       }
       // Per-column filters
       if (contentFilters.kol_ids.length > 0 && !contentFilters.kol_ids.includes(content.campaign_kols_id)) return false;
+      if (contentFilters.kol_types.length > 0) {
+        const cat = campaignKOLs.find((k: any) => k.id === content.campaign_kols_id)?.master_kol?.kol_category ?? 'Web3';
+        if (!contentFilters.kol_types.includes(cat)) return false;
+      }
       if (contentFilters.platforms.length > 0 && !contentFilters.platforms.includes(content.platform)) return false;
       if (contentFilters.types.length > 0 && !contentFilters.types.includes(content.type)) return false;
       if (contentFilters.statuses.length > 0 && !contentFilters.statuses.includes(content.status)) return false;
@@ -750,6 +758,9 @@ export function ContentDashboardTableView() {
           <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ minWidth: 120 }}>
             <SelectValue>
               {campaignKOLs.find((k: any) => k.id === value)?.master_kol?.name || '-'}
+              {campaignKOLs.find((k: any) => k.id === value)?.master_kol?.kol_category === 'Web2' && (
+                <StatusBadge tone="purple" size="sm" className="ml-1.5">Web2</StatusBadge>
+              )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -1076,7 +1087,47 @@ export function ContentDashboardTableView() {
                       <TableHeader>
                         <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
-                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">KOL</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>KOL</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button type="button" className="opacity-50 group-hover:opacity-100 transition-opacity" aria-label="Filter by KOL type">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter KOL type</div>
+                                    {['Web2', 'Web3'].map((kt) => (
+                                      <div
+                                        key={kt}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
+                                        onClick={() => setContentFilters(prev => ({
+                                          ...prev,
+                                          kol_types: prev.kol_types.includes(kt) ? prev.kol_types.filter(x => x !== kt) : [...prev.kol_types, kt],
+                                        }))}
+                                      >
+                                        <Checkbox checked={contentFilters.kol_types.includes(kt)} />
+                                        <span className="text-xs">{kt}</span>
+                                      </div>
+                                    ))}
+                                    <p className="mt-2 text-[10px] leading-snug text-ink-warm-500">Set per KOL on the KOLs page; every post they make follows.</p>
+                                    {contentFilters.kol_types.length > 0 && (
+                                      <Button size="sm" variant="ghost" className="w-full mt-2 text-xs" onClick={() => setContentFilters(prev => ({ ...prev, kol_types: [] }))}>
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {contentFilters.kol_types.length > 0 && (
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {contentFilters.kol_types.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Platform</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Type</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Status</TableHead>
@@ -1389,7 +1440,47 @@ export function ContentDashboardTableView() {
                               checked={filteredContents.length > 0 && filteredContents.every((content: any) => selectedContents.includes(content.id))}
                             />
                           </TableHead>
-                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">KOL</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>KOL</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button type="button" className="opacity-50 group-hover:opacity-100 transition-opacity" aria-label="Filter by KOL type">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter KOL type</div>
+                                    {['Web2', 'Web3'].map((kt) => (
+                                      <div
+                                        key={kt}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
+                                        onClick={() => setContentFilters(prev => ({
+                                          ...prev,
+                                          kol_types: prev.kol_types.includes(kt) ? prev.kol_types.filter(x => x !== kt) : [...prev.kol_types, kt],
+                                        }))}
+                                      >
+                                        <Checkbox checked={contentFilters.kol_types.includes(kt)} />
+                                        <span className="text-xs">{kt}</span>
+                                      </div>
+                                    ))}
+                                    <p className="mt-2 text-[10px] leading-snug text-ink-warm-500">Set per KOL on the KOLs page; every post they make follows.</p>
+                                    {contentFilters.kol_types.length > 0 && (
+                                      <Button size="sm" variant="ghost" className="w-full mt-2 text-xs" onClick={() => setContentFilters(prev => ({ ...prev, kol_types: [] }))}>
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {contentFilters.kol_types.length > 0 && (
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {contentFilters.kol_types.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Platform</span>
@@ -1829,6 +1920,7 @@ export function ContentDashboardTableView() {
                                   onClick={() => {
                                     setContentFilters({
                                       kol_ids: [],
+                                      kol_types: [],
                                       platforms: [],
                                       types: [],
                                       statuses: [],
