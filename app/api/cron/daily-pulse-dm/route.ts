@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
-import { getRoster, promptFor, isFridayUTC, pulseDateFor } from '@/lib/dailyPulse';
+import { getRoster, promptFor, isFridayUTC, pulseDateFor, logPulseRun } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -47,6 +47,8 @@ export async function GET(request: Request) {
   try {
     const roster = await getRoster(sb);
     if (roster.length === 0) {
+      // Logged, not silent: an empty roster is a config state the health sweep should see.
+      await logPulseRun(sb, 'DAILY_PULSE_DM', runStart, 'success', 'roster empty — no DMs sent. Configure it on /admin/telegram-comm.');
       return NextResponse.json({ sent: 0, reason: 'roster empty — configure it on /admin/telegram-comm' });
     }
 
@@ -84,16 +86,10 @@ export async function GET(request: Request) {
     }
 
     const sent = results.filter(r => r.dmSent).length;
-    try {
-      await (sb as any).from('agent_runs').insert({
-        agent_name: 'DAILY_PULSE_DM',
-        run_type: 'cron',
-        started_at: new Date(runStart).toISOString(),
-        completed_at: new Date().toISOString(),
-        status: 'success',
-        output_summary: `${sent}/${roster.length} DM(s) sent (${friday ? 'Friday' : 'weekday'} variant).`,
-      });
-    } catch { /* swallow */ }
+    const failedSends = results.filter(r => !r.dmSent && r.error && r.error !== 'dry-run');
+    // A run where nobody got the DM is a failure the health sweep should page on.
+    await logPulseRun(sb, 'DAILY_PULSE_DM', runStart, sent === 0 && !dryRun ? 'failed' : 'success',
+      `${sent}/${roster.length} DM(s) sent (${friday ? 'Friday' : 'weekday'} variant)${failedSends.length ? ` · failed: ${failedSends.map(r => `${r.name ?? '?'} (${r.error})`).join(', ')}` : ''}.`);
 
     return NextResponse.json({ pulseDate, friday, roster: roster.length, sent, results });
   } catch (err) {

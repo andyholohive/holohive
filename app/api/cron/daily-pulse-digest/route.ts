@@ -23,7 +23,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 import { escapeHtml } from '@/lib/telegramHtml';
-import { getRoster, getDigestDestination, isFridayUTC, pulseDateFor } from '@/lib/dailyPulse';
+import { getRoster, getDigestDestination, isFridayUTC, pulseDateFor, logPulseRun } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -56,6 +56,7 @@ export async function GET(request: Request) {
   try {
     const [roster, dest] = await Promise.all([getRoster(sb), getDigestDestination(sb)]);
     if (roster.length === 0) {
+      await logPulseRun(sb, 'DAILY_PULSE_DIGEST', runStart, 'success', 'roster empty — digest not posted. Configure it on /admin/telegram-comm.');
       return NextResponse.json({ posted: false, reason: 'roster empty' });
     }
 
@@ -109,33 +110,24 @@ export async function GET(request: Request) {
     let posted = false;
     if (!dest.chatId) {
       // Nowhere to post — surface but don't error the cron.
-      try {
-        await (sb as any).from('agent_runs').insert({
-          agent_name: 'DAILY_PULSE_DIGEST',
-          run_type: 'cron',
-          started_at: new Date(runStart).toISOString(),
-          completed_at: new Date().toISOString(),
-          status: 'success',
-          output_summary: 'no digest chat configured; digest not posted.',
-        });
-      } catch { /* swallow */ }
+      await logPulseRun(sb, 'DAILY_PULSE_DIGEST', runStart, 'success', 'no digest chat configured; digest not posted.');
       return NextResponse.json({ posted: false, reason: 'no digest chat configured', preview: message });
     }
 
+    let sendError: string | null = null;
     if (!dryRun) {
-      posted = await TelegramService.sendToChat(dest.chatId, message, 'HTML', dest.threadId ?? undefined);
+      try {
+        posted = await TelegramService.sendToChat(dest.chatId, message, 'HTML', dest.threadId ?? undefined);
+      } catch (err: any) {
+        sendError = err?.message ?? 'send threw';
+      }
     }
 
-    try {
-      await (sb as any).from('agent_runs').insert({
-        agent_name: 'DAILY_PULSE_DIGEST',
-        run_type: 'cron',
-        started_at: new Date(runStart).toISOString(),
-        completed_at: new Date().toISOString(),
-        status: 'success',
-        output_summary: `${blocked.length} blocked, ${clear.length} clear, ${noCheckin.length} no check-in${friday ? `, ${wins.length} win(s)` : ''}.`,
-      });
-    } catch { /* swallow */ }
+    // [defect 4] The run row now says whether the digest actually reached
+    // Telegram. A failed post is logged as failed, so the health sweep pages.
+    const counts = `${blocked.length} blocked, ${clear.length} clear, ${noCheckin.length} no check-in${friday ? `, ${wins.length} win(s)` : ''}`;
+    await logPulseRun(sb, 'DAILY_PULSE_DIGEST', runStart, dryRun || posted ? 'success' : 'failed',
+      dryRun ? `${counts} — dry run, not posted.` : posted ? `${counts} — posted to ${dest.chatId}${dest.threadId ? `/${dest.threadId}` : ''}.` : `${counts} — Telegram post FAILED${sendError ? `: ${sendError}` : ''}.`);
 
     return NextResponse.json({
       posted,

@@ -20,6 +20,58 @@ export const PULSE_CUTOFF_HOUR_UTC = 12;
 
 export type PulseStatus = 'no_checkin' | 'clear' | 'blocked';
 
+/**
+ * One agent_runs row per cron invocation, including the no-op branches.
+ * [2026-10-19, defect 2] Both crons used to return early on an empty roster
+ * WITHOUT logging, so unchecking the roster silenced the bot forever and the
+ * health sweep had nothing to notice. Every exit path logs now.
+ */
+export async function logPulseRun(
+  client: SupabaseClient,
+  agent: 'DAILY_PULSE_DM' | 'DAILY_PULSE_DIGEST',
+  startedAtMs: number,
+  status: 'success' | 'failed',
+  summary: string,
+): Promise<void> {
+  try {
+    await (client as any).from('agent_runs').insert({
+      agent_name: agent,
+      run_type: 'cron',
+      started_at: new Date(startedAtMs).toISOString(),
+      completed_at: new Date().toISOString(),
+      status,
+      output_summary: summary,
+      error_message: status === 'failed' ? summary : null,
+    });
+  } catch { /* logging must never fail the cron */ }
+}
+
+/**
+ * A short follow-up after a reply has already been captured ("thanks", "ok",
+ * "👍") is an acknowledgement, not a new answer. [2026-10-19, defect 3] It used
+ * to be re-classified and overwrite the day's blocker with "thanks".
+ */
+const FOLLOW_UP_PHRASES = new Set([
+  'thanks', 'thank you', 'thx', 'ty', 'ok', 'okay', 'k', 'kk', 'cool', 'noted', 'got it',
+  'sure', 'cheers', 'great', 'nice', 'perfect', 'sounds good', 'will do', 'done', 'yes', 'yep', 'yup', 'no', 'nope',
+]);
+export function isFollowUp(raw: string): boolean {
+  const t = (raw || '').trim();
+  if (!t) return true;
+  // Emoji / punctuation only, or a known short acknowledgement.
+  const letters = t.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+  if (!letters) return true;
+  return FOLLOW_UP_PHRASES.has(letters) && letters.split(' ').length <= 2;
+}
+
+/** Append a win to any already recorded that day; identical lines once. [defect 1] */
+export function mergeWins(existing: string | null | undefined, incoming: string | null | undefined): string | null {
+  const lines = [...(existing ?? '').split('\n'), ...(incoming ?? '').split('\n')].map(l => l.trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const out = lines.filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  return out.length ? out.join('\n') : null;
+}
+
 export interface RosterMember {
   id: string;
   name: string | null;

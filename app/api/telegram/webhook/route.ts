@@ -7,7 +7,7 @@ import { ensureKolDeliverable } from '@/lib/kolDeliverableAutoAdd';
 import { triggerKolScan } from '@/lib/githubActions';
 import { getCampaignWeek } from '@/lib/campaignWeekHelpers';
 import { isPreShipGateExempt } from '@/lib/preShipGate';
-import { classifyReply, isFridayUTC, pulseDateFor, PULSE_CUTOFF_HOUR_UTC } from '@/lib/dailyPulse';
+import { classifyReply, isFridayUTC, pulseDateFor, PULSE_CUTOFF_HOUR_UTC, getRoster, isFollowUp, mergeWins } from '@/lib/dailyPulse';
 
 export const dynamic = 'force-dynamic';
 
@@ -4021,12 +4021,16 @@ async function handleDailyPulseReply(message: any): Promise<boolean> {
       .eq('telegram_id', fromId)
       .maybeSingle();
     if (!user) return false;
+    // [defect 5] Membership is the configured roster, not "has a users row":
+    // someone removed from the roster mid-day must not keep writing to it.
+    const roster = await getRoster(supabaseAdmin);
+    if (!roster.some(r => r.id === (user as any).id)) return false;
 
     // Must have been prompted today (the DM cron seeds the row + prompted_at).
     const pulseDate = pulseDateFor(now);
     const { data: row } = await supabaseAdmin
       .from('daily_pulse')
-      .select('id, prompted_at, win_text')
+      .select('id, prompted_at, replied_at, status, blocker_text, win_text')
       .eq('pulse_date', pulseDate)
       .eq('user_id', (user as any).id)
       .maybeSingle();
@@ -4034,8 +4038,14 @@ async function handleDailyPulseReply(message: any): Promise<boolean> {
 
     const friday = isFridayUTC(now);
     const cls = classifyReply(rawText, friday);
-    // Preserve an earlier win if this message didn't restate one.
-    const winText = cls.winText ?? (row as any).win_text ?? null;
+    const already = !!(row as any).replied_at;
+
+    // [defect 3] "thanks" / "ok" / "👍" after a captured reply is an
+    // acknowledgement. Leave the day's answer alone and don't ack the ack.
+    if (already && !cls.winText && isFollowUp(rawText)) return true;
+
+    // [defect 1] Wins append across messages; the old code kept only the last.
+    const winText = mergeWins((row as any).win_text, cls.winText);
 
     await supabaseAdmin
       .from('daily_pulse')
@@ -4048,9 +4058,17 @@ async function handleDailyPulseReply(message: any): Promise<boolean> {
       })
       .eq('id', (row as any).id);
 
-    // Ack so the member knows it registered (and doesn't re-send).
-    let ack = cls.status === 'clear' ? '✅ logged — clear' : '✅ logged';
-    if (winText) ack += ' · win noted 🎉';
+    // Ack says what was recorded — and, on a second message, what it replaced,
+    // so an accidental overwrite is visible to the person who caused it.
+    let ack: string;
+    if (!already) {
+      ack = cls.status === 'clear' ? '✅ logged — clear' : '✅ logged';
+    } else if (cls.status === 'blocked') {
+      ack = `✅ updated — today's blocker is now: <i>${escapeHtml((cls.blockerText ?? '').slice(0, 120))}</i>`;
+    } else {
+      ack = (row as any).status === 'blocked' ? '✅ updated — clear (earlier blocker removed)' : '✅ updated — clear';
+    }
+    if (cls.winText) ack += winText && winText.includes('\n') ? ' · win added 🎉' : ' · win noted 🎉';
     await sendTelegramMessage(message.chat.id.toString(), ack, 'HTML');
     return true;
   } catch (err) {
