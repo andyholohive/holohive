@@ -84,11 +84,19 @@ export async function fetchTelegramMetrics(url: string): Promise<{ views: number
   }
 }
 
+/** Views settle over the first two days; before that a reading is noise (team rule, 2026-05-27). */
+export const METRICS_MIN_AGE_HOURS = 48;
+
 export interface ApplyResult {
   ok: boolean;
-  reason?: 'not_telegram' | 'not_found' | 'no_metrics' | 'write_failed';
+  /** 'too_new': the post is under METRICS_MIN_AGE_HOURS old — date filled, metrics left for the daily job. */
+  reason?: 'not_telegram' | 'not_found' | 'no_metrics' | 'write_failed' | 'too_new';
   views: number | null;
   reactions: number | null;
+  /** Telegram's own post time, when the embed carried one. */
+  postedAt: string | null;
+  /** When the daily job will first pull metrics for a too-new post. */
+  eligibleAt: string | null;
   /** Fields actually written (the monotonic guard may keep the stored number). */
   updated: Partial<{ impressions: number; likes: number; activation_date: string }>;
 }
@@ -98,22 +106,39 @@ export interface ApplyResult {
  * written when the fetched number is HIGHER than what's stored — views and
  * reactions never fall in real life, so a lower number is a parse failure or
  * a stale CDN page, and a higher hand-typed number is never overwritten.
+ *
+ * Respects the 48h rule [Quazo 2026-10-20]: a post younger than
+ * METRICS_MIN_AGE_HOURS (by Telegram's own timestamp) gets its date filled
+ * but NO metrics — the daily job pulls them once it's old enough, so nobody
+ * has to come back and fix an early reading. Pass `minAgeHours: 0` to force.
  */
-export async function applyTelegramMetrics(db: SupabaseClient, contentId: string): Promise<ApplyResult> {
+export async function applyTelegramMetrics(db: SupabaseClient, contentId: string, opts: { minAgeHours?: number } = {}): Promise<ApplyResult> {
   const sb = db as any;
+  const none = { views: null, reactions: null, postedAt: null, eligibleAt: null, updated: {} as ApplyResult['updated'] };
   const { data: row } = await sb.from('contents').select('id, content_link, impressions, likes, activation_date').eq('id', contentId).maybeSingle();
-  if (!row) return { ok: false, reason: 'not_found', views: null, reactions: null, updated: {} };
-  if (!isTelegramPostUrl(row.content_link)) return { ok: false, reason: 'not_telegram', views: null, reactions: null, updated: {} };
+  if (!row) return { ok: false, reason: 'not_found', ...none };
+  if (!isTelegramPostUrl(row.content_link)) return { ok: false, reason: 'not_telegram', ...none };
   const m = await fetchTelegramMetrics(row.content_link);
-  if (!m || (m.views === null && m.reactions === null)) return { ok: false, reason: 'no_metrics', views: null, reactions: null, updated: {} };
+  if (!m || (m.views === null && m.reactions === null && !m.postedAt)) return { ok: false, reason: 'no_metrics', ...none };
+
   const updated: ApplyResult['updated'] = {};
-  if (m.views !== null && m.views > (row.impressions || 0)) updated.impressions = m.views;
-  if (m.reactions !== null && m.reactions > (row.likes || 0)) updated.likes = m.reactions;
-  // Post date, only when nobody has set one: the day it went live in Korea.
-  if (!row.activation_date && m.postedAt) updated.activation_date = new Date(Date.parse(m.postedAt) + 9 * 3_600_000).toISOString().slice(0, 10);
+  // Post date, only when nobody has set one. UTC day, matching what /submit
+  // stores (content_items.posted_at), so the same post never lands on two
+  // different days depending on who logged it.
+  if (!row.activation_date && m.postedAt) updated.activation_date = m.postedAt.slice(0, 10);
+
+  const minAge = opts.minAgeHours ?? METRICS_MIN_AGE_HOURS;
+  const ageHours = m.postedAt ? (Date.now() - Date.parse(m.postedAt)) / 3_600_000 : Infinity;
+  const tooNew = ageHours < minAge;
+  const eligibleAt = m.postedAt ? new Date(Date.parse(m.postedAt) + minAge * 3_600_000).toISOString() : null;
+  if (!tooNew) {
+    if (m.views !== null && m.views > (row.impressions || 0)) updated.impressions = m.views;
+    if (m.reactions !== null && m.reactions > (row.likes || 0)) updated.likes = m.reactions;
+  }
   if (Object.keys(updated).length) {
     const { error } = await sb.from('contents').update({ ...updated, updated_at: new Date().toISOString() }).eq('id', contentId);
-    if (error) return { ok: false, reason: 'write_failed', views: m.views, reactions: m.reactions, updated: {} };
+    if (error) return { ok: false, reason: 'write_failed', views: m.views, reactions: m.reactions, postedAt: m.postedAt, eligibleAt, updated: {} };
   }
-  return { ok: true, views: m.views, reactions: m.reactions, updated };
+  if (tooNew) return { ok: false, reason: 'too_new', views: m.views, reactions: m.reactions, postedAt: m.postedAt, eligibleAt, updated };
+  return { ok: true, views: m.views, reactions: m.reactions, postedAt: m.postedAt, eligibleAt, updated };
 }

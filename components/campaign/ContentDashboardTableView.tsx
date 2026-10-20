@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { formatDate } from '@/lib/dateFormat';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -307,14 +308,25 @@ export function ContentDashboardTableView() {
     try {
       const r = await fetch(`/api/contents/${contentId}/fetch-metrics`, { method: 'POST' });
       const d = await r.json().catch(() => null);
-      if (!r.ok || !d?.ok) return;
+      if (!r.ok || !d) return;
       const upd = d.updated ?? {};
       if (Object.keys(upd).length) setContents((prev: any[]) => prev.map(c => c.id === contentId ? { ...c, ...upd } : c));
       const fmt = (n: number) => n.toLocaleString('en-US');
+      if (d.reason === 'too_new') {
+        // 48h rule: date filled, numbers left for the daily job. Say when, so
+        // nobody types an early reading in the meantime.
+        toast({
+          title: upd.activation_date ? `Post date set to ${formatDate(upd.activation_date)}` : 'Post is under 48 hours old',
+          description: `Views and reactions will be pulled automatically from ${d.eligibleAt ? formatDate(d.eligibleAt) : 'the 48-hour mark'} — no need to enter them.`,
+          duration: 5000,
+        });
+        return;
+      }
+      if (!d.ok) return;
       toast({
         title: 'Metrics fetched from Telegram',
         description: [d.views !== null ? `${fmt(d.views)} views` : null, d.reactions !== null ? `${fmt(d.reactions)} reactions` : null].filter(Boolean).join(' · ')
-          + (Object.keys(upd).length ? '' : ' — stored numbers already higher, kept.'),
+          + (upd.impressions || upd.likes ? '' : ' — stored numbers already higher, kept.'),
         duration: 3500,
       });
     } catch { /* the daily cron catches it */ }
