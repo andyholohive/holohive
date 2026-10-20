@@ -135,7 +135,8 @@ const COLUMNS: Array<{ label: string; width: string }> = [
   // maintaining it — 164 prospects have a bump count whose status has since
   // moved on to replied/dead, and that history is the only record of how
   // many bumps those took.
-  { label: 'Last Outreach', width: 'w-[130px]' },
+  { label: 'First messaged', width: 'w-[130px]' },
+  { label: 'Last messaged', width: 'w-[130px]' },
   { label: 'Owner',         width: 'w-[110px]' },
   { label: 'Notes',         width: 'w-[200px]' },
 ];
@@ -167,7 +168,7 @@ function parseCompanyInput(input: string): { company: string; company_url: strin
 /** Every column that can be edited in place. */
 type EditField =
   | 'telegram' | 'role' | 'company'
-  | 'status' | 'message_type' | 'responded_to_step' | 'date_outreached'
+  | 'status' | 'message_type' | 'responded_to_step' | 'date_outreached' | 'last_messaged'
   | 'owner' | 'notes';
 
 /** Radix Select forbids an empty-string value, so "no message type" needs a
@@ -210,19 +211,24 @@ const VIEWS: Array<{ key: ViewKey; label: string; match: (p: OutreachProspect, c
   { key: 'parked',     label: 'Parked',        match: p => p.parked_at !== null },
 ];
 
-type SortKey = 'newest' | 'oldest' | 'updated' | 'company' | 'bumps';
+type SortKey = 'newest' | 'oldest' | 'last_messaged' | 'updated' | 'company' | 'bumps';
 const SORTS: Array<{ key: SortKey; label: string }> = [
-  { key: 'newest', label: 'Newest outreach' },
-  { key: 'oldest', label: 'Oldest outreach' },
+  { key: 'newest', label: 'Newest first message' },
+  { key: 'oldest', label: 'Oldest first message' },
+  { key: 'last_messaged', label: 'Longest since last message' },
   { key: 'updated', label: 'Recently updated' },
   { key: 'company', label: 'Company A–Z' },
   { key: 'bumps', label: 'Most bumps' },
 ];
 const when = (p: OutreachProspect) => p.date_outreached ?? p.created_at.slice(0, 10);
+/** "today" / "3d ago" for a bare date, in whole days. */
+const daysAgo = (iso: string) => { const d = Math.floor((Date.now() - Date.parse(`${iso}T00:00:00Z`)) / 86_400_000); return d <= 0 ? 'today' : `${d}d ago`; };
 const SORTERS: Record<SortKey, (a: OutreachProspect, b: OutreachProspect) => number> = {
   // Undated rows sink to the bottom in both date orders.
   newest: (a, b) => (b.date_outreached ? 1 : 0) - (a.date_outreached ? 1 : 0) || when(b).localeCompare(when(a)) || a.company.localeCompare(b.company),
   oldest: (a, b) => (b.date_outreached ? 1 : 0) - (a.date_outreached ? 1 : 0) || when(a).localeCompare(when(b)) || a.company.localeCompare(b.company),
+  // Oldest last message first: the people who most need a message.
+  last_messaged: (a, b) => (a.last_messaged ?? when(a)).localeCompare(b.last_messaged ?? when(b)),
   updated: (a, b) => b.updated_at.localeCompare(a.updated_at),
   company: (a, b) => a.company.localeCompare(b.company) || when(b).localeCompare(when(a)),
   bumps: (a, b) => (b.bumps_used ?? 0) - (a.bumps_used ?? 0) || when(b).localeCompare(when(a)),
@@ -1210,8 +1216,8 @@ export default function OutreachPage() {
                         )}
                       </td>
 
-                      {/* Last outreach — Popover + Calendar, never a native
-                          date input (CLAUDE.md). Opens straight from the click. */}
+                      {/* First messaged (date_outreached) — Popover + Calendar, never a
+                          native date input (CLAUDE.md). Opens straight from the click. */}
                       <td className="border-r border-cream-200 align-middle">
                         <Popover
                           open={isEditing('date_outreached')}
@@ -1241,6 +1247,49 @@ export default function OutreachPage() {
                                 size="sm"
                                 className="w-full h-7 text-xs text-ink-warm-500"
                                 onClick={() => { setEdit(null); saveField(p, 'date_outreached', null); }}
+                              >
+                                Clear date
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </td>
+
+                      {/* Last messaged — the day the most recent DM or bump went out.
+                          Stamped by every send; edit by hand for sends made elsewhere.
+                          [Yano 2026-10-20] Drives the Follow up queue. */}
+                      <td className="border-r border-cream-200 align-middle">
+                        <Popover
+                          open={isEditing('last_messaged')}
+                          onOpenChange={o => setEdit(o ? { id: p.id, field: 'last_messaged' } : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <div className="py-3.5 px-4 cursor-pointer hover:bg-cream-50/60 min-h-[3rem] flex items-center">
+                              {p.last_messaged ? (
+                                <span className="flex items-center gap-1.5">
+                                  <span className="text-xs tabular-nums text-ink-warm-700">{formatDate(p.last_messaged)}</span>
+                                  {stage === 'outreached' && <span className="text-[10px] text-ink-warm-400 tabular-nums">{daysAgo(p.last_messaged)}</span>}
+                                </span>
+                              ) : <span className="text-xs text-ink-warm-300">—</span>}
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={p.last_messaged ? new Date(p.last_messaged + 'T00:00:00') : undefined}
+                              onSelect={d => {
+                                setEdit(null);
+                                saveField(p, 'last_messaged', d ? toIsoDate(d) : null);
+                              }}
+                              classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                            />
+                            <div className="border-t border-cream-100 p-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full h-7 text-xs text-ink-warm-500"
+                                onClick={() => { setEdit(null); saveField(p, 'last_messaged', null); }}
                               >
                                 Clear date
                               </Button>

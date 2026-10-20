@@ -7,8 +7,8 @@
  * statuses; this gives it a clock, so the board can say who is due a bump
  * today and move them along in one click.
  *
- * Cadence counts from the LAST send: the outreach date for the first bump,
- * then last_bumped_at for each one after. After the final bump, a prospect
+ * Cadence counts from the LAST send (outreach_prospects.last_messaged, the
+ * "Last messaged" column; date_outreached is "First messaged"). After the final bump, a prospect
  * that still hasn't replied is suggested for parking (stale_no_reply), which
  * keeps the worklist honest without deleting the history the rates use.
  */
@@ -54,9 +54,10 @@ export function followUpFor(p: OutreachProspect, now = Date.now()): FollowUp | n
   if (p.parked_at) return null;
   const onLadder = p.status === 'contacted' || BUMP_STATUSES.includes(p.status);
   if (!onLadder) return null;
-  // Last send: the outreach date for a never-bumped row, else the last bump.
-  // Rows bumped before last_bumped_at existed fall back to updated_at.
-  const lastIso = p.bumps_used > 0 ? (p.last_bumped_at ?? p.updated_at) : p.date_outreached;
+  // Last send = the Last messaged date Yano keeps (stamped on every send,
+  // editable by hand). Older rows without one fall back to the last bump,
+  // then the first message.
+  const lastIso = p.last_messaged ?? (p.bumps_used > 0 ? (p.last_bumped_at ?? p.updated_at) : p.date_outreached);
   if (!lastIso) return null;
   const lastSendAt = lastIso.length === 10 ? Date.parse(`${lastIso}T00:00:00Z`) : Date.parse(lastIso);
   if (!Number.isFinite(lastSendAt)) return null;

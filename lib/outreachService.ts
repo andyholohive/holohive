@@ -153,8 +153,11 @@ export interface OutreachProspect {
    *  reversible and the row keeps every field it had. */
   parked_at: string | null;
   parked_reason: ParkReason | null;
-  /** Last move to a bump status; drives the follow-up queue (lib/outreachFollowUp). */
+  /** Last move to a bump status (timestamp). Superseded by last_messaged for the queue; kept for history. */
   last_bumped_at: string | null;
+  /** Last day a message went to this prospect — first DM or any bump. Editable. [Yano 2026-10-20]
+   *  date_outreached is "first messaged"; this is "last messaged". */
+  last_messaged: string | null;
 }
 
 /** The outreach ladder, mirroring the bump statuses. Fixed, not a
@@ -257,7 +260,7 @@ async function duplicateMessage(input: CreateProspectData): Promise<string> {
 const COLUMNS =
   'id, role, telegram, company, company_url, owner, owner_user_id, status, message_type, ' +
   'date_outreached, bumps_used, bumps_before_conversion, source, responded_to_step, ' +
-  'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason, last_bumped_at';
+  'crm_opportunity_id, notes, created_at, updated_at, parked_at, parked_reason, last_bumped_at, last_messaged';
 
 // ── Rates ────────────────────────────────────────────────────────────
 //
@@ -457,8 +460,16 @@ export class OutreachService {
     // denominator of all three rates is "has a date_outreached", so a
     // status that means "we sent it" must set one or the rates under-count.
     const nowSending = status === 'contacted' || BUMP_STATUSES.includes(status);
+    const today = new Date().toISOString().slice(0, 10);
     if (nowSending && !p.date_outreached) {
-      updates.date_outreached = new Date().toISOString().slice(0, 10);
+      updates.date_outreached = today;
+    }
+    // Every send — the first DM or a new bump rung — is a "last messaged".
+    // Yano edits the date by hand when a send happened outside a status move.
+    const bumpIndexForSend = BUMP_STATUSES.indexOf(status);
+    const newRung = bumpIndexForSend >= 0 && Math.min(4, Math.floor(bumpIndexForSend / 2) + 1) !== p.bumps_used;
+    if ((status === 'contacted' && p.status !== 'contacted') || newRung) {
+      updates.last_messaged = today;
     }
 
     // Bump count follows the bump status rather than being tracked by hand.
