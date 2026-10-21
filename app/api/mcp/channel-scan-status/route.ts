@@ -24,6 +24,8 @@ export const dynamic = 'force-dynamic';
  *             not_channel | flood_wait | error
  *   - detail: string | null        — the exception text, truncated
  *   - posts_found: number
+ *   - access_hash: string | null   — optional; persisted on tg_monitored_channels
+ *   - channel_tg_id: string | null — optional; only written alongside access_hash
  *
  * Auth: Bearer CRON_SECRET, same as the sibling MCP ingest routes.
  */
@@ -92,6 +94,17 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // [2026-10-21] The scraper hands back the channel's Telegram access_hash
+  // (and id) once it has resolved the username, so every later run opens the
+  // channel directly. Resolving ~130 usernames per run is what got the
+  // account a 7-hour FloodWait and froze the corpus for 15h on 10-20.
+  const hash = body?.access_hash;
+  if (hash !== undefined && hash !== null && /^-?\d{1,20}$/.test(String(hash))) {
+    const patch: Record<string, string> = { access_hash: String(hash) };
+    if (typeof body.channel_tg_id === 'string' && /^-?\d{5,20}$/.test(body.channel_tg_id)) patch.channel_tg_id = body.channel_tg_id;
+    await (supabase as any).from('tg_monitored_channels').update(patch).eq('id', id).then(() => null, () => null);
   }
   return NextResponse.json({ ok: true });
 }
