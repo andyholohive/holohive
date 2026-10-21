@@ -64,7 +64,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   LIST_ACCESS_CLEANUP: 1,      // daily 08:00 UTC — expired list-access grant revocation
   REMINDERS: 1,                // daily 09:00 UTC — reminder rules sweep
   SNAPSHOT_TG_FOLLOWERS: 1,    // monthly (1st) — KOL TG follower snapshots
-  CRON_HEALTH_CHECK: 1,        // daily 08:00 UTC — this sweep's own self-log
+  CRON_HEALTH_CHECK: 24,       // hourly since 2026-08-27 (was daily); at 1 it flagged itself as a runaway every day
   TASK_ALERTS: 1,              // weekdays 00:00 UTC (09:00 KST) — overdue/stale task DMs
   LINEUP_DEADLINES: 1,         // Fri/Mon/Thu 12:00 UTC — lineup propose/approve/posted reminders
   WEEKLY_CONTENT_RECAP: 1,     // Mon 12:00 UTC — per-campaign weekly content recap post
