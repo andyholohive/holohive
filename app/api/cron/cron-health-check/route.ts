@@ -71,6 +71,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   DAILY_PULSE_DM: 1,           // weekdays 06:00 UTC — Daily Pulse morning blocker DM
   DAILY_PULSE_DIGEST: 1,       // weekdays 12:00 UTC — Daily Pulse digest to HH Ops terminal
   ATTENTION_DIGEST: 1,         // weekdays 06:30 UTC — Needs Attention digest (preview-only until enabled)
+  SCRAPE_WATCHDOG: 24,         // hourly :45 — re-dispatches the TG scrape when GitHub's schedule misses (acts at 7h stale)
   KOL_BRIEF_NUDGE: 1,          // Fri 00:00 UTC (09:00 KST) — un-opened KOL brief nudge to team
   KR_SIGNAL_WEEKLY_GENERATE: 1, // weekly (Saturday 12:00 UTC) — builds the weekly report + queues it for review
   KR_SIGNAL_WEEKLY: 1,         // weekly (Sunday 12:00 UTC) — sends APPROVED reports; nudges the ops chat about unapproved ones

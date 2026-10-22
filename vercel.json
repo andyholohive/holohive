@@ -141,6 +141,10 @@
       "schedule": "30 6 * * 1-5"
     },
     {
+      "path": "/api/cron/scrape-watchdog",
+      "schedule": "45 * * * *"
+    },
+    {
       "path": "/api/cron/kol-brief-nudge",
       "schedule": "0 0 * * 5"
     },
