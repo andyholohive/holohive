@@ -137,6 +137,10 @@
       "schedule": "0 12 * * 1-5"
     },
     {
+      "path": "/api/cron/attention-digest",
+      "schedule": "30 6 * * 1-5"
+    },
+    {
       "path": "/api/cron/kol-brief-nudge",
       "schedule": "0 0 * * 5"
     },
