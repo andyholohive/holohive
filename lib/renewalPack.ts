@@ -17,7 +17,6 @@ export interface RenewalSnapshot {
   client: ClientDashboardData['client'];
   week: ClientDashboardData['week'];
   startDate: string | null;
-  graceUntil: string | null;
   totals: ClientDashboardData['totals'];
   weekly: ClientDashboardData['weekly'];
   creators: ClientDashboardData['creators'];
@@ -58,7 +57,6 @@ export function buildRenewalSnapshot(d: ClientDashboardData): RenewalSnapshot {
     client: d.client,
     week: d.week,
     startDate: d.startDate,
-    graceUntil: d.graceUntil,
     totals: d.totals,
     weekly: d.weekly,
     creators: d.creators.slice(0, 5),

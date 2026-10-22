@@ -18,8 +18,6 @@ export interface ClientDashboardData {
   campaigns: Array<{ id: string; name: string; status: string | null }>;
   week: CampaignWeekState | null;
   startDate: string | null;
-  /** Resign grace: still active through this date after the term ended. Null when none / passed. */
-  graceUntil: string | null;
   totals: { reads: number; posts: number; engagements: number; creators: number; byPlatform: Array<{ platform: string; posts: number; reads: number }>; web2: { posts: number; reads: number; creators: number } } | null;
   weekly: WeekPoint[];
   creators: Array<{ name: string; posts: number; reads: number; best: number; engagements: number }>;
@@ -87,7 +85,7 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
 
   const [{ data: campaigns }, { data: stints }, { data: coverage }] = await Promise.all([
     sb.from('campaigns').select('id, name, status, start_date, is_test').eq('client_id', clientId).is('archived_at', null),
-    sb.from('client_stints').select('start_date, end_date, grace_until').eq('client_id', clientId),
+    sb.from('client_stints').select('start_date, end_date').eq('client_id', clientId),
     sb.from('client_coverage').select('covered_through').eq('client_id', clientId).maybeSingle(),
   ]);
   const camps = ((campaigns ?? []) as any[]).filter((c) => !c.is_test);
@@ -98,8 +96,6 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
   const ends = ((stints ?? []) as any[]).map((s) => s.end_date).filter(Boolean).sort();
   const startDate: string | null = starts[0] ?? null;
   const termEnd: string | null = coverage?.covered_through ?? ends[ends.length - 1] ?? null;
-  const todayKst = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
-  const graceUntil: string | null = ((stints ?? []) as any[]).map((s) => s.grace_until).filter((g) => g && g >= todayKst).sort().pop() ?? null;
   const week = getCampaignWeekState(startDate, termEnd);
 
   // ── Delivery: every live post across the client's campaigns ──────────
@@ -329,7 +325,7 @@ export async function loadClientDashboard(db: SupabaseClient, clientId: string):
   return {
     client: { id: client.id, name: client.name, logoUrl: client.logo_url ?? null, isActive: !!client.is_active },
     campaigns: camps.map((c) => ({ id: c.id, name: c.name, status: c.status ?? null })),
-    week, startDate, graceUntil,
+    week, startDate,
     totals, weekly, creators, sentiment, market, buzz, lineup, placement, position, channels, journey, spend, benchmarks,
   };
 }

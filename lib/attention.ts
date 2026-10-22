@@ -67,7 +67,7 @@ export async function loadAttention(db: SupabaseClient): Promise<AttentionItem[]
   if (!ids.length) return [];
 
   const [{ data: stints }, { data: coverage }, { data: campaigns }, { data: drafts }, { data: krClients }] = await Promise.all([
-    sb.from('client_stints').select('client_id, end_date, grace_until').in('client_id', ids),
+    sb.from('client_stints').select('client_id, end_date').in('client_id', ids),
     sb.from('client_coverage').select('client_id, covered_through').in('client_id', ids),
     sb.from('campaigns').select('id, name, client_id, is_test').in('client_id', ids).is('archived_at', null),
     sb.from('client_delivery_log').select('client_id, created_at').in('client_id', ids).eq('pending_review', true),
@@ -82,30 +82,12 @@ export async function loadAttention(db: SupabaseClient): Promise<AttentionItem[]
 
   // ── Engagement end ─────────────────────────────────────────────────
   const termEnd = new Map<string, string>();
-  // Resign grace [Andy 2026-10-22]: the stint stays active through grace_until
-  // after the term ends. Tracked separately so the item can say so.
-  const graceUntil = new Map<string, string>();
   for (const s of (stints ?? []) as any[]) {
     if (s.end_date && (!termEnd.has(s.client_id) || s.end_date > termEnd.get(s.client_id)!)) termEnd.set(s.client_id, s.end_date);
-    if (s.grace_until && s.grace_until >= today && (!graceUntil.has(s.client_id) || s.grace_until > graceUntil.get(s.client_id)!)) graceUntil.set(s.client_id, s.grace_until);
   }
   for (const c of (coverage ?? []) as any[]) if (c.covered_through) termEnd.set(c.client_id, c.covered_through);
   for (const [clientId, end] of termEnd) {
     const left = daysBetween(today, end);
-    const grace = graceUntil.get(clientId);
-    if (grace && left < 0) {
-      const gLeft = daysBetween(today, grace);
-      push(clientId, {
-        id: `engagement:${clientId}`,
-        severity: gLeft <= 2 ? 'urgent' : 'soon',
-        kind: 'engagement',
-        title: gLeft === 0 ? 'Grace period ends today' : `Grace period ends in ${plural(gLeft, 'day')}`,
-        detail: `Term ended ${formatDate(end)}; the client stays active until ${formatDate(grace)}. Re-sign by then or it lapses.`,
-        href: `/clients/${clientId}`,
-        hrefLabel: 'Open dashboard',
-      });
-      continue;
-    }
     if (left > 21) continue;
     push(clientId, {
       id: `engagement:${clientId}`,
@@ -113,14 +95,12 @@ export async function loadAttention(db: SupabaseClient): Promise<AttentionItem[]
       kind: 'engagement',
       title: left < 0 ? `Engagement ended ${formatDate(end)}` : left === 0 ? 'Engagement ends today' : `Engagement ends in ${plural(left, 'day')}`,
       detail: left < 0
-        ? 'The client is still marked active. Renew the term, grant a grace period, or let it lapse.'
+        ? 'The client is still marked active. Renew the term or let it lapse.'
         : `Term runs to ${formatDate(end)}. Time for the renewal conversation.`,
       href: `/clients/${clientId}`,
       hrefLabel: 'Open dashboard',
     });
   }
-  // A client in grace is still covered for lineups: treat grace_until as the term end below.
-  for (const [clientId, grace] of graceUntil) if ((termEnd.get(clientId) ?? '') < grace) termEnd.set(clientId, grace);
 
   // ── Weekly lineups ─────────────────────────────────────────────────
   const camps = ((campaigns ?? []) as any[]).filter((c) => !c.is_test);

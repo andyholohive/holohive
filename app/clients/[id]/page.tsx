@@ -105,9 +105,6 @@ export default function ClientDashboardPage() {
             {data && (
               <div className="flex items-center gap-2.5 mt-4 text-xs flex-wrap">
                 <StatusBadge tone={data.client.isActive ? 'brand' : 'neutral'} size="sm">{data.client.isActive ? 'Active' : 'Inactive'}</StatusBadge>
-                {data.graceUntil && (
-                  <StatusBadge tone="warning" size="sm">Grace period · ends {formatDate(data.graceUntil)}</StatusBadge>
-                )}
                 {week && (
                   <span className="inline-flex items-center gap-2 text-ink-warm-700">
                     {week.lifecycle === 'ended' ? 'Ended · ' : ''}Week <span className="mono tabular-nums font-medium text-ink-warm-900">{week.weekNumber}</span>
