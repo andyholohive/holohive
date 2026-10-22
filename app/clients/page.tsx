@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { AccessLogDialog } from '@/components/clients/AccessLogDialog';
+import { SharePortalDialog } from '@/components/clients/SharePortalDialog';
 import { StartClientDialog } from '@/components/clients/StartClientDialog';
 import mammoth from 'mammoth';
 import { Button } from '@/components/ui/button';
@@ -411,9 +413,6 @@ export default function ClientsPage() {
   const [linkedAccounts, setLinkedAccounts] = useState<Record<string, CRMOpportunity[]>>({});
   const [isSharePortalOpen, setIsSharePortalOpen] = useState(false);
   const [clientToShare, setClientToShare] = useState<ClientWithAccess | null>(null);
-  const [shareForms, setShareForms] = useState<FormWithStats[]>([]);
-  const [shareExtraForms, setShareExtraForms] = useState<string[]>([]);
-  const [shareAddFormOpen, setShareAddFormOpen] = useState(false);
   // Meeting notes state
   const [clientMeetingNotes, setClientMeetingNotes] = useState<Record<string, MeetingNote[]>>({});
   const [meetingNotesModalClient, setMeetingNotesModalClient] = useState<ClientWithAccess | null>(null);
@@ -569,19 +568,6 @@ export default function ClientsPage() {
   // in fetchClients() to avoid a second round-trip per render.
   const [hqTaskCounts, setHqTaskCounts] = useState<Record<string, number>>({});
   const [accessLogModalClient, setAccessLogModalClient] = useState<ClientWithAccess | null>(null);
-  const [accessLogRows, setAccessLogRows] = useState<
-    Array<{ id: string; email: string; authorized_via: string; accessed_at: string; user_agent: string | null; ip_address: string | null; source: string | null; campaign_id: string | null }>
-  >([]);
-  // [2026-07-06] campaign_id → name lookup for tracker-visit rows, so
-  // the Source badge can say WHICH campaign tracker was opened.
-  const [accessLogCampaignNames, setAccessLogCampaignNames] = useState<Record<string, string>>({});
-  const [accessLogLoading, setAccessLogLoading] = useState(false);
-  // [2026-06-08] Audience filter for the portal-visits modal. Defaults
-  // to 'external' so it matches the per-card "Visit log" badge (which
-  // already excludes @holohive.io / @holohive.agency). User can flip
-  // to 'all' to see the full audit log, or 'internal' to QA team
-  // traffic specifically.
-  const [accessLogAudience, setAccessLogAudience] = useState<'external' | 'internal' | 'all'>('external');
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -657,85 +643,9 @@ export default function ClientsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const openSharePortal = async (client: ClientWithAccess) => {
-    setClientToShare(client);
-    setShareExtraForms([]);
-    setShareAddFormOpen(false);
-    setIsSharePortalOpen(true);
-    try {
-      const forms = await FormService.getAllForms();
-      setShareForms(forms.filter(f => f.status === 'published'));
-    } catch (err) {
-      console.error('Error fetching forms:', err);
-    }
-  };
+  const openSharePortal = (client: ClientWithAccess) => { setClientToShare(client); setIsSharePortalOpen(true); };
 
-  // Lazy-load the full access log for a client when the admin opens
-  // the Visits modal. We don't want to fetch this for every client on
-  // the initial /clients load — the page already does 11 parallel
-  // queries — so it stays modal-scoped.
-  const openAccessLogModal = async (client: ClientWithAccess) => {
-    setAccessLogModalClient(client);
-    setAccessLogRows([]);
-    setAccessLogLoading(true);
-    setAccessLogAudience('external'); // matches the on-card badge
-    try {
-      const { data, error } = await (supabase as any)
-        .from('portal_access_log')
-        .select('id, email, authorized_via, accessed_at, user_agent, ip_address, source, campaign_id')
-        .eq('client_id', client.id)
-        .order('accessed_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      setAccessLogRows((data || []) as any);
-      // Resolve campaign names for tracker-visit rows so the Source
-      // badge can say which campaign tracker was opened.
-      const campaignIds = [...new Set(((data || []) as any[]).map(r => r.campaign_id).filter(Boolean))];
-      if (campaignIds.length > 0) {
-        const { data: campRows } = await (supabase as any)
-          .from('campaigns')
-          .select('id, name')
-          .in('id', campaignIds);
-        const nameMap: Record<string, string> = {};
-        for (const c of ((campRows || []) as Array<{ id: string; name: string }>)) nameMap[c.id] = c.name;
-        setAccessLogCampaignNames(nameMap);
-      } else {
-        setAccessLogCampaignNames({});
-      }
-    } catch (err) {
-      console.error('Error loading portal access log:', err);
-      toast({ title: 'Load failed', description: err instanceof Error ? err.message : 'Failed to load access log', variant: 'destructive' });
-    } finally {
-      setAccessLogLoading(false);
-    }
-  };
 
-  const copyPortalLink = () => {
-    if (!clientToShare) return;
-    const portalUrl = `${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`;
-    navigator.clipboard.writeText(portalUrl);
-    toast({
-      title: 'Link copied',
-      description: 'Portal link copied to clipboard.',
-    });
-  };
-
-  const ONBOARDING_FORM_SLUG = 'holo-hive-onboarding';
-
-  const getFormUrl = (formSlugOrId: string) => {
-    if (!clientToShare) return '';
-    return `${typeof window !== 'undefined' ? window.location.origin : ''}/public/forms/${formSlugOrId}?client=${clientToShare.id}`;
-  };
-
-  const copyFormLink = (formSlugOrId: string, formName: string) => {
-    const url = getFormUrl(formSlugOrId);
-    if (!url) return;
-    navigator.clipboard.writeText(url);
-    toast({
-      title: 'Link copied',
-      description: `${formName} link copied to clipboard.`,
-    });
-  };
 
   useEffect(() => {
     fetchClients();
@@ -4579,7 +4489,7 @@ export default function ClientsPage() {
                               variant="outline"
                               size="sm"
                               className="flex-1 min-w-[110px] px-2"
-                              onClick={() => openAccessLogModal(client)}
+                              onClick={() => setAccessLogModalClient(client)}
                               title={
                                 lastVisitAt
                                   ? `Last external visit ${lastVisitRel} · ${visits30d} in last 30 days`
@@ -4727,268 +4637,10 @@ export default function ClientsPage() {
             via RLS (see migration 064). Cap at 200 most-recent rows
             for UI snappiness; we can add pagination if anyone scrolls
             to the bottom. */}
-        <Dialog open={!!accessLogModalClient} onOpenChange={(open) => { if (!open) setAccessLogModalClient(null); }}>
-          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-brand" />
-                Portal visits — {accessLogModalClient?.name}
-              </DialogTitle>
-              <DialogDescription>
-                Who has accessed this client&apos;s public portal, when, and which allowlist rule let them in.
-              </DialogDescription>
-            </DialogHeader>
-            {/* [2026-06-08] Audience filter — defaults to External so the
-                modal matches the on-card "Visit log" badge (which always
-                excludes @holohive.io / @holohive.agency). User can flip
-                to Internal to QA team traffic or All to see the full
-                audit log. Counts live next to each label so it's clear
-                what the split is at a glance. */}
-            {(() => {
-              const isInternal = (email: string | null | undefined) => {
-                if (!email) return false;
-                const lower = email.toLowerCase();
-                return lower.endsWith('@holohive.io') || lower.endsWith('@holohive.agency');
-              };
-              const externalCount = accessLogRows.filter(r => !isInternal(r.email)).length;
-              const internalCount = accessLogRows.filter(r => isInternal(r.email)).length;
-              const visibleRows = accessLogRows.filter(r => {
-                if (accessLogAudience === 'all') return true;
-                if (accessLogAudience === 'external') return !isInternal(r.email);
-                return isInternal(r.email);
-              });
-              return (
-                <>
-                  {!accessLogLoading && accessLogRows.length > 0 && (
-                    // Audience selector — uses the same Tabs primitive
-                    // as every other in-popup selector in this page
-                    // (Meeting Notes / Decision Log at L3597, the
-                    // Context / Action Board switch at L3861, etc.)
-                    // so dialog chrome stays consistent.
-                    <Tabs value={accessLogAudience} onValueChange={(v) => setAccessLogAudience(v as 'external' | 'internal' | 'all')}>
-                      <TabsList className="bg-cream-100 p-1 mb-3 shrink-0 w-fit">
-                        <TabsTrigger value="external" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">
-                          External
-                          <span className="ml-1.5 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full pointer-events-none">{externalCount}</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="internal" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">
-                          Internal
-                          <span className="ml-1.5 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full pointer-events-none">{internalCount}</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="all" className="data-[state=active]:bg-white px-4 py-2 text-sm font-medium">
-                          All
-                          <span className="ml-1.5 text-xs bg-cream-200 text-ink-warm-700 px-1.5 py-0.5 rounded-full pointer-events-none">{accessLogRows.length}</span>
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  )}
-                  <div className="flex-1 overflow-y-auto px-1">
-                    {accessLogLoading ? (
-                      <div className="space-y-2 py-4">
-                        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-                      </div>
-                    ) : accessLogRows.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-ink-warm-500">
-                        No portal visits recorded yet.
-                        <p className="text-xs text-ink-warm-400 mt-1">
-                          Share the portal link via the <Share2 className="inline h-3 w-3" /> icon to start tracking.
-                        </p>
-                      </div>
-                    ) : visibleRows.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-ink-warm-500">
-                        No {accessLogAudience} visits.
-                        <p className="text-xs text-ink-warm-400 mt-1">
-                          Try a different audience above.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-cream-50 hover:bg-cream-50">
-                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">When</TableHead>
-                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Email</TableHead>
-                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Source</TableHead>
-                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Via</TableHead>
-                              <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">IP</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {visibleRows.map(row => {
-                              // Pretty labels for the authorization-rule enum.
-                              // 'cache' = returning visitor on a still-valid
-                              // 24h localStorage token, distinct from a fresh
-                              // login.
-                              const viaLabel =
-                                row.authorized_via === 'exact' ? 'Primary email'
-                                : row.authorized_via === 'approved_email' ? 'Approved email'
-                                : row.authorized_via === 'same_domain' ? 'Same domain'
-                                : row.authorized_via === 'approved_domain' ? 'Approved domain'
-                                : row.authorized_via === 'cache' ? 'Returning'
-                                : row.authorized_via;
-                              const viaTone: BadgeTone =
-                                row.authorized_via === 'exact' ? 'success'
-                                : row.authorized_via === 'cache' ? 'neutral'
-                                : 'info';
-                              const rowIsInternal = isInternal(row.email);
-                              return (
-                                <TableRow key={row.id} className="border-cream-100">
-                                  <TableCell className="px-3 py-2 text-xs text-ink-warm-700 whitespace-nowrap">
-                                    {new Date(row.accessed_at).toLocaleString()}
-                                  </TableCell>
-                                  <TableCell className="px-3 py-2 text-xs text-ink-warm-900">
-                                    <span className="inline-flex items-center gap-1.5">
-                                      <span>{row.email}</span>
-                                      {rowIsInternal && (
-                                        // Tiny internal-team marker so admins can
-                                        // scan the All view without reading every
-                                        // domain. Slate to read as "ops/admin"
-                                        // per the StatusBadge palette.
-                                        <StatusBadge tone="slate" size="sm" bordered>Internal</StatusBadge>
-                                      )}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="px-3 py-2">
-                                    {/* [2026-07-06] Which door the visitor used —
-                                        the client portal or a campaign tracker
-                                        (with the campaign's name when known). */}
-                                    {row.source === 'campaign' ? (
-                                      <StatusBadge tone="purple" size="sm" bordered>
-                                        {row.campaign_id && accessLogCampaignNames[row.campaign_id]
-                                          ? accessLogCampaignNames[row.campaign_id]
-                                          : 'Campaign tracker'}
-                                      </StatusBadge>
-                                    ) : (
-                                      <StatusBadge tone="brand" size="sm" bordered>Portal</StatusBadge>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="px-3 py-2">
-                                    <StatusBadge tone={viaTone} size="sm" bordered withDot>{viaLabel}</StatusBadge>
-                                  </TableCell>
-                                  <TableCell className="px-3 py-2 text-xs text-ink-warm-400 font-mono">
-                                    {row.ip_address || '—'}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-              <Button variant="outline" onClick={() => setAccessLogModalClient(null)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <AccessLogDialog client={accessLogModalClient} onClose={() => setAccessLogModalClient(null)} />
 
         {/* Share Portal Dialog */}
-        <Dialog open={isSharePortalOpen} onOpenChange={setIsSharePortalOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Share Links: {clientToShare?.name}</DialogTitle>
-              <DialogDescription>
-                Share portal and form links with this client.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Portal Link</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/portal/${clientToShare?.slug || clientToShare?.id}`}
-                    readOnly
-                    className="flex-1 focus-brand"
-                  />
-                  <Button variant="outline" className="h-10" onClick={copyPortalLink}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" className="h-10" onClick={() => {
-                    if (typeof window !== 'undefined' && clientToShare) {
-                      window.open(`${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`, '_blank');
-                    }
-                  }}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Onboarding Form</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={getFormUrl(ONBOARDING_FORM_SLUG)}
-                    readOnly
-                    className="flex-1 focus-brand"
-                  />
-                  <Button variant="outline" className="h-10" onClick={() => copyFormLink(ONBOARDING_FORM_SLUG, 'Onboarding form')}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" className="h-10" onClick={() => {
-                    const url = getFormUrl(ONBOARDING_FORM_SLUG);
-                    if (url) window.open(url, '_blank');
-                  }}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              {shareExtraForms.map(formSlugOrId => {
-                const form = shareForms.find(f => (f.slug || f.id) === formSlugOrId);
-                if (!form) return null;
-                return (
-                  <div key={formSlugOrId} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>{form.name}</Label>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-ink-warm-400 hover:text-rose-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input value={getFormUrl(formSlugOrId)} readOnly className="flex-1 focus-brand" />
-                      <Button variant="outline" className="h-10" onClick={() => copyFormLink(formSlugOrId, form.name)}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" className="h-10" onClick={() => {
-                        const url = getFormUrl(formSlugOrId);
-                        if (url) window.open(url, '_blank');
-                      }}>
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-              {(() => {
-                const availableForms = shareForms.filter(f => (f.slug || f.id) !== ONBOARDING_FORM_SLUG && !shareExtraForms.includes(f.slug || f.id));
-                if (availableForms.length === 0) return null;
-                return shareAddFormOpen ? (
-                  <div className="space-y-2">
-                    <Label>Add Form</Label>
-                    <Select onValueChange={v => { setShareExtraForms(prev => [...prev, v]); setShareAddFormOpen(false); }}>
-                      <SelectTrigger className="focus-brand">
-                        <SelectValue placeholder="Select a form..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableForms.map(f => (
-                          <SelectItem key={f.id} value={f.slug || f.id}>{f.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setShareAddFormOpen(true)}>
-                    <Plus className="h-4 w-4 mr-1" /> Add Form
-                  </Button>
-                );
-              })()}
-              <p className="text-sm text-ink-warm-500">
-                Clients can access the portal using their registered email address ({clientToShare?.email}).
-              </p>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <SharePortalDialog client={clientToShare} open={isSharePortalOpen} onOpenChange={setIsSharePortalOpen} />
         {/* Meeting Notes Modal */}
         <Dialog open={!!meetingNotesModalClient} onOpenChange={(open) => { if (!open) { setMeetingNotesModalClient(null); setIsNoteFormOpen(false); setEditingNoteId(null); setDeletingNoteId(null); setIsDecisionFormOpen(false); setEditingDecisionId(null); setDeletingDecisionId(null); } }}>
           <DialogContent className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
