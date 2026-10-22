@@ -2257,6 +2257,7 @@ export type Database = {
           created_at: string
           end_date: string | null
           ended_reason: string | null
+          grace_until: string | null
           id: string
           notes: string | null
           start_date: string
@@ -2268,6 +2269,7 @@ export type Database = {
           created_at?: string
           end_date?: string | null
           ended_reason?: string | null
+          grace_until?: string | null
           id?: string
           notes?: string | null
           start_date: string
@@ -2279,6 +2281,7 @@ export type Database = {
           created_at?: string
           end_date?: string | null
           ended_reason?: string | null
+          grace_until?: string | null
           id?: string
           notes?: string | null
           start_date?: string

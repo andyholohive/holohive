@@ -46,9 +46,7 @@ import {
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  Handshake, Plus, Pencil, Trash2, Calendar as CalIcon, ChevronDown,
-} from 'lucide-react';
+import { Handshake, Plus, Pencil, Trash2, Calendar as CalIcon, ChevronDown, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import {
@@ -230,6 +228,8 @@ type StintView = {
   end_date: string | null;
   status: string;
   ended_reason: string | null;
+  /** Resign grace: stays active through this date after end_date. */
+  grace_until: string | null;
   notes: string | null;
   periods: PeriodView[];
   coverage: CoverageStatus | null;
@@ -249,6 +249,7 @@ function draftToView(d: DraftStint): StintView {
     end_date: d.end_date,
     status: ended ? 'ended' : 'active',
     ended_reason: null,
+    grace_until: null,
     notes: d.notes,
     periods: d.periods.map((p) => ({
       id: p.key,
@@ -340,6 +341,33 @@ export function EngagementTab({
   }, [isDraft]);
 
   const view: StintView[] = isDraft ? draftStints.map(draftToView) : stints;
+  const todayIsoNow = toIsoDate(new Date())!;
+  const [savingGrace, setSavingGrace] = useState<string | null>(null);
+
+  /**
+   * Resign grace [Andy 2026-10-22]: keep a client active for a while after the
+   * term ends so they can re-sign. +7 days from the term end (or from the
+   * current grace end, so a second click extends). The DB trigger flips the
+   * stint back to active and reopens its auto-completed campaigns.
+   */
+  async function setGrace(stint: StintView, days: number | null) {
+    setSavingGrace(stint.id);
+    try {
+      let value: string | null = null;
+      if (days !== null) {
+        const base = [stint.grace_until, stint.end_date, todayIsoNow].filter(Boolean).sort().pop()!;
+        const d = new Date(`${base}T00:00:00`); d.setDate(d.getDate() + days);
+        value = toIsoDate(d)!;
+      }
+      await updateStint(stint.id, { grace_until: value });
+      await load();
+      toast(value
+        ? { title: `Grace period to ${formatDate(value)}`, description: 'Client stays active until then; campaigns stay open.' }
+        : { title: 'Grace period removed' });
+    } catch (err: any) {
+      toast({ title: 'Could not update grace period', description: err?.message, variant: 'destructive' });
+    } finally { setSavingGrace(null); }
+  }
 
   // ─── Stint actions ───────────────────────────────────────────────
 
@@ -659,6 +687,33 @@ export function EngagementTab({
                     <StatusBadge tone={STINT_STATUS_TONE[stint.status] ?? 'neutral'} size="sm">
                       {stint.status === 'ended' ? 'Ended' : 'Active'}
                     </StatusBadge>
+                    {(() => {
+                      // Grace affordance: shown once the term has ended or is
+                      // about to (≤ 3 days), and while a grace is running.
+                      if (isDraft || !stint.end_date) return null;
+                      const graceOn = !!stint.grace_until && stint.grace_until >= todayIsoNow;
+                      const endingSoon = stint.end_date <= toIsoDate(new Date(Date.now() + 3 * 86_400_000))!;
+                      if (!graceOn && !endingSoon) return null;
+                      const busy = savingGrace === stint.id;
+                      return (
+                        <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          {graceOn && (
+                            <StatusBadge tone="warning" size="sm">Grace until {formatDate(stint.grace_until!)}</StatusBadge>
+                          )}
+                          <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" disabled={busy}
+                            title={graceOn ? 'Extend the grace period by 7 days' : 'Keep this client active 7 more days to re-sign'}
+                            onClick={() => setGrace(stint, 7)}>
+                            {graceOn ? '+7d' : 'Grace +7d'}
+                          </Button>
+                          {graceOn && (
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-ink-warm-500" disabled={busy} title="Remove grace period"
+                              onClick={() => setGrace(stint, null)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </span>
+                      );
+                    })()}
                     {coverageTone && daysLeft != null && (
                       <StatusBadge tone={coverageTone} size="sm">
                         {daysLeft >= 0 ? `${daysLeft}d left` : `Lapsed ${Math.abs(daysLeft)}d ago`}
