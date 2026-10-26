@@ -42,7 +42,13 @@ export async function assembleWeekly(
   const [fx, usdtKrw, perVenue, kospi, futures, upbitKrw, bithumbKrw] = await Promise.all([
     adapters.getUsdKrw(),
     adapters.getUsdtKrw(),
-    cfg.coingecko_id ? adapters.getPerVenueVolume(cfg.coingecko_id) : Promise.resolve({} as Record<string, number>),
+    // A failed venue pull drops the By Venue block, not the whole report.
+    cfg.coingecko_id
+      ? adapters.getPerVenueVolume(cfg.coingecko_id).catch((e) => {
+          pending.push(`By Venue + KR vol share — live venue pull failed (${String(e?.message || e)})`);
+          return {} as Record<string, number>;
+        })
+      : Promise.resolve({} as Record<string, number>),
     adapters.getKospi(),
     adapters.getFuturesTotalUsd(),
     adapters.getUpbitKrCexQuoteVolKrw(),

@@ -57,10 +57,44 @@ const CG_KEY = process.env.COINGECKO_API_KEY;
 function cgHdr(): Record<string, string> {
   return CG_KEY ? { "x-cg-demo-api-key": CG_KEY } : {};
 }
+/**
+ * CoinGecko calls are paced and retried [2026-10-26].
+ *
+ * The Saturday weekly generate fired the client's venue pull plus one call
+ * per peer in the basket, all at once, for two clients back to back, on a
+ * keyless free-tier budget (~5-15 calls/min from one IP, shared with the
+ * hourly listings cron that runs the same minute). Fogo's run spent the
+ * budget and Venice's first call got a 429, which nothing retried, so Venice
+ * had no report for the week ending 10/25 and the run still logged
+ * "completed". Every call now goes through one queue with a floor between
+ * requests, and a 429 waits and retries before it counts as a failure.
+ */
+const CG_MIN_GAP_MS = 2500;
+const CG_RETRIES = 3;
+let cgChain: Promise<unknown> = Promise.resolve();
+let cgLastAt = 0;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function cgJson(url: string): Promise<any> {
-  const r = await fetch(url, { headers: cgHdr() });
-  if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
-  return r.json();
+  const run = async () => {
+    for (let attempt = 0; ; attempt++) {
+      const wait = cgLastAt + CG_MIN_GAP_MS - Date.now();
+      if (wait > 0) await sleep(wait);
+      cgLastAt = Date.now();
+      const r = await fetch(url, { headers: cgHdr() });
+      if (r.ok) return r.json();
+      if (r.status === 429 && attempt < CG_RETRIES) {
+        const retryAfter = Number(r.headers.get("retry-after"));
+        await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 15_000 * (attempt + 1));
+        continue;
+      }
+      throw new Error(`CoinGecko ${r.status}`);
+    }
+  };
+  // Serialize: the next call starts only after this one finished (or failed).
+  const result = cgChain.then(run, run);
+  cgChain = result.catch(() => undefined);
+  return result;
 }
 const VENUE_MATCH: [string, string][] = [
   ["upbit", "upbit"], ["bithumb", "bithumb"], ["coinbase", "coinbase"],
@@ -105,9 +139,16 @@ export async function searchCoingeckoIdBySymbol(symbol: string): Promise<string 
   }
 }
 
+/** CoinGecko exchange ids for the venues we track. Passed as a filter so the
+ *  response holds only those markets: /tickers is paginated at 100 and for a
+ *  large coin the Korean pairs sit past page one — Solana's first page had
+ *  zero Upbit/Bithumb tickers, which read as "0% KR share" (verified
+ *  2026-10-26; with the filter: 3 Upbit + 2 Bithumb pairs). */
+const CG_EXCHANGE_IDS = "upbit,bithumb,gdax,bybit_spot,kraken,bitget,gate";
+
 /** Map CoinGecko market names → our venue keys; aggregate 24h converted USD volume. */
 export async function getPerVenueVolume(id: string): Promise<Record<string, number>> {
-  const c = await cgJson(`${CG}/coins/${id}/tickers?depth=false`);
+  const c = await cgJson(`${CG}/coins/${id}/tickers?depth=false&exchange_ids=${CG_EXCHANGE_IDS}`);
   const out: Record<string, number> = {};
   for (const tk of c.tickers || []) {
     const name = (tk.market?.name || "").toLowerCase();

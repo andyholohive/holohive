@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/kr-signal-weekly-generate",
-      "schedule": "0 12 * * 6"
+      "schedule": "5 12 * * 6"
     },
     {
       "path": "/api/cron/kr-signal-weekly",

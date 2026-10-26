@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * GET /api/cron/kr-signal-weekly-generate — Saturday 12:00 UTC.
+ * GET /api/cron/kr-signal-weekly-generate — Saturday 12:05 UTC (12:00 collides with the hourly listings cron on the CoinGecko budget).
  *
  * Builds each active client's Weekly KR Market Report and parks it in
  * `pending_review`. Sends NOTHING to clients. A review card goes to the ops

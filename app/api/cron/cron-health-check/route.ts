@@ -73,7 +73,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   ATTENTION_DIGEST: 1,         // weekdays 06:30 UTC — Needs Attention digest (preview-only until enabled)
   SCRAPE_WATCHDOG: 24,         // hourly :45 — re-dispatches the TG scrape when GitHub's schedule misses (acts at 7h stale)
   KOL_BRIEF_NUDGE: 1,          // Fri 00:00 UTC (09:00 KST) — un-opened KOL brief nudge to team
-  KR_SIGNAL_WEEKLY_GENERATE: 1, // weekly (Saturday 12:00 UTC) — builds the weekly report + queues it for review
+  KR_SIGNAL_WEEKLY_GENERATE: 1, // weekly (Saturday 12:05 UTC, off the hourly listings minute) — builds the weekly report + queues it for review
   KR_SIGNAL_WEEKLY: 1,         // weekly (Sunday 12:00 UTC) — sends APPROVED reports; nudges the ops chat about unapproved ones
   KR_SIGNAL_BASELINES: 1,      // weekly (Sunday 12:30 UTC) — KR Signal §5 regime baseline refresh
   KR_SIGNAL_LISTINGS: 24,      // hourly — KR Signal listings alert + digest sweep (Feature B)
