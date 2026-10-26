@@ -15,7 +15,10 @@
  * Deals arrive here on their own: reaching Lead or Lead — Trial on the
  * Outreach board creates the opportunity, or attaches the prospect to the
  * company's open deal (trg_outreach_lead_to_pipeline). Replies alone
- * (Interested, Referred, Team Engaged) stay on Outreach [Yano 2026-10-07].
+ * (Interested, Referred, Team Engaged) stay on Outreach [Yano 2026-10-07],
+ * and a contact that leaves Lead takes an unworked auto-created deal back
+ * off the board (trg_outreach_left_lead_demotes_deal). Anything else —
+ * referral, inbound, expansion — comes in through New deal [Yano 2026-10-26].
  */
 
 import { useState } from 'react';
@@ -26,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Target, Send } from 'lucide-react';
 import PipelineBoard from '@/components/crm/PipelineBoard';
 import OrbitList from '@/components/crm/OrbitList';
+import NewDealDialog from '@/components/crm/NewDealDialog';
 
 export default function PipelinePage() {
   // Remount keys: a deal parked from the board shows up in Orbit, and one
@@ -41,11 +45,14 @@ export default function PipelinePage() {
         title="Pipeline"
         subtitle="Deals in flight — drag a card to move it, drop it below to close it"
         actions={(
-          <Button asChild variant="outline" size="sm">
-            <Link href="/crm/outreach">
-              <Send className="h-4 w-4 mr-2" />Outreach
-            </Link>
-          </Button>
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/crm/outreach">
+                <Send className="h-4 w-4 mr-2" />Outreach
+              </Link>
+            </Button>
+            <NewDealDialog onCreated={() => setBoardKey(k => k + 1)} />
+          </>
         )}
       />
 

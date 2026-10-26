@@ -40,12 +40,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Target, Send, ChevronsLeftRight, Archive, MoreHorizontal,
-  CheckCircle2, CalendarClock, MessageCircle, UserCog,
+  Target, ChevronsLeftRight, Archive, MoreHorizontal,
+  CheckCircle2, CalendarClock, MessageCircle, UserCog, Trophy, XCircle, Users,
+  Calendar as CalendarIcon, X,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import {
   PipelineV13Service, BOARD_STAGES, STAGE_LABELS, STAGE_WIN_PCT, LOSS_REASONS,
-  FIT_SUB_REASONS,
+  FIT_SUB_REASONS, nextStepOverdue, PROPOSAL_FOLLOW_UP_DAYS,
   daysIdle, isStalled, type PipelineDeal, type PipelineStage,
 } from '@/lib/pipelineV13Service';
 
@@ -111,6 +114,10 @@ function DealCard({
 }) {
   const idle = daysIdle(deal);
   const stalled = isStalled(deal);
+  // [Yano 2026-10-26] A next step whose date has passed turns the card red —
+  // the same signal as stalled, because it means the same thing.
+  const overdue = nextStepOverdue(deal);
+  const red = stalled || overdue;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -127,12 +134,12 @@ function DealCard({
   return (
     <div
       className={`group/card rounded-lg border bg-white transition-all ${
-        stalled ? 'border-rose-200' : 'border-cream-200'
-      } ${dragging ? 'shadow-card rotate-1' : 'hover:border-cream-300 hover:shadow-card'}`}
+        red ? 'border-rose-200' : 'border-cream-200'
+      } ${overdue ? 'bg-rose-50/40' : ''} ${dragging ? 'shadow-card rotate-1' : 'hover:border-cream-300 hover:shadow-card'}`}
     >
       {/* A hairline in the stage's own colour, so a card that has been dragged
           out of its column is obvious before you read anything on it. */}
-      <div className={`h-0.5 rounded-t-lg ${stalled ? 'bg-rose-300' : 'bg-brand/30'}`} />
+      <div className={`h-0.5 rounded-t-lg ${red ? 'bg-rose-300' : 'bg-brand/30'}`} />
 
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
@@ -176,6 +183,15 @@ function DealCard({
                     </a>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuSeparator />
+                {/* [Yano 2026-10-26] Won / lost from the menu, not only by
+                    dragging to the zones at the bottom of a long board. */}
+                <DropdownMenuItem onClick={() => actions.onWon(deal)} className="text-emerald-700">
+                  <Trophy className="h-3.5 w-3.5 mr-2" />Closed Won
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => actions.onLost(deal)}>
+                  <XCircle className="h-3.5 w-3.5 mr-2" />Closed Lost…
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => actions.onArchive(deal)} className="text-rose-600">
                   <Archive className="h-3.5 w-3.5 mr-2" />Archive
@@ -236,11 +252,18 @@ function DealCard({
 
         {/* The next step, shown rather than buried in a menu — it is the one
             thing that says whether this deal is being worked. */}
-        {deal.next_action_notes && (
-          <div className="flex items-start gap-1.5 rounded bg-cream-50 border border-cream-200 px-2 py-1">
-            <CalendarClock className="h-3 w-3 text-brand mt-0.5 flex-shrink-0" />
-            <span className="text-[11px] text-ink-warm-700 leading-snug break-words">
-              {deal.next_action_notes}
+        {(deal.next_action_notes || deal.next_action_at) && (
+          <div className={`flex items-start gap-1.5 rounded border px-2 py-1 ${
+            overdue ? 'bg-rose-50 border-rose-200' : 'bg-cream-50 border-cream-200'
+          }`}>
+            <CalendarClock className={`h-3 w-3 mt-0.5 flex-shrink-0 ${overdue ? 'text-rose-600' : 'text-brand'}`} />
+            <span className="text-[11px] text-ink-warm-700 leading-snug break-words min-w-0">
+              {deal.next_action_notes ?? 'Follow up'}
+              {deal.next_action_at && (
+                <span className={`ml-1 tabular-nums ${overdue ? 'text-rose-600 font-semibold' : 'text-ink-warm-400'}`}>
+                  · {overdue ? 'was due ' : ''}{formatDate(deal.next_action_at)}
+                </span>
+              )}
             </span>
           </div>
         )}
@@ -252,6 +275,18 @@ function DealCard({
             </StatusBadge>
           )}
           {deal.outreach_status && <OutreachChip status={deal.outreach_status} />}
+          {deal.client_name && <StatusBadge tone="purple" size="sm">Expansion · {deal.client_name}</StatusBadge>}
+          {/* One card per project; the people we are talking to there are a
+              count, with the handles on hover [Yano 2026-10-26: "Sonic shows
+              up 3 times since 3 contacts"]. */}
+          {deal.contacts.length > 1 && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] text-ink-warm-500 tabular-nums"
+              title={deal.contacts.map(c => `${c.telegram ?? '?'} — ${OUTREACH_CHIP[c.status ?? ''] ?? titleCase(c.status ?? '')}`).join('\n')}
+            >
+              <Users className="h-3 w-3" />{deal.contacts.length} contacts
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-cream-100">
@@ -265,9 +300,10 @@ function DealCard({
               {deal.owner_name ?? 'Unassigned'}
             </span>
           </span>
-          {deal.next_action_at && (
-            <span className="text-[10px] text-ink-warm-400 flex-shrink-0 tabular-nums">
-              {formatDate(deal.next_action_at)}
+          {/* Who brought it in, when that is not the person working it. */}
+          {deal.sourced_by_name && deal.sourced_by !== deal.owner_id && (
+            <span className="text-[10px] text-ink-warm-400 flex-shrink-0 truncate" title={`Sourced by ${deal.sourced_by_name}`}>
+              via {deal.sourced_by_name.split(' ')[0]}
             </span>
           )}
         </div>
@@ -281,6 +317,44 @@ export interface CardActions {
   onNextStep: (d: PipelineDeal) => void;
   onReassign: (d: PipelineDeal) => void;
   onArchive: (d: PipelineDeal) => void;
+  onWon: (d: PipelineDeal) => void;
+  onLost: (d: PipelineDeal) => void;
+}
+
+/** Popover + Calendar date field, per CLAUDE.md (no native date inputs).
+ *  Value is 'YYYY-MM-DD' or ''. */
+function DateField({ value, onChange, placeholder = 'Pick a date' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+}) {
+  const selected = value ? new Date(value + 'T00:00:00') : undefined;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className={`h-9 w-full justify-start font-normal focus-brand ${value ? '' : 'text-ink-warm-400'}`}>
+          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+          {value ? formatDate(value) : placeholder}
+          {value && (
+            <span role="button" aria-label="Clear date" className="ml-auto opacity-50 hover:opacity-100"
+              onClick={e => { e.stopPropagation(); e.preventDefault(); onChange(''); }}>
+              <X className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+        <CalendarPicker
+          mode="single"
+          selected={selected}
+          onSelect={date => {
+            if (!date) { onChange(''); return; }
+            onChange(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
+          }}
+          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function DraggableCard({
@@ -502,6 +576,11 @@ export default function PipelineBoard({ onOutcome }: {
   // ── Card actions ───────────────────────────────────────────────────────
   const [nextStepFor, setNextStepFor] = useState<PipelineDeal | null>(null);
   const [nextStepNotes, setNextStepNotes] = useState('');
+  const [nextStepDate, setNextStepDate] = useState('');
+  /** Entering Proposal with no value asks for one before the move lands
+   *  [Yano 2026-10-26]: a proposal is the moment the number exists. */
+  const [proposalFor, setProposalFor] = useState<PipelineDeal | null>(null);
+  const [proposalValue, setProposalValue] = useState('');
   const [reassignFor, setReassignFor] = useState<PipelineDeal | null>(null);
   const [team, setTeam] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -532,15 +611,46 @@ export default function PipelineBoard({ onOutcome }: {
         () => PipelineV13Service.logContact(d.id), 'Could not log the contact');
       toast({ title: `Marked ${d.name} contacted today`, duration: 1500 });
     },
-    onNextStep: (d) => { setNextStepFor(d); setNextStepNotes(d.next_action_notes ?? ''); },
+    onNextStep: (d) => { setNextStepFor(d); setNextStepNotes(d.next_action_notes ?? ''); setNextStepDate(d.next_action_at?.slice(0, 10) ?? ''); },
     onReassign: (d) => setReassignFor(d),
+    onWon: (d) => {
+      const before = deals ?? [];
+      setDeals(before.filter(x => x.id !== d.id));
+      void (async () => {
+        try {
+          await PipelineV13Service.close(d.id, 'closed_won');
+          onOutcome?.();
+          toast({ title: `${d.name} — Closed Won 🎉` });
+        } catch (err: any) {
+          setDeals(before);
+          toast({ title: 'Could not close', description: err?.message, variant: 'destructive' });
+        }
+      })();
+    },
+    onLost: (d) => { setLossFor(d); setLossReason(''); setLossSubReason(''); },
     onArchive: (d) => {
       void patchDeal(d.id, { archived_at: new Date().toISOString() },
         () => PipelineV13Service.setArchived(d.id, true), 'Could not archive');
       setArchivedCount(c => c + 1);
       toast({ title: `${d.name} archived`, description: 'Find it under Show archived.' });
     },
-  }), [patchDeal, toast]);
+  }), [patchDeal, toast, deals, onOutcome]);
+
+  /** Stage move shared by drag and the Proposal value prompt. */
+  const moveTo = useCallback(async (deal: PipelineDeal, next: PipelineStage, dealValue?: number | null) => {
+    const before = deals ?? [];
+    setDeals(before.map(d => (d.id === deal.id ? { ...d, pipeline_stage: next, ...(dealValue !== undefined ? { deal_value: dealValue } : {}) } : d)));
+    try {
+      const patch = await PipelineV13Service.setStage(deal.id, next, { dealValue, currentNextAt: deal.next_action_at });
+      setDeals(prev => (prev ?? []).map(d => (d.id === deal.id ? { ...d, ...patch } : d)));
+      if (next === 'proposal' && patch.next_action_at) {
+        toast({ title: `${deal.name} → Proposal`, description: `Follow-up set for ${formatDate(patch.next_action_at)} (${PROPOSAL_FOLLOW_UP_DAYS} days).`, duration: 3000 });
+      }
+    } catch (err: any) {
+      setDeals(before);
+      toast({ title: 'Move failed', description: err?.message, variant: 'destructive' });
+    }
+  }, [deals, toast]);
 
   const saveValue = useCallback(async (id: string, value: number | null) => {
     const before = deals ?? [];
@@ -565,22 +675,13 @@ export default function PipelineBoard({ onOutcome }: {
       setLossFor(deal); setLossReason(''); setLossSubReason(''); return;
     }
 
-    const next: PipelineStage | 'closed_won' =
-      target === 'zone-won' ? 'closed_won' : (target as PipelineStage);
+    if (target === 'zone-won') { cardActions.onWon(deal); return; }
+    const next = target as PipelineStage;
     if (next === deal.pipeline_stage) return;
-
-    // Optimistic: the card moves under the cursor, and reverts on failure.
-    const before = deals ?? [];
-    setDeals(next === 'closed_won'
-      ? before.filter(d => d.id !== id)
-      : before.map(d => (d.id === id ? { ...d, pipeline_stage: next } : d)));
-    try {
-      if (next === 'closed_won') await PipelineV13Service.close(id, 'closed_won');
-      else await PipelineV13Service.setStage(id, next);
-    } catch (err: any) {
-      setDeals(before);
-      toast({ title: 'Move failed', description: err?.message, variant: 'destructive' });
+    if (next === 'proposal' && !deal.deal_value) {
+      setProposalFor(deal); setProposalValue(''); return;
     }
+    await moveTo(deal, next);
   }
 
   async function confirmLoss() {
@@ -626,7 +727,7 @@ export default function PipelineBoard({ onOutcome }: {
       <EmptyState
         icon={Target}
         title="No deals in the pipeline"
-        description="Prospects arrive here automatically once they reach Lead on the Outreach board."
+        description="Prospects arrive here when they reach Lead on the Outreach board, or use New deal above."
       />
     );
   }
@@ -754,6 +855,11 @@ export default function PipelineBoard({ onOutcome }: {
             placeholder="e.g. Send the Korea deck, follow up Thursday"
             className="focus-brand min-h-[90px]"
           />
+          <div>
+            <Label>Due</Label>
+            <div className="mt-1"><DateField value={nextStepDate} onChange={setNextStepDate} placeholder="When is this due?" /></div>
+            <p className="text-[11px] text-ink-warm-500 mt-1">The card turns red once this date passes.</p>
+          </div>
           <DialogFooter>
             {nextStepFor?.next_action_notes && (
               <Button
@@ -772,17 +878,52 @@ export default function PipelineBoard({ onOutcome }: {
             <Button variant="outline" onClick={() => setNextStepFor(null)}>Cancel</Button>
             <Button
               variant="brand"
-              disabled={!nextStepNotes.trim()}
+              disabled={!nextStepNotes.trim() && !nextStepDate}
               onClick={() => {
                 const d = nextStepFor!;
-                const notes = nextStepNotes.trim();
+                const notes = nextStepNotes.trim() || null;
+                const at = nextStepDate || null;
                 setNextStepFor(null);
-                void patchDeal(d.id, { next_action_notes: notes },
-                  () => PipelineV13Service.setNextAction(d.id, notes, d.next_action_at),
+                void patchDeal(d.id, { next_action_notes: notes, next_action_at: at },
+                  () => PipelineV13Service.setNextAction(d.id, notes, at),
                   'Could not save the next step');
               }}
             >
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={proposalFor !== null} onOpenChange={o => { if (!o) setProposalFor(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>What is the proposal worth?</DialogTitle>
+            <DialogDescription>
+              {proposalFor?.name} is moving to Proposal with no value. The follow-up
+              is set {PROPOSAL_FOLLOW_UP_DAYS} days out automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-ink-warm-500">$</span>
+            <Input
+              autoFocus inputMode="numeric" value={proposalValue}
+              onChange={e => setProposalValue(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('proposal-move')?.click(); } }}
+              placeholder="e.g. 25000" className="h-9 focus-brand"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              const d = proposalFor!; setProposalFor(null); void moveTo(d, 'proposal');
+            }}>Skip for now</Button>
+            <Button id="proposal-move" variant="brand"
+              disabled={!Number.isFinite(Number(proposalValue.replace(/[$,]/g, ''))) || !proposalValue.trim()}
+              onClick={() => {
+                const d = proposalFor!; const v = Number(proposalValue.replace(/[$,]/g, ''));
+                setProposalFor(null); void moveTo(d, 'proposal', v);
+              }}>
+              Move to Proposal
             </Button>
           </DialogFooter>
         </DialogContent>
