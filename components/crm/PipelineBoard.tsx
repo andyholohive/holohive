@@ -58,7 +58,7 @@ const money = (n: number | null) =>
 /** Sources carry a tone so a board can be read by colour before text. */
 const SOURCE_TONES: Record<string, BadgeTone> = {
   cold_outbound: 'slate', referral: 'purple', inbound: 'success',
-  event: 'info', discovery: 'brand',
+  event: 'info', discovery: 'brand', expansion: 'purple',
 };
 
 /** Written-out labels rather than the stored key. The column holds
@@ -269,7 +269,7 @@ function DealCard({
         )}
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          {deal.source && (
+          {deal.source && !(deal.source === 'expansion' && deal.client_name) && (
             <StatusBadge tone={SOURCE_TONES[deal.source] ?? 'neutral'} size="sm">
               {sourceLabel(deal.source)}
             </StatusBadge>
@@ -300,13 +300,14 @@ function DealCard({
               {deal.owner_name ?? 'Unassigned'}
             </span>
           </span>
-          {/* Who brought it in, when that is not the person working it. */}
-          {deal.sourced_by_name && deal.sourced_by !== deal.owner_id && (
-            <span className="text-[10px] text-ink-warm-400 flex-shrink-0 truncate" title={`Sourced by ${deal.sourced_by_name}`}>
-              via {deal.sourced_by_name.split(' ')[0]}
-            </span>
-          )}
         </div>
+        {/* Who brought it in, when that is not the person working it. Its own
+            line: next to the owner it squeezed both names into initials. */}
+        {deal.sourced_by_name && deal.sourced_by !== deal.owner_id && (
+          <p className="text-[10px] text-ink-warm-400 truncate -mt-1" title={`Sourced by ${deal.sourced_by_name}`}>
+            Sourced by {deal.sourced_by_name}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -63,7 +63,7 @@ export default function PipelinePage() {
         first
       />
 
-      <PipelineBoard key={boardKey} onOutcome={() => setOrbitKey(k => k + 1)} />
+      <PipelineBoard key={`board-${boardKey}`} onOutcome={() => setOrbitKey(k => k + 1)} />
 
       <SectionHeader
         label="Orbit"
@@ -71,7 +71,7 @@ export default function PipelinePage() {
         counter="02 — parked on timing or internal priority, not lost"
       />
 
-      <OrbitList key={orbitKey} onReopened={() => setBoardKey(k => k + 1)} />
+      <OrbitList key={`orbit-${orbitKey}`} onReopened={() => setBoardKey(k => k + 1)} />
     </div>
   );
 }
