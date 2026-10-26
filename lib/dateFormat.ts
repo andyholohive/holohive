@@ -32,7 +32,13 @@ type DateInput = string | number | Date | null | undefined;
 
 function toDate(input: DateInput): Date | null {
   if (input == null || input === '') return null;
-  const d = input instanceof Date ? input : new Date(input);
+  // A bare 'YYYY-MM-DD' (a DATE column, or a date picker's value) is a
+  // calendar day, not an instant. new Date('2026-10-28') reads it as UTC
+  // midnight, which is still the 27th anywhere west of UTC.
+  const ymd = typeof input === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
+  const d = input instanceof Date ? input
+    : ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3])
+    : new Date(input);
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }
