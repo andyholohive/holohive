@@ -258,7 +258,7 @@ export function InitiativesTaskTab() {
                         <Play className="h-3 w-3 mr-1" />Advance
                       </Button>
                     )}
-                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
+                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" aria-label="Open initiative" title="Open initiative">
                       <Link href={`/initiatives?id=${i.id}`}><ExternalLink className="h-3.5 w-3.5" /></Link>
                     </Button>
                   </div>

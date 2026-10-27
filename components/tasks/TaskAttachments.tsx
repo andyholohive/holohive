@@ -199,12 +199,12 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
               </div>
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <a href={att.file_url} target="_blank" rel="noopener noreferrer" download>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="Download attachment" title="Download attachment">
                     <Download className="h-3 w-3 text-gray-500" />
                   </Button>
                 </a>
                 {isOwnerOrAdmin(att.uploaded_by) && (
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" onClick={() => handleDelete(att.id)}>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" aria-label="Delete attachment" title="Delete attachment" onClick={() => handleDelete(att.id)}>
                     <Trash2 className="h-3 w-3 text-rose-500" />
                   </Button>
                 )}

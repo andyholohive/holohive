@@ -1074,10 +1074,10 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                           </td>
                           <td className="py-3.5 px-4 border-r border-cream-200 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" aria-label="Save entry" title="Save entry" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
                                 <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) }); }}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" aria-label="Cancel" title="Cancel" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) }); }}>
                                 <X className="h-4 w-4 text-ink-warm-400" />
                               </Button>
                             </div>

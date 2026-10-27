@@ -1636,7 +1636,7 @@ export default function TasksPage() {
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-200" onClick={() => openForm(task)} title="Edit in popup">
               <Expand className="h-3.5 w-3.5 text-ink-warm-500" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingId(task.id)}>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" aria-label="Delete task" title="Delete task" onClick={() => setDeletingId(task.id)}>
               <Trash2 className="h-3.5 w-3.5 text-rose-500" />
             </Button>
           </div>

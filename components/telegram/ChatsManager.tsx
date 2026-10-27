@@ -763,7 +763,7 @@ export function ChatsManager({ view = 'chats' }: { view?: 'chats' | 'topics' | '
   const renderChatActions = (chat: TelegramChat) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Chat actions" title="Chat actions">
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -2788,7 +2788,7 @@ export function ChatsManager({ view = 'chats' }: { view?: 'chats' | 'topics' | '
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
                               <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="Copy chat ID" title="Copy chat ID" onClick={() => copyToClipboard(chat.chat_id)}>
                                 <Copy className="h-3 w-3" />
                               </Button>
                             </div>
@@ -2875,7 +2875,7 @@ export function ChatsManager({ view = 'chats' }: { view?: 'chats' | 'topics' | '
                             <div className="flex items-center gap-1.5">
                               <Hash className="h-3.5 w-3.5" />
                               <code className="text-xs bg-cream-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="Copy chat ID" title="Copy chat ID" onClick={() => copyToClipboard(chat.chat_id)}>
                                 <Copy className="h-3 w-3" />
                               </Button>
                             </div>

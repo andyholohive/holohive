@@ -202,7 +202,7 @@ export default function ActivationSourcesManager({ campaignId }: { campaignId: s
                     <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" disabled={busyId === s.id} onClick={() => patchSource(s.id, { enabled: !s.enabled })}>
                       {s.enabled ? 'Disable' : 'Enable'}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-rose-600 hover:text-rose-700" disabled={busyId === s.id} onClick={() => deleteSource(s.id)}>
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-rose-600 hover:text-rose-700" aria-label="Delete activation source" title="Delete activation source" disabled={busyId === s.id} onClick={() => deleteSource(s.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>

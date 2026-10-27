@@ -623,7 +623,7 @@ export default function ExpensesPage() {
                     </TableCell>
                     <TableCell className="py-3.5 px-5 text-sm text-ink-warm-700 max-w-md truncate" title={e.description}>{e.description}</TableCell>
                     <TableCell className="py-3.5 px-5 text-right" onClick={(ev) => ev.stopPropagation()}>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openDetail(e)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="View expense" title="View expense" onClick={() => openDetail(e)}>
                         <Eye className="h-3.5 w-3.5 text-ink-warm-500" />
                       </Button>
                     </TableCell>
@@ -1233,10 +1233,10 @@ function DetailDialog({
                       <span className="text-xs text-ink-warm-500 tabular-nums">
                         {att.file_size_bytes ? `${Math.round(att.file_size_bytes / 1024)}KB` : '—'}
                       </span>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => viewAttachment(att)}>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="View attachment" title="View attachment" onClick={() => viewAttachment(att)}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => deleteAttachment(att)}>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="Delete attachment" title="Delete attachment" onClick={() => deleteAttachment(att)}>
                         <X className="h-3.5 w-3.5 text-rose-500" />
                       </Button>
                     </div>

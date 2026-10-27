@@ -2545,7 +2545,7 @@ export default function MindsharePage() {
                           <SelectItem value="vi">Vietnamese</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-warm-400 hover:text-rose-500" onClick={() => deleteChannel(c)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-warm-400 hover:text-rose-500" aria-label="Delete channel" title="Delete channel" onClick={() => deleteChannel(c)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>

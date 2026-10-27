@@ -121,7 +121,7 @@ export function SharePortalDialog({ client, open, onOpenChange }: { client: Clie
               <div key={formSlugOrId} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>{form.name}</Label>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-ink-warm-400 hover:text-rose-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-ink-warm-400 hover:text-rose-500" aria-label="Remove form" title="Remove form" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
                     <X className="h-3 w-3" />
                   </Button>
                 </div>

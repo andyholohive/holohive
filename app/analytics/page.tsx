@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * /analytics — Team analytics dashboard.
@@ -521,7 +522,12 @@ export default function AnalyticsPage() {
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}
           </div>
         ) : !costs || costs.services.length === 0 ? (
-          <p className="text-sm text-ink-warm-400 py-4 text-center">No cost data entered yet.</p>
+          <EmptyState
+            icon={CreditCard}
+            title="No cost data entered yet"
+            description="Monthly invoices recorded with Edit roll up here, service by service."
+            className="py-8"
+          />
         ) : (
           <div className="space-y-1">
             {/* Per-service rows */}
@@ -660,7 +666,12 @@ export default function AnalyticsPage() {
             <h3 className="text-sm font-semibold text-ink-warm-900 uppercase tracking-wider">Team Workload</h3>
           </div>
           {data.owners.length === 0 ? (
-            <p className="text-sm text-ink-warm-400 py-4 text-center">No owned opportunities.</p>
+            <EmptyState
+              icon={Users}
+              title="No owned opportunities"
+              description="Open opportunities with an owner in the CRM appear here."
+              className="py-8"
+            />
           ) : (
             <div className="space-y-2.5">
               {data.owners.slice(0, 8).map(o => (
@@ -701,7 +712,12 @@ export default function AnalyticsPage() {
             <Badge variant="secondary" className="text-[10px]">last {windowDays}d</Badge>
           </div>
           {data.recent_activity.length === 0 ? (
-            <p className="text-sm text-ink-warm-400 py-4 text-center">No activity in this window.</p>
+            <EmptyState
+              icon={Activity}
+              title="No activity in this period"
+              description="Pick a wider window or check back after the next CRM touch is logged."
+              className="py-8"
+            />
           ) : (
             <div className="space-y-3">
               {data.recent_activity.slice(0, 12).map(a => {

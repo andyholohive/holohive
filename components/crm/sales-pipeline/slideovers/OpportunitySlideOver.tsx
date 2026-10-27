@@ -256,7 +256,7 @@ export function OpportunitySlideOver() {
                   >
                     <History className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditDialog(opp)}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Edit opportunity" title="Edit opportunity" onClick={() => openEditDialog(opp)}>
                     <Edit className="h-4 w-4" />
                   </Button>
                 </>
@@ -265,7 +265,7 @@ export function OpportunitySlideOver() {
                   Cancel
                 </Button>
               )}
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { setSlideOverOpp(null); setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); setActionGuidance(null); }}>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Close" title="Close" onClick={() => { setSlideOverOpp(null); setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); setActionGuidance(null); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

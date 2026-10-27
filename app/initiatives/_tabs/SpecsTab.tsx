@@ -424,7 +424,18 @@ export default function SpecsTab() {
               : 'Upload a spec doc or create one manually to get started.'
             }
             className="py-12"
-          />
+          >
+            {statusFilter === 'all' && (
+              <Button size="sm" variant="brand" onClick={() => {
+                setNewSpecName('');
+                setNewSpecSummary('');
+                setNewSpecOpen(true);
+              }}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                New spec
+              </Button>
+            )}
+          </EmptyState>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -925,7 +936,21 @@ function SpecDetailView({
         </div>
         <CardContent className="p-0">
           {spec.features.length === 0 ? (
-            <p className="p-6 text-center text-xs text-ink-warm-500 italic">No features yet.</p>
+            <EmptyState
+              icon={FileCheck2}
+              title="No features yet"
+              description="Features are the testable units of this spec; add the first one to start tracking."
+              className="py-8"
+            >
+              <Button size="sm" variant="outline" onClick={() => {
+                setNewFeatureName('');
+                setNewFeatureDesc('');
+                setAddFeatureOpen(true);
+              }}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add feature
+              </Button>
+            </EmptyState>
           ) : (() => {
             // 'parked' is a build_status, every other tab is a test_status —
             // hence the special case. Parked features are also hidden from the
@@ -937,7 +962,14 @@ function SpecDetailView({
               : statusFilter === 'parked' ? spec.features.filter(f => f.build_status === 'parked')
               : spec.features.filter(f => f.build_status !== 'parked' && f.test_status === statusFilter);
             if (visible.length === 0) {
-              return <p className="p-6 text-center text-xs text-ink-warm-500 italic">No features in this status.</p>;
+              return (
+                <EmptyState
+                  icon={Circle}
+                  title="No features in this status"
+                  description="Switch to All to see every feature on this spec."
+                  className="py-8"
+                />
+              );
             }
             return (
             <ul className="divide-y divide-cream-100">
@@ -1334,7 +1366,12 @@ function HistoryDialog({
           {history === null ? (
             <Skeleton className="h-32 rounded" />
           ) : history.length === 0 ? (
-            <p className="text-xs text-ink-warm-500 italic text-center py-6">No history yet.</p>
+            <EmptyState
+              icon={History}
+              title="No history yet"
+              description="Each test-status change on this feature is recorded here."
+              className="py-8"
+            />
           ) : (
             <ul className="divide-y divide-cream-100">
               {history.map(row => {

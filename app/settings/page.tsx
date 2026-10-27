@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Settings as SettingsIcon, User, Mail, AtSign, Camera, Loader2, Save, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink, Video } from 'lucide-react';
+import { Settings as SettingsIcon, User, Mail, AtSign, Camera, Loader2, Save, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink, Video, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -546,6 +547,12 @@ function SettingsContent() {
       // so account-settings forms render at a comfortable reading width
       // rather than the full-width admin layout used by data-dense pages.
       <div className="max-w-3xl mx-auto space-y-6">
+        {/* [2026-10-27, UX audit] /settings renders without the sidebar, so
+            without this the only way out is the browser's back button. */}
+        <Link href="/dashboard" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+          <ArrowLeft className="h-3 w-3 mr-1" />
+          Back to Dashboard
+        </Link>
         <PageHeader
           icon={SettingsIcon}
           title="Settings"

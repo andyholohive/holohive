@@ -496,7 +496,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                   restore the "auto-fill peers with same role" branch
                   in the Assignee onValueChange handler (look for the
                   sameRolePeers comment in the same file). */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b">
@@ -685,7 +685,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                 </div>
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b">

@@ -862,7 +862,12 @@ export default function Sidebar({ children }: SidebarProps) {
                     && !guestHide('/crm/sales-pipeline') && (
                     <div className="pl-6 space-y-0.5">
                       <SubNavItem href="/crm/pipeline" icon={Target} label="Board" exact />
-                      <SubNavItem href="/crm/sales-pipeline" icon={Archive} label="Legacy Sales" />
+                      {/* [2026-10-27, UX audit] Two sales boards side by side read as
+                          two sources of truth. Legacy Sales stays reachable for
+                          super_admin until it is retired; everyone else sees one. */}
+                      {userProfile?.role === 'super_admin' && (
+                        <SubNavItem href="/crm/sales-pipeline" icon={Archive} label="Legacy Sales" />
+                      )}
                     </div>
                   )}
                   {/* [2026-09-07, Yano] "LTV should be a section in Sales since

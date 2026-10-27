@@ -522,7 +522,7 @@ export function SalesDashboard({ onRecalculate, isRecalculating, metrics }: Sale
             )}
 
             {/* Stage conversion table */}
-            <div className="rounded-lg border border-cream-200 overflow-hidden">
+            <div className="rounded-lg border border-cream-200 overflow-hidden overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-cream-50/80">

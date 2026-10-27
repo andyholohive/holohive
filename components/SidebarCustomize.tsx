@@ -98,7 +98,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // [2026-09-01] Now reached as a child of Pipeline rather than its own
   // top-level entry, but it keeps its registry row: the route still exists,
   // still has a pageKey, and hiding it must stay possible.
-  { href: '/crm/sales-pipeline', label: 'Legacy Sales', icon: Archive, section: 'Sales / CRM', pageKey: '/crm/sales-pipeline' },
+  { href: '/crm/sales-pipeline', label: 'Legacy Sales', icon: Archive, section: 'Sales / CRM', pageKey: '/crm/sales-pipeline', requiredRole: 'super_admin' },
   { href: '/crm/outreach', label: 'Outreach', icon: Send, section: 'Sales / CRM', pageKey: '/crm/outreach' },
   { href: '/crm/pipeline', label: 'Pipeline', icon: Target, section: 'Sales / CRM', pageKey: '/crm/pipeline' },
   { href: '/clients/ltv', label: 'Lifetime Value', icon: DollarSign, section: 'Sales / CRM', pageKey: '/clients/ltv', requiredRole: 'admin' },

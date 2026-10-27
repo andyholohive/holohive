@@ -312,7 +312,7 @@ export function PipelineTable() {
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Opportunity actions" title="Opportunity actions">
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>

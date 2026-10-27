@@ -168,7 +168,7 @@ export function AddActivationDialog({ open, onOpenChange, campaignId, campaignNa
                           {a.notes && <p className="mt-1 text-[11px] text-ink-warm-500 italic">{a.notes}</p>}
                         </TableCell>
                         <TableCell className="py-2 px-3">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50" onClick={() => remove(a.id)}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50" aria-label="Remove activation" title="Remove activation" onClick={() => remove(a.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>
@@ -249,7 +249,7 @@ export function AddActivationDialog({ open, onOpenChange, campaignId, campaignNa
                         onChange={(e) => updateDeliverable(i, { count: Number(e.target.value) || 1 })}
                         className="h-8 w-20 focus-brand text-xs"
                       />
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => removeDeliverable(i)}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Remove deliverable" title="Remove deliverable" onClick={() => removeDeliverable(i)}>
                         <Trash2 className="h-3.5 w-3.5 text-rose-600" />
                       </Button>
                     </div>

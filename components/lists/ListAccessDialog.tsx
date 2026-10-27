@@ -321,7 +321,7 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
                   No one has access yet.
                 </p>
               ) : (
-                <div className="border border-cream-200 rounded-[14px] overflow-hidden">
+                <div className="border border-cream-200 rounded-[14px] overflow-hidden overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-cream-50">
                       <tr>
@@ -425,7 +425,7 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
                 <summary className="px-3 py-2 text-xs text-ink-warm-700 cursor-pointer hover:bg-cream-50 select-none">
                   Revoked history ({revokedGrants.length})
                 </summary>
-                <div className="border-t border-cream-100">
+                <div className="border-t border-cream-100 overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-cream-50/50">
                       <tr>

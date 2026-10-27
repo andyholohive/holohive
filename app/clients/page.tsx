@@ -5333,10 +5333,10 @@ export default function ClientsPage() {
                                 Create HQ task
                               </button>
                             )}
-                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" onClick={() => toggleActionItemHidden(item)}>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" aria-label={item.is_hidden ? 'Show action item' : 'Hide action item'} title={item.is_hidden ? 'Show action item' : 'Hide action item'} onClick={() => toggleActionItemHidden(item)}>
                               {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-ink-warm-400" /> : <Eye className="h-3.5 w-3.5 text-ink-warm-400" />}
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" onClick={() => {
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" aria-label="Edit action item" title="Edit action item" onClick={() => {
                               setEditingActionItemId(item.id);
                               setActionItemForm({ text: item.text, court: item.court, attachment_url: item.attachment_url || '', attachment_label: item.attachment_label || '' });
                               setActiveMilestoneId(item.milestone_id);
@@ -5344,7 +5344,7 @@ export default function ClientsPage() {
                             }}>
                               <Pencil className="h-3.5 w-3.5 text-ink-warm-400" />
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingActionItemId(item.id)}>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" aria-label="Delete action item" title="Delete action item" onClick={() => setDeletingActionItemId(item.id)}>
                               <Trash2 className="h-3.5 w-3.5 text-rose-400" />
                             </Button>
                           </div>
@@ -5511,14 +5511,14 @@ export default function ClientsPage() {
                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title={ms.is_visible ? 'Hide from portal' : 'Show on portal'} onClick={() => toggleMilestoneVisibility(ms.id, ms.is_visible)}>
                                       {ms.is_visible ? <Eye className="h-3 w-3 text-ink-warm-400" /> : <EyeOff className="h-3 w-3 text-ink-warm-400" />}
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="Edit milestone" title="Edit milestone" onClick={() => {
                                       setEditingMilestoneId(ms.id);
                                       setMilestoneForm({ name: ms.name, subtitle: ms.subtitle || '', status_message: ms.status_message || '' });
                                       setIsMilestoneFormOpen(true);
                                     }}>
                                       <Pencil className="h-3 w-3 text-ink-warm-400" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" onClick={() => deleteMilestone(ms.id)}>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" aria-label="Delete milestone" title="Delete milestone" onClick={() => deleteMilestone(ms.id)}>
                                       <Trash2 className="h-3 w-3 text-rose-400" />
                                     </Button>
                                   </div>
