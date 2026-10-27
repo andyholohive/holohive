@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedGuard } from '@/hooks/use-unsaved-guard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 import { PipelineV13Service } from '@/lib/pipelineV13Service';
@@ -92,13 +93,20 @@ export default function NewDealDialog({ onCreated }: { onCreated?: () => void })
     } finally { setSaving(false); }
   }
 
+  // [2026-10-27] Unsaved-changes guard (UX audit #5).
+  const guard = useUnsavedGuard({
+    open,
+    value: [name, value, source, ownerId, sourcedBy, expansion, clientId],
+    onOpenChange: (o) => { setOpen(o); if (!o) reset(); },
+  });
+
   return (
     <>
       <Button variant="brand" size="sm" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4 mr-2" />New deal
       </Button>
-      <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) reset(); }}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={open} onOpenChange={guard.onOpenChange}>
+        <DialogContent {...guard.contentProps} className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>New deal</DialogTitle>
             <DialogDescription>

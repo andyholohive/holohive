@@ -41,6 +41,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedGuard } from '@/hooks/use-unsaved-guard';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
@@ -2492,6 +2493,32 @@ export default function ClientsPage() {
     });
     setDomainInput('');
   };
+
+  // [2026-10-27] Unsaved-changes guards (UX audit #5). Each wraps the dialog's
+  // existing close handler: a close while the form is dirty asks first; an
+  // open, a clean close, or a programmatic close after save is unchanged.
+  // See hooks/use-unsaved-guard.ts for how "dirty" is decided.
+  const clientDialogGuard = useUnsavedGuard({
+    open: isNewClientOpen,
+    value: [newClient, domainInput, draftEngagement],
+    resetKey: isEditMode ? editingClient?.id ?? 'edit' : 'new',
+    onOpenChange: (open) => { if (!open) handleCloseClientModal(); else setIsNewClientOpen(true); },
+  });
+  const meetingNotesGuard = useUnsavedGuard({
+    open: !!meetingNotesModalClient,
+    value: [meetingNoteForm, decisionForm],
+    // A new note/decision session (add → edit X → add) re-arms the guard so
+    // loading a row to edit isn't mistaken for the user's own edits.
+    resetKey: `${isNoteFormOpen ? editingNoteId ?? 'new' : '-'}|${isDecisionFormOpen ? editingDecisionId ?? 'new' : '-'}`,
+    onOpenChange: (open) => { if (!open) { setMeetingNotesModalClient(null); setIsNoteFormOpen(false); setEditingNoteId(null); setDeletingNoteId(null); setIsDecisionFormOpen(false); setEditingDecisionId(null); setDeletingDecisionId(null); } },
+  });
+  const contextModalGuard = useUnsavedGuard({
+    open: !!contextModalClient,
+    value: [contextForm, actionItemForm],
+    resetKey: `${contextModalClient?.id ?? ''}|${isActionItemFormOpen ? editingActionItemId ?? 'new' : '-'}`,
+    onOpenChange: (open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } },
+  });
+
   const handleDeleteClient = (client: ClientWithAccess) => {
     setClientToDelete(client);
     setIsDeleteDialogOpen(true);
@@ -3589,20 +3616,14 @@ export default function ClientsPage() {
                   /templates is its own sidebar entry, so this was a second
                   door to the same room taking up header width next to the
                   page's actual CTA. Template CRUD is unchanged. */}
-              <Dialog open={isNewClientOpen} onOpenChange={(open) => {
-                if (!open) {
-                  handleCloseClientModal();
-                } else {
-                  setIsNewClientOpen(true);
-                }
-              }}>
+              <Dialog open={isNewClientOpen} onOpenChange={clientDialogGuard.onOpenChange}>
                 <DialogTrigger asChild>
                   <Button variant="brand">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Client
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[640px] max-h-[85vh] flex flex-col">
+                <DialogContent {...clientDialogGuard.contentProps} className="sm:max-w-[640px] max-h-[85vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit Client' : 'Add New Client'}</DialogTitle>
                     <DialogDescription>
@@ -4642,8 +4663,8 @@ export default function ClientsPage() {
         {/* Share Portal Dialog */}
         <SharePortalDialog client={clientToShare} open={isSharePortalOpen} onOpenChange={setIsSharePortalOpen} />
         {/* Meeting Notes Modal */}
-        <Dialog open={!!meetingNotesModalClient} onOpenChange={(open) => { if (!open) { setMeetingNotesModalClient(null); setIsNoteFormOpen(false); setEditingNoteId(null); setDeletingNoteId(null); setIsDecisionFormOpen(false); setEditingDecisionId(null); setDeletingDecisionId(null); } }}>
-          <DialogContent className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
+        <Dialog open={!!meetingNotesModalClient} onOpenChange={meetingNotesGuard.onOpenChange}>
+          <DialogContent {...meetingNotesGuard.contentProps} className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Notes & Decisions — {meetingNotesModalClient?.name}</DialogTitle>
               <DialogDescription>Manage meeting notes and decision log for this client.</DialogDescription>
@@ -4962,8 +4983,8 @@ export default function ClientsPage() {
         />
 
         {/* Client Context Modal */}
-        <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } }}>
-          <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
+        <Dialog open={!!contextModalClient} onOpenChange={contextModalGuard.onOpenChange}>
+          <DialogContent {...contextModalGuard.contentProps} className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 flex-wrap">
                 <span>Client Context — {contextModalClient?.name}</span>

@@ -50,6 +50,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDate, toIsoDate } from '@/lib/dateFormat';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedGuard } from '@/hooks/use-unsaved-guard';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -289,6 +290,9 @@ export default function OutreachPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState(emptyDraft());
+  // [2026-10-27] Unsaved-changes guard on New Prospect (UX audit #5).
+  const addGuard = useUnsavedGuard({ open: addOpen, value: draft, onOpenChange: setAddOpen });
+
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
@@ -1378,8 +1382,8 @@ export default function OutreachPage() {
       </Card>
 
       {/* ── New prospect ─────────────────────────────────────────────── */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-[460px]">
+      <Dialog open={addOpen} onOpenChange={addGuard.onOpenChange}>
+        <DialogContent {...addGuard.contentProps} className="sm:max-w-[460px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-4 w-4 text-brand" />New Prospect

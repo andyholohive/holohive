@@ -16,6 +16,7 @@ import 'react-quill/dist/quill.snow.css';
 import { Task, TaskService } from '@/lib/taskService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useUnsavedGuard } from '@/hooks/use-unsaved-guard';
 import { TaskComments } from './TaskComments';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
@@ -416,9 +417,13 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
 
   const isEditing = !!task;
 
+  // [2026-10-27] Unsaved-changes guard (UX audit #5) — asks before an
+  // Escape / outside-click / × close throws away a dirty form.
+  const guard = useUnsavedGuard({ open, value: form, onOpenChange, resetKey: task?.id ?? 'new' });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={guard.onOpenChange}>
+      <DialogContent {...guard.contentProps} className="sm:max-w-[750px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Task' : 'Add Task'}</DialogTitle>
           <DialogDescription>
