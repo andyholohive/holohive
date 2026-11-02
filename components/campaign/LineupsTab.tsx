@@ -67,6 +67,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { usePortalContainer } from '@/components/ui/portal-container';
 import { supabase } from '@/lib/supabase';
 import { ChatThreadPicker } from '@/components/telegram/ChatThreadPicker';
 import { AddKOLsDialog } from '@/components/campaign/AddKOLsDialog';
@@ -176,6 +178,7 @@ const ACTION_LABEL: Record<LineupActivityAction, string> = {
   angle_removed:  'Angle removed',
   angle_renamed:  'Angle renamed',
   slot_reordered: 'Slots reordered',
+  slot_status_set: 'Status set by hand',
 };
 
 function shortNum(n: number | null | undefined): string {
@@ -477,6 +480,23 @@ export default function LineupsTab({
     if (!lineup) return;
     const fresh = await service.getLineupFull(lineup.id);
     setLineup(fresh);
+  }
+
+  // [2026-11-03, Bolt] Manual posted/missed/pending override on a slot, admin
+  // and up, reason required. See LineupManagerService.setSlotStatus.
+  const { userProfile } = useAuth();
+  const canOverrideSlotStatus = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  async function handleSetSlotStatus(slotId: string, status: 'pending' | 'posted' | 'missed', reason: string) {
+    setBusy(true);
+    try {
+      await service.setSlotStatus(slotId, status, reason, currentUserId);
+      await refreshLineup();
+      toast({ title: `Marked ${status}`, description: 'Recorded in the lineup activity log.' });
+    } catch (err: any) {
+      toast({ title: 'Could not set status', description: err?.message, variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function refreshAll() {
@@ -1087,7 +1107,7 @@ export default function LineupsTab({
           );
         })() : isReadOnlySummary ? (
           <>
-            <SummaryView lineup={lineup} rosterById={rosterById} />
+            <SummaryView lineup={lineup} rosterById={rosterById} onSetSlotStatus={canOverrideSlotStatus ? handleSetSlotStatus : undefined} />
             {lineup.status === 'confirmed' && (
               <BriefDeliveryPanel
                 lineupId={lineup.id}
@@ -1741,12 +1761,112 @@ function SortableSlot({
 
 // ─── Summary view (confirmed/completed) ────────────────────────────
 
+const SLOT_STATUS_TONE: Record<'pending' | 'posted' | 'missed', BadgeTone> = { posted: 'success', missed: 'danger', pending: 'neutral' };
+const SLOT_STATUS_LABEL: Record<'pending' | 'posted' | 'missed', string> = { posted: 'Posted', missed: 'Missed', pending: 'Pending' };
+
+function SlotStatusBadge({ slot }: { slot: LineupFull['angles'][number]['slots'][number] }) {
+  return (
+    <StatusBadge tone={SLOT_STATUS_TONE[slot.status]} size="sm">
+      {SLOT_STATUS_LABEL[slot.status]}{slot.status_reason ? ' ·' : ''}
+      {slot.status_reason && <span className="sr-only"> set by hand</span>}
+    </StatusBadge>
+  );
+}
+
+/**
+ * [2026-11-03, Bolt] Admin override for one slot. The badge is the trigger; the
+ * popover offers the three statuses and insists on a reason, which lands on the
+ * slot and in the lineup's activity log so a later reader can see it was a
+ * human call ("posted Sunday, counted for Wk 16").
+ */
+function SlotStatusControl({
+  slot,
+  onSave,
+}: {
+  slot: LineupFull['angles'][number]['slots'][number];
+  onSave: (slotId: string, status: 'pending' | 'posted' | 'missed', reason: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [next, setNext] = useState<'pending' | 'posted' | 'missed'>(slot.status);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const dirty = next !== slot.status;
+  const container = usePortalContainer();
+  async function save() {
+    if (!dirty || !reason.trim()) return;
+    setSaving(true);
+    try {
+      await onSave(slot.id, next, reason.trim());
+      setOpen(false);
+      setReason('');
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) { setNext(slot.status); setReason(''); } }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full focus-brand"
+          aria-label={`Set status for this slot (currently ${SLOT_STATUS_LABEL[slot.status]})`}
+          title={slot.status_reason ? `Set by hand: ${slot.status_reason}` : 'Set status by hand'}
+        >
+          <SlotStatusBadge slot={slot} />
+          <ChevronDown className="h-3 w-3 text-ink-warm-400" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" container={container} className="w-72 p-3 space-y-3 !bg-white border shadow-md z-[80]">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-ink-warm-500 mb-1.5">Set status by hand</p>
+          <div className="flex gap-1.5">
+            {(['posted', 'missed', 'pending'] as const).map((s) => (
+              <Button
+                key={s}
+                type="button"
+                size="sm"
+                variant={next === s ? 'brand' : 'outline'}
+                className="h-7 px-2.5 text-xs flex-1"
+                onClick={() => setNext(s)}
+              >
+                {SLOT_STATUS_LABEL[s]}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Reason <RequiredAsterisk /></Label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Posted Sunday 11/01, counted toward this week"
+            className="focus-brand text-sm min-h-[64px]"
+          />
+          <p className="text-[11px] text-ink-warm-500">Goes on the slot and into the lineup activity log.</p>
+        </div>
+        {slot.status_reason && (
+          <p className="text-[11px] text-ink-warm-500 border-t border-cream-100 pt-2">Currently set by hand: {slot.status_reason}</p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" size="sm" className="h-7" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button type="button" variant="brand" size="sm" className="h-7" disabled={!dirty || !reason.trim() || saving} onClick={save}>
+            {saving ? 'Saving…' : `Mark ${SLOT_STATUS_LABEL[next]}`}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function SummaryView({
   lineup,
   rosterById,
+  onSetSlotStatus,
 }: {
   lineup: LineupFull;
   rosterById: Map<string, RosterKol>;
+  /** Present for admin+ only: lets a slot's status be set by hand, with a reason. */
+  onSetSlotStatus?: (slotId: string, status: 'pending' | 'posted' | 'missed', reason: string) => Promise<void>;
 }) {
   const totalKols = lineup.angles.reduce((s, a) => s + a.slots.length, 0);
   return (
@@ -1792,14 +1912,10 @@ function SummaryView({
                     <span className="text-sm text-ink-warm-900 truncate flex-1">
                       {k?.name || slot.kol_id.slice(0, 8)}
                     </span>
-                    {slot.status === 'posted' && (
-                      <StatusBadge tone="success" size="sm">Posted</StatusBadge>
-                    )}
-                    {slot.status === 'missed' && (
-                      <StatusBadge tone="danger" size="sm">Missed</StatusBadge>
-                    )}
-                    {slot.status === 'pending' && (
-                      <StatusBadge tone="neutral" size="sm">Pending</StatusBadge>
+                    {onSetSlotStatus ? (
+                      <SlotStatusControl slot={slot} onSave={onSetSlotStatus} />
+                    ) : (
+                      <SlotStatusBadge slot={slot} />
                     )}
                   </li>
                 );

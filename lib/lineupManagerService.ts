@@ -88,7 +88,7 @@ export type LineupSlotStatus = 'pending' | 'posted' | 'missed';
 export type LineupActivityAction =
   | 'draft_saved' | 'proposed' | 'confirmed' | 'completed' | 'unlocked'
   | 'duplicated' | 'kol_added' | 'kol_removed' | 'angle_added'
-  | 'angle_removed' | 'angle_renamed' | 'slot_reordered';
+  | 'angle_removed' | 'angle_renamed' | 'slot_reordered' | 'slot_status_set';
 
 export type CampaignLineup = {
   id: string;
@@ -121,6 +121,10 @@ export type LineupSlot = {
   sort_order: number;
   status: LineupSlotStatus;
   created_at: string;
+  /** Set when an admin overrode the status by hand (see setSlotStatus). */
+  status_set_by?: string | null;
+  status_set_at?: string | null;
+  status_reason?: string | null;
 };
 
 export type LineupActivityLogRow = {
@@ -443,6 +447,52 @@ export class LineupManagerService {
       .single();
     await this.logActivity(lineupId, 'kol_added', actorId, kol?.name || kolId);
     return data as LineupSlot;
+  }
+
+  /**
+   * [2026-11-03, Bolt] Manual status override for one slot, with a reason.
+   *
+   * Posted/missed are normally decided by content matching (markLineupSlotPosted)
+   * and the weekly close (markCompletedIfWeekEnded). Neither can see a post that
+   * happened before the week opened, or a post the team agreed to count anyway,
+   * so ops had to ask for a DB edit. This is the attributable version: the slot
+   * records who set it and why, and the lineup's activity log gets a line.
+   *
+   * The automatic paths still run afterwards: a real post for this KOL inside
+   * the week flips missed→posted; the close job flips a pending slot to missed.
+   * Both are what a human would do too, so the override does not fight them.
+   */
+  async setSlotStatus(
+    slotId: string,
+    status: LineupSlotStatus,
+    reason: string,
+    actorId: string | null,
+  ): Promise<void> {
+    const why = reason.trim();
+    if (!why) throw new Error('A reason is required to set a slot status by hand.');
+    const { data: slot, error: sErr } = await (this.supabase as any)
+      .from('lineup_slots')
+      .select('id, status, kol_id, angle:lineup_angles!inner(lineup_id), kol:master_kols(name)')
+      .eq('id', slotId)
+      .maybeSingle();
+    if (sErr) throw sErr;
+    if (!slot) throw new Error('Slot not found.');
+    const { error } = await (this.supabase as any)
+      .from('lineup_slots')
+      .update({
+        status,
+        status_set_by: actorId,
+        status_set_at: new Date().toISOString(),
+        status_reason: why,
+      })
+      .eq('id', slotId);
+    if (error) throw error;
+    const lineupId = (slot as any).angle?.lineup_id as string | undefined;
+    if (lineupId) {
+      const kolName = (slot as any).kol?.name || (slot as any).kol_id;
+      await this.logActivity(lineupId, 'slot_status_set', actorId,
+        `${kolName}: ${(slot as any).status} → ${status} — ${why}`);
+    }
   }
 
   async removeSlot(slotId: string, actorId: string | null): Promise<void> {
