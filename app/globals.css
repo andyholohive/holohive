@@ -174,26 +174,30 @@ thead span {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+  /* [2026-11-08] Dark values follow the v11 warm palette (page #141311,
+     surface #1D1B18, hairline #2E2B27, ink #F3EFE6) so shadcn primitives
+     (Dialog, Popover, Select, Input) match the token-driven pages. */
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    color-scheme: dark;
+    --background: 36 8% 8%;
+    --foreground: 40 29% 93%;
+    --card: 36 9% 11%;
+    --card-foreground: 40 29% 93%;
+    --popover: 36 9% 11%;
+    --popover-foreground: 40 29% 93%;
+    --primary: 40 29% 93%;
+    --primary-foreground: 36 8% 8%;
+    --secondary: 33 8% 15%;
+    --secondary-foreground: 40 29% 93%;
+    --muted: 33 8% 15%;
+    --muted-foreground: 36 10% 60%;
+    --accent: 33 8% 15%;
+    --accent-foreground: 40 29% 93%;
+    --destructive: 350 70% 45%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 34 9% 17%;
+    --input: 34 9% 17%;
+    --ring: 189 37% 46%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -210,6 +214,51 @@ thead span {
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Dark mode [2026-11-08]
+   Palette classes flip through app/theme-tokens.css. What follows is the part
+   a token can't express: `white` stays white (text-white on a teal button must
+   not change), so the *surface* uses of white are redirected here. bg-black
+   stays black on purpose — it is the dialog overlay.
+   --------------------------------------------------------------------------- */
+:root {
+  --shadow-card:       0 1px 0 rgba(255,255,255,0.75) inset, 0 1px 2px rgba(60,40,20,0.04), 0 2px 4px -2px rgba(60,40,20,0.04);
+  --shadow-card-hover: 0 1px 0 rgba(255,255,255,0.75) inset, 0 1px 2px rgba(60,40,20,0.04), 0 10px 24px -8px rgba(60,40,20,0.10);
+  --shadow-btn-brand:  0 1px 0 rgba(255,255,255,0.20) inset, 0 -1px 0 rgba(20,40,45,0.12) inset, 0 1px 2px rgba(20,40,45,0.20), 0 1px 0 rgba(20,40,45,0.06);
+  --shadow-inset-hl:   0 1px 0 rgba(255,255,255,0.75) inset;
+  /* Semantic colours for inline styles and charts (where a Tailwind class can't reach). */
+  --surface:      rgb(var(--c-surface));
+  --page:         rgb(var(--c-cream-50));
+  --hairline:     rgb(var(--c-cream-200));
+  --ink:          rgb(var(--c-ink-warm-900));
+  --ink-muted:    rgb(var(--c-ink-warm-500));
+  --ink-faint:    rgb(var(--c-ink-warm-400));
+  --chart-grid:   rgb(var(--c-gray-200));
+  --chart-axis:   rgb(var(--c-gray-500));
+}
+.dark {
+  --shadow-card:       0 1px 0 rgba(255,255,255,0.05) inset, 0 1px 2px rgba(0,0,0,0.30), 0 2px 4px -2px rgba(0,0,0,0.30);
+  --shadow-card-hover: 0 1px 0 rgba(255,255,255,0.06) inset, 0 1px 2px rgba(0,0,0,0.30), 0 10px 24px -8px rgba(0,0,0,0.50);
+  --shadow-btn-brand:  0 1px 0 rgba(255,255,255,0.12) inset, 0 -1px 0 rgba(0,0,0,0.25) inset, 0 1px 2px rgba(0,0,0,0.40);
+  --shadow-inset-hl:   0 1px 0 rgba(255,255,255,0.05) inset;
+}
+.dark .bg-white            { background-color: rgb(var(--c-surface) / var(--tw-bg-opacity, 1)); }
+.dark .\!bg-white          { background-color: rgb(var(--c-surface) / 1) !important; }
+.dark .hover\:bg-white:hover { background-color: rgb(var(--c-surface) / 1); }
+.dark .bg-white\/10        { background-color: rgb(var(--c-surface) / 0.10); }
+.dark .bg-white\/15        { background-color: rgb(var(--c-surface) / 0.15); }
+.dark .bg-white\/55        { background-color: rgb(var(--c-surface) / 0.55); }
+.dark .bg-white\/60        { background-color: rgb(var(--c-surface) / 0.60); }
+.dark .bg-white\/70        { background-color: rgb(var(--c-surface) / 0.70); }
+.dark .bg-white\/80        { background-color: rgb(var(--c-surface) / 0.80); }
+.dark .bg-white\/85        { background-color: rgb(var(--c-surface) / 0.85); }
+.dark .bg-white\/90        { background-color: rgb(var(--c-surface) / 0.90); }
+.dark .bg-white\/95        { background-color: rgb(var(--c-surface) / 0.95); }
+.dark .border-white        { border-color: rgb(var(--c-surface) / 1); }
+.dark .ring-white          { --tw-ring-color: rgb(var(--c-surface) / 1); }
+/* Images that are logos on white (client / partner marks) get a soft plate instead of inverting. */
+.dark img[data-logo]       { background: #fff; border-radius: 4px; padding: 2px; }
 
 /* Brand-colored focus state for inputs (and Select/Popover triggers).
  *

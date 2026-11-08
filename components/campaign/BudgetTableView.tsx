@@ -173,7 +173,7 @@ export function BudgetTableView() {
           <span
             key={i}
             className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white whitespace-nowrap"
-            style={{ backgroundColor: c.color || '#64748b' }}
+            style={{ backgroundColor: c.color || 'var(--ink-muted)' }}
           >
             {c.label}
           </span>
@@ -488,7 +488,7 @@ export function BudgetTableView() {
               onSelect={(date) => handlePaymentCellSave(payment, field, date ? formatDateLocal(date) : '')}
               initialFocus
               classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+              modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
             />
           </PopoverContent>
         </Popover>

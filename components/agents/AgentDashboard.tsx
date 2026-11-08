@@ -464,7 +464,7 @@ export default function AgentDashboard() {
               size="sm"
               variant={activeSection === section ? 'default' : 'outline'}
               onClick={() => setActiveSection(section)}
-              style={activeSection === section ? { backgroundColor: '#3e8692' } : {}}
+              style={activeSection === section ? { backgroundColor: 'rgb(var(--c-brand))' } : {}}
               className={activeSection === section ? 'text-white border-transparent' : ''}
             >
               {section === 'overview' && 'Runs'}

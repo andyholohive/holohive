@@ -131,7 +131,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
             <Button
               variant="outline"
               className="focus-brand justify-start text-left font-normal"
-              style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: endDate ? '#111827' : '#9ca3af' }}
+              style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: endDate ? 'var(--ink)' : 'var(--ink-faint)' }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {endDate ? formatDate(endDate) : 'Select end date'}
@@ -153,7 +153,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
               }}
               initialFocus
               classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+              modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
             />
           </PopoverContent>
         </Popover>

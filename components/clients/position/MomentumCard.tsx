@@ -26,11 +26,11 @@ function Spark({ h }: { h: Momentum['history'] }) {
   const last = h[h.length - 1];
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-16 w-full" preserveAspectRatio="none" role="img" aria-label="Momentum, last weeks">
-      <defs><linearGradient id="mc-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3e8692" stopOpacity="0.28" /><stop offset="100%" stopColor="#3e8692" stopOpacity="0" /></linearGradient></defs>
+      <defs><linearGradient id="mc-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgb(var(--c-brand))" stopOpacity="0.28" /><stop offset="100%" stopColor="rgb(var(--c-brand))" stopOpacity="0" /></linearGradient></defs>
       <line x1={pad} x2={W - pad} y1={Y(50)} y2={Y(50)} stroke="#D4E5E4" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
       <path d={area} fill="url(#mc-a)" />
-      <path d={line} fill="none" stroke="#3e8692" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" className="mc-line" />
-      <circle cx={X(h.length - 1)} cy={Y(last.score)} r="3.5" fill="#1f4651" stroke="#fff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      <path d={line} fill="none" stroke="rgb(var(--c-brand))" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" className="mc-line" />
+      <circle cx={X(h.length - 1)} cy={Y(last.score)} r="3.5" fill="rgb(var(--c-brand-deep))" stroke="#fff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

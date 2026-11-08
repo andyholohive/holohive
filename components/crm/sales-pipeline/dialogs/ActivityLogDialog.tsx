@@ -39,7 +39,7 @@
  * v11 note: gray-* tokens preserved during the structural split.
  * The blue/sky/purple/amber/orange/cream pills for the type-picker
  * row will be reconsidered when the page-wide v11 pass runs at the
- * end of Phase 4. Some inline `style={{ borderColor: '#e5e7eb', ... }}`
+ * end of Phase 4. Some inline `style={{ borderColor: 'var(--hairline)', ... }}`
  * on date-picker buttons are also flagged for that pass.
  */
 
@@ -310,7 +310,7 @@ export function ActivityLogDialog() {
                       }}
                       initialFocus
                       classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                      modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                      modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                     />
                   </PopoverContent>
                 </Popover>
@@ -482,7 +482,7 @@ export function ActivityLogDialog() {
                   onSelect={date => setActivityLogForm(f => ({ ...f, next_step_date: date ? date.toISOString() : undefined }))}
                   initialFocus
                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                  modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                  modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                 />
               </PopoverContent>
             </Popover>

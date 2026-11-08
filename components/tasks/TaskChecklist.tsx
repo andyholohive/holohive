@@ -101,7 +101,7 @@ export function TaskChecklist({ taskId }: TaskChecklistProps) {
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-300"
-            style={{ width: `${progress}%`, backgroundColor: progress === 100 ? '#22c55e' : '#3e8692' }}
+            style={{ width: `${progress}%`, backgroundColor: progress === 100 ? '#22c55e' : 'rgb(var(--c-brand))' }}
           />
         </div>
       )}

@@ -191,7 +191,7 @@ function DateField({
             onSelect={(d) => onChange(d || undefined)}
             initialFocus
             classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+            modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
           />
         </PopoverContent>
       </Popover>

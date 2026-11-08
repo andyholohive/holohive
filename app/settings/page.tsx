@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { ThemeSelect } from '@/components/theme-toggle';
 import { Settings as SettingsIcon, User, Mail, AtSign, Camera, Loader2, Save, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink, Video, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -772,6 +773,22 @@ function SettingsContent() {
                   )}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Appearance [2026-11-08] ─────────────────────────── */}
+          <SectionHeader
+            label="Appearance"
+            dot="brand"
+            counter="Light · Dark · System"
+          />
+          <Card className="border-cream-200">
+            <CardContent className="p-6 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-medium text-ink-warm-900">Theme</p>
+                <p className="text-xs text-ink-warm-500 mt-0.5">Saved in this browser. The moon button in the sidebar flips it too.</p>
+              </div>
+              <ThemeSelect />
             </CardContent>
           </Card>
 

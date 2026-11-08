@@ -59,7 +59,7 @@ const COLOR_PRESETS = [
   { hex: '#a855f7', label: 'Purple' },
   { hex: '#f59e0b', label: 'Amber' },
   { hex: '#ef4444', label: 'Rose' },
-  { hex: '#64748b', label: 'Slate' },
+  { hex: 'var(--ink-muted)', label: 'Slate' },
   { hex: '#0ea5e9', label: 'Sky' },
   { hex: '#ec4899', label: 'Pink' },
 ] as const;
@@ -418,7 +418,7 @@ function TagListCard({
               <li key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-cream-50/40">
                 <span
                   className="inline-block px-2 py-0.5 rounded text-[11px] font-medium text-white shrink-0"
-                  style={{ backgroundColor: t.color || '#64748b' }}
+                  style={{ backgroundColor: t.color || 'var(--ink-muted)' }}
                 >
                   {t.name}
                 </span>

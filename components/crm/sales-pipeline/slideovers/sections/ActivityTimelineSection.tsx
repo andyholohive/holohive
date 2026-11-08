@@ -221,7 +221,7 @@ export function ActivityTimelineSection() {
                   onSelect={date => setActivityMeetingDate(date ? date.toISOString() : undefined)}
                   initialFocus
                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                  modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                  modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                 />
               </PopoverContent>
             </Popover>
@@ -306,7 +306,7 @@ export function ActivityTimelineSection() {
                 onSelect={(date) => setActivityForm(f => ({ ...f, next_step_date: date ? date.toISOString() : undefined }))}
                 initialFocus
                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
               />
             </PopoverContent>
           </Popover>

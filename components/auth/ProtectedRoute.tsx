@@ -49,7 +49,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   if (loading || guestLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderBottomColor: '#3e8692' }}></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderBottomColor: 'rgb(var(--c-brand))' }}></div>
       </div>
     )
   }

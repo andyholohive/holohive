@@ -560,7 +560,7 @@ export function InformationEditMode({
                             onSelect={date => handleChange("start_date", date ? formatDateForInput(date) : undefined)}
                             initialFocus
                             classNames={{ day_selected: "text-white hover:text-white focus:text-white" }}
-                            modifiersStyles={{ selected: { backgroundColor: "#3e8692" } }}
+                            modifiersStyles={{ selected: { backgroundColor: "rgb(var(--c-brand))" } }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -589,7 +589,7 @@ export function InformationEditMode({
                             disabled={date => form?.start_date ? date < parseDate(form.start_date)! : false}
                             initialFocus
                             classNames={{ day_selected: "text-white hover:text-white focus:text-white" }}
-                            modifiersStyles={{ selected: { backgroundColor: "#3e8692" } }}
+                            modifiersStyles={{ selected: { backgroundColor: "rgb(var(--c-brand))" } }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -776,7 +776,7 @@ export function InformationEditMode({
                               onSelect={date => handleChange("intro_call_date", date ? formatDateForInput(date) : undefined)}
                               initialFocus
                               classNames={{ day_selected: "text-white hover:text-white focus:text-white" }}
-                              modifiersStyles={{ selected: { backgroundColor: "#3e8692" } }}
+                              modifiersStyles={{ selected: { backgroundColor: "rgb(var(--c-brand))" } }}
                             />
                           </PopoverContent>
                         </Popover>

@@ -417,7 +417,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                     <Button
                       variant="outline"
                       className="focus-brand w-full justify-start text-left font-normal"
-                      style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: '#111827' }}
+                      style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: 'var(--ink)' }}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {formatDate(startDate)}
@@ -430,7 +430,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                       onSelect={d => d && setStartDate(d)}
                       initialFocus
                       classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                      modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                      modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                     />
                   </PopoverContent>
                 </Popover>
@@ -615,9 +615,9 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                                 variant="outline"
                                 className="focus-brand h-8 text-xs w-full justify-start text-left font-normal"
                                 style={{
-                                  borderColor: '#e5e7eb',
+                                  borderColor: 'var(--hairline)',
                                   backgroundColor: 'white',
-                                  color: (dueDateOverrides[s.step_order] || dueDates[s.step_order]) ? '#111827' : '#9ca3af',
+                                  color: (dueDateOverrides[s.step_order] || dueDates[s.step_order]) ? 'var(--ink)' : 'var(--ink-faint)',
                                 }}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -640,7 +640,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                                 }}
                                 initialFocus
                                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                               />
                             </PopoverContent>
                           </Popover>
@@ -658,7 +658,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
             <div className="space-y-4 py-2">
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: (selectedTemplate?.color || '#3e8692') + '15' }}>
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: (selectedTemplate?.color || 'rgb(var(--c-brand))') + '15' }}>
                     <IconComponent className="h-5 w-5" style={{ color: selectedTemplate?.color }} />
                   </div>
                   <div>
@@ -822,7 +822,7 @@ function BulkDueDatePopover({
           onSelect={setPicked}
           initialFocus
           classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+          modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
         />
         <div className="p-2 border-t flex flex-col gap-1.5">
           <Button

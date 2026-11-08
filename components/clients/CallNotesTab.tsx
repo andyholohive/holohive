@@ -669,7 +669,7 @@ function CallNoteForm({
               selected={form.meeting_date}
               onSelect={(d) => setForm({ ...form, meeting_date: d })}
               classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+              modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
             />
           </PopoverContent>
         </Popover>

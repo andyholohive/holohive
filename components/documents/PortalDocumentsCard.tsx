@@ -210,7 +210,7 @@ export default function PortalDocumentsCard({ portalId, email, className }: { po
                panel has nothing to sit against; against ink the sheet reads
                as paper and the eye goes to the document instead of the
                dialog around it. */
-            <div className="max-h-[75vh] overflow-y-auto rounded-lg bg-ink-warm-900 px-2 py-4 sm:px-6">
+            <div className="max-h-[75vh] overflow-y-auto rounded-lg bg-[#16140F] px-2 py-4 sm:px-6">
               <DocumentPdfViewer
                 signedUrl={active.signedUrl}
                 documentId={active.document_id}

@@ -597,7 +597,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
                 <Button
                   variant="outline"
                   className="focus-brand justify-start text-left font-normal"
-                  style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.due_date ? '#111827' : '#9ca3af' }}
+                  style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: form.due_date ? 'var(--ink)' : 'var(--ink-faint)' }}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {form.due_date ? formatDate(form.due_date) : 'Select date'}
@@ -610,7 +610,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
                   onSelect={(date) => setForm({ ...form, due_date: date || undefined })}
                   initialFocus
                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                  modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                  modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                 />
               </PopoverContent>
             </Popover>

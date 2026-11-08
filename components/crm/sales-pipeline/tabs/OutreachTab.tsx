@@ -170,7 +170,7 @@ export function OutreachTab() {
           { label: 'No-show', value: personal.noShows, tone: personal.noShows > 0 ? 'bad' as const : 'neutral' as const },
         ];
         return (
-          <div className="mb-4 bg-gradient-to-r from-sky-50 to-white border border-sky-100 rounded-lg p-3">
+          <div className="mb-4 bg-gradient-to-r from-sky-50 to-surface border border-sky-100 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">My outreach · last 30 days</span>
               <button

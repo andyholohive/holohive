@@ -1653,7 +1653,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     if (platform === 'X') return '#000000';
                     if (platform === 'Telegram') return '#0088cc';
                     if (platform === 'YouTube') return '#FF0000';
-                    return '#3e8692';
+                    return 'rgb(var(--c-brand))';
                   };
                   const regionColor = (region: string): string => {
                     if (region === 'China') return '#de2910';
@@ -1664,10 +1664,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     if (region === 'Brazil') return '#009c3b';
                     if (region === 'Global') return '#1e40af';
                     if (region === 'SEA') return '#059669';
-                    return '#3e8692';
+                    return 'rgb(var(--c-brand))';
                   };
                   const chartTooltipStyle = {
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--surface)',
                     border: '1px solid #e2e8f0',
                     borderRadius: '12px',
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -1703,7 +1703,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="h-96">
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart data={platformChartData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                                 <XAxis
                                   dataKey="platform"
                                   axisLine={false}
@@ -1719,12 +1719,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                           </svg>
                                         </g>
                                       ) : (
-                                        <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={12}>{payload.value}</text>
+                                        <text x={0} y={0} dy={16} textAnchor="middle" fill="var(--ink-muted)" fontSize={12}>{payload.value}</text>
                                       )}
                                     </g>
                                   )}
                                 />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)' }} allowDecimals={false} />
                                 <Tooltip
                                   contentStyle={chartTooltipStyle}
                                   formatter={(value: number) => [value, 'Count']}
@@ -1750,9 +1750,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="h-96">
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart data={regionChartData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                <XAxis dataKey="region" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                                <XAxis dataKey="region" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)' }} allowDecimals={false} />
                                 <Tooltip
                                   contentStyle={chartTooltipStyle}
                                   formatter={(value: number) => [value, 'Count']}
@@ -2532,12 +2532,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             })()}
                             margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                           >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                             <XAxis
                               dataKey="name"
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }}
                               angle={-45}
                               textAnchor="end"
                               height={100}
@@ -2545,11 +2545,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             <YAxis
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: '#64748b' }}
+                              tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                             />
                             <Tooltip
                               contentStyle={{
-                                backgroundColor: 'white',
+                                backgroundColor: 'var(--surface)',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '12px',
                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -2557,7 +2557,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               }}
                               formatter={(value: number) => [value.toLocaleString(), 'Reactions']}
                             />
-                            <Bar dataKey="likes" fill="#3e8692" radius={[8, 8, 0, 0]} />
+                            <Bar dataKey="likes" fill="rgb(var(--c-brand))" radius={[8, 8, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -2595,12 +2595,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             })()}
                             margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                           >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                             <XAxis
                               dataKey="name"
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }}
                               angle={-45}
                               textAnchor="end"
                               height={100}
@@ -2608,11 +2608,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             <YAxis
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: '#64748b' }}
+                              tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                             />
                             <Tooltip
                               contentStyle={{
-                                backgroundColor: 'white',
+                                backgroundColor: 'var(--surface)',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '12px',
                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -2620,7 +2620,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               }}
                               formatter={(value: number) => [value.toLocaleString(), 'Views']}
                             />
-                            <Bar dataKey="impressions" fill="#2d6470" radius={[8, 8, 0, 0]} />
+                            <Bar dataKey="impressions" fill="rgb(var(--c-brand-dark))" radius={[8, 8, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -3119,22 +3119,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 data={contentLineData}
                                 margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                               >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                                 <XAxis
                                   dataKey="date"
                                   axisLine={false}
                                   tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                  tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }}
                                 />
                                 <YAxis
                                   axisLine={false}
                                   tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                  tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                                   tickFormatter={(value) => value.toLocaleString()}
                                 />
                                 <Tooltip
                                   contentStyle={{
-                                    backgroundColor: 'white',
+                                    backgroundColor: 'var(--surface)',
                                     border: '1px solid #e2e8f0',
                                     borderRadius: '12px',
                                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -3145,7 +3145,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   formatter={(value: number) => [value.toLocaleString(), 'Cumulative Views']}
                                   labelFormatter={(label: string) => `Date: ${label}`}
                                   labelStyle={{
-                                    color: '#374151',
+                                    color: 'var(--ink)',
                                     fontWeight: '600',
                                     marginBottom: '4px'
                                   }}
@@ -3153,9 +3153,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 <Line
                                   type="monotone"
                                   dataKey="impressions"
-                                  stroke="#3e8692"
+                                  stroke="rgb(var(--c-brand))"
                                   strokeWidth={3}
-                                  dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }}
+                                  dot={{ fill: 'rgb(var(--c-brand))', strokeWidth: 2, r: 4 }}
                                 />
                               </LineChart>
                             </ResponsiveContainer>
@@ -3176,7 +3176,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   data={contentPieData}
                                   cx="50%"
                                   cy="50%"
-                                  labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                                  labelLine={{ stroke: 'var(--ink-faint)', strokeWidth: 1 }}
                                   label={(props: any) => {
                                     const { cx, cy, midAngle, outerRadius, platform, impressions } = props;
                                     const RADIAN = Math.PI / 180;
@@ -3191,7 +3191,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
                                               {getPlatformIcon(platform)}
                                             </div>
-                                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#374151', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--ink)', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                               {impressions.toLocaleString()}
                                             </div>
                                           </div>
@@ -3203,13 +3203,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   dataKey="impressions"
                                 >
                                   {contentPieData.map((_, index) => {
-                                    const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
+                                    const colors = ['rgb(var(--c-brand))', 'rgb(var(--c-brand-dark))', '#1e4a5a', '#0f2d3a'];
                                     return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                                   })}
                                 </Pie>
                                 <Tooltip
                                   contentStyle={{
-                                    backgroundColor: 'white',
+                                    backgroundColor: 'var(--surface)',
                                     border: '1px solid #e2e8f0',
                                     borderRadius: '12px',
                                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -3226,7 +3226,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   }}
                                   labelFormatter={(label: string) => `Platform: ${label}`}
                                   labelStyle={{
-                                    color: '#374151',
+                                    color: 'var(--ink)',
                                     fontWeight: '600',
                                     marginBottom: '4px'
                                   }}

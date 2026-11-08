@@ -279,7 +279,7 @@ export default function FundingRadarPanel() {
         {stats && (
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: 'Funded Projects', value: stats.total_funded, icon: Building2, color: '#3e8692' },
+              { label: 'Funded Projects', value: stats.total_funded, icon: Building2, color: 'rgb(var(--c-brand))' },
               { label: 'Korean VC Backed', value: stats.korean_vc_count, icon: Flag, color: '#dc2626' },
               { label: 'Not in Pipeline', value: stats.not_in_pipeline, icon: Zap, color: '#f59e0b' },
               { label: 'Total Raised', value: formatAmount(stats.total_raised), icon: TrendingUp, color: '#10b981' },
@@ -313,7 +313,7 @@ export default function FundingRadarPanel() {
                   ? 'text-white'
                   : 'text-gray-600 hover:bg-gray-100 border border-transparent'
               }`}
-              style={filter === tab.value ? { backgroundColor: '#3e8692' } : {}}
+              style={filter === tab.value ? { backgroundColor: 'rgb(var(--c-brand))' } : {}}
             >
               {tab.label}
               {tab.count != null && (

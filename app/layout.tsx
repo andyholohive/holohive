@@ -1,3 +1,4 @@
+import './theme-tokens.css';
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
@@ -9,6 +10,7 @@ import ViewAsBanner from '@/components/ViewAsBanner';
 import { Toaster } from '@/components/ui/toaster';
 import ChangelogModal from '@/components/changelog/ChangelogModal';
 import { ChunkErrorHandler } from '@/components/ChunkErrorHandler';
+import { ThemeProvider } from '@/components/theme-provider';
 
 // v11 design system (2026-06-01) — Geist replaces Inter as the body font.
 // Next 13.5 doesn't ship Geist in `next/font/google`, so we load it via
@@ -39,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
         {/* Geist + Geist Mono loaded from Google Fonts CDN.
             display=swap so the page renders with the fallback (Inter)
@@ -53,6 +55,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-cream-50 text-ink-warm-900">
         <ChunkErrorHandler />
+        <ThemeProvider>
         {/* Promise-based confirm() Dialog for every page — see contexts/ConfirmContext.tsx. */}
         <ConfirmProvider>
         <AuthProvider>
@@ -70,6 +73,7 @@ export default function RootLayout({
         </AuthProvider>
         </ConfirmProvider>
         <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -349,9 +349,9 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                           variant="outline"
                           className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                           style={{
-                            borderColor: '#e5e7eb',
+                            borderColor: 'var(--hairline)',
                             backgroundColor: 'white',
-                            color: startClientForm.callDate ? '#111827' : '#9ca3af'
+                            color: startClientForm.callDate ? 'var(--ink)' : 'var(--ink-faint)'
                           }}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -368,7 +368,7 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                             day_selected: 'text-white hover:text-white focus:text-white',
                           }}
                           modifiersStyles={{
-                            selected: { backgroundColor: '#3e8692' }
+                            selected: { backgroundColor: 'rgb(var(--c-brand))' }
                           }}
                         />
                       </PopoverContent>
@@ -422,9 +422,9 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                           variant="outline"
                           className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                           style={{
-                            borderColor: '#e5e7eb',
+                            borderColor: 'var(--hairline)',
                             backgroundColor: 'white',
-                            color: startClientForm.startDate ? '#111827' : '#9ca3af'
+                            color: startClientForm.startDate ? 'var(--ink)' : 'var(--ink-faint)'
                           }}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -441,7 +441,7 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                             day_selected: 'text-white hover:text-white focus:text-white',
                           }}
                           modifiersStyles={{
-                            selected: { backgroundColor: '#3e8692' }
+                            selected: { backgroundColor: 'rgb(var(--c-brand))' }
                           }}
                         />
                       </PopoverContent>
@@ -455,9 +455,9 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                           variant="outline"
                           className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                           style={{
-                            borderColor: '#e5e7eb',
+                            borderColor: 'var(--hairline)',
                             backgroundColor: 'white',
-                            color: startClientForm.endDate ? '#111827' : '#9ca3af'
+                            color: startClientForm.endDate ? 'var(--ink)' : 'var(--ink-faint)'
                           }}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -475,7 +475,7 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                             day_selected: 'text-white hover:text-white focus:text-white',
                           }}
                           modifiersStyles={{
-                            selected: { backgroundColor: '#3e8692' }
+                            selected: { backgroundColor: 'rgb(var(--c-brand))' }
                           }}
                         />
                       </PopoverContent>
@@ -536,9 +536,9 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                           variant="outline"
                           className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                           style={{
-                            borderColor: '#e5e7eb',
+                            borderColor: 'var(--hairline)',
                             backgroundColor: 'white',
-                            color: startClientForm.intro_call_date ? '#111827' : '#9ca3af'
+                            color: startClientForm.intro_call_date ? 'var(--ink)' : 'var(--ink-faint)'
                           }}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -555,7 +555,7 @@ export function StartClientDialog({ open, onOpenChange, clients, allUsers, onCre
                             day_selected: 'text-white hover:text-white focus:text-white',
                           }}
                           modifiersStyles={{
-                            selected: { backgroundColor: '#3e8692' }
+                            selected: { backgroundColor: 'rgb(var(--c-brand))' }
                           }}
                         />
                       </PopoverContent>

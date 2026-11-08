@@ -98,12 +98,12 @@ export function ContentDashboardOverview() {
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => value.toLocaleString()} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)' }} tickFormatter={(value) => value.toLocaleString()} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--surface)',
                     border: '1px solid #e2e8f0',
                     borderRadius: '12px',
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -130,7 +130,7 @@ export function ContentDashboardOverview() {
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                  labelLine={{ stroke: 'var(--ink-faint)', strokeWidth: 1 }}
                   label={(props: any) => {
                     const { cx, cy, midAngle, outerRadius, platform, impressions } = props;
                     const RADIAN = Math.PI / 180;
@@ -144,7 +144,7 @@ export function ContentDashboardOverview() {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
                               {getPlatformIcon(platform)}
                             </div>
-                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#374151', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--ink)', textAlign: 'center', whiteSpace: 'nowrap' }}>
                               {impressions.toLocaleString()}
                             </div>
                           </div>
@@ -164,7 +164,7 @@ export function ContentDashboardOverview() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--surface)',
                     border: '1px solid #e2e8f0',
                     borderRadius: '12px',
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',

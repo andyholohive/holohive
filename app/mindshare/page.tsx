@@ -188,7 +188,7 @@ function Sparkline({ values }: { values: number[] }) {
   const lastV = values[values.length - 1] || 0;
   const firstV = values.find(v => v > 0) || 0;
   const trendUp = lastV > firstV;
-  const stroke = trendUp ? '#16a34a' : (lastV < firstV ? '#dc2626' : '#9ca3af');
+  const stroke = trendUp ? '#16a34a' : (lastV < firstV ? '#dc2626' : 'var(--ink-faint)');
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="inline-block">
       <polyline points={points} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" />
@@ -245,7 +245,7 @@ function deltaColor(delta: number): { bg: string; border: string; text: string; 
   return {
     bg: 'hsl(220, 14%, 30%)',
     border: 'hsl(220, 14%, 22%)',
-    text: '#f1f5f9',
+    text: 'var(--chart-grid)',
     muted: 'rgba(241, 245, 249, 0.7)',
   };
 }
@@ -1422,7 +1422,7 @@ export default function MindsharePage() {
                   volume, colored by Δ vs prior period. */}
               {treemapItems.length > 0 ? (
                 <div
-                  className="rounded-xl p-4 border border-slate-800/60 shadow-inner"
+                  className="rounded-xl p-4 border border-[#1e293b]/60 shadow-inner"
                   style={{
                     background: 'linear-gradient(160deg, #0b1220 0%, #0f172a 60%, #111827 100%)',
                   }}
@@ -1431,34 +1431,34 @@ export default function MindsharePage() {
                     <div className="flex items-center gap-1 text-xs">
                       <button
                         onClick={() => setTreemapTier('top20')}
-                        className={`px-3 py-1.5 rounded-md font-medium transition-colors ${treemapTier === 'top20' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+                        className={`px-3 py-1.5 rounded-md font-medium transition-colors ${treemapTier === 'top20' ? 'bg-emerald-600 text-white shadow-sm' : 'text-[#94a3b8] hover:text-white hover:bg-[#1e293b]/60'}`}
                       >
                         Top 20
                       </button>
-                      <span className="text-slate-600 px-1">›</span>
+                      <span className="text-[#475569] px-1">›</span>
                       <button
                         onClick={() => setTreemapTier('top21_50')}
-                        className={`px-3 py-1.5 rounded-md font-medium transition-colors ${treemapTier === 'top21_50' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+                        className={`px-3 py-1.5 rounded-md font-medium transition-colors ${treemapTier === 'top21_50' ? 'bg-emerald-600 text-white shadow-sm' : 'text-[#94a3b8] hover:text-white hover:bg-[#1e293b]/60'}`}
                       >
                         Top 21–50
                       </button>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                    <div className="flex items-center gap-3 text-[11px] text-[#64748b]">
                       <span className="hidden sm:inline">Cell size = mention volume</span>
                       <span className="hidden sm:inline text-slate-700">·</span>
                       <div className="flex items-center gap-2">
                         <span>Δ vs prior {range === '24h' ? 'day' : range === '7d' ? 'week' : 'month'}:</span>
                         <span className="inline-flex items-center gap-1">
                           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'hsl(358, 50%, 38%)' }} />
-                          <span className="text-slate-400">down</span>
+                          <span className="text-[#94a3b8]">down</span>
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'hsl(220, 14%, 30%)' }} />
-                          <span className="text-slate-400">flat</span>
+                          <span className="text-[#94a3b8]">flat</span>
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'hsl(152, 46%, 36%)' }} />
-                          <span className="text-slate-400">up</span>
+                          <span className="text-[#94a3b8]">up</span>
                         </span>
                       </div>
                     </div>
@@ -1479,8 +1479,8 @@ export default function MindsharePage() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-slate-900 rounded-xl p-12 flex items-center justify-center border border-slate-800/60">
-                  <p className="text-sm text-slate-500">No mentions for the current filters.</p>
+                <div className="bg-[#0f172a] rounded-xl p-12 flex items-center justify-center border border-[#1e293b]/60">
+                  <p className="text-sm text-[#64748b]">No mentions for the current filters.</p>
                 </div>
               )}
             </div>

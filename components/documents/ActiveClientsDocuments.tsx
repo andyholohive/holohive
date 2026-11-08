@@ -452,7 +452,7 @@ export default function ActiveClientsDocuments() {
                                 selected={d.expires_at ? new Date(d.expires_at) : undefined}
                                 onSelect={(day) => { if (day) void setExpiry(d, endOfLocalDayIso(day)); }}
                                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                               />
                               {d.expires_at && (
                                 <div className="border-t p-2">

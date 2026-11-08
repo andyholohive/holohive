@@ -2985,7 +2985,7 @@ export default function ClientsPage() {
                               if (paneClient) loadWeeklyV2Row(paneClient.id, monday);
                             }}
                             classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                            modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -3266,7 +3266,7 @@ export default function ClientsPage() {
                                           if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { execution_plan: next });
                                         }}
                                         classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                        modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                        modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                                       />
                                     </PopoverContent>
                                   </Popover>
@@ -3383,7 +3383,7 @@ export default function ClientsPage() {
                                       if (paneClient) saveWeeklyV2(paneClient.id, weeklyV2Week, { this_week_feed: next });
                                     }}
                                     classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                    modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                                   />
                                 </PopoverContent>
                               </Popover>
@@ -3820,7 +3820,7 @@ export default function ClientsPage() {
                                 type="button"
                                 variant="outline"
                                 className="focus-brand justify-start text-left font-normal"
-                                style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: newClient.start_date ? '#111827' : '#9ca3af' }}
+                                style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: newClient.start_date ? 'var(--ink)' : 'var(--ink-faint)' }}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 {newClient.start_date
@@ -3835,7 +3835,7 @@ export default function ClientsPage() {
                                 onSelect={(date) => setNewClient({ ...newClient, start_date: date || undefined })}
                                 initialFocus
                                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                               />
                             </PopoverContent>
                           </Popover>
@@ -4689,13 +4689,13 @@ export default function ClientsPage() {
                       <Label>Date <span className="text-rose-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: decisionForm.decision_date ? '#111827' : '#9ca3af' }}>
+                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: decisionForm.decision_date ? 'var(--ink)' : 'var(--ink-faint)' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {decisionForm.decision_date ? formatDate(decisionForm.decision_date) : 'Select date'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={decisionForm.decision_date} onSelect={(date) => setDecisionForm({ ...decisionForm, decision_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
+                          <Calendar mode="single" selected={decisionForm.decision_date} onSelect={(date) => setDecisionForm({ ...decisionForm, decision_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }} />
                         </PopoverContent>
                       </Popover>
                     </div>
@@ -4798,13 +4798,13 @@ export default function ClientsPage() {
                     <Label>Meeting Date <span className="text-rose-500">*</span></Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? '#111827' : '#9ca3af' }}>
+                        <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? 'var(--ink)' : 'var(--ink-faint)' }}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {meetingNoteForm.meeting_date ? formatDate(meetingNoteForm.meeting_date) : 'Select date'}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={meetingNoteForm.meeting_date} onSelect={(date) => setMeetingNoteForm({ ...meetingNoteForm, meeting_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
+                        <Calendar mode="single" selected={meetingNoteForm.meeting_date} onSelect={(date) => setMeetingNoteForm({ ...meetingNoteForm, meeting_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }} />
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -5162,7 +5162,7 @@ export default function ClientsPage() {
                             <Button
                               variant="outline"
                               className="focus-brand justify-between font-normal h-auto min-h-9 py-2 text-left"
-                              style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: selectedUsers.length > 0 ? '#111827' : '#9ca3af' }}
+                              style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: selectedUsers.length > 0 ? 'var(--ink)' : 'var(--ink-faint)' }}
                             >
                               <span className="truncate">{triggerLabel}</span>
                               <ChevronDown className="h-4 w-4 text-ink-warm-400 flex-shrink-0 ml-2" />

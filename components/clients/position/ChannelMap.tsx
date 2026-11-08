@@ -25,7 +25,7 @@ import { Network, Target } from 'lucide-react';
 import { useWidth } from '@/components/portal/korea/KoreaCharts';
 import type { ChannelNode } from '@/lib/clientPosition';
 
-const COLORS = { hired: '#3e8692', organic: '#0EA5E9', gap: '#C7C0AF' };
+const COLORS = { hired: 'rgb(var(--c-brand))', organic: '#0EA5E9', gap: '#C7C0AF' };
 
 export function ChannelMap({ channels, clientName, campaign }: {
   channels: ChannelNode[] | null; clientName: string;
@@ -118,9 +118,9 @@ export function ChannelMap({ channels, clientName, campaign }: {
                 );
               })}
               {/* The client at the centre */}
-              <circle cx={cx} cy={cy} r={30} fill="#3e8692" opacity={0.14} />
+              <circle cx={cx} cy={cy} r={30} fill="rgb(var(--c-brand))" opacity={0.14} />
               <circle cx={cx} cy={cy} r={22} fill="url(#cm-core)" stroke="#FFFFFF" strokeWidth={3} />
-              <defs><linearGradient id="cm-core" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3e8692" /><stop offset="100%" stopColor="#1f4651" /></linearGradient></defs>
+              <defs><linearGradient id="cm-core" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="rgb(var(--c-brand))" /><stop offset="100%" stopColor="rgb(var(--c-brand-deep))" /></linearGradient></defs>
               <text x={cx} y={cy + 5} textAnchor="middle" fontSize="15" fontWeight="700" fill="#FFFFFF">{clientName.charAt(0).toUpperCase()}</text>
               {hv && (() => {
                 const p = pos(hv);

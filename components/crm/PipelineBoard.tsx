@@ -351,7 +351,7 @@ function DateField({ value, onChange, placeholder = 'Pick a date' }: {
             onChange(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
           }}
           classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+          modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
         />
       </PopoverContent>
     </Popover>

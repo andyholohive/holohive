@@ -1243,7 +1243,7 @@ export default function OutreachPage() {
                                 saveField(p, 'date_outreached', d ? toIsoDate(d) : null);
                               }}
                               classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                              modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                             />
                             <div className="border-t border-cream-100 p-2">
                               <Button
@@ -1286,7 +1286,7 @@ export default function OutreachPage() {
                                 saveField(p, 'last_messaged', d ? toIsoDate(d) : null);
                               }}
                               classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                              modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                              modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                             />
                             <div className="border-t border-cream-100 p-2">
                               <Button

@@ -104,7 +104,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
               </div>
               <Badge
                 variant={insight.actionable ? "default" : "secondary"}
-                style={insight.actionable ? { backgroundColor: '#3e8692', color: 'white' } : undefined}
+                style={insight.actionable ? { backgroundColor: 'rgb(var(--c-brand))', color: 'white' } : undefined}
               >
                 {insight.actionable ? "Actionable" : "Informational"}
               </Badge>

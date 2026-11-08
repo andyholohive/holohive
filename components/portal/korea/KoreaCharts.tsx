@@ -18,7 +18,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
  */
 const THEMES = {
   light: {
-    line: '#3e8692', fillTop: 'rgba(62,134,146,0.16)', fillBottom: 'rgba(62,134,146,0.02)', neg: '#f59e0b',
+    line: 'rgb(var(--c-brand))', fillTop: 'rgba(62,134,146,0.16)', fillBottom: 'rgba(62,134,146,0.02)', neg: '#f59e0b',
     grid: '#EBE6D8', zero: '#C7C0AF',
     // ink-warm-500: the lighter #9A9385 measured ~2.9:1 on white, too faint for 10.5px text.
     axis: '#6B6557', ink: '#16140F', ring: '#fff', hollow: '#fff', glow: false,

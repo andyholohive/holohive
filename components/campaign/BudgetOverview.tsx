@@ -242,22 +242,22 @@ export function BudgetOverview() {
                             margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                             barCategoryGap="40%"
                           >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                             <XAxis 
                               dataKey="name" 
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 14, fill: '#64748b', fontWeight: 500 }}
+                              tick={{ fontSize: 14, fill: 'var(--ink-muted)', fontWeight: 500 }}
                             />
                             <YAxis 
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: '#64748b' }}
+                              tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                               tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                             />
                             <Tooltip 
                               contentStyle={{
-                                backgroundColor: 'white',
+                                backgroundColor: 'var(--surface)',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '12px',
                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -269,7 +269,7 @@ export function BudgetOverview() {
                               ]}
                               labelFormatter={() => ''}
                             />
-                            <Bar dataKey="total" fill="#9ca3af" name="total" radius={[8, 8, 8, 8]} />
+                            <Bar dataKey="total" fill="var(--ink-faint)" name="total" radius={[8, 8, 8, 8]} />
                             <Bar dataKey="allocated" fill={BRAND_HEX} name="allocated" radius={[8, 8, 8, 8]} />
                             <Bar dataKey="remaining" fill="#10b981" name="remaining" radius={[8, 8, 8, 8]} />
                           </BarChart>
@@ -344,23 +344,23 @@ export function BudgetOverview() {
                               })()}
                               margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                             >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                               <XAxis 
                                 dataKey="region" 
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }}
                                 tickFormatter={(value) => value === 'apac' ? 'APAC' : value === 'global' ? 'Global' : value}
                               />
                               <YAxis 
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b' }}
+                                tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                                 tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                               />
                               <Tooltip 
                                 contentStyle={{
-                                  backgroundColor: 'white',
+                                  backgroundColor: 'var(--surface)',
                                   border: '1px solid #e2e8f0',
                                   borderRadius: '12px',
                                   boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -374,7 +374,7 @@ export function BudgetOverview() {
                                   return label === 'apac' ? 'APAC' : label === 'global' ? 'Global' : label;
                                 }}
                               />
-                              <Bar dataKey="allocated" fill="#9ca3af" name="allocated" radius={[8, 8, 8, 8]} />
+                              <Bar dataKey="allocated" fill="var(--ink-faint)" name="allocated" radius={[8, 8, 8, 8]} />
                               <Bar dataKey="payments" fill={BRAND_HEX} name="payments" radius={[8, 8, 8, 8]} />
                               <Bar dataKey="remaining" fill="#10b981" name="remaining" radius={[8, 8, 8, 8]} />
                             </BarChart>
@@ -430,22 +430,22 @@ export function BudgetOverview() {
                                 })()}
                                 margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                               >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                                 <XAxis 
                                   dataKey="method" 
                                   axisLine={false}
                                   tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                  tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }}
                                 />
                                 <YAxis 
                                   axisLine={false}
                                   tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                  tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                                   tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                                 />
                                 <Tooltip 
                                   contentStyle={{
-                                    backgroundColor: 'white',
+                                    backgroundColor: 'var(--surface)',
                                     border: '1px solid #e2e8f0',
                                     borderRadius: '12px',
                                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -546,22 +546,22 @@ export function BudgetOverview() {
                                 })()}
                                 margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                               >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                                 <XAxis 
                                   dataKey="date" 
                                   axisLine={false}
                                   tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                  tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }}
                                 />
                                 <YAxis 
                                   axisLine={false}
                                   tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                  tick={{ fontSize: 12, fill: 'var(--ink-muted)' }}
                                   tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                                 />
                                 <Tooltip 
                                   contentStyle={{
-                                    backgroundColor: 'white',
+                                    backgroundColor: 'var(--surface)',
                                     border: '1px solid #e2e8f0',
                                     borderRadius: '12px',
                                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',

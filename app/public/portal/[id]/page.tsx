@@ -1493,7 +1493,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
       const results = [];
       for (const d of dels) {
-        const tmpl = tmplMap.get(d.template_id) || { name: 'Workflow', color: '#3e8692', icon: 'ClipboardList' };
+        const tmpl = tmplMap.get(d.template_id) || { name: 'Workflow', color: 'rgb(var(--c-brand))', icon: 'ClipboardList' };
         const { data: subtasks } = await supabasePublic
           .from('tasks')
           .select('status')
@@ -2177,7 +2177,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${campaignWeekInfo.progressPct}%`,
-                        backgroundColor: '#3e8692', // brand
+                        backgroundColor: 'rgb(var(--c-brand))', // brand
                       }}
                     />
                   </div>
@@ -2676,7 +2676,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           ).sort((a, b) => a.display_order - b.display_order);
           if (items.length === 0) return null;
           return (
-            <Card id="section-your-tasks" className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white shadow-xl rounded-xl overflow-hidden mb-6">
+            <Card id="section-your-tasks" className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-surface shadow-xl rounded-xl overflow-hidden mb-6">
               <CardContent className="p-6 sm:p-7">
                 <div className="flex items-start gap-4">
                   <div className="p-2.5 bg-orange-500 rounded-xl shadow-md flex-shrink-0">
@@ -2742,7 +2742,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               <div className="relative mb-6 flex items-center" style={{ height: '20px' }}>
                 {/* Bar */}
                 <div className="absolute left-0 right-0 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${milestones.length > 1 ? (completedMilestones / (milestones.length - 1)) * 100 : 0}%`, backgroundColor: '#3e8692' }} />
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${milestones.length > 1 ? (completedMilestones / (milestones.length - 1)) * 100 : 0}%`, backgroundColor: 'rgb(var(--c-brand))' }} />
                 </div>
                 {/* Dots */}
                 <div className="relative w-full flex justify-between">
@@ -2931,8 +2931,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <div className="flex items-center gap-5 mb-5">
                     <div className="relative w-16 h-16 flex-shrink-0">
                       <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#e5e7eb" strokeWidth="3.5" />
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#3e8692" strokeWidth="3.5"
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="var(--hairline)" strokeWidth="3.5" />
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="rgb(var(--c-brand))" strokeWidth="3.5"
                           strokeDasharray={`${mindshareWeekly[mindshareWeekly.length - 1].mindshare_pct * 0.88} 88`}
                           strokeLinecap="round" />
                       </svg>
@@ -3554,7 +3554,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${progressPct}%`, backgroundColor: d.templateColor || '#3e8692' }}
+                          style={{ width: `${progressPct}%`, backgroundColor: d.templateColor || 'rgb(var(--c-brand))' }}
                         />
                       </div>
 

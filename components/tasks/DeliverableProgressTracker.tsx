@@ -101,7 +101,7 @@ export function DeliverableProgressTracker({ parentTaskId }: DeliverableProgress
           className="h-2 rounded-full transition-all"
           style={{
             width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
-            backgroundColor: deliverable.template.color || '#3e8692',
+            backgroundColor: deliverable.template.color || 'rgb(var(--c-brand))',
           }}
         />
       </div>

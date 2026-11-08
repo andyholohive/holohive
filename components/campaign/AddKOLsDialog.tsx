@@ -399,7 +399,7 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
                           day_selected: "text-white hover:text-white focus:text-white",
                         }}
                         modifiersStyles={{
-                          selected: { backgroundColor: "#3e8692" },
+                          selected: { backgroundColor: "rgb(var(--c-brand))" },
                         }}
                       />
                     </PopoverContent>

@@ -688,7 +688,7 @@ function DateField({
         <Button
           variant="outline"
           className="h-9 w-full justify-start font-normal focus-brand"
-          style={{ color: value ? '#111827' : '#9ca3af' }}
+          style={{ color: value ? 'var(--ink)' : 'var(--ink-faint)' }}
         >
           <CalendarIcon className="mr-2 h-3.5 w-3.5" />
           {value
@@ -719,7 +719,7 @@ function DateField({
           }}
           initialFocus
           classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+          modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
         />
       </PopoverContent>
     </Popover>

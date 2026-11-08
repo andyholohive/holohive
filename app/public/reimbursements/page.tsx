@@ -311,7 +311,7 @@ function DateField({ value, onChange, disabled, placeholder, allowClear }: { val
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" disabled={disabled} className="w-full justify-start font-normal focus-brand" style={{ color: value ? '#111827' : '#6b7280' }}>
+        <Button type="button" variant="outline" disabled={disabled} className="w-full justify-start font-normal focus-brand" style={{ color: value ? 'var(--ink)' : 'var(--ink-muted)' }}>
           <CalendarIcon className="mr-2 h-4 w-4 opacity-70" />
           {value ? fmtDate(selectedDate!) : (placeholder || 'Select date')}
           {allowClear && value && (
@@ -339,7 +339,7 @@ function DateField({ value, onChange, disabled, placeholder, allowClear }: { val
           }}
           initialFocus
           classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+          modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
         />
       </PopoverContent>
     </Popover>

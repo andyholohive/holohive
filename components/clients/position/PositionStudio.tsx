@@ -96,7 +96,7 @@ function PositionMap({ s, i }: { s: PositionSeries; i: number }) {
       {w > 0 && (
         <svg width={W} height={H} role="img" aria-label="Korea position map" className="block overflow-visible">
           <defs>
-            <radialGradient id="pm-lead" cx="100%" cy="0%" r="80%"><stop offset="0%" stopColor="#3e8692" stopOpacity="0.14" /><stop offset="100%" stopColor="#3e8692" stopOpacity="0" /></radialGradient>
+            <radialGradient id="pm-lead" cx="100%" cy="0%" r="80%"><stop offset="0%" stopColor="rgb(var(--c-brand))" stopOpacity="0.14" /><stop offset="100%" stopColor="rgb(var(--c-brand))" stopOpacity="0" /></radialGradient>
             <filter id="pm-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="4" /></filter>
           </defs>
           {/* Leading quadrant glow + quadrant split */}
@@ -105,7 +105,7 @@ function PositionMap({ s, i }: { s: PositionSeries; i: number }) {
           <line x1={m.l} x2={m.l + iw} y1={Y(0)} y2={Y(0)} stroke="#D9D2BD" strokeDasharray="3 4" />
           <line x1={sx} x2={sx} y1={m.t} y2={m.t + ih} stroke="#D9D2BD" strokeDasharray="3 4" className="pm-anim" />
           {quads.map((q) => (
-            <text key={q.label} x={q.x} y={q.y} textAnchor={q.anchor} fontSize="10" fontWeight="600" letterSpacing="0.18em" fill={q.label === 'Leading' ? '#2d6470' : '#9A9385'}>{q.label.toUpperCase()}</text>
+            <text key={q.label} x={q.x} y={q.y} textAnchor={q.anchor} fontSize="10" fontWeight="600" letterSpacing="0.18em" fill={q.label === 'Leading' ? 'rgb(var(--c-brand-dark))' : '#9A9385'}>{q.label.toUpperCase()}</text>
           ))}
           {/* Axes */}
           {xTicks.map((t) => (
@@ -118,8 +118,8 @@ function PositionMap({ s, i }: { s: PositionSeries; i: number }) {
           <text transform={`translate(12 ${m.t + ih / 2}) rotate(-90)`} textAnchor="middle" fontSize="10" fontWeight="600" letterSpacing="0.16em" fill="#6B6557">MOMENTUM →</text>
 
           {/* Client trail */}
-          {path && <path d={path} fill="none" stroke="#3e8692" strokeWidth="2" strokeOpacity="0.35" strokeLinecap="round" strokeLinejoin="round" />}
-          {trail.map((p, j) => p && j < i && <circle key={j} cx={p[0]} cy={p[1]} r={2.5} fill="#3e8692" opacity={0.25 + (0.5 * j) / Math.max(i, 1)} />)}
+          {path && <path d={path} fill="none" stroke="rgb(var(--c-brand))" strokeWidth="2" strokeOpacity="0.35" strokeLinecap="round" strokeLinejoin="round" />}
+          {trail.map((p, j) => p && j < i && <circle key={j} cx={p[0]} cy={p[1]} r={2.5} fill="rgb(var(--c-brand))" opacity={0.25 + (0.5 * j) / Math.max(i, 1)} />)}
 
           {/* Projects */}
           {s.projects.map((p) => {
@@ -130,9 +130,9 @@ function PositionMap({ s, i }: { s: PositionSeries; i: number }) {
             return (
               <g key={p.id} className="pm-dot" style={{ transform: `translate(${x}px, ${y}px)`, opacity: ok ? 1 : 0 }}
                 onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)}>
-                {p.isClient && <circle r={16} fill="#3e8692" opacity={0.18} filter="url(#pm-glow)" className="pm-pulse" />}
-                <circle r={p.isClient ? 8 : active ? 6.5 : 5} fill={p.isClient ? '#3e8692' : '#FFFFFF'} stroke={p.isClient ? '#FFFFFF' : '#9A9385'} strokeWidth={p.isClient ? 2.5 : 1.5} />
-                <text x={labels.get(p.id)?.dx ?? 9} y={labels.get(p.id)?.dy ?? 4} textAnchor={labels.get(p.id)?.anchor ?? 'start'} fontSize={p.isClient ? 12 : 11} fontWeight={p.isClient ? 700 : 500} fill={p.isClient ? '#1f4651' : '#46423A'}
+                {p.isClient && <circle r={16} fill="rgb(var(--c-brand))" opacity={0.18} filter="url(#pm-glow)" className="pm-pulse" />}
+                <circle r={p.isClient ? 8 : active ? 6.5 : 5} fill={p.isClient ? 'rgb(var(--c-brand))' : '#FFFFFF'} stroke={p.isClient ? '#FFFFFF' : '#9A9385'} strokeWidth={p.isClient ? 2.5 : 1.5} />
+                <text x={labels.get(p.id)?.dx ?? 9} y={labels.get(p.id)?.dy ?? 4} textAnchor={labels.get(p.id)?.anchor ?? 'start'} fontSize={p.isClient ? 12 : 11} fontWeight={p.isClient ? 700 : 500} fill={p.isClient ? 'rgb(var(--c-brand-deep))' : '#46423A'}
                   paintOrder="stroke" stroke="#FBF9F4" strokeWidth="3">{p.name}</text>
                 {active && ok && (
                   <text x={9} y={18} fontSize="10" fill="#6B6557" paintOrder="stroke" stroke="#FBF9F4" strokeWidth="3" className="tabular-nums">{v!.toFixed(2)}% · {times(mo!)}</text>
@@ -165,7 +165,7 @@ function RankRace({ s, i }: { s: PositionSeries; i: number }) {
               <div className={`rr-bar absolute inset-y-0 left-0 rounded-md ${p.isClient ? 'bg-gradient-to-r from-brand to-brand-dark shadow-btn-brand' : 'bg-ink-warm-200'}`}
                 style={{ width: `${Math.max((v / top) * 100, 1.5)}%` }} />
               <span className={`absolute inset-y-0 left-2.5 flex items-center truncate text-[13px] ${p.isClient ? 'font-semibold text-white' : 'font-medium text-ink-warm-800'}`}
-                style={p.isClient && v / top < 0.35 ? { color: '#1f4651', left: `calc(${(v / top) * 100}% + 8px)` } : undefined}>{p.name}</span>
+                style={p.isClient && v / top < 0.35 ? { color: 'rgb(var(--c-brand-deep))', left: `calc(${(v / top) * 100}% + 8px)` } : undefined}>{p.name}</span>
             </div>
             <span className={`w-14 text-right text-[13px] tabular-nums ${p.isClient ? 'font-semibold text-brand-deep' : 'text-ink-warm-700'}`}>{v.toFixed(2)}%</span>
           </div>

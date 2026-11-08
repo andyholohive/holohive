@@ -970,7 +970,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                   onSelect={(date) => setInlineNew({ ...inlineNew, logged_at: date ? toLocalDateStr(date) : '' })}
                                   initialFocus
                                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                  modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                  modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                                 />
                               </PopoverContent>
                             </Popover>
@@ -1109,7 +1109,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                   onSelect={(date) => saveDateField(entry.id, date)}
                                   initialFocus
                                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                                  modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                                  modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                                 />
                               </PopoverContent>
                             </Popover>
@@ -1204,13 +1204,13 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 <Label>Date <RequiredAsterisk /></Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
+                    <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: form.logged_at ? 'var(--ink)' : 'var(--ink-faint)' }}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {form.logged_at ? formatDate(form.logged_at) : 'Select date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={form.logged_at} onSelect={(date) => setForm({ ...form, logged_at: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
+                    <Calendar mode="single" selected={form.logged_at} onSelect={(date) => setForm({ ...form, logged_at: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }} />
                   </PopoverContent>
                 </Popover>
               </div>

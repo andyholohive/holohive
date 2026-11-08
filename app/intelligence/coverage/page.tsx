@@ -368,7 +368,7 @@ function CoverageInner() {
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <Bar dataKey="posts" radius={[4, 4, 0, 0]}>
                       {contract.velocity.map((v, i) => (
-                        <Cell key={i} fill={v.posts >= maxVelocity ? '#3e8692' : '#9cc3c9'} />
+                        <Cell key={i} fill={v.posts >= maxVelocity ? 'rgb(var(--c-brand))' : '#9cc3c9'} />
                       ))}
                     </Bar>
                   </BarChart>

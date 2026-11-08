@@ -885,7 +885,7 @@ export function EngagementEditForm({
               <Button
                 variant="outline"
                 className="h-9 w-full justify-start text-left font-normal focus-brand text-sm"
-                style={{ color: startDate ? '#111827' : '#9ca3af' }}
+                style={{ color: startDate ? 'var(--ink)' : 'var(--ink-faint)' }}
               >
                 <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                 {startDate ? displayDate(startDate) : 'Select start date'}
@@ -898,7 +898,7 @@ export function EngagementEditForm({
                 onSelect={(date) => setStartDate(formatDateForStorage(date))}
                 initialFocus
                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
               />
             </PopoverContent>
           </Popover>
@@ -910,7 +910,7 @@ export function EngagementEditForm({
               <Button
                 variant="outline"
                 className="h-9 w-full justify-start text-left font-normal focus-brand text-sm"
-                style={{ color: endDate ? '#111827' : '#9ca3af' }}
+                style={{ color: endDate ? 'var(--ink)' : 'var(--ink-faint)' }}
               >
                 <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                 {endDate ? displayDate(endDate) : 'Select end date'}
@@ -923,7 +923,7 @@ export function EngagementEditForm({
                 onSelect={(date) => setEndDate(formatDateForStorage(date))}
                 initialFocus
                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
               />
             </PopoverContent>
           </Popover>

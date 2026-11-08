@@ -202,7 +202,7 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
                         className="h-full transition-all duration-300"
                         style={{
                           width: `${uploadingFile.progress}%`,
-                          backgroundColor: '#3e8692',
+                          backgroundColor: 'rgb(var(--c-brand))',
                         }}
                       />
                     </div>

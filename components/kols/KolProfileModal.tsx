@@ -1126,7 +1126,7 @@ function SnapshotTrendChart({ rows }: { rows: KolChannelSnapshot[] }) {
         <div className="text-xs font-semibold text-ink-warm-700">Channel Trend</div>
         <div className="flex items-center gap-3 text-[10px] text-ink-warm-500">
           <span className="inline-flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#3e8692' }} />Followers
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'rgb(var(--c-brand))' }} />Followers
           </span>
           <span className="inline-flex items-center gap-1">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#8b5cf6' }} />Avg Views
@@ -1139,17 +1139,17 @@ function SnapshotTrendChart({ rows }: { rows: KolChannelSnapshot[] }) {
       <div className="h-44 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#6b7280' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
+            <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--ink-muted)' }} />
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
               tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 10, fill: '#6b7280' }}
+              tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
               tickFormatter={(v) => `${v}%`}
             />
             <ChartTooltip
@@ -1161,7 +1161,7 @@ function SnapshotTrendChart({ rows }: { rows: KolChannelSnapshot[] }) {
               labelStyle={{ fontSize: 11 }}
               contentStyle={{ fontSize: 11 }}
             />
-            <Line yAxisId="left" type="monotone" dataKey="followers" name="Followers" stroke="#3e8692" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+            <Line yAxisId="left" type="monotone" dataKey="followers" name="Followers" stroke="rgb(var(--c-brand))" strokeWidth={2} dot={{ r: 3 }} connectNulls />
             <Line yAxisId="left" type="monotone" dataKey="avgViews" name="Avg Views" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} connectNulls />
             <Line yAxisId="right" type="monotone" dataKey="erPct" name="ER %" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} connectNulls />
           </LineChart>
@@ -1650,7 +1650,7 @@ function CallLogForm({
                   }
                 }}
                 classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
               />
             </PopoverContent>
           </Popover>

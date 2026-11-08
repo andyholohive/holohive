@@ -300,7 +300,7 @@ export default function ContentTagDialog({
                             <span
                               key={a.id}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white"
-                              style={{ backgroundColor: tag.color || '#64748b' }}
+                              style={{ backgroundColor: tag.color || 'var(--ink-muted)' }}
                             >
                               {seqLabel}
                               {isMultiPost && (
@@ -371,7 +371,7 @@ export default function ContentTagDialog({
                                     >
                                       <span
                                         className="h-2 w-2 rounded-full shrink-0"
-                                        style={{ backgroundColor: t.color || '#64748b' }}
+                                        style={{ backgroundColor: t.color || 'var(--ink-muted)' }}
                                       />
                                       <span className="text-xs text-ink-warm-900 truncate">{t.name}</span>
                                       <Label className="ml-auto text-[9px] uppercase tracking-wider text-ink-warm-500">

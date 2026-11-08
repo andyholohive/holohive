@@ -1714,7 +1714,7 @@ export default function NetworkPage() {
                       <div className="flex items-center gap-2">
                         <Badge
                           variant={partner.status === 'active' ? 'default' : 'secondary'}
-                          style={partner.status === 'active' ? { backgroundColor: '#3e8692' } : {}}
+                          style={partner.status === 'active' ? { backgroundColor: 'rgb(var(--c-brand))' } : {}}
                           className="capitalize cursor-default hover:bg-inherit"
                         >
                           {partner.status}
@@ -2976,7 +2976,7 @@ export default function NetworkPage() {
                 <div className="border rounded-lg p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full" style={{ backgroundColor: '#e8f4f5' }}>
+                      <div className="p-2 rounded-full" style={{ backgroundColor: 'rgb(var(--c-brand-light))' }}>
                         <Handshake className="h-4 w-4 text-brand"/>
                       </div>
                       <div>

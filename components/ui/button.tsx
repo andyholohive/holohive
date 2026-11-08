@@ -31,7 +31,7 @@ const buttonVariants = cva(
         ghost: 'hover:bg-accent',
         link: 'text-primary underline-offset-4 hover:underline',
         // [Design system, May 2026] Holo Hive brand teal CTA. Replaces
-        // the 264 inline `style={{ backgroundColor: '#3e8692' }}` hex
+        // the 264 inline `style={{ backgroundColor: 'rgb(var(--c-brand))' }}` hex
         // hacks scattered across the codebase. Use `<Button variant="brand">`
         // for primary "Start Client", "Add Project", "Save Campaign"
         // style actions — anywhere the brand color was previously

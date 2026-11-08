@@ -36,7 +36,7 @@
  * grid + Notes + Quick Actions + Stage Move + Edit-mode form.
  *
  * v11 note: gray-* tokens preserved during the structural split. The
- * inline date-picker chrome (`style={{ borderColor: '#e5e7eb', ... }}`
+ * inline date-picker chrome (`style={{ borderColor: 'var(--hairline)', ... }}`
  * on Popover triggers) is the most obvious follow-up — the v11 pass
  * at the end of Phase 4 will swap those for explicit cream-200 +
  * conditional ink-warm classes (same fix pattern I used on the
@@ -212,7 +212,7 @@ export function OpportunitySlideOver() {
           by the panel itself) cover dismissal. */}
       <div className="fixed inset-y-0 right-0 w-[480px] max-w-[calc(100vw-2rem)] bg-white border-l shadow-xl z-[70] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-cream-50 to-white">
+        <div className="px-6 py-4 border-b bg-gradient-to-r from-cream-50 to-surface">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">

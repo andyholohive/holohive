@@ -209,18 +209,18 @@ function RoleCombobox({
 // accent tones, plus a few neutrals). The CustomColorPicker behind
 // "Custom…" is the escape hatch for anything outside this set.
 const PRESET_COLORS = [
-  '#3E8692', // brand teal
+  'rgb(var(--c-brand))', // brand teal
   '#10B981', // emerald
   '#0EA5E9', // sky
   '#A855F7', // purple
   '#F59E0B', // amber
   '#F43F5E', // rose
   '#EC4899', // pink
-  '#64748B', // slate
+  'var(--ink-muted)', // slate
   '#84CC16', // lime
   '#06B6D4', // cyan
   '#F97316', // orange
-  '#1F2937', // ink-warm-900-ish
+  'var(--ink)', // ink-warm-900-ish
 ];
 
 /**
@@ -412,7 +412,7 @@ export default function DeliverableTemplatesTab() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<DeliverableTemplate | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', slug: '', description: '', category: 'client', icon: 'ClipboardList', color: '#3e8692' });
+  const [editForm, setEditForm] = useState({ name: '', slug: '', description: '', category: 'client', icon: 'ClipboardList', color: 'rgb(var(--c-brand))' });
 
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<DeliverableTemplateStep | null>(null);
@@ -616,7 +616,7 @@ export default function DeliverableTemplatesTab() {
       setEditForm({ name: t.name, slug: t.slug, description: t.description || '', category: t.category, icon: t.icon, color: t.color });
     } else {
       setEditingTemplate(null);
-      setEditForm({ name: '', slug: '', description: '', category: 'client', icon: 'ClipboardList', color: '#3e8692' });
+      setEditForm({ name: '', slug: '', description: '', category: 'client', icon: 'ClipboardList', color: 'rgb(var(--c-brand))' });
     }
     setEditDialogOpen(true);
   };
@@ -1070,7 +1070,7 @@ export default function DeliverableTemplatesTab() {
                         value={editForm.color}
                         onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))}
                         className="focus-brand h-8 text-xs font-mono"
-                        placeholder="#3E8692"
+                        placeholder="rgb(var(--c-brand))"
                       />
                     </div>
                     <Button
@@ -1422,7 +1422,7 @@ export default function DeliverableTemplatesTab() {
               setEditForm(f => ({ ...f, color }));
               setCustomColorOpen(false);
             }}
-            initialColor={editForm.color || '#3E8692'}
+            initialColor={editForm.color || 'rgb(var(--c-brand))'}
             presetColors={PRESET_COLORS}
           />
         </DialogContent>

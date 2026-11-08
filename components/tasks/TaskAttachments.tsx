@@ -173,7 +173,7 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
                 <span className="text-rose-500">{uf.error}</span>
               ) : (
                 <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full transition-all" style={{ width: `${uf.progress}%`, backgroundColor: '#3e8692' }} />
+                  <div className="h-full transition-all" style={{ width: `${uf.progress}%`, backgroundColor: 'rgb(var(--c-brand))' }} />
                 </div>
               )}
               <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setUploadingFiles(prev => prev.filter(f => f.file !== uf.file))}>

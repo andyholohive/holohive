@@ -78,7 +78,7 @@ const formatNum = (n: number | null | undefined): string => {
 };
 
 // Donut palette — recycle through 8 colors so a 20-KOL chart still reads.
-const PIE = ['#3e8692', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#0ea5e9', '#ef4444', '#64748b'];
+const PIE = ['rgb(var(--c-brand))', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#0ea5e9', '#ef4444', 'var(--ink-muted)'];
 
 export default function ActivationResultsSection({
   activations,
@@ -202,14 +202,14 @@ export default function ActivationResultsSection({
                       <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={daily} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--ink-faint)' }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--ink-faint)' }} />
                             <Tooltip
-                              contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
+                              contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
                               formatter={(value: number) => [value.toLocaleString(), 'Entries']}
                             />
-                            <Bar dataKey="entries" fill="#3e8692" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="entries" fill="rgb(var(--c-brand))" radius={[4, 4, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -238,7 +238,7 @@ export default function ActivationResultsSection({
                               ))}
                             </Pie>
                             <Tooltip
-                              contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
+                              contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
                               formatter={(value: number, name: string) => [value.toLocaleString(), name]}
                             />
                           </PieChart>

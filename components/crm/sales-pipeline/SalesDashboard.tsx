@@ -323,7 +323,7 @@ export function SalesDashboard({ onRecalculate, isRecalculating, metrics }: Sale
                   <Button
                     variant="outline"
                     className="h-7 px-2.5 text-xs justify-start font-normal gap-1.5"
-                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: dashboardCustomFrom ? '#111827' : '#9ca3af' }}
+                    style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: dashboardCustomFrom ? 'var(--ink)' : 'var(--ink-faint)' }}
                   >
                     <Calendar className="h-3 w-3" />
                     {dashboardCustomFrom ? format(new Date(dashboardCustomFrom + 'T00:00:00'), 'MMM d, yyyy') : 'From'}
@@ -336,7 +336,7 @@ export function SalesDashboard({ onRecalculate, isRecalculating, metrics }: Sale
                     onSelect={date => setDashboardCustomFrom(date ? format(date, 'yyyy-MM-dd') : '')}
                     initialFocus
                     classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                    modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                   />
                 </PopoverContent>
               </Popover>
@@ -346,7 +346,7 @@ export function SalesDashboard({ onRecalculate, isRecalculating, metrics }: Sale
                   <Button
                     variant="outline"
                     className="h-7 px-2.5 text-xs justify-start font-normal gap-1.5"
-                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: dashboardCustomTo ? '#111827' : '#9ca3af' }}
+                    style={{ borderColor: 'var(--hairline)', backgroundColor: 'white', color: dashboardCustomTo ? 'var(--ink)' : 'var(--ink-faint)' }}
                   >
                     <Calendar className="h-3 w-3" />
                     {dashboardCustomTo ? format(new Date(dashboardCustomTo + 'T00:00:00'), 'MMM d, yyyy') : 'To'}
@@ -359,7 +359,7 @@ export function SalesDashboard({ onRecalculate, isRecalculating, metrics }: Sale
                     onSelect={date => setDashboardCustomTo(date ? format(date, 'yyyy-MM-dd') : '')}
                     initialFocus
                     classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                    modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                   />
                 </PopoverContent>
               </Popover>

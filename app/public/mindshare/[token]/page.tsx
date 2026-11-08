@@ -189,7 +189,7 @@ export default function PublicMindsharePage() {
                       }
                     }}
                     classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                    modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                   />
                   <div className="mt-2 flex gap-1">
                     {[14, 30, 60, 90].map(n => (
@@ -241,24 +241,24 @@ export default function PublicMindsharePage() {
               <XAxis
                 dataKey="day"
                 tickFormatter={formatChartTick}
-                tick={{ fontSize: 10, fill: '#6b7280' }}
-                axisLine={{ stroke: '#e5e7eb' }}
+                tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
+                axisLine={{ stroke: 'var(--hairline)' }}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                tick={{ fontSize: 10, fill: '#6b7280' }}
-                axisLine={{ stroke: '#e5e7eb' }}
+                tick={{ fontSize: 10, fill: 'var(--ink-muted)' }}
+                axisLine={{ stroke: 'var(--hairline)' }}
                 tickLine={false}
                 width={44}
               />
               <Tooltip
                 labelFormatter={(d) => formatDate(String(d))}
                 formatter={(v: any, name: string) => name === 'pct' ? [`${Number(v).toFixed(2)}%`, 'Mindshare'] : [v, 'Mentions']}
-                contentStyle={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 }}
+                contentStyle={{ background: 'var(--surface)', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 }}
               />
-              <ReferenceLine x={after.from} stroke="#3e8692" strokeDasharray="3 3" label={{ value: 'Campaign start', position: 'top', fill: '#3e8692', fontSize: 10 }} />
-              <Line type="monotone" dataKey="pct" stroke="#3e8692" strokeWidth={2} dot={false} />
+              <ReferenceLine x={after.from} stroke="rgb(var(--c-brand))" strokeDasharray="3 3" label={{ value: 'Campaign start', position: 'top', fill: 'rgb(var(--c-brand))', fontSize: 10 }} />
+              <Line type="monotone" dataKey="pct" stroke="rgb(var(--c-brand))" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

@@ -780,9 +780,9 @@ export default function CampaignsPage() {
                           variant="outline"
                           className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                           style={{
-                            borderColor: "#e5e7eb",
+                            borderColor: "var(--hairline)",
                             backgroundColor: "white",
-                            color: newCampaign.start_date ? "#111827" : "#9ca3af"
+                            color: newCampaign.start_date ? "var(--ink)" : "var(--ink-faint)"
                           }}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -799,7 +799,7 @@ export default function CampaignsPage() {
                             day_selected: "text-white hover:text-white focus:text-white",
                           }}
                           modifiersStyles={{
-                            selected: { backgroundColor: "#3e8692" }
+                            selected: { backgroundColor: "rgb(var(--c-brand))" }
                           }}
                         />
                       </PopoverContent>
@@ -947,9 +947,9 @@ export default function CampaignsPage() {
                             variant="outline"
                             className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{
-                              borderColor: '#e5e7eb',
+                              borderColor: 'var(--hairline)',
                               backgroundColor: 'white',
-                              color: newCampaign.intro_call_date ? '#111827' : '#9ca3af'
+                              color: newCampaign.intro_call_date ? 'var(--ink)' : 'var(--ink-faint)'
                             }}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -966,7 +966,7 @@ export default function CampaignsPage() {
                               day_selected: 'text-white hover:text-white focus:text-white',
                             }}
                             modifiersStyles={{
-                              selected: { backgroundColor: '#3e8692' }
+                              selected: { backgroundColor: 'rgb(var(--c-brand))' }
                             }}
                           />
                         </PopoverContent>

@@ -55,7 +55,7 @@ function SortableRow({ option, onToggleActive, onDelete }: SortableRowProps) {
       <TableCell className="font-medium">{option.option_value}</TableCell>
       <TableCell>{option.display_order}</TableCell>
       <TableCell>
-        <Badge variant={option.is_active ? 'default' : 'secondary'} style={option.is_active ? { backgroundColor: '#3e8692' } : {}}>
+        <Badge variant={option.is_active ? 'default' : 'secondary'} style={option.is_active ? { backgroundColor: 'rgb(var(--c-brand))' } : {}}>
           {option.is_active ? 'Active' : 'Inactive'}
         </Badge>
       </TableCell>

@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Users, Megaphone, Crown, List, Building2, Send, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X, Wallet, Repeat2, Search, AlertTriangle } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, NAV_REGISTRY, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
+import { ThemeToggleButton } from '@/components/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { canViewPortfolio } from '@/lib/portfolioAccess';
 import GlobalCommandPalette, { openCommandPalette } from '@/components/command/GlobalCommandPalette';
@@ -1064,6 +1065,8 @@ export default function Sidebar({ children }: SidebarProps) {
                     <SlidersHorizontal className="h-4 w-4 text-ink-warm-500" />
                   </Button>
                 )}
+                {/* [2026-11-08] Light / dark. Full choice incl. "match system" lives in Settings. */}
+                <ThemeToggleButton />
                 <Button
                   variant="ghost"
                   size="sm"

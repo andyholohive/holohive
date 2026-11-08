@@ -752,9 +752,9 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   variant="outline"
                   className={`focus-brand w-full justify-start text-left font-normal ${hasError ? 'border-rose-500' : ''}`}
                   style={{
-                    borderColor: hasError ? '#ef4444' : '#e5e7eb',
+                    borderColor: hasError ? '#ef4444' : 'var(--hairline)',
                     backgroundColor: 'white',
-                    color: formData[field.id] ? '#111827' : '#9ca3af'
+                    color: formData[field.id] ? 'var(--ink)' : 'var(--ink-faint)'
                   }}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -771,7 +771,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     day_selected: "text-white hover:text-white focus:text-white",
                   }}
                   modifiersStyles={{
-                    selected: { backgroundColor: "#3e8692" }
+                    selected: { backgroundColor: "rgb(var(--c-brand))" }
                   }}
                 />
               </PopoverContent>

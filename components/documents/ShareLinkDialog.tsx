@@ -184,7 +184,7 @@ export default function ShareLinkDialog({
                   selected={expiresAt ? new Date(expiresAt) : undefined}
                   onSelect={(day) => { if (day) setExpiresAt(endOfLocalDayIso(day)); }}
                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                  modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                  modifiersStyles={{ selected: { backgroundColor: 'rgb(var(--c-brand))' } }}
                 />
                 {expiresAt && (
                   <div className="border-t p-2">

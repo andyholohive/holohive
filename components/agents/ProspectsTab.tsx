@@ -595,7 +595,7 @@ export default function ProspectsTab() {
                 ? 'text-white'
                 : 'text-gray-600 hover:bg-gray-100 border border-transparent'
             }`}
-            style={statusFilter === tab.value ? { backgroundColor: '#3e8692' } : {}}
+            style={statusFilter === tab.value ? { backgroundColor: 'rgb(var(--c-brand))' } : {}}
           >
             {tab.label}
             {statusCounts[tab.value] != null && tab.value !== 'all' && (
@@ -964,7 +964,7 @@ export default function ProspectsTab() {
                         ? 'text-white border-transparent'
                         : 'text-gray-600 border-gray-200 hover:bg-gray-50'
                     }`}
-                    style={scraperSource === s.value ? { backgroundColor: '#3e8692' } : {}}
+                    style={scraperSource === s.value ? { backgroundColor: 'rgb(var(--c-brand))' } : {}}
                   >
                     {s.label}
                   </button>

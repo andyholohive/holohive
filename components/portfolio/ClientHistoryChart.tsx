@@ -131,8 +131,8 @@ export function ClientHistoryChart({ points }: { points: MonthPoint[] }) {
           >
             <defs>
               <linearGradient id="chc-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3e8692" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="#3e8692" stopOpacity="0" />
+                <stop offset="0%" stopColor="rgb(var(--c-brand))" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="rgb(var(--c-brand))" stopOpacity="0" />
               </linearGradient>
             </defs>
 
@@ -153,14 +153,14 @@ export function ClientHistoryChart({ points }: { points: MonthPoint[] }) {
             ))}
 
             <path d={area} fill="url(#chc-fill)" />
-            <path d={line} fill="none" stroke="#3e8692" strokeWidth={2}
+            <path d={line} fill="none" stroke="rgb(var(--c-brand))" strokeWidth={2}
                   strokeLinejoin="round" strokeLinecap="round" />
 
             {/* Crosshair on the hovered month. */}
             {hover !== null && (
               <line
                 x1={x(hover)} x2={x(hover)} y1={PAD_T - 4} y2={y(0)}
-                stroke="#3e8692" strokeWidth={1} strokeDasharray="3 3" opacity={0.5}
+                stroke="rgb(var(--c-brand))" strokeWidth={1} strokeDasharray="3 3" opacity={0.5}
               />
             )}
 
@@ -171,7 +171,7 @@ export function ClientHistoryChart({ points }: { points: MonthPoint[] }) {
                   {/* A surface-coloured ring keeps the dot legible on the line. */}
                   <circle
                     cx={x(i)} cy={y(p.retained)} r={on ? 5.5 : 3.5}
-                    fill="#3e8692" stroke="#ffffff" strokeWidth={2}
+                    fill="rgb(var(--c-brand))" stroke="#ffffff" strokeWidth={2}
                   />
                   <text
                     x={x(i)} y={H - 6} textAnchor="middle"

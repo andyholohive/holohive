@@ -325,7 +325,7 @@ function CollapsibleEmbed({ children }: { children: React.ReactNode }) {
       >
         <div ref={innerRef}>{children}</div>
         {!expanded && overflows && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-surface to-transparent" />
         )}
       </div>
       {overflows && (

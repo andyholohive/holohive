@@ -155,7 +155,7 @@ export function KolDashboardOverview() {
   };
 
   const chartTooltipStyle = {
-    backgroundColor: 'white',
+    backgroundColor: 'var(--surface)',
     border: '1px solid #e2e8f0',
     borderRadius: '12px',
     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
@@ -193,7 +193,7 @@ export function KolDashboardOverview() {
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={platformChartData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                 <XAxis
                   dataKey="platform"
                   axisLine={false}
@@ -209,12 +209,12 @@ export function KolDashboardOverview() {
                           </svg>
                         </g>
                       ) : (
-                        <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={12}>{payload.value}</text>
+                        <text x={0} y={0} dy={16} textAnchor="middle" fill="var(--ink-muted)" fontSize={12}>{payload.value}</text>
                       )}
                     </g>
                   )}
                 />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)' }} allowDecimals={false} />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   formatter={(value: number) => [value, 'Count']}
@@ -241,9 +241,9 @@ export function KolDashboardOverview() {
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={regionChartData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="region" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="region" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontWeight: 500 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--ink-muted)' }} allowDecimals={false} />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   formatter={(value: number) => [value, 'Count']}

@@ -740,7 +740,7 @@ export default function McpGuidePage() {
       )}
 
       {/* ── Pro tips ───────────────────────────────────────────────── */}
-      <div className="mt-12 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 p-6">
+      <div className="mt-12 rounded-2xl bg-gradient-to-br from-gray-50 to-surface border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="h-4 w-4 text-brand" />
           <h3 className="text-base font-bold text-gray-900">Pro tips</h3>

@@ -636,7 +636,7 @@ function VenueChip({ label, active, onClick, kr }: { label: string; active: bool
       onClick={onClick}
       className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
         active
-          ? kr ? 'bg-brand text-white border-brand' : 'bg-ink-warm-800 text-white border-ink-warm-800'
+          ? kr ? 'bg-brand text-white border-brand' : 'bg-ink-warm-800 text-cream-50 border-ink-warm-800'
           : 'bg-cream-50 text-ink-warm-600 border-cream-200 hover:bg-cream-100'
       }`}
     >
