@@ -181,6 +181,9 @@ export default function SubmissionsPage() {
       const insertPayload: any = {
         name: s.project_name || s.name || 'Untitled inbound',
         stage: 'new',
+        // Without this the stage-forward trigger maps 'new' to 'prospect',
+        // which the v1.3 board (/crm/pipeline) does not show.
+        pipeline_stage: 'new_lead',
         source: 'inbound',
         poc_platform: s.telegram ? 'telegram' : (s.email ? 'email' : null),
         poc_handle: s.telegram || s.email || null,
@@ -209,7 +212,7 @@ export default function SubmissionsPage() {
             .single();
           if (existing?.id) {
             toast({ title: 'Already converted', description: 'Opening existing opportunity.' });
-            router.push(`/crm/sales-pipeline?opp=${existing.id}`);
+            router.push('/crm/pipeline');
             return;
           }
         }
@@ -223,7 +226,7 @@ export default function SubmissionsPage() {
         return next;
       });
       toast({ title: 'Opportunity created', description: `${insertPayload.name} added to the pipeline.` });
-      if (data?.id) router.push(`/crm/sales-pipeline?opp=${data.id}`);
+      router.push('/crm/pipeline');
     } catch (err: any) {
       console.error('Error converting submission:', err);
       toast({ title: 'Conversion failed', description: err?.message || 'Could not create opportunity.', variant: 'destructive' });
@@ -782,7 +785,7 @@ export default function SubmissionsPage() {
                 variant="outline"
                 onClick={() => {
                   const oppId = convertedOppMap.get(selectedSubmission.id);
-                  if (oppId) router.push(`/crm/sales-pipeline?opp=${oppId}`);
+                  if (oppId) router.push('/crm/pipeline');
                 }}
               >
                 <ArrowRight className="h-4 w-4 mr-1.5" /> Open in pipeline
