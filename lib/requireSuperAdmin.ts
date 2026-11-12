@@ -103,7 +103,7 @@ export async function requireRole(
   });
   const { data: profile, error } = await (admin as any)
     .from('users')
-    .select('id, name, role')
+    .select('id, name, role, is_active')
     .eq('id', sessionUser.id)
     .maybeSingle();
 
@@ -111,6 +111,16 @@ export async function requireRole(
     return {
       ok: false,
       response: NextResponse.json({ error: 'User profile missing' }, { status: 403 }),
+    };
+  }
+  // A pending sign-up is created as role 'member' with is_active=false, so the
+  // role check alone lets them through. ProtectedRoute blocks them in the UI,
+  // but public pages (the client portal's Team preview) and direct API calls
+  // never pass through it — this is the server-side half [Andy 2026-11-13].
+  if (profile.is_active === false) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Account pending approval' }, { status: 403 }),
     };
   }
   if (!allowedRoles.includes(profile.role)) {
