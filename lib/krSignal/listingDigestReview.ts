@@ -21,7 +21,7 @@ export interface ListingDigestRow {
   week_ending: string;
   digest_html: string;
   edited_html: string | null;
-  status: 'pending_review' | 'sent' | 'skipped';
+  status: 'pending_review' | 'sent' | 'skipped' | 'expired';
   preflight: any;
   deliveries: any;
   review_chat_id: string | null;
@@ -71,6 +71,23 @@ export async function saveDigestForReview(
     .insert({ week_ending: weekEnding, digest_html: digestHtml, preflight })
     .select('*').single();
   return (data as ListingDigestRow) ?? null;
+}
+
+/** Same rule as the weekly report: once this week's digest is queued, older
+ *  digests nobody decided on are closed as expired, and their cards' buttons
+ *  are stripped by the caller. Four stale digests were re-posted alongside
+ *  the live one before this existed. */
+export async function expireSupersededDigests(
+  supabase: SupabaseClient, newWeekEnding: string,
+): Promise<ListingDigestRow[]> {
+  const now = new Date().toISOString();
+  const { data, error } = await (supabase as any).from(TABLE)
+    .update({ status: 'expired', approved_by_name: `Superseded by week ending ${newWeekEnding}`, updated_at: now })
+    .eq('status', 'pending_review')
+    .lt('week_ending', newWeekEnding)
+    .select('*');
+  if (error) throw new Error(`expireSupersededDigests: ${error.message}`);
+  return (data ?? []) as ListingDigestRow[];
 }
 
 export async function attachDigestCard(

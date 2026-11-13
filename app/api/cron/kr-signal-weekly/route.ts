@@ -84,6 +84,15 @@ export async function GET(request: Request) {
       }
 
       // Still pending at the send window — tell the humans, not the client.
+      //
+      // [2026-11-13] Only for the week that just closed. Older pending rows
+      // are normally expired by the generate cron; if one survives (a client
+      // whose generate failed), nudging about a report that is weeks stale
+      // just adds to the pile the nudge was meant to clear.
+      if (ageDays(row.week_ending, startedAt) > 8) {
+        nudged.push({ client: clientName, week_ending: row.week_ending, skipped: 'stale — not re-nudged' });
+        continue;
+      }
       if (!reviewChatId) {
         nudged.push({ client: clientName, error: 'no review chat configured' });
         continue;
@@ -115,4 +124,10 @@ export async function GET(request: Request) {
     await finishRun('failed', { sent, nudged }, String(e?.message || e));
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
+}
+
+/** Whole days between an ISO date (YYYY-MM-DD) and `now`. */
+function ageDays(isoDate: string, now: Date): number {
+  const t = Date.parse(`${isoDate}T00:00:00Z`);
+  return Number.isFinite(t) ? (now.getTime() - t) / 86_400_000 : Infinity;
 }

@@ -117,7 +117,7 @@ export function reviewButtons(rowId: string, briefUrl?: string | null): InlineBu
  *  record, the buttons go away, and the outcome names who did it. */
 export function decidedCard(
   original: string,
-  outcome: 'sent' | 'skipped' | 'failed',
+  outcome: 'sent' | 'skipped' | 'failed' | 'expired',
   byName: string | null,
   detail?: string
 ): string {
@@ -128,6 +128,8 @@ export function decidedCard(
     sent: `✅ <b>Sent to client</b>${byName ? ` by ${escapeHtml(byName)}` : ''}${detail ? ` — ${escapeHtml(detail)}` : ''}`,
     skipped: `⏭ <b>Skipped</b>${byName ? ` by ${escapeHtml(byName)}` : ''} — not sent this week`,
     failed: `🚫 <b>Send failed</b>${detail ? ` — ${escapeHtml(detail)}` : ''}`,
+    // Closed by the system, not a person: a newer week's card replaced it.
+    expired: `⏳ <b>Expired</b>${detail ? ` — ${escapeHtml(detail)}` : ''} — never sent`,
   }[outcome];
   return `${stamp}\n\n${original}`;
 }

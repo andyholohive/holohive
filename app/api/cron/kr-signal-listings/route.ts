@@ -14,11 +14,11 @@ import {
   type DigestEntry,
 } from '@/lib/krSignal/listings';
 import { getUsdKrw, getTrailing7dAvgVolumeUsd, getCoinPriceAndMcapUsd, searchCoingeckoIdBySymbol, getPerVenueVolume } from '@/lib/krSignal/adapters';
-import { editMessageText, sendMessageWithButtons, probeChat } from '@/lib/krSignal/telegram';
+import { editMessageText, sendMessageWithButtons, probeChat, editMessageAndClearButtons } from '@/lib/krSignal/telegram';
 import { getAppSettingStrict } from '@/lib/appSettings';
-import { saveDigestForReview, attachDigestCard } from '@/lib/krSignal/listingDigestReview';
+import { saveDigestForReview, attachDigestCard, expireSupersededDigests, effectiveDigestHtml } from '@/lib/krSignal/listingDigestReview';
 import { saveAlertForReview, attachAlertCard } from '@/lib/krSignal/listingAlertReview';
-import { buildListingDigestCard, listingDigestButtons, buildListingAlertCard, listingAlertButtons } from '@/lib/krSignal/reviewCard';
+import { buildListingDigestCard, listingDigestButtons, buildListingAlertCard, listingAlertButtons, decidedCard } from '@/lib/krSignal/reviewCard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -305,6 +305,18 @@ export async function GET(request: Request) {
         summary.digestQueued = 'already decided this week';
       } else {
         summary.digestQueued = true;
+        // [2026-11-13] One live digest card at a time — older undecided ones
+        // close as expired and lose their buttons (see expireSupersededWeeklies).
+        const expired = await expireSupersededDigests(supabase, weekEnding);
+        for (const old of expired) {
+          if (old.review_chat_id && old.review_message_id) {
+            await editMessageAndClearButtons(
+              old.review_chat_id, old.review_message_id,
+              decidedCard(effectiveDigestHtml(old), 'expired', null, `replaced by the week ending ${weekEnding}`),
+            );
+          }
+        }
+        summary.digestsExpired = expired.length;
         if (reviewChatId && !row.review_message_id) {
           const card = buildListingDigestCard({
             weekLabel: weekLabelFor(now),

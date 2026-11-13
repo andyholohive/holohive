@@ -49,7 +49,7 @@ export async function approveAndSend(
 ): Promise<ApproveResult> {
   const row = await getWeeklyReviewById(supabase, rowId);
   if (!row) return { ok: false, error: 'Report not found.' };
-  if (row.status === 'sent' || row.status === 'skipped') {
+  if (row.status === 'sent' || row.status === 'skipped' || row.status === 'expired') {
     return { ok: false, alreadyDecided: row.status };
   }
 
@@ -112,7 +112,7 @@ export async function skipReport(
 ): Promise<{ ok: boolean; error?: string; alreadyDecided?: WeeklyReviewRow['status'] }> {
   const row = await getWeeklyReviewById(supabase, rowId);
   if (!row) return { ok: false, error: 'Report not found.' };
-  if (row.status === 'sent' || row.status === 'skipped') {
+  if (row.status === 'sent' || row.status === 'skipped' || row.status === 'expired') {
     return { ok: false, alreadyDecided: row.status };
   }
 

@@ -212,7 +212,10 @@ export async function refreshBaselines(
 // These helpers are the whole state machine; the crons, the webhook and the
 // in-app editor all go through them so the transitions can't drift apart.
 
-export type WeeklyReviewStatus = "pending_review" | "approved" | "sent" | "skipped";
+/** 'expired' = never decided, superseded by a newer week's card. Not a human
+ *  decision (that is 'skipped'); the generate cron stamps it so stale cards
+ *  stop piling up in the review topic. */
+export type WeeklyReviewStatus = "pending_review" | "approved" | "sent" | "skipped" | "expired";
 
 export interface WeeklyReviewRow {
   id: string;
@@ -275,6 +278,39 @@ export async function saveWeeklyForReview(
     .single();
   if (error) throw new Error(`saveWeeklyForReview: ${error.message}`);
   return data as unknown as WeeklyReviewRow;
+}
+
+/**
+ * Close every older card for this client that nobody ever decided on.
+ *
+ * [2026-11-13] Eleven weekly cards (Fogo + Venice, Sep 27 → Nov 1) sat in
+ * pending_review because no one approved or skipped them, and the Sunday
+ * nudge re-posted all eleven every week — "16 notis for 2 projects" (Jdot).
+ * Only the newest week is ever worth deciding, so when a new week's report is
+ * generated the older pending ones are marked expired here. 'approved' rows
+ * are left alone: someone said yes to those and the Sunday cron will send them.
+ *
+ * Returns the rows it closed so the caller can strip the buttons off their
+ * Telegram cards.
+ */
+export async function expireSupersededWeeklies(
+  supabase: SupabaseClient,
+  clientId: string,
+  newWeekEnding: string
+): Promise<WeeklyReviewRow[]> {
+  const { data, error } = await supabase
+    .from("kr_signal_client_weekly")
+    .update({
+      status: "expired",
+      approved_at: new Date().toISOString(),
+      approved_by_name: `Superseded by week ending ${newWeekEnding}`,
+    })
+    .eq("client_id", clientId)
+    .eq("status", "pending_review")
+    .lt("week_ending", newWeekEnding)
+    .select(REVIEW_COLUMNS);
+  if (error) throw new Error(`expireSupersededWeeklies: ${error.message}`);
+  return (data ?? []) as unknown as WeeklyReviewRow[];
 }
 
 /** Everything still waiting on a human, oldest week first. */

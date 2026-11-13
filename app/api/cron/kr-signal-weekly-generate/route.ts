@@ -3,9 +3,10 @@ import { koreaBriefPreviewUrl, telegramSafeUrl } from '@/lib/koreaIntel/briefLin
 import { createClient } from '@supabase/supabase-js';
 import { loadActiveClients } from '@/lib/krSignal/config';
 import { assembleWeekly } from '@/lib/krSignal/assembleWeekly';
-import { sendMessageWithButtons, probeChat } from '@/lib/krSignal/telegram';
-import { saveWeeklyForReview, saveGlobalWeekly, attachReviewCard } from '@/lib/krSignal/store';
-import { buildReviewCard, reviewButtons } from '@/lib/krSignal/reviewCard';
+import { sendMessageWithButtons, probeChat, editMessageAndClearButtons } from '@/lib/krSignal/telegram';
+import { saveWeeklyForReview, saveGlobalWeekly, attachReviewCard, expireSupersededWeeklies } from '@/lib/krSignal/store';
+import { buildReviewCard, reviewButtons, decidedCard } from '@/lib/krSignal/reviewCard';
+import { effectiveHtml } from '@/lib/krSignal/reportEdit';
 import { getAppSetting } from '@/lib/appSettings';
 
 export const dynamic = 'force-dynamic';
@@ -97,6 +98,20 @@ export async function GET(request: Request) {
         // what's being reviewed, so it persists regardless of the decision.
         await saveGlobalWeekly(supabase, res.weekEnding, res.global);
 
+        // [2026-11-13] Only the newest week is worth a decision. Close every
+        // older card still waiting on this client and take its buttons away,
+        // so the review topic holds one live card per client instead of a
+        // growing stack the Sunday nudge re-posts in full.
+        const expired = await expireSupersededWeeklies(supabase, c.id, res.weekEnding);
+        for (const old of expired) {
+          if (old.review_chat_id && old.review_message_id) {
+            await editMessageAndClearButtons(
+              old.review_chat_id, old.review_message_id,
+              decidedCard(effectiveHtml(old), 'expired', null, `replaced by the week ending ${res.weekEnding}`),
+            );
+          }
+        }
+
         if (reviewChatId) {
           const card = buildReviewCard({
             clientName: c.name,
@@ -115,6 +130,7 @@ export async function GET(request: Request) {
           queued: true,
           preflight_ok: preflight.ok,
           pending: res.pending.length,
+          expired: expired.length,
         });
       } catch (e: any) {
         results.push({ client: c.name, error: String(e?.message || e) });
