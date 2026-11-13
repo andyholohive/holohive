@@ -584,6 +584,10 @@ export default function ClientsPage() {
     // [2026-07-16] Every new client is pre-approved for holohive.io so the
     // Holo Hive team can always access the portal. Enforced again at insert.
     approved_domains: ['holohive.io'] as string[],
+    // [2026-11-13] Extra people at the client who can open the portal,
+    // campaign and report pages, beyond the primary email. The server-side
+    // gates already honour clients.approved_emails; this is its only editor.
+    approved_emails: [] as string[],
     // Dashboard v2: specialized engagement models (Impossible, Robonet, …)
     // EXCLUDED from priority dashboard rollups so they don't skew KPIs.
     is_ad_hoc: false,
@@ -595,6 +599,18 @@ export default function ClientsPage() {
     start_date: undefined as Date | undefined,
   });
   const [domainInput, setDomainInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  // Typed-but-not-yet-added addresses are folded in on save, so pressing
+  // Save without hitting Add first doesn't silently drop them.
+  const parseEmails = (raw: string) => raw.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  const mergedApprovedEmails = () => {
+    const primary = newClient.email.trim().toLowerCase();
+    return Array.from(new Set([...newClient.approved_emails, ...parseEmails(emailInput)])).filter(e => e !== primary);
+  };
+  const addApprovedEmails = () => {
+    setNewClient({ ...newClient, approved_emails: mergedApprovedEmails() });
+    setEmailInput('');
+  };
   /**
    * [2026-08-05] Pull a company logo from the client's X profile.
    *
@@ -2453,10 +2469,12 @@ export default function ClientsPage() {
       whitelist_partner_id: client.whitelist_partner_id,
       logo_url: (client as any).logo_url || null,
       approved_domains: (client as any).approved_domains || [],
+      approved_emails: (client as any).approved_emails || [],
       is_ad_hoc: (client as any).is_ad_hoc || false,
       start_date: ctxStartDate,
     });
     setDomainInput('');
+    setEmailInput('');
     setLogoPreview((client as any).logo_url || null);
     setLogoFile(null);
     setIsEditMode(true);
@@ -2488,10 +2506,12 @@ export default function ClientsPage() {
       whitelist_partner_id: null,
       logo_url: null,
       approved_domains: ['holohive.io'],
+      approved_emails: [],
       is_ad_hoc: false,
       start_date: undefined,
     });
     setDomainInput('');
+    setEmailInput('');
   };
 
   // [2026-10-27] Unsaved-changes guards (UX audit #5). Each wraps the dialog's
@@ -2500,7 +2520,7 @@ export default function ClientsPage() {
   // See hooks/use-unsaved-guard.ts for how "dirty" is decided.
   const clientDialogGuard = useUnsavedGuard({
     open: isNewClientOpen,
-    value: [newClient, domainInput, draftEngagement],
+    value: [newClient, domainInput, emailInput, draftEngagement],
     resetKey: isEditMode ? editingClient?.id ?? 'edit' : 'new',
     onOpenChange: (open) => { if (!open) handleCloseClientModal(); else setIsNewClientOpen(true); },
   });
@@ -2646,6 +2666,7 @@ export default function ClientsPage() {
           whitelist_partner_id: newClient.whitelist_partner_id,
           logo_url: logoUrl,
           approved_domains: newClient.approved_domains.length > 0 ? newClient.approved_domains : null,
+          approved_emails: mergedApprovedEmails().length > 0 ? mergedApprovedEmails() : null,
           is_ad_hoc: newClient.is_ad_hoc,
         } as any);
         savedClientId = editingClient.id;
@@ -2671,6 +2692,7 @@ export default function ClientsPage() {
             ...newClient.approved_domains.map(d => d.trim().toLowerCase()).filter(Boolean),
           ]));
           if (newClient.is_ad_hoc) extras.is_ad_hoc = true;
+          if (mergedApprovedEmails().length > 0) extras.approved_emails = mergedApprovedEmails();
           await ClientService.updateClient(client.id, extras as any);
         }
 
@@ -3748,6 +3770,44 @@ export default function ClientsPage() {
                       <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} placeholder="Enter email address" className="focus-brand" required />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="extra-emails">Additional Emails</Label>
+                        <p className="text-xs text-ink-warm-500">Other people at this client who can open the portal, campaign and report pages.</p>
+                        <div className="flex gap-2">
+                          <Input
+                            id="extra-emails"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (parseEmails(emailInput).length > 0) addApprovedEmails(); } }}
+                            placeholder="name@client.com, another@client.com"
+                            className="focus-brand flex-1"
+                          />
+                          <Button type="button" variant="outline" onClick={addApprovedEmails} disabled={parseEmails(emailInput).length === 0}>
+                            <Plus className="h-4 w-4 mr-1" />Add
+                          </Button>
+                        </div>
+                        {newClient.approved_emails.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {newClient.approved_emails.map((email, index) => (
+                              <div
+                                key={email}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-brand-soft text-brand-deep border border-brand-light rounded-full text-sm"
+                              >
+                                <Mail className="h-3.5 w-3.5" />
+                                {email}
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${email}`}
+                                  onClick={() => setNewClient({ ...newClient, approved_emails: newClient.approved_emails.filter((_, i) => i !== index) })}
+                                  className="ml-1 text-brand hover:text-brand-dark"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       {/* Location field hidden per May 2026 audit — was
                           inconsistently filled across the team and the
