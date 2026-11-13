@@ -4,6 +4,7 @@ import { TelegramService } from '@/lib/telegramService';
 import { escapeHtml } from '@/lib/telegramHtml';
 import { getDigestDestination } from '@/lib/dailyPulse';
 import { loadAttention, loadMomentumAlerts, type AttentionItem } from '@/lib/attention';
+import { loadRedZone, renderRedZone, type RedZone } from '@/lib/dashboard/escalations';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -12,8 +13,15 @@ export const maxDuration = 60;
  * GET /api/cron/attention-digest
  *
  * Weekday morning post of the Needs Attention list (/attention) to the ops
- * chat: urgent items, then this week's, each with the client and a link to
- * where it gets fixed. Nothing on a quiet day.
+ * chat: the Priority Dashboard red zone first (renewals, person escalations,
+ * red-overdue tasks, stale initiatives), then urgent items, then this
+ * week's, each with the client and a link to where it gets fixed. Nothing
+ * on a quiet day.
+ *
+ * [2026-11-13, Jdot] This is now the ONE daily digest. The separate
+ * dashboard-escalations cron (group post + per-owner DMs, 08:00 UTC) was
+ * folded in here — two posts a day off the same dashboard, plus DMs, were
+ * burying the chats. Nothing from this digest is DM'd.
  *
  * OFF until app_settings.attention_digest_enabled = 'true' [Andy's call —
  * it is an outward send]. Until then every run builds the message and logs
@@ -56,8 +64,10 @@ export async function GET(request: Request) {
   };
 
   try {
-    const [items, momentum, enabledRaw, chatOverride, threadOverride, pulseDest] = await Promise.all([
+    const emptyZone: RedZone = { cfg: null as any, redRenewals: [], personEscalations: [], redOverdueTasks: [], staleInitiatives: [], count: 0 };
+    const [items, momentum, redZone, enabledRaw, chatOverride, threadOverride, pulseDest] = await Promise.all([
       loadAttention(sb), loadMomentumAlerts(sb).catch(() => [] as AttentionItem[]),
+      loadRedZone(sb).catch(() => emptyZone),
       setting(sb, 'attention_digest_enabled'), setting(sb, 'attention_digest_chat_id'), setting(sb, 'attention_digest_thread_id'),
       getDigestDestination(sb),
     ]);
@@ -68,12 +78,14 @@ export async function GET(request: Request) {
     const chatId = chatOverride || pulseDest.chatId;
     const threadId = threadOverride ? parseInt(threadOverride, 10) : pulseDest.threadId;
 
-    if (!urgent.length && !soon.length) {
+    if (!urgent.length && !soon.length && redZone.count === 0) {
       await log('success', `quiet day — nothing urgent or due this week${enabled ? '' : ' (digest disabled)'}.`);
       return NextResponse.json({ posted: false, reason: 'nothing to report' });
     }
 
-    const lines: string[] = [`⚠️ <b>Needs attention</b> — ${urgent.length} urgent · ${soon.length} this week`];
+    const lines: string[] = [`⚠️ <b>Needs attention</b> — ${redZone.count} red · ${urgent.length} urgent · ${soon.length} this week`];
+    const red = renderRedZone(redZone);
+    if (red.length) lines.push('', ...red);
     if (urgent.length) {
       lines.push('', '🔴 <b>Urgent</b>', ...urgent.slice(0, MAX_PER_SECTION).map(line));
       if (urgent.length > MAX_PER_SECTION) lines.push(`  …and ${urgent.length - MAX_PER_SECTION} more`);
@@ -82,11 +94,11 @@ export async function GET(request: Request) {
       lines.push('', '🟠 <b>This week</b>', ...soon.slice(0, MAX_PER_SECTION).map(line));
       if (soon.length > MAX_PER_SECTION) lines.push(`  …and ${soon.length - MAX_PER_SECTION} more`);
     }
-    lines.push('', `<a href="${APP}/attention">Open the full list</a>`);
+    lines.push('', `<a href="${APP}/attention">Open the full list</a> · <a href="${APP}/dashboard">Dashboard</a>`);
     const message = lines.join('\n');
 
     if (!enabled) {
-      await log('success', `PREVIEW (disabled): ${urgent.length} urgent, ${soon.length} this week.\n\n${message}`);
+      await log('success', `PREVIEW (disabled): ${redZone.count} red, ${urgent.length} urgent, ${soon.length} this week.\n\n${message}`);
       return NextResponse.json({ posted: false, reason: 'attention_digest_enabled is not true', preview: message });
     }
     if (!chatId) {
@@ -97,9 +109,9 @@ export async function GET(request: Request) {
     try { posted = await TelegramService.sendToChat(chatId, message, 'HTML', threadId ?? undefined); }
     catch (e: any) { sendError = e?.message ?? 'send threw'; }
     await log(posted ? 'success' : 'failed', posted
-      ? `${urgent.length} urgent, ${soon.length} this week — posted to ${chatId}${threadId ? `/${threadId}` : ''}.`
-      : `${urgent.length} urgent, ${soon.length} this week — Telegram post FAILED${sendError ? `: ${sendError}` : ''}.`);
-    return NextResponse.json({ posted, counts: { urgent: urgent.length, soon: soon.length } });
+      ? `${redZone.count} red, ${urgent.length} urgent, ${soon.length} this week — posted to ${chatId}${threadId ? `/${threadId}` : ''}.`
+      : `${redZone.count} red, ${urgent.length} urgent, ${soon.length} this week — Telegram post FAILED${sendError ? `: ${sendError}` : ''}.`);
+    return NextResponse.json({ posted, counts: { red: redZone.count, urgent: urgent.length, soon: soon.length } });
   } catch (err: any) {
     await log('failed', err?.message ?? 'attention-digest crashed');
     return NextResponse.json({ error: 'attention-digest failed', detail: err?.message }, { status: 500 });

@@ -81,10 +81,6 @@
       "schedule": "5 * * * *"
     },
     {
-      "path": "/api/cron/dashboard-escalations",
-      "schedule": "0 8 * * *"
-    },
-    {
       "path": "/api/cron/generate-expense-instances",
       "schedule": "30 0 * * *"
     },
@@ -139,6 +135,10 @@
     {
       "path": "/api/cron/attention-digest",
       "schedule": "30 6 * * 1-5"
+    },
+    {
+      "path": "/api/cron/task-completions-eod",
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/scrape-watchdog",

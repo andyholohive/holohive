@@ -55,7 +55,6 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   LINEUP_COMPLETION: 1,        // daily — HHP Lineup Manager Spec § 4.1 auto-completion
   DELIVERABLE_RECURRENCE: 1,   // daily — HHP Deliverable Templates spec Template 2 Notes
   STINT_LAPSE_SWEEP: 1,        // daily — HHP Stint+Period F1 auto-stamp churn after grace
-  DASHBOARD_ESCALATIONS: 1,    // daily 08:00 UTC — HHP Team Dashboard v2 escalations
   KOL_AVATAR_REFRESH: 1,       // daily 05:00 UTC — KOL-AVATAR.10 staleness cron
   KOL_NICHE_DRIFT: 1,          // daily 04:30 UTC — PROF.6 / Doc 2 Q7b 30-day niche drift sweep
   TG_SCAN_NUDGE: 1,            // monthly (1st @ 03:00 UTC) — TG-CRON.1 manual scan reminder
@@ -66,11 +65,12 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   SNAPSHOT_TG_FOLLOWERS: 1,    // monthly (1st) — KOL TG follower snapshots
   CRON_HEALTH_CHECK: 24,       // hourly since 2026-08-27 (was daily); at 1 it flagged itself as a runaway every day
   TASK_ALERTS: 1,              // weekdays 00:00 UTC (09:00 KST) — overdue/stale task DMs
+  TASK_COMPLETIONS_EOD: 1,     // daily 09:00 UTC (18:00 KST) — one line of the day's completed tasks to HH Ops › HQ
   LINEUP_DEADLINES: 1,         // Fri/Mon/Thu 12:00 UTC — lineup propose/approve/posted reminders
   WEEKLY_CONTENT_RECAP: 1,     // Mon 12:00 UTC — per-campaign weekly content recap post
   DAILY_PULSE_DM: 1,           // weekdays 06:00 UTC — Daily Pulse morning blocker DM
   DAILY_PULSE_DIGEST: 1,       // weekdays 12:00 UTC — Daily Pulse digest to HH Ops terminal
-  ATTENTION_DIGEST: 1,         // weekdays 06:30 UTC — Needs Attention digest (preview-only until enabled)
+  ATTENTION_DIGEST: 1,         // weekdays 06:30 UTC — the one daily digest: dashboard red zone + Needs Attention (absorbed DASHBOARD_ESCALATIONS 2026-11-13)
   SCRAPE_WATCHDOG: 24,         // hourly :45 — re-dispatches the TG scrape when GitHub's schedule misses (acts at 7h stale)
   KOL_BRIEF_NUDGE: 1,          // Fri 00:00 UTC (09:00 KST) — un-opened KOL brief nudge to team
   KR_SIGNAL_WEEKLY_GENERATE: 1, // weekly (Saturday 12:05 UTC, off the hourly listings minute) — builds the weekly report + queues it for review

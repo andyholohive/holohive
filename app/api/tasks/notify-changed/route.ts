@@ -123,8 +123,14 @@ export async function POST(request: Request) {
   const actorName = nameById.get(user.id) || 'someone';
 
   // ── Build the diff message ──────────────────────────────────────────
+  //
+  // [2026-11-13, Jdot] 69 of the last 99 pings in HH Ops › HQ were
+  // "→ complete". A status change is announced only when it needs someone
+  // else's attention: paused (the board's "blocked") or ready for feedback.
+  // Completions are rolled into one end-of-day line by
+  // /api/cron/task-completions-eod; to-do / in-progress flips say nothing.
   const lines: string[] = [];
-  if ('status' in changes) {
+  if ('status' in changes && ANNOUNCED_STATUSES.has(changes.status ?? '')) {
     lines.push(`<b>Status:</b> ${escapeHtml(formatStatus(prev.status))} → ${escapeHtml(formatStatus(changes.status))}`);
   }
   if ('due_date' in changes) {
@@ -137,7 +143,7 @@ export async function POST(request: Request) {
   }
 
   if (lines.length === 0) {
-    return NextResponse.json({ ok: true, skipped: 'no diff lines' });
+    return NextResponse.json({ ok: true, skipped: 'nothing announceable (status flips other than paused / ready for feedback are batched at EOD)' });
   }
 
   const idLabel = task.short_id ? `${task.short_id} ` : '';
@@ -167,6 +173,9 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
+
+/** Status values worth a ping of their own. Everything else is quiet. */
+const ANNOUNCED_STATUSES = new Set(['paused', 'ready_for_feedback']);
 
 function formatStatus(s: string | null | undefined): string {
   if (!s) return 'none';
