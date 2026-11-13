@@ -11,7 +11,7 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2, ClipboardList, Inbox } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2, ClipboardList, Inbox, PauseCircle, PlayCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -84,8 +84,23 @@ const formatCategory = (category: string | null | undefined): string => {
 const FORM_STATUS_TONES: Record<string, BadgeTone> = {
   draft: 'neutral',
   published: 'success',
-  closed: 'danger',
+  closed: 'slate',
 };
+
+// [2026-11-13, Quazo] Short-lived forms (lunch availability, one-off panel
+// surveys) were burying the evergreen ones. A form is now either ACTIVE
+// (draft or published — still being built or still collecting) or INACTIVE
+// (status 'closed': kept for its responses, no longer accepting any, hidden
+// from the default view). 'closed' is the existing enum value; the UI just
+// stops calling it that, since "Closed" read as a problem rather than a
+// parking spot.
+const FORM_STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  published: 'Published',
+  closed: 'Inactive',
+};
+const isInactiveForm = (f: { status: string }) => f.status === 'closed';
+type FormListFilter = 'active' | 'inactive' | 'all' | FormStatus;
 
 type RecentSubmission = {
   id: string;
@@ -121,7 +136,7 @@ export default function FormsPage() {
   const [recent, setRecent] = useState<RecentSubmission[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | FormStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<FormListFilter>('active');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedFormId, setCopiedFormId] = useState<string | null>(null);
@@ -620,9 +635,43 @@ export default function FormsPage() {
   const filteredForms = forms.filter(form => {
     const matchesSearch = form.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           form.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || form.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all' ? true
+      : statusFilter === 'active' ? !isInactiveForm(form)
+      : statusFilter === 'inactive' ? isInactiveForm(form)
+      : form.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const activeCount = forms.filter(f => !isInactiveForm(f)).length;
+  const inactiveCount = forms.length - activeCount;
+
+  // Park a form (stop accepting submissions, drop out of the default list)
+  // or bring it back. Reactivating publishes it: a form someone set aside
+  // was live when it was parked, and a draft is never parked in the first
+  // place — the Inactive option isn't offered for drafts.
+  const [togglingFormId, setTogglingFormId] = useState<string | null>(null);
+  const handleToggleInactive = async (form: FormWithStats) => {
+    const next: FormStatus = isInactiveForm(form) ? 'published' : 'closed';
+    setTogglingFormId(form.id);
+    try {
+      await FormService.updateForm({ id: form.id, status: next });
+      setForms(prev => prev.map(f => (f.id === form.id ? { ...f, status: next } : f)));
+      toast({
+        title: next === 'closed' ? 'Form set inactive' : 'Form reactivated',
+        description: next === 'closed'
+          ? 'It no longer accepts submissions. Find it under the Inactive filter.'
+          : 'It is published and accepting submissions again.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Could not change the form status',
+        variant: 'destructive',
+      });
+    } finally {
+      setTogglingFormId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -678,7 +727,7 @@ export default function FormsPage() {
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="published">Published</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="closed">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -759,7 +808,7 @@ export default function FormsPage() {
             <SectionHeader
               label="Forms"
               dot="brand"
-              counter={`${filteredForms.length} of ${forms.length} form${forms.length === 1 ? '' : 's'}`}
+              counter={`${filteredForms.length} shown · ${activeCount} active · ${inactiveCount} inactive`}
               first
             />
             {/* Search and Filters */}
@@ -773,15 +822,16 @@ export default function FormsPage() {
               className="pl-10 focus-brand"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-            <SelectTrigger className="w-[150px] focus-brand">
-              <SelectValue placeholder="All Status" />
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as FormListFilter)}>
+            <SelectTrigger className="w-[170px] focus-brand">
+              <SelectValue placeholder="Active" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="published">Published only</SelectItem>
+              <SelectItem value="draft">Drafts only</SelectItem>
+              <SelectItem value="all">All forms</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -813,14 +863,20 @@ export default function FormsPage() {
           <Card className="border-cream-200">
             <EmptyState
               icon={FileText}
-              title={searchTerm || statusFilter !== 'all' ? 'No forms found' : 'No forms yet'}
+              title={
+                searchTerm ? 'No forms found'
+                : statusFilter === 'inactive' ? 'No inactive forms'
+                : forms.length === 0 ? 'No forms yet'
+                : 'No forms match'
+              }
               description={
-                searchTerm || statusFilter !== 'all'
-                  ? 'Try adjusting your filters'
-                  : 'Create your first form to start collecting data'
+                searchTerm ? 'Try a different search'
+                : statusFilter === 'inactive' ? 'Set a form inactive from its card when it is no longer collecting responses.'
+                : forms.length === 0 ? 'Create your first form to start collecting data'
+                : 'Try another filter'
               }
             >
-              {!searchTerm && statusFilter === 'all' && (
+              {!searchTerm && forms.length === 0 && (
                 <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Form
@@ -839,7 +895,7 @@ export default function FormsPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg text-ink-warm-900 mb-1">{form.name}</h3>
                       <StatusBadge tone={FORM_STATUS_TONES[form.status] ?? 'neutral'}>
-                        {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
+                        {FORM_STATUS_LABELS[form.status] ?? form.status}
                       </StatusBadge>
                     </div>
                   </div>
@@ -893,11 +949,26 @@ export default function FormsPage() {
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                      {form.status !== 'draft' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleInactive(form)}
+                          disabled={togglingFormId === form.id}
+                          title={isInactiveForm(form) ? 'Reactivate form' : 'Set inactive'}
+                          aria-label={isInactiveForm(form) ? 'Reactivate form' : 'Set inactive'}
+                        >
+                          {isInactiveForm(form)
+                            ? <PlayCircle className="h-4 w-4 text-emerald-600" />
+                            : <PauseCircle className="h-4 w-4 text-ink-warm-500" />}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteForm(form.id, form.name)}
-                        title="Delete form"
+                        title="Archive form"
+                        aria-label="Archive form"
                       >
                         <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>

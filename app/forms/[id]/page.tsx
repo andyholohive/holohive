@@ -2362,7 +2362,7 @@ export default function FormBuilderPage() {
                               <SelectContent>
                                 <SelectItem value="draft">Draft</SelectItem>
                                 <SelectItem value="published">Published</SelectItem>
-                                <SelectItem value="closed">Closed</SelectItem>
+                                <SelectItem value="closed">Inactive</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
