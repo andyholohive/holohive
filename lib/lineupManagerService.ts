@@ -85,6 +85,7 @@ export function hasWeekEnded(weekOf: string): boolean {
 }
 
 export type LineupSlotStatus = 'pending' | 'posted' | 'missed';
+export type LineupDraftState = 'in_review' | 'changes_requested' | 'approved';
 export type LineupActivityAction =
   | 'draft_saved' | 'proposed' | 'confirmed' | 'completed' | 'unlocked'
   | 'duplicated' | 'kol_added' | 'kol_removed' | 'angle_added'
@@ -125,6 +126,12 @@ export type LineupSlot = {
   status_set_by?: string | null;
   status_set_at?: string | null;
   status_reason?: string | null;
+  /**
+   * Derived at read time from the latest /draft for this slot, never stored
+   * [Jdot spec 2026-11-12]. Only meaningful while `status` is 'pending':
+   * posted and missed win over it.
+   */
+  draft_state?: LineupDraftState | null;
 };
 
 export type LineupActivityLogRow = {
@@ -252,8 +259,32 @@ export class LineupManagerService {
       .order('sort_order');
     if (sErr) throw sErr;
 
+    // Draft state per slot: the newest /draft row decides. A failed read
+    // just leaves the slots on their base status.
+    const draftStateBySlot = new Map<string, LineupDraftState>();
+    const slotIds = ((slots || []) as LineupSlot[]).map(s => s.id);
+    if (slotIds.length > 0) {
+      const { data: drafts } = await (this.supabase as any)
+        .from('content_drafts')
+        .select('lineup_slot_id, status, version_n')
+        .in('lineup_slot_id', slotIds)
+        .order('version_n', { ascending: false });
+      const seen = new Set<string>();
+      for (const d of (drafts || []) as Array<{ lineup_slot_id: string; status: string }>) {
+        if (seen.has(d.lineup_slot_id)) continue;
+        seen.add(d.lineup_slot_id);
+        const state: LineupDraftState | null =
+          d.status === 'pending_review' ? 'in_review'
+          : d.status === 'changes_requested' ? 'changes_requested'
+          : d.status === 'approved' ? 'approved'
+          : null;
+        if (state) draftStateBySlot.set(d.lineup_slot_id, state);
+      }
+    }
+
     const slotsByAngle = new Map<string, LineupSlot[]>();
     for (const s of (slots || []) as LineupSlot[]) {
+      s.draft_state = draftStateBySlot.get(s.id) ?? null;
       const arr = slotsByAngle.get(s.angle_id) || [];
       arr.push(s);
       slotsByAngle.set(s.angle_id, arr);

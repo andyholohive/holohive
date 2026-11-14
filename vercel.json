@@ -141,6 +141,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/draft-worker",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/scrape-watchdog",
       "schedule": "45 * * * *"
     },

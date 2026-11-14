@@ -66,6 +66,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   CRON_HEALTH_CHECK: 24,       // hourly since 2026-08-27 (was daily); at 1 it flagged itself as a runaway every day
   TASK_ALERTS: 1,              // weekdays 00:00 UTC (09:00 KST) — overdue/stale task DMs
   TASK_COMPLETIONS_EOD: 1,     // daily 09:00 UTC (18:00 KST) — one line of the day's completed tasks to HH Ops › HQ
+  DRAFT_WORKER: 1440,          // every minute — /draft delayed sends + nudges; logs only when it acted or failed
   LINEUP_DEADLINES: 1,         // Fri/Mon/Thu 12:00 UTC — lineup propose/approve/posted reminders
   WEEKLY_CONTENT_RECAP: 1,     // Mon 12:00 UTC — per-campaign weekly content recap post
   DAILY_PULSE_DM: 1,           // weekdays 06:00 UTC — Daily Pulse morning blocker DM

@@ -31,6 +31,10 @@ import { acceptedWebhookSecrets } from '@/lib/telegramWebhookSecret';
 import { escapeHtml } from '@/lib/telegramHtml';
 import { getTemplate, renderTemplate } from '@/lib/messageTemplates';
 import { resolveStintId } from '@/lib/stintAnchor';
+import { isDraftCommand, handleDraftCommand, bufferAlbumPart } from '@/lib/draftBot/intake';
+import { handleDraftCallback, handleChangeNoteReply } from '@/lib/draftBot/review';
+import { getDraftConfig, draftAllowedInChat } from '@/lib/draftBot/config';
+import { claimableApprovedDraftId } from '@/lib/draftBot/resolve';
 
 // Content thread in HH Operations for KOL social links
 const CONTENT_THREAD_CHAT_ID = '-1002636253963';
@@ -1484,6 +1488,13 @@ async function handleCallbackQuery(cq: any) {
     return;
   }
 
+  // `drf:*` — /draft: client picker in the KOL group, and Approve / Request
+  // changes / Cancel on the review card. See lib/draftBot/review.ts.
+  if (data.startsWith('drf:')) {
+    await handleDraftCallback(supabaseAdmin, cq);
+    return;
+  }
+
   // `pdate:<content_item_id>:<daysAgo>` — the post-date buttons on the
   // /submit receipt. Sets content_items.posted_at back N days so the SPA
   // buckets a backfilled post into the week it actually went live.
@@ -2931,6 +2942,29 @@ async function finalizeSubmission(opts: {
     }
   }
 
+  // [2026-11-14] /draft link (Jdot spec §7). Attach the KOL's approved draft
+  // to this post; when there is none, the review card carries a warning line.
+  // Skipped entirely while /draft is off for this chat, so /submit behaves
+  // exactly as before until the feature is switched on.
+  let postedWithoutDraft = false;
+  try {
+    const draftCfg = await getDraftConfig(supabaseAdmin);
+    if (draftAllowedInChat(draftCfg, opts.chatId)) {
+      const draftId = await claimableApprovedDraftId(supabaseAdmin, opts.kolId, opts.campaignId);
+      if (draftId) {
+        await (supabaseAdmin as any)
+          .from('content_items')
+          .update({ draft_id: draftId })
+          .eq('kol_id', opts.kolId).eq('campaign_id', opts.campaignId).eq('link', opts.link)
+          .is('draft_id', null);
+      } else {
+        postedWithoutDraft = true;
+      }
+    }
+  } catch (err) {
+    console.warn('[/submit] draft link lookup failed:', err);
+  }
+
   // [2026-06-12] Per Appendix v3 F2 + Andy: kol_id + campaign_id FKs are
   // the only authoritative identity. Display names render live via JOIN.
   // kol_telegram_id, kol_name, campaign_name columns were dropped.
@@ -3022,6 +3056,7 @@ async function finalizeSubmission(opts: {
     platform: opts.platform,
     link: opts.link,
     submittedAt: submittedLabel,
+    postedWithoutDraft,
   });
 
   // [2026-07-22, per Andy] Pre-approval SPA fire DISABLED. It read the same
@@ -3304,6 +3339,8 @@ async function forwardSubmissionToReviewChannel(opts: {
   platform: string;
   link: string;
   submittedAt: string;
+  /** No approved /draft for this post: add the QC warning line. */
+  postedWithoutDraft?: boolean;
 }): Promise<void> {
   const { data: chanRow } = await (supabaseAdmin as any)
     .from('app_settings')
@@ -3339,7 +3376,7 @@ async function forwardSubmissionToReviewChannel(opts: {
   // Review card body is template-driven — editable on /admin/telegram-comm.
   // The Approve/Reject buttons are attached below regardless of template.
   const cardTemplate = await getTemplate(supabaseAdmin, 'tmpl_content_review_card');
-  const body = renderTemplate(cardTemplate, {
+  const cardBody = renderTemplate(cardTemplate, {
     kol: escapeHtml(opts.kolName),
     campaign: escapeHtml(opts.campaignName),
     type: escapeHtml(opts.contentType),
@@ -3347,6 +3384,7 @@ async function forwardSubmissionToReviewChannel(opts: {
     link: escapeHtml(opts.link),
     submitted: escapeHtml(opts.submittedAt),
   });
+  const body = opts.postedWithoutDraft ? `${cardBody}\n\n⚠ Posted without an approved draft` : cardBody;
 
   const buttons = [[
     { text: '✅ Approve', callback_data: `subm:approve:${opts.submissionId}` },
@@ -4094,8 +4132,26 @@ async function handleMessage(message: any) {
     return;
   }
 
+  // [2026-11-14] /draft (Jdot spec). Handled ahead of the generic command
+  // split because a draft is usually multi-line and arrives as a caption or
+  // a reply, which `split(' ')` below can't represent. All three hooks
+  // no-op unless app_settings.draft_mode allows this chat. Never let a
+  // failure here stop the chat tracking further down.
+  let draftHandled = false;
+  try {
+    if (message.media_group_id) await bufferAlbumPart(supabaseAdmin, message);
+    if (isDraftCommand(message)) {
+      draftHandled = true;
+      await handleDraftCommand(supabaseAdmin, message);
+    } else if (message.reply_to_message?.from?.is_bot && message.text && !message.text.startsWith('/')) {
+      draftHandled = await handleChangeNoteReply(supabaseAdmin, message);
+    }
+  } catch (err) {
+    console.error('[/draft] handler threw:', err);
+  }
+
   // Handle commands (messages starting with /)
-  if (messageText.startsWith('/')) {
+  if (!draftHandled && messageText.startsWith('/')) {
     const parts = messageText.split(' ');
     const command = parts[0];
     const args = parts.slice(1);

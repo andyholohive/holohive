@@ -1764,7 +1764,19 @@ function SortableSlot({
 const SLOT_STATUS_TONE: Record<'pending' | 'posted' | 'missed', BadgeTone> = { posted: 'success', missed: 'danger', pending: 'neutral' };
 const SLOT_STATUS_LABEL: Record<'pending' | 'posted' | 'missed', string> = { posted: 'Posted', missed: 'Missed', pending: 'Pending' };
 
+// Draft states sit between Pending and Posted. They come from /draft and are
+// derived on read; posted and missed always win.
+const DRAFT_STATE_TONE: Record<'in_review' | 'changes_requested' | 'approved', BadgeTone> = { in_review: 'info', changes_requested: 'warning', approved: 'brand' };
+const DRAFT_STATE_LABEL: Record<'in_review' | 'changes_requested' | 'approved', string> = { in_review: 'Draft in review', changes_requested: 'Changes requested', approved: 'Draft approved' };
+
 function SlotStatusBadge({ slot }: { slot: LineupFull['angles'][number]['slots'][number] }) {
+  if (slot.status === 'pending' && slot.draft_state) {
+    return (
+      <StatusBadge tone={DRAFT_STATE_TONE[slot.draft_state]} size="sm">
+        {DRAFT_STATE_LABEL[slot.draft_state]}
+      </StatusBadge>
+    );
+  }
   return (
     <StatusBadge tone={SLOT_STATUS_TONE[slot.status]} size="sm">
       {SLOT_STATUS_LABEL[slot.status]}{slot.status_reason ? ' ·' : ''}
