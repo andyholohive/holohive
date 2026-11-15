@@ -19,6 +19,8 @@ import {
   Filter, ArrowUpDown, X, Link2, Table as TableIcon, LayoutGrid, Download
 } from 'lucide-react';
 import { downloadCsv, todayStamp } from '@/lib/csvExport';
+import { fetchTelegramContactRows } from '@/lib/crmTelegramExport';
+import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -77,6 +79,33 @@ export default function ContactsPage() {
 
   // View mode state
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
+
+  // Telegram handle + company across the whole CRM, not just this page's
+  // contacts. Fetched on click: it reads every pipeline deal.
+  const { toast } = useToast();
+  const [exportingTelegram, setExportingTelegram] = useState(false);
+  const handleExportTelegram = async () => {
+    setExportingTelegram(true);
+    try {
+      const rows = await fetchTelegramContactRows();
+      if (rows.length === 0) {
+        toast({ title: 'Nothing to export', description: 'No Telegram handles found in the CRM.' });
+        return;
+      }
+      downloadCsv(rows, [
+        { header: 'Company', accessor: r => r.company },
+        { header: 'Telegram', accessor: r => r.telegram },
+        { header: 'Contact name', accessor: r => r.contactName },
+        { header: 'Source', accessor: r => r.source },
+        { header: 'Stage / role', accessor: r => r.stageOrRole },
+      ], `crm-telegram-contacts-${todayStamp()}`);
+      toast({ title: 'Exported', description: `${rows.length} Telegram contacts.` });
+    } catch (err: any) {
+      toast({ title: 'Export failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setExportingTelegram(false);
+    }
+  };
 
   useEffect(() => {
     fetchContacts();
@@ -493,6 +522,15 @@ export default function ContactsPage() {
               Clear Filters
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportTelegram}
+            disabled={exportingTelegram}
+            title="Every Telegram handle in the CRM with its company: pipeline deals and contacts"
+          >
+            <Download className="h-4 w-4 mr-1" /> {exportingTelegram ? 'Exporting…' : 'Export Telegram list'}
+          </Button>
           <Button
             variant="outline"
             size="sm"
