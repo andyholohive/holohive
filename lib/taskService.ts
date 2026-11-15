@@ -149,14 +149,27 @@ export class TaskService {
    */
   static async getAllTasks(): Promise<Task[]> {
     try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return (data as Task[]) || [];
+      // [2026-11-16] Read in pages. A plain select stops at 1,000 rows, and
+      // the table passed that: at 1,354 tasks HQ silently dropped everything
+      // past row 1,000 in this sort order, i.e. the highest step numbers.
+      // Bolt's four open "6. Send Weekly Report" steps showed on the
+      // dashboard but not here, along with 9 other open tasks. `id` is the
+      // tiebreaker so pages can't overlap or skip.
+      const PAGE = 1000;
+      const all: Task[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        all.push(...((data as Task[]) || []));
+        if (!data || data.length < PAGE) break;
+      }
+      return all;
     } catch (error) {
       console.error('Error fetching tasks:', error);
       throw error;
