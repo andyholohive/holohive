@@ -9,8 +9,9 @@ export const maxDuration = 60;
 /**
  * GET /api/cron/task-completions-eod — daily 09:00 UTC (18:00 KST).
  *
- * One line to HH Ops › HQ listing every task completed in the last 24h,
- * grouped by who closed it. Replaces the per-task "→ complete" ping that
+ * One post to HH Ops › HQ listing every task completed in the last 24h,
+ * grouped by client, every task shown [Jdot, 2026-11-17 — the first version
+ * listed 12 in completion order and cut the rest to "…and 5 more"]. Replaces the per-task "→ complete" ping that
  * /api/tasks/notify-changed used to send: 69 of the last 99 pings in that
  * topic were completions [Jdot, 2026-11-13]. Same destination as the live
  * pings (the task_changed reminder rule), so turning that rule off silences
@@ -19,7 +20,8 @@ export const maxDuration = 60;
  * Quiet day → nothing posted. Auth: Bearer ${CRON_SECRET}.
  */
 const WINDOW_HOURS = 24;
-const MAX_LISTED = 12;
+// Telegram caps a message at 4096 characters; a long day splits between clients.
+const MAX_MESSAGE_CHARS = 3800;
 
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
@@ -47,12 +49,12 @@ export async function GET(request: Request) {
         .select('telegram_chat_id, telegram_thread_id, is_active')
         .eq('rule_type', 'task_changed').maybeSingle(),
       sb.from('tasks')
-        .select('short_id, task_name, assigned_to_name, completed_at')
+        .select('short_id, task_name, assigned_to_name, completed_at, client:clients(name)')
         .eq('status', 'complete').gte('completed_at', since)
         .order('completed_at', { ascending: true }),
     ]);
 
-    const tasks = (done ?? []) as Array<{ short_id: string | null; task_name: string | null; assigned_to_name: string | null; completed_at: string }>;
+    const tasks = (done ?? []) as Array<{ short_id: string | null; task_name: string | null; assigned_to_name: string | null; completed_at: string; client: { name: string | null } | null }>;
     if (tasks.length === 0) {
       await log('success', 'quiet day — no completions in the last 24h.');
       return NextResponse.json({ posted: false, reason: 'no completions' });
@@ -73,13 +75,42 @@ export async function GET(request: Request) {
       .map(([name, n]) => `${escapeHtml(name)} (${n})`)
       .join(' · ');
 
-    const lines = [
-      `✅ <b>${tasks.length} task${tasks.length === 1 ? '' : 's'} completed today</b> — ${whoLine}`,
-      ...tasks.slice(0, MAX_LISTED).map(t =>
-        `• ${t.short_id ? `${escapeHtml(t.short_id)} ` : ''}${escapeHtml(t.task_name || '(untitled)')}${t.assigned_to_name ? ` — ${escapeHtml(t.assigned_to_name)}` : ''}`),
-    ];
-    if (tasks.length > MAX_LISTED) lines.push(`  …and ${tasks.length - MAX_LISTED} more`);
-    const message = lines.join('\n');
+    // Grouped by client, A–Z, tasks with no client last. Completion order is
+    // kept inside each client so a parent and its steps read in sequence.
+    const NO_CLIENT = 'No client';
+    const byClient = new Map<string, typeof tasks>();
+    for (const t of tasks) {
+      const key = t.client?.name?.trim() || NO_CLIENT;
+      byClient.set(key, [...(byClient.get(key) ?? []), t]);
+    }
+    const clientNames = Array.from(byClient.keys()).sort((a, b) =>
+      a === NO_CLIENT ? 1 : b === NO_CLIENT ? -1 : a.localeCompare(b));
+    const taskLine = (t: (typeof tasks)[number]) =>
+      `• ${t.short_id ? `${escapeHtml(t.short_id)} ` : ''}${escapeHtml(t.task_name || '(untitled)')}${t.assigned_to_name ? ` — ${escapeHtml(t.assigned_to_name)}` : ''}`;
+
+    const header = `✅ <b>${tasks.length} task${tasks.length === 1 ? '' : 's'} completed today</b> — ${whoLine}`;
+    // Every task is listed, so a busy day can pass Telegram's limit. Lines are
+    // packed into as many messages as needed; a client that straddles a break
+    // gets its heading repeated so no task is left without one.
+    const messages: string[] = [];
+    let current = header;
+    for (const name of clientNames) {
+      const rows = byClient.get(name)!;
+      const heading = `\n<b>${escapeHtml(name)}</b> (${rows.length})`;
+      let needsHeading = true;
+      for (const t of rows) {
+        const line = taskLine(t);
+        if (current.length + (needsHeading ? heading.length + 1 : 0) + line.length + 1 > MAX_MESSAGE_CHARS) {
+          messages.push(current);
+          current = `<b>${escapeHtml(name)}</b>${needsHeading ? ` (${rows.length})` : ' (continued)'}`;
+          needsHeading = false;
+        }
+        if (needsHeading) { current += `\n${heading}`; needsHeading = false; }
+        current += `\n${line}`;
+      }
+    }
+    messages.push(current);
+    const message = messages.join('\n\n');
 
     const dryRun = new URL(request.url).searchParams.get('dryRun') === '1';
     if (dryRun) {
@@ -87,8 +118,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ posted: false, dryRun: true, preview: message });
     }
     let posted = false; let sendError: string | null = null;
-    try { posted = await TelegramService.sendToChat(rule.telegram_chat_id, message, 'HTML', rule.telegram_thread_id ?? undefined); }
-    catch (e: any) { sendError = e?.message ?? 'send threw'; }
+    try {
+      posted = true;
+      for (const part of messages) {
+        const ok = await TelegramService.sendToChat(rule.telegram_chat_id, part, 'HTML', rule.telegram_thread_id ?? undefined);
+        if (!ok) { posted = false; break; }
+      }
+    } catch (e: any) { posted = false; sendError = e?.message ?? 'send threw'; }
     await log(posted ? 'success' : 'failed', posted
       ? `${tasks.length} completion(s) posted to ${rule.telegram_chat_id}${rule.telegram_thread_id ? `/${rule.telegram_thread_id}` : ''}.`
       : `${tasks.length} completion(s) — Telegram post FAILED${sendError ? `: ${sendError}` : ''}.`);
