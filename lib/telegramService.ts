@@ -3,7 +3,44 @@
  * Sends notifications to Telegram chat rooms
  */
 
+import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from '@/lib/telegramHtml';
+
+/**
+ * Where "terminal" posts go: form, lead, link and partner submissions.
+ *
+ * [2026-11-18, Jdot] These were pinned to TELEGRAM_TERMINAL_CHAT_ID / _THREAD_ID,
+ * so moving them to HH Bot Feed › Inbound & Forms meant a redeploy while every
+ * other destination was a setting. app_settings.terminal_chat_id /
+ * terminal_thread_id now win; the env pair stays as the fallback, so an unset
+ * or unreadable setting posts where it always did instead of nowhere.
+ */
+let terminalCache: { chatId?: string; threadId?: string; at: number } | null = null;
+const TERMINAL_TTL_MS = 60_000;
+
+export async function resolveTerminalDestination(): Promise<{ chatId?: string; threadId?: string }> {
+  const env = { chatId: process.env.TELEGRAM_TERMINAL_CHAT_ID, threadId: process.env.TELEGRAM_TERMINAL_THREAD_ID };
+  if (terminalCache && Date.now() - terminalCache.at < TERMINAL_TTL_MS) return terminalCache;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return env;
+  try {
+    const sb = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data, error } = await sb.from('app_settings').select('key, value').in('key', ['terminal_chat_id', 'terminal_thread_id']);
+    if (error) return env; // not cached: a failed read must not pin the fallback for a minute
+    const m = new Map((data ?? []).map((r: any) => [r.key as string, (r.value ?? '') as string]));
+    const chatId = (m.get('terminal_chat_id') || '').trim();
+    // A thread id only means something inside its own chat, so the setting's
+    // thread is used only alongside the setting's chat.
+    const dest = chatId
+      ? { chatId, threadId: (m.get('terminal_thread_id') || '').trim() || undefined }
+      : env;
+    terminalCache = { ...dest, at: Date.now() };
+    return dest;
+  } catch {
+    return env;
+  }
+}
 
 interface TelegramMessage {
   chat_id: string;
@@ -19,21 +56,13 @@ export class TelegramService {
     return process.env.TELEGRAM_BOT_TOKEN;
   }
 
-  private static get chatId() {
-    return process.env.TELEGRAM_TERMINAL_CHAT_ID;
-  }
-
-  private static get threadId() {
-    return process.env.TELEGRAM_TERMINAL_THREAD_ID;
-  }
 
   /**
    * Send a message to the configured Telegram chat
    */
   static async sendMessage(text: string, parseMode: 'HTML' | 'Markdown' = 'HTML'): Promise<boolean> {
     const botToken = this.botToken;
-    const chatId = this.chatId;
-    const threadId = this.threadId;
+    const { chatId, threadId } = await resolveTerminalDestination();
 
     if (!botToken || !chatId) {
       console.error('[Telegram] Configuration missing:', {
@@ -114,8 +143,9 @@ export class TelegramService {
     // meaningful within its own chat, so when overriding the chat, take
     // the thread from the override too (not the env thread).
     const usingOverride = !!opts?.chatId;
-    const chatId = opts?.chatId || this.chatId;
-    const threadId = usingOverride ? opts?.threadId : this.threadId;
+    const terminal = usingOverride ? null : await resolveTerminalDestination();
+    const chatId = opts?.chatId || terminal?.chatId;
+    const threadId = usingOverride ? opts?.threadId : terminal?.threadId;
     const parseMode = opts?.parseMode || 'HTML';
     if (!botToken || !chatId) {
       console.error('[Telegram] sendMessageWithButtons: config missing', {

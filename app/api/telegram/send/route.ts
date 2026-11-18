@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resolveTerminalDestination } from '@/lib/telegramService';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Use terminal chat if requested, otherwise use provided chatId or default to operations chat
-    const terminalChatId = process.env.TELEGRAM_TERMINAL_CHAT_ID;
+    const terminal = useTerminalChat ? await resolveTerminalDestination() : null;
+    const terminalChatId = terminal?.chatId;
     const targetChatId = useTerminalChat && terminalChatId ? terminalChatId : (chatId || OPERATIONS_CHAT_ID);
 
     const messagePayload: any = {
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Add thread_id for topic-based messaging
     // Use terminal thread ID if using terminal chat, otherwise use provided threadId
-    const terminalThreadId = process.env.TELEGRAM_TERMINAL_THREAD_ID;
+    const terminalThreadId = terminal?.threadId;
     const targetThreadId = useTerminalChat && terminalThreadId ? terminalThreadId : threadId;
     if (targetThreadId) {
       messagePayload.message_thread_id = parseInt(targetThreadId);
