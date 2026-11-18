@@ -51,9 +51,10 @@ import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 export default function CampaignsPage() {
   const { user, userProfile } = useAuth();
-  // [2026-11-18] Members see campaigns without budgets or payment status,
-  // and do not create or archive them (a campaign cannot be created without
-  // a budget). See lib/memberAccess.
+  // [2026-11-18] Members see campaigns without budgets or payment status
+  // and do not archive them. [2026-11-19, Andy] They do create them: the
+  // budget fields are hidden and the campaign is saved with a $0 budget and
+  // no allocations for an admin to fill in. See lib/memberAccess.
   const { canSeeMoney, canDeleteClientWork } = useGuestPermissions();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -229,7 +230,7 @@ export default function CampaignsPage() {
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date) return;
+    if (!newCampaign.client_id || !newCampaign.name.trim() || (canSeeMoney && !newCampaign.total_budget) || !newCampaign.start_date) return;
     try {
       setIsSubmittingCampaign(true);
 
@@ -241,7 +242,7 @@ export default function CampaignsPage() {
       const campaign = await CampaignService.createCampaign({
         client_id: newCampaign.client_id,
         name: newCampaign.name.trim(),
-        total_budget: parseFloat(newCampaign.total_budget),
+        total_budget: canSeeMoney ? parseFloat(newCampaign.total_budget) : 0,
         status: newCampaign.status,
         start_date: newCampaign.start_date,
         end_date: newCampaign.end_date || undefined,
@@ -276,7 +277,7 @@ export default function CampaignsPage() {
       await fetchCampaigns();
       // After creating the campaign, add budget allocations
       await Promise.all(
-        (newCampaign.budgetAllocations || [])
+        (canSeeMoney ? newCampaign.budgetAllocations || [] : [])
           .filter(a => a.region && a.amount)
           .map((alloc) =>
             CampaignService.addBudgetAllocation(campaign.id, alloc.region, parseFloat(alloc.amount))
@@ -585,12 +586,12 @@ export default function CampaignsPage() {
           subtitle="Track and manage your marketing campaigns"
           kicker="Clients · Campaigns"
           kickerDot="sky"
-          actions={canSeeMoney ? (
+          actions={
             <Button variant="brand" onClick={() => setIsNewCampaignOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Campaign
             </Button>
-          ) : undefined}
+          }
         />
         {/* ── Campaigns skeleton ──────────────────────────────────
             Mirrors the loaded layout: SectionHeader + toolbar
@@ -669,7 +670,6 @@ export default function CampaignsPage() {
                 All Budgets
               </Button>
             )}
-          {canSeeMoney && (
           <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
             <DialogTrigger asChild>
               <Button variant="brand">
@@ -725,7 +725,7 @@ export default function CampaignsPage() {
                             <div className="flex flex-col">
                               <span className="font-medium">{template.name}</span>
                               <span className="text-xs text-ink-warm-500">
-                                ${template.total_budget.toLocaleString()} • {template.region} • {template.usage_count || 0} uses
+                                {canSeeMoney && <>${template.total_budget.toLocaleString()} • </>}{template.region} • {template.usage_count || 0} uses
                               </span>
                             </div>
                           </SelectItem>
@@ -982,6 +982,7 @@ export default function CampaignsPage() {
                     </div>
                   )}
                   {/* Move Budget and Budget Allocation fields here, at the end */}
+                  {canSeeMoney && (<>
                   <div className="grid gap-2 mt-2">
                     <Label htmlFor="totalBudget">Total Budget <span className="text-rose-500">*</span></Label>
                     <div className="relative w-full">
@@ -1078,19 +1079,19 @@ export default function CampaignsPage() {
                       >Add Allocation</Button>
                     </div>
                   </div>
+                  </>)}
                 </div>
                 <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                   <Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>
                     Cancel
                   </Button>
-                  <Button variant="brand" type="submit" disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date}>
+                  <Button variant="brand" type="submit" disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || (canSeeMoney && !newCampaign.total_budget) || !newCampaign.start_date}>
                     {isSubmittingCampaign ? "Creating..." : "Create Campaign"}
                   </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-          )}
           </>
         }
       />

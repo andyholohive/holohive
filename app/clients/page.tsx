@@ -341,8 +341,9 @@ function relativeTimeFromNow(iso: string): string {
 
 export default function ClientsPage() {
   const { user, userProfile } = useAuth();
-  // [2026-11-18] Members edit clients and share portals; adding and deleting
-  // a client and the Engagement tab (contract amounts) stay with admins.
+  // [2026-11-18] Members edit clients and share portals; deleting a client
+  // and the Engagement tab (contract amounts) stay with admins.
+  // [2026-11-19, Andy] Members add clients too.
   // See lib/memberAccess.
   const { canSeeMoney } = useGuestPermissions();
   const isAdminRole = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
@@ -2914,7 +2915,7 @@ export default function ClientsPage() {
             subtitle="Manage your client relationships"
             kicker="Clients · Engagements"
             kickerDot="sky"
-            actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
+            actions={canEditClients ? (
               <>
                 {/* "Start Client" hidden 2026-06-02 — Add Client is now the
                     primary CTA. State + Dialog left intact below for easy
@@ -3647,7 +3648,7 @@ export default function ClientsPage() {
                   page's actual CTA. Template CRUD is unchanged. */}
               <Dialog open={isNewClientOpen} onOpenChange={clientDialogGuard.onOpenChange}>
                 <DialogTrigger asChild>
-                  <Button variant="brand" className={isAdminRole ? undefined : 'hidden'}>
+                  <Button variant="brand">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Client
                   </Button>
