@@ -39,6 +39,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from "@/contexts/AuthContext";
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { supabase } from "@/lib/supabase";
 import { KOLService, MasterKOL } from "@/lib/kolService";
 import { FieldOptionsService } from "@/lib/fieldOptionsService";
@@ -180,7 +181,11 @@ export default function KOLsPage() {
   };
 
   // Initialize visible columns from URL params
-  const [visibleColumns, setVisibleColumns] = useState(() => {
+  // [2026-11-18] Members see the directory without the Pricing column and
+  // without delete (lib/memberAccess). Pricing is forced off on the DERIVED
+  // value only, so a member's saved column choices are never rewritten.
+  const { canSeeMoney, canDeleteClientWork } = useGuestPermissions();
+  const [visibleColumnsRaw, setVisibleColumns] = useState(() => {
     const columnsParam = searchParams.get('columns');
     if (columnsParam) {
       try {
@@ -192,6 +197,10 @@ export default function KOLsPage() {
     }
     return defaultVisibleColumns;
   });
+  const visibleColumns = useMemo(
+    () => (canSeeMoney ? visibleColumnsRaw : { ...visibleColumnsRaw, pricing: false }),
+    [visibleColumnsRaw, canSeeMoney],
+  );
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [filterSearchTerms, setFilterSearchTerms] = useState<{[key: string]: string}>({});
   const [dynamicFieldOptions, setDynamicFieldOptions] = useState<{ [key: string]: string[] }>({});
@@ -416,7 +425,7 @@ export default function KOLsPage() {
 
   // Function to handle column visibility changes
   const handleColumnVisibilityChange = (columnKey: keyof typeof defaultVisibleColumns, checked: boolean) => {
-    const newVisibleColumns = { ...visibleColumns, [columnKey]: checked };
+    const newVisibleColumns = { ...visibleColumnsRaw, [columnKey]: checked };
     setVisibleColumns(newVisibleColumns);
     updateColumnVisibilityInURL(newVisibleColumns);
   };
@@ -2518,14 +2527,16 @@ export default function KOLsPage() {
               >
                 Apply
               </Button>
-              <Button
-                size="sm"
-                className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
-                disabled={selectedKOLs.length === 0 || isBulkDeleting}
-                onClick={() => setShowBulkDeleteDialog(true)}
-              >
-                Delete
-              </Button>
+              {canDeleteClientWork && (
+                <Button
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
+                  disabled={selectedKOLs.length === 0 || isBulkDeleting}
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                >
+                  Delete
+                </Button>
+              )}
             </div>
             <div className="text-xs text-ink-warm-500 font-medium">
               {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
@@ -2912,7 +2923,7 @@ export default function KOLsPage() {
                     group_chat: 'Group Chat',
                     in_house: 'In-House',
                     description: 'Notes'
-                  }).map(([key, label]) => (
+                  }).filter(([key]) => canSeeMoney || key !== 'pricing').map(([key, label]) => (
                     <label key={key} className="flex items-center justify-between cursor-pointer hover:bg-cream-50 p-2 rounded transition-colors">
                       <span className="text-sm font-medium mr-4">{label}</span>
                       <Switch
@@ -3821,9 +3832,11 @@ export default function KOLsPage() {
                   })()}
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-right w-16`}>
                     <div className="flex space-x-1 justify-end">
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(kol.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {canDeleteClientWork && (
+                        <Button size="sm" variant="outline" onClick={() => handleDelete(kol.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

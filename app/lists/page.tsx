@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -181,6 +182,8 @@ const getListStatusTone = (status: string | null | undefined): BadgeTone => {
 
 export default function ListsPage() {
   const { user, userProfile } = useAuth();
+  // Members edit but do not delete (lib/memberAccess).
+  const { canDeleteClientWork } = useGuestPermissions();
   const [lists, setLists] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2850,15 +2853,17 @@ export default function ListsPage() {
                       >
                         <Edit className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteList(list.id); }}
-                        className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
-                        title="Delete list"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {canDeleteClientWork && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteList(list.id); }}
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete list"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {/* Status badge row — KOL count only. Status pill
@@ -2997,12 +3002,14 @@ export default function ListsPage() {
                           <DropdownMenuItem onClick={() => handleEditList(list)}>
                             <Edit className="h-3.5 w-3.5 mr-2" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteList(list.id)}
-                            className="text-rose-600 focus:text-rose-600"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                          </DropdownMenuItem>
+                          {canDeleteClientWork && (
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteList(list.id)}
+                              className="text-rose-600 focus:text-rose-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

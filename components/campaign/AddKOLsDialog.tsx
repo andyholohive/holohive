@@ -13,6 +13,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -76,6 +77,8 @@ const DEFAULT_FORM = {
 };
 
 export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
+  // Asking prices and the initial-payment form are money (lib/memberAccess).
+  const { canSeeMoney } = useGuestPermissions();
   const {
     campaign,
     availableKOLs,
@@ -196,7 +199,7 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
                     <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Creator Type</TableHead>
                     <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Content Type</TableHead>
                     <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Deliverables</TableHead>
-                    <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Pricing</TableHead>
+                    {canSeeMoney && <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Pricing</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -304,13 +307,15 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
                             </div>
                           ) : '-'}
                         </TableCell>
-                        <TableCell>
-                          {kol.post_price != null ? (
-                            <span className="px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-brand-light text-brand tabular-nums">
-                              ${Number(kol.post_price).toLocaleString('en-US')}
-                            </span>
-                          ) : '-'}
-                        </TableCell>
+                        {canSeeMoney && (
+                          <TableCell>
+                            {kol.post_price != null ? (
+                              <span className="px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-brand-light text-brand tabular-nums">
+                                ${Number(kol.post_price).toLocaleString('en-US')}
+                              </span>
+                            ) : '-'}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -345,6 +350,7 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
             />
           </div>
 
+          {canSeeMoney && (
           <div className="border-t pt-4 max-w-md">
             <div className="flex items-center space-x-2 mb-4">
               <Checkbox
@@ -424,6 +430,7 @@ export function AddKOLsDialog({ open, onOpenChange }: AddKOLsDialogProps) {
               </div>
             )}
           </div>
+          )}
         </div>
         <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

@@ -16,7 +16,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   const { user, userProfile, loading, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const { isGuest, canAccessPath, firstAllowedPath, loading: guestLoading } = useGuestPermissions()
+  const { isGuest, canAccessPath, firstAllowedPath, loading: guestLoading, isMemberBlocked, memberHome } = useGuestPermissions()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -45,6 +45,14 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
       }
     }
   }, [loading, guestLoading, isGuest, pathname, canAccessPath, firstAllowedPath, router])
+
+  // [2026-11-18] Members are redirected off Sales / CRM and Measurement
+  // (lib/memberAccess) unless an admin granted that page. Without this the
+  // sidebar hides the entry but a pasted link still opens.
+  const memberBlocked = Boolean(pathname && isMemberBlocked(pathname))
+  useEffect(() => {
+    if (!loading && !guestLoading && memberBlocked) router.replace(memberHome)
+  }, [loading, guestLoading, memberBlocked, memberHome, router])
 
   if (loading || guestLoading) {
     return (
@@ -103,6 +111,11 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
 
   // Guest on unauthorized page — will redirect via useEffect
   if (isGuest && pathname && !canAccessPath(pathname)) {
+    return null
+  }
+
+  // Member on an off-limits page — will redirect via useEffect
+  if (memberBlocked) {
     return null
   }
 

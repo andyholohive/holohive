@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { sanitizeMoneyInput, formatMoneyDisplay } from '@/lib/moneyInput';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
 import { FormService, FormWithStats } from '@/lib/formService';
@@ -340,6 +341,12 @@ function relativeTimeFromNow(iso: string): string {
 
 export default function ClientsPage() {
   const { user, userProfile } = useAuth();
+  // [2026-11-18] Members edit clients and share portals; adding and deleting
+  // a client and the Engagement tab (contract amounts) stay with admins.
+  // See lib/memberAccess.
+  const { canSeeMoney } = useGuestPermissions();
+  const isAdminRole = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+  const canEditClients = isAdminRole || userProfile?.role === 'member';
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -666,7 +673,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients();
-    if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') {
+    if (canEditClients) {
       UserService.getActiveUsers().then(setAllUsers);
     }
     fetchPartners();
@@ -3627,7 +3634,7 @@ export default function ClientsPage() {
                   Korea Signal
                 </Button>
               )}
-              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+              {canEditClients && (
             <>
               {/* "Start Client" trigger hidden 2026-06-02 — Add Client is
                   the primary CTA. Dialog tree below still wired to
@@ -3640,7 +3647,7 @@ export default function ClientsPage() {
                   page's actual CTA. Template CRUD is unchanged. */}
               <Dialog open={isNewClientOpen} onOpenChange={clientDialogGuard.onOpenChange}>
                 <DialogTrigger asChild>
-                  <Button variant="brand">
+                  <Button variant="brand" className={isAdminRole ? undefined : 'hidden'}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Client
                   </Button>
@@ -3676,12 +3683,14 @@ export default function ClientsPage() {
                             handleCreateClient flushes it once there's an id —
                             you set the engagement up in one pass instead of
                             creating, then remembering to come back. */}
+                        {canSeeMoney && (
                         <TabsTrigger
                           value="engagement"
                           className="px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand"
                         >
                           Engagement
                         </TabsTrigger>
+                        )}
                       </TabsList>
                       <TabsContent value="details" className="flex-1 flex flex-col min-h-0 mt-0">
                     <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
@@ -4001,6 +4010,7 @@ export default function ClientsPage() {
                       </div>
                     </div>
                       </TabsContent>
+                      {canSeeMoney && (
                       <TabsContent value="engagement" className="flex-1 flex flex-col min-h-0 mt-0">
                         <div className="flex-1 overflow-y-auto px-1 pb-4">
                           {/* null clientId = draft mode: edits land in
@@ -4012,6 +4022,7 @@ export default function ClientsPage() {
                           />
                         </div>
                       </TabsContent>
+                      )}
                     </Tabs>
                     <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
@@ -4196,7 +4207,7 @@ export default function ClientsPage() {
                             ))
                           )}
                         </div>
-                        {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                        {canEditClients && (
                           // Hover-action cluster: low-opacity icons that
                           // sharpen on card hover. Square 28px tiles per
                           // CLAUDE.md inline icon convention; cream tile
@@ -4222,15 +4233,17 @@ export default function ClientsPage() {
                             >
                               <Edit className="h-3.5 w-3.5" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => { e.stopPropagation(); handleDeleteClient(client); }}
-                              className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
-                              title="Delete client"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            {isAdminRole && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteClient(client); }}
+                                className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                                title="Delete client"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

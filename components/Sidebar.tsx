@@ -33,7 +33,7 @@ export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userProfile, signOut, loading: authLoading } = useAuth();
-  const { isGuest, canView, loading: guestLoading, hasMemberGrant, canSeePage, isGuestView, previewing, roleView } = useGuestPermissions();
+  const { isGuest, canView, loading: guestLoading, hasMemberGrant, canSeePage, isGuestView, previewing, roleView, isMemberBlocked } = useGuestPermissions();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebarCollapsed');
@@ -756,6 +756,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   canView,
                   hasMemberGrant,
                   email: userProfile?.email,
+                  isMemberBlocked,
                 };
                 const visible = bookmarkedHrefs
                   .map(href => NAV_BY_HREF[href])
@@ -1099,7 +1100,7 @@ export default function Sidebar({ children }: SidebarProps) {
         onToggleBookmark={toggleBookmark}
         onToggleHidden={toggleHidden}
         onReset={resetCustomization}
-        ctx={{ isGuest: isGuestUser, role: roleView, canView, hasMemberGrant }}
+        ctx={{ isGuest: isGuestUser, role: roleView, canView, hasMemberGrant, isMemberBlocked }}
       />
       <GlobalCommandPalette />
 

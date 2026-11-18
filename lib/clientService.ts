@@ -14,13 +14,17 @@ export interface ClientWithAccess extends Client {
 export class ClientService {
   /**
    * Get clients based on user role
-   * - Admins: See all clients
-   * - Members: See only clients they have access to via client_access_members
+   * - Admins and members: all non-archived clients
+   * - Anyone else: only clients shared with them via client_access_members
+   *
+   * [2026-11-18, Andy] Members moved to the first group. Per-client sharing
+   * meant a new joiner opened an empty Clients page until someone shared
+   * each client by hand; nobody on the team was ever set up that way.
    */
   static async getClientsForUser(userRole: 'super_admin' | 'admin' | 'member' | 'client', userId: string): Promise<ClientWithAccess[]> {
     try {
-      if (userRole === 'admin' || userRole === 'super_admin') {
-        // Admins and super admins can see all non-archived clients
+      if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'member') {
+        // Admins, super admins and members see all non-archived clients
         const { data: clients, error } = await supabase
           .from('clients')
           .select(`
@@ -41,7 +45,7 @@ export class ClientService {
           whitelist_partner_name: (client.whitelist_partner as any)?.name
         })) || [];
       } else {
-        // Members can only see non-archived clients they have access to
+        // Everyone else: only non-archived clients shared with them
         const { data: clientAccess, error } = await supabase
           .from('client_access_members')
           .select(`

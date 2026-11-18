@@ -120,6 +120,7 @@ import ActivationResultsSection from '@/components/activations/ActivationResults
 const LineupsTab = dynamic(() => import("@/components/campaign/LineupsTab"), { ssr: false, loading: () => <TabSkeleton /> });
 import { AddActivationDialog } from '@/components/campaign/AddActivationDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { formatDate } from '@/lib/dateFormat';
 import { hasAgreedRate } from '@/lib/kolRate';
 
@@ -205,6 +206,11 @@ const CampaignDetailsPage = () => {
   // Current logged-in user — needed to attribute Lineup Manager
   // actions (proposed_by / confirmed_by / actor on the audit log).
   const { userProfile } = useAuth();
+  // [2026-11-18] Members work the KOL, Content and Lineups tabs without the
+  // Budget tab or any payment prompt. The payment rows themselves are still
+  // written when content is added, so nothing is lost for the admin who
+  // settles them. See lib/memberAccess.
+  const { canSeeMoney } = useGuestPermissions();
   // Extend CampaignWithDetails inline for local use
   type CampaignDetails = CampaignWithDetails;
   const [campaign, setCampaign] = useState<CampaignDetails | null>(null);
@@ -279,6 +285,12 @@ const CampaignDetailsPage = () => {
       setActiveTab(tabParam);
     }
   }, []);
+
+  // A ?tab=payments link opened by someone who cannot see money falls back
+  // to the KOL Dashboard instead of an empty panel.
+  useEffect(() => {
+    if (!canSeeMoney && activeTab === 'payments') setActiveTab('kols');
+  }, [canSeeMoney, activeTab]);
 
   // Master KOL edit dialog (opened by clicking the edit pencil next to
   // a KOL name in the table view). Edits the underlying master_kols row,
@@ -2591,12 +2603,14 @@ const CampaignDetailsPage = () => {
               >
                 Lineups
               </TabsTrigger>
+              {canSeeMoney && (
               <TabsTrigger
                 value="payments"
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
               >
                 Budget
               </TabsTrigger>
+              )}
               {/* Report tab hidden 2026-06-XX per product decision —
                   the surface wasn't getting use and the Report tab's
                   ReportTabContent component is still wired below for
@@ -2998,6 +3012,7 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           {/* Budget Tab */}
+          {canSeeMoney && (
           <TabsContent value="payments" className="mt-4">
               {/* Toolbar row: Record Payment on the right. The
                   Overview/Table tab toggle was removed 2026-06-16 per
@@ -3023,6 +3038,7 @@ const CampaignDetailsPage = () => {
                 <BudgetTableView />
               </div>
           </TabsContent>
+          )}
 
           {/* Report Tab */}
           <TabsContent value="report" className="mt-4">
@@ -3164,7 +3180,7 @@ const CampaignDetailsPage = () => {
         loading={loadingEmailViews}
       />
       <PaymentNotifyDialog
-        open={paymentNotifyDialogOpen}
+        open={canSeeMoney && paymentNotifyDialogOpen}
         onOpenChange={setPaymentNotifyDialogOpen}
         kolName={pendingPaymentNotification?.kolName}
         chatTitle={pendingPaymentNotification?.chatTitle}
@@ -3175,13 +3191,13 @@ const CampaignDetailsPage = () => {
         onSkip={skipPaymentNotification}
       />
       <PricingSuggestionDialog
-        state={pricingSuggestionDialog}
+        state={canSeeMoney ? pricingSuggestionDialog : null}
         onClose={() => setPricingSuggestionDialog(null)}
         recordPaymentDialogRef={recordPaymentDialogRef}
       />
 
       {/* Payment terms dialog — fires when a KOL is newly onboarded without an agreed rate */}
-      {paymentTermsDialog && (
+      {canSeeMoney && paymentTermsDialog && (
         <SetPaymentTermsDialog
           open={paymentTermsDialog.open}
           onOpenChange={(open) => {

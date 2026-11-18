@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ContentTagCell, { ClientFacingTagBadges, type ContentTag } from './ContentTagCell';
 import { supabase as supabaseClient } from '@/lib/supabase';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import {
   ArrowDown,
   ArrowUp,
@@ -98,6 +99,9 @@ const contentStatusOptions = [
 ];
 
 export function ContentDashboardTableView() {
+  // [2026-11-18] Members edit content but do not delete it (a delete also
+  // removes the linked payments), and never see the repost-rate prompt.
+  const { canSeeMoney, canDeleteClientWork } = useGuestPermissions();
   // Section 7.5 — fetch the global active-tags list once at the
   // table level and pass to every TagCell. Skips N per-row
   // round-trips to content_tags (which is a tiny table, ~5 rows,
@@ -1076,14 +1080,16 @@ export function ContentDashboardTableView() {
                         </div>
                         <div className="flex flex-col items-end justify-end">
                           <div className="h-5"></div>
-                          <Button
-                            size="sm"
-                            variant="destructive" className="whitespace-nowrap"
-                            disabled={selectedContents.length === 0}
-                            onClick={() => setShowBulkDeleteDialog(true)}
-                          >
-                            Delete
-                          </Button>
+                          {canDeleteClientWork && (
+                            <Button
+                              size="sm"
+                              variant="destructive" className="whitespace-nowrap"
+                              disabled={selectedContents.length === 0}
+                              onClick={() => setShowBulkDeleteDialog(true)}
+                            >
+                              Delete
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <div className="text-xs text-ink-warm-500 font-medium ml-auto whitespace-nowrap">
@@ -2113,9 +2119,11 @@ export function ContentDashboardTableView() {
                                       Verify
                                     </Button>
                                   )}
-                                  <Button size="sm" variant="outline" onClick={() => setDeleteContentPending(content)}>
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                                  {canDeleteClientWork && (
+                                    <Button size="sm" variant="outline" onClick={() => setDeleteContentPending(content)}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -2241,7 +2249,7 @@ export function ContentDashboardTableView() {
           set to 'Repost' for a KOL whose repost_rate isn't on file yet.
           Pre-fills with 50% of standard_rate. Once saved, the Budget
           Dashboard picks up the new rate for every Repost row. */}
-      {repostRateDialog && (
+      {canSeeMoney && repostRateDialog && (
         <SetRepostRateDialog
           open={repostRateDialog.open}
           onOpenChange={(open) => {

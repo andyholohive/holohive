@@ -1197,7 +1197,7 @@ export default function TeamPage() {
                               )}
                               {member.role === 'member' && (
                                 <p className="text-[11px] text-ink-warm-500 pb-1">
-                                  Members already have the core app. These grants unlock the admin-gated surfaces below for this member only.
+                                  Members get every active client, campaign, KOL and delivery log, and can edit but not delete. Sales, client money and Measurement are off by default. Tick a row to open it for this member only.
                                 </p>
                               )}
                               {/* Admin restriction toggle. Admins hold every

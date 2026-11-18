@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -98,6 +99,8 @@ const toLocalDateStr = (d: Date) => {
 
 export default function DeliveryLogPage({ params }: { params: { id: string } }) {
   const { user } = useAuth();
+  // Members edit but do not delete (lib/memberAccess).
+  const { canDeleteClientWork } = useGuestPermissions();
   const router = useRouter();
   const clientId = params.id;
 
@@ -1165,9 +1168,11 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-cream-100" onClick={() => openForm(entry)} title="Edit in popup">
                                 <Expand className="h-3.5 w-3.5 text-ink-warm-700" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
-                                <Trash2 className="h-3.5 w-3.5 text-rose-600" />
-                              </Button>
+                              {canDeleteClientWork && (
+                                <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
+                                  <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

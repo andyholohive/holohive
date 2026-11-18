@@ -158,6 +158,9 @@ export type AvailabilityCtx = {
   hasMemberGrant?: (pageKey: string) => boolean;
   /** Signed-in email, for owner-only entries. */
   email?: string | null;
+  /** From useGuestPermissions().isMemberBlocked — pages the member role
+   *  does not get (lib/memberAccess). Optional so older callers stay valid. */
+  isMemberBlocked?: (path: string) => boolean;
 };
 
 /**
@@ -178,6 +181,8 @@ export function isItemAvailable(item: NavItemDef, ctx: AvailabilityCtx): boolean
   // pageKey + isGuest: only block if guest user explicitly lacks access.
   // Non-guests aren't subject to canView; they see everything role-allowed.
   if (item.pageKey && ctx.isGuest && !ctx.canView(item.pageKey)) return false;
+  // Member-role exclusions (Sales / CRM, Measurement) unless granted.
+  if (ctx.isMemberBlocked?.(item.href)) return false;
   return true;
 }
 

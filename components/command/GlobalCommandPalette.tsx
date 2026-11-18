@@ -372,7 +372,7 @@ function GlobalCommandPaletteInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { userProfile } = useAuth();
-  const { isGuest, canView, hasMemberGrant, roleView, isGuestView } = useGuestPermissions();
+  const { isGuest, canView, hasMemberGrant, roleView, isGuestView, isMemberBlocked } = useGuestPermissions();
 
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -434,9 +434,9 @@ function GlobalCommandPaletteInner() {
   }, [open]);
 
   const pages = React.useMemo(() => {
-    const ctx = { isGuest: guestUser, role: roleView ?? userProfile?.role, canView, hasMemberGrant, email: userProfile?.email };
+    const ctx = { isGuest: guestUser, role: roleView ?? userProfile?.role, canView, hasMemberGrant, email: userProfile?.email, isMemberBlocked };
     return NAV_REGISTRY.filter((item) => isItemAvailable(item, ctx));
-  }, [guestUser, roleView, userProfile?.role, userProfile?.email, canView, hasMemberGrant]);
+  }, [guestUser, roleView, userProfile?.role, userProfile?.email, canView, hasMemberGrant, isMemberBlocked]);
 
   const go = React.useCallback((href: string, recent?: Recent) => {
     setOpen(false);

@@ -49,6 +49,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -199,6 +200,8 @@ export function KolDashboardTableView({
   kolFilters,
   setKolFilters,
 }: KolDashboardTableViewProps) {
+  // Members do not remove KOLs from a campaign (lib/memberAccess).
+  const { canDeleteClientWork } = useGuestPermissions();
   const {
     campaign,
     setCampaign,
@@ -675,17 +678,19 @@ export function KolDashboardTableView({
                       </div>
                       <div className="flex flex-col items-end justify-end">
                         <div className="h-5"></div>
-                        <Button
-                          size="sm"
-                          variant="destructive" className="whitespace-nowrap"
-                          disabled={selectedKOLs.length === 0}
-                          onClick={() => {
-                            setKolsToDelete(selectedKOLs);
-                            setShowKOLDeleteDialog(true);
-                          }}
-                        >
-                          Delete
-                        </Button>
+                        {canDeleteClientWork && (
+                          <Button
+                            size="sm"
+                            variant="destructive" className="whitespace-nowrap"
+                            disabled={selectedKOLs.length === 0}
+                            onClick={() => {
+                              setKolsToDelete(selectedKOLs);
+                              setShowKOLDeleteDialog(true);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="text-xs text-ink-warm-500 font-medium ml-auto whitespace-nowrap">
@@ -1727,16 +1732,18 @@ export function KolDashboardTableView({
                                   >
                                     {campaignKOL.hidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setKolsToDelete([campaignKOL.id]);
-                                          setShowKOLDeleteDialog(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                                  {canDeleteClientWork && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setKolsToDelete([campaignKOL.id]);
+                                        setShowKOLDeleteDialog(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>

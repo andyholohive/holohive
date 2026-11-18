@@ -37,6 +37,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -485,6 +486,8 @@ export default function LineupsTab({
   // [2026-11-03, Bolt] Manual posted/missed/pending override on a slot, admin
   // and up, reason required. See LineupManagerService.setSlotStatus.
   const { userProfile } = useAuth();
+  // Members edit but do not delete (lib/memberAccess).
+  const { canDeleteClientWork } = useGuestPermissions();
   const canOverrideSlotStatus = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
   async function handleSetSlotStatus(slotId: string, status: 'pending' | 'posted' | 'missed', reason: string) {
     setBusy(true);
@@ -1044,6 +1047,7 @@ export default function LineupsTab({
               );
             })()}
             <AuditLogButton lineupId={lineup.id} service={service} />
+            {canDeleteClientWork && (
             <div className="ml-auto">
               <Button
                 size="sm"
@@ -1057,6 +1061,7 @@ export default function LineupsTab({
                 Delete lineup
               </Button>
             </div>
+            )}
           </div>
         )}
 

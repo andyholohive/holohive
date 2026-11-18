@@ -16,6 +16,7 @@
 
 import { ChevronDown, ExternalLink, Flag, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
@@ -84,6 +85,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters }: KolDashboardCardsViewProps) {
+  const { canSeeMoney } = useGuestPermissions();
   const { contents } = useCampaignDetail();
 
   const activeFilterCount =
@@ -184,6 +186,7 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                   className="w-full"
                 />
               </Field>
+              {canSeeMoney && (
               <Field label="Budget type">
                 <MultiSelect
                   options={['Token', 'Fiat', 'WL']}
@@ -192,6 +195,7 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                   className="w-full"
                 />
               </Field>
+              )}
               <Field label="Followers">
                 <div className="flex items-center gap-1.5">
                   <Select
@@ -216,6 +220,7 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                   />
                 </div>
               </Field>
+              {canSeeMoney && (
               <Field label="Budget (USD)">
                 <div className="flex items-center gap-1.5">
                   <Select
@@ -240,6 +245,7 @@ export function KolDashboardCardsView({ filteredKOLs, kolFilters, setKolFilters 
                   />
                 </div>
               </Field>
+              )}
             </div>
           </PopoverContent>
         </Popover>

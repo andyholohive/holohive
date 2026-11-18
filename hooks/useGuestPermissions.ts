@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useViewAs } from '@/contexts/ViewAsContext';
+import { MEMBER_BLOCKED_PAGES, MEMBER_MONEY_GRANT, MEMBER_HOME, memberBlockRule } from '@/lib/memberAccess';
 
 type Permission = {
   page_key: string;
@@ -20,7 +21,11 @@ type Permission = {
 export const MEMBER_GRANT_PAGES = [
   { key: '/sops', label: 'SOPs' },
   { key: '/templates', label: 'Templates — Tasks & Deliverables editors' },
-] as const;
+  // [2026-11-18] Members no longer get Sales / CRM or client money from the
+  // role (see lib/memberAccess). These open them for one member.
+  { key: MEMBER_MONEY_GRANT, label: 'Client money — payments, budgets, KOL rates' },
+  ...MEMBER_BLOCKED_PAGES.filter(p => p.grantable).map(p => ({ key: p.key, label: `${p.group} — ${p.label}` })),
+];
 
 // All pages a guest could potentially access
 export const GUEST_PAGES = [
@@ -79,6 +84,9 @@ export function useGuestPermissions() {
   const isRestricted = previewing
     ? (viewAs!.role !== 'super_admin' && viewAs!.restricted)
     : ownRestricted;
+  // Role as the CURRENT VIEW sees it (the preview target's while previewing).
+  const effectiveRole = (previewing ? viewAs!.role : userProfile?.role) as string | undefined;
+  const effectiveIsMember = effectiveRole === 'member';
 
   useEffect(() => {
     if (previewing) return;               // rows come from the preview target
@@ -136,10 +144,32 @@ export function useGuestPermissions() {
   // role check (`isAdmin || hasMemberGrant('/sops')`), so admin access
   // never depends on grant rows existing.
   const hasMemberGrant = useCallback((pageKey: string): boolean => {
-    if (!isMember) return false;
+    if (!effectiveIsMember) return false;
     const perm = effectivePermissions.find(p => p.page_key === pageKey);
     return perm?.can_view ?? false;
-  }, [isMember, effectivePermissions]);
+  }, [effectiveIsMember, effectivePermissions]);
+
+  // [2026-11-18] Role-level exclusions for members: Sales / CRM and
+  // Measurement (lib/memberAccess). True when this path is off limits and no
+  // grant row opens it. Fails CLOSED while rows load: a grant can only add
+  // access, so the worst case is a granted item appearing a beat late.
+  const isMemberBlocked = useCallback((path: string): boolean => {
+    if (!effectiveIsMember) return false;
+    const rule = memberBlockRule(path);
+    if (!rule) return false;
+    if (!rule.grantable) return true;
+    return !effectivePermissions.some(p => p.can_view && p.page_key === rule.key);
+  }, [effectiveIsMember, effectivePermissions]);
+
+  // Payments, budgets and KOL rates inside client and campaign pages.
+  // Admins always; a member only with the money grant. Guests are left as
+  // they were: their access is the per-page allowlist.
+  const canSeeMoney = !effectiveIsMember
+    || effectivePermissions.some(p => p.can_view && p.page_key === MEMBER_MONEY_GRANT);
+
+  // Members edit client work but do not delete it. Guests keep their own
+  // per-page can_delete (see canDelete above).
+  const canDeleteClientWork = !effectiveIsMember;
 
   // Pages all users (including guests) can always access
   const ALWAYS_ALLOWED = ['/settings', '/auth'];
@@ -149,10 +179,11 @@ export function useGuestPermissions() {
   // Guests and restricted users share the same allowlist semantics here —
   // the difference is only in who gets rows, not how they're read.
   const canAccessPath = useCallback((path: string): boolean => {
+    if (isMemberBlocked(path)) return false;
     if (!effectiveIsGuest && !isRestricted) return true;
     if (ALWAYS_ALLOWED.some(p => path.startsWith(p))) return true;
     return effectivePermissions.some(p => p.can_view && path.startsWith(p.page_key));
-  }, [effectiveIsGuest, isRestricted, effectivePermissions]);
+  }, [effectiveIsGuest, isRestricted, effectivePermissions, isMemberBlocked]);
 
   /**
    * Should this nav item / page be shown?
@@ -166,11 +197,12 @@ export function useGuestPermissions() {
    * The gate that matters is the page's own data access, not the nav item.
    */
   const canSeePage = useCallback((pageKey: string): boolean => {
+    if (isMemberBlocked(pageKey)) return false;
     if (!isRestricted) return true;
     if (loading && !previewing) return true;
     if (ALWAYS_ALLOWED.some(p => pageKey.startsWith(p))) return true;
     return effectivePermissions.some(p => p.can_view && p.page_key === pageKey);
-  }, [isRestricted, loading, previewing, effectivePermissions]);
+  }, [isRestricted, loading, previewing, effectivePermissions, isMemberBlocked]);
 
   // First page the user has access to (for redirect). Restricted users need
   // this too — landing them on a page they can't see is a dead end.
@@ -182,6 +214,9 @@ export function useGuestPermissions() {
     isGuest, isRestricted, permissions, loading,
     canView, canEdit, canDelete, canAccessPath, canSeePage,
     firstAllowedPath, hasMemberGrant,
+    isMemberBlocked, canSeeMoney, canDeleteClientWork,
+    /** Where to send a member who opened a blocked page. */
+    memberHome: MEMBER_HOME,
     /**
      * Guest-ness as the CURRENT VIEW sees it: the preview target's role
      * while previewing, otherwise the signed-in user's.

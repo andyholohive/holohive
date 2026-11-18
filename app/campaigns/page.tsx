@@ -20,6 +20,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeMoneyInput, formatMoneyDisplay } from "@/lib/moneyInput";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
@@ -50,6 +51,10 @@ import { formatDate as fmtDate } from '@/lib/dateFormat';
 
 export default function CampaignsPage() {
   const { user, userProfile } = useAuth();
+  // [2026-11-18] Members see campaigns without budgets or payment status,
+  // and do not create or archive them (a campaign cannot be created without
+  // a budget). See lib/memberAccess.
+  const { canSeeMoney, canDeleteClientWork } = useGuestPermissions();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const clientIdParam = searchParams.get('clientId');
@@ -580,12 +585,12 @@ export default function CampaignsPage() {
           subtitle="Track and manage your marketing campaigns"
           kicker="Clients · Campaigns"
           kickerDot="sky"
-          actions={
+          actions={canSeeMoney ? (
             <Button variant="brand" onClick={() => setIsNewCampaignOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Campaign
             </Button>
-          }
+          ) : undefined}
         />
         {/* ── Campaigns skeleton ──────────────────────────────────
             Mirrors the loaded layout: SectionHeader + toolbar
@@ -658,10 +663,13 @@ export default function CampaignsPage() {
               <ListChecks className="h-4 w-4 mr-2" />
               All Lineups
             </Button>
-            <Button variant="outline" onClick={() => setRollupMode('budgets')}>
-              <Wallet className="h-4 w-4 mr-2" />
-              All Budgets
-            </Button>
+            {canSeeMoney && (
+              <Button variant="outline" onClick={() => setRollupMode('budgets')}>
+                <Wallet className="h-4 w-4 mr-2" />
+                All Budgets
+              </Button>
+            )}
+          {canSeeMoney && (
           <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
             <DialogTrigger asChild>
               <Button variant="brand">
@@ -1082,6 +1090,7 @@ export default function CampaignsPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
           </>
         }
       />
@@ -1287,15 +1296,17 @@ export default function CampaignsPage() {
                       >
                         <Share2 className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); handleArchiveCampaign(campaign); }}
-                        className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-amber-700 hover:bg-amber-50"
-                        title="Archive campaign"
-                      >
-                        <Archive className="h-3.5 w-3.5" />
-                      </Button>
+                      {canDeleteClientWork && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleArchiveCampaign(campaign); }}
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-amber-700 hover:bg-amber-50"
+                          title="Archive campaign"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {/* Status badge row — derived client bucket, matches the tab */}
@@ -1315,10 +1326,12 @@ export default function CampaignsPage() {
                       <Building2 className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
                       <span className="truncate">{campaign.client_name}</span>
                     </div>
-                    <div className="flex items-center text-sm text-ink-warm-700">
-                      <DollarSign className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
-                      <span className="tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</span>
-                    </div>
+                    {canSeeMoney && (
+                      <div className="flex items-center text-sm text-ink-warm-700">
+                        <DollarSign className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
+                        <span className="tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</span>
+                      </div>
+                    )}
                     <div className="flex items-center text-sm text-ink-warm-700">
                       <CalendarIcon className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
                       {/* [2026-07-25] End = the engagement TERM end only. No
@@ -1354,7 +1367,7 @@ export default function CampaignsPage() {
                           ? <><span className="tabular-nums">{counts.posted}</span> of <span className="tabular-nums">{counts.total}</span> content posted</>
                           : 'No content yet'}
                       </div>
-                      {counts && counts.total > 0 && (
+                      {canSeeMoney && counts && counts.total > 0 && (
                         <div>
                           <span className="tabular-nums">{paidContentCounts[campaign.id] || 0}</span> of <span className="tabular-nums">{counts.total}</span> content paid
                         </div>
@@ -1372,7 +1385,7 @@ export default function CampaignsPage() {
                         { label: 'Content Dashboard', tab: 'contents', icon: FileText },
                         { label: 'Lineups', tab: 'lineups', icon: List },
                         { label: 'Budget', tab: 'payments', icon: DollarSign },
-                      ] as const).map(({ label, tab, icon: Icon }) => (
+                      ] as const).filter(({ tab }) => canSeeMoney || tab !== 'payments').map(({ label, tab, icon: Icon }) => (
                         <Button
                           key={tab}
                           variant="outline"
@@ -1406,7 +1419,7 @@ export default function CampaignsPage() {
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Campaign</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
-                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Budget</TableHead>
+                {canSeeMoney && <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Budget</TableHead>}
                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Dates</TableHead>
                 {/* [Phase hidden everywhere] Campaign phase is no longer
                     surfaced in any HQ or public view. Column gated off
@@ -1458,7 +1471,7 @@ export default function CampaignsPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</TableCell>
+                    {canSeeMoney && <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.client_budget_total ?? campaign.total_budget)}</TableCell>}
                     <TableCell className="py-3.5 px-5 text-ink-warm-700 text-sm tabular-nums">
                       {/* [2026-07-25] End = engagement TERM end only. */}
                       {formatDate(campaign.start_date)}
@@ -1509,15 +1522,17 @@ export default function CampaignsPage() {
                         >
                           <Share2 className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-amber-700 hover:bg-amber-50"
-                          onClick={() => handleArchiveCampaign(campaign)}
-                          title="Archive campaign"
-                        >
-                          <Archive className="h-3.5 w-3.5" />
-                        </Button>
+                        {canDeleteClientWork && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-amber-700 hover:bg-amber-50"
+                            onClick={() => handleArchiveCampaign(campaign)}
+                            title="Archive campaign"
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

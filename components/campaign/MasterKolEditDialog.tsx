@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -141,6 +142,9 @@ interface MasterKolEditDialogProps {
 }
 
 export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) {
+  // Price fields are hidden without money access; the saved values are
+  // carried through untouched because the form is seeded from the row.
+  const { canSeeMoney } = useGuestPermissions();
   const { setCampaignKOLs, toast } = useCampaignDetail();
   const fieldOptions = KOLService.getFieldOptions();
 
@@ -342,6 +346,7 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
                 </Select>
               </div>
 
+              {canSeeMoney && (<>
               <div className="space-y-1.5">
                 <Label htmlFor="mk-post-price">Post Price ($) <RequiredAsterisk /></Label>
                 <Input
@@ -388,6 +393,7 @@ export function MasterKolEditDialog({ kol, onClose }: MasterKolEditDialogProps) 
                   className="focus-brand"
                 />
               </div>
+              </>)}
 
               {/* Tier select removed — column dropped in migration 071.
                   Phase 3 will surface the auto-derived Score badge here. */}

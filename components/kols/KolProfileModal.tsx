@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -281,6 +282,7 @@ function OverviewTab({
   kol: MasterKOL;
   onKolChanged?: (updated: MasterKOL) => void;
 }) {
+  const { canSeeMoney } = useGuestPermissions();
   const [notes, setNotes] = useState(kol.notes || "");
   const [savingNotes, setSavingNotes] = useState(false);
   // Latest snapshot — fetched here so the team can see channel health
@@ -359,6 +361,7 @@ function OverviewTab({
           }
         />
         <Field label="Group Chat" value={kol.group_chat ? "Yes" : "No"} />
+        {canSeeMoney && (<>
         <Field
           label="Post Price"
           value={kol.post_price != null ? `$${Number(kol.post_price).toLocaleString('en-US')}` : "—"}
@@ -368,6 +371,7 @@ function OverviewTab({
           value={kol.share_price != null ? `$${Number(kol.share_price).toLocaleString('en-US')}` : "—"}
         />
         {kol.pricing_notes ? <Field label="Pricing Notes" value={kol.pricing_notes} /> : null}
+        </>)}
       </Card>
       {/* Score field + per-dim breakdown moved to the dedicated Score
           tab per Jdot Q8 (modal-with-tabs). Single source of truth — no
