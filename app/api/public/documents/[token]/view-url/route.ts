@@ -4,6 +4,7 @@ import { Database } from '@/lib/database.types';
 import { authorizePortalEmail } from '@/lib/portalDocAuth';
 import { signLogToken } from '@/lib/portalLogToken';
 import { resolveShareToken, recordShareLinkAccess } from '@/lib/documentShareLink';
+import { signDocumentDownloadUrl } from '@/lib/documentDownload';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +92,8 @@ export async function POST(request: Request, { params }: { params: { token: stri
     signedUrl: signed.signedUrl,
     page_count: version.page_count,
     download_enabled: doc.download_enabled,
+    // Separate URL that forces a save (see lib/documentDownload); null when off.
+    downloadUrl: doc.download_enabled ? await signDocumentDownloadUrl(admin, version.storage_ref, doc.title) : null,
     version_id: version.id,
     document_id: doc.id,
     client_name: auth.clientName,

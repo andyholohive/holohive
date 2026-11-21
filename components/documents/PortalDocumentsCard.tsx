@@ -38,6 +38,7 @@ interface PortalDoc {
 interface ViewMeta {
   title: string;
   signedUrl: string;
+  downloadUrl?: string | null;
   page_count: number | null;
   download_enabled: boolean;
   version_id: string | null;
@@ -193,9 +194,9 @@ export default function PortalDocumentsCard({ portalId, email, className }: { po
                     {active.page_count} {active.page_count === 1 ? 'page' : 'pages'}
                   </span>
                 ) : null}
-                {active?.download_enabled && active.signedUrl && (
+                {active?.download_enabled && active.downloadUrl && (
                   <a
-                    href={active.signedUrl}
+                    href={active.downloadUrl}
                     download
                     className="ml-auto inline-flex items-center gap-1 text-xs font-normal text-brand hover:underline flex-shrink-0"
                   >

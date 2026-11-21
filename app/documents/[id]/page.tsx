@@ -38,6 +38,7 @@ interface ViewMeta {
   signedUrl: string;
   page_count: number | null;
   download_enabled: boolean;
+  downloadUrl?: string | null;
   version_id: string | null;
   document_id: string;
 }
@@ -134,9 +135,9 @@ export default function DocumentViewerPage() {
               <span className="text-gray-300">|</span>
               <span className="text-gray-600 font-medium truncate">Document Preview</span>
             </div>
-            {meta?.download_enabled && meta.signedUrl && (
+            {meta?.download_enabled && meta.downloadUrl && (
               <Button asChild variant="outline" size="sm" className="flex-shrink-0">
-                <a href={meta.signedUrl} download><Download className="h-4 w-4 mr-2" />Download</a>
+                <a href={meta.downloadUrl} download><Download className="h-4 w-4 mr-2" />Download</a>
               </Button>
             )}
           </div>

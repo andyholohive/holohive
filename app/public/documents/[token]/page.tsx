@@ -37,6 +37,7 @@ interface ViewMeta {
   signedUrl: string;
   page_count: number | null;
   download_enabled: boolean;
+  downloadUrl?: string | null;
   version_id: string | null;
   document_id: string;
   client_name: string | null;
@@ -173,9 +174,9 @@ export default function PublicDocumentPage() {
                   <FileText className="h-5 w-5 text-white" />
                 </div>
                 <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-gray-900">{meta.title}</h1>
-                {meta.download_enabled && (
+                {meta.download_enabled && meta.downloadUrl && (
                   <Button asChild variant="outline" size="sm">
-                    <a href={meta.signedUrl} download target="_blank" rel="noreferrer">
+                    <a href={meta.downloadUrl} download>
                       <Download className="mr-1.5 h-4 w-4" />Download
                     </a>
                   </Button>

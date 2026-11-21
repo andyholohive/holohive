@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { requireRole } from '@/lib/requireSuperAdmin';
+import { signDocumentDownloadUrl } from '@/lib/documentDownload';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     signedUrl: signed.signedUrl,
     page_count: version.page_count,
     download_enabled: doc.download_enabled,
+    // Separate URL that forces a save (see lib/documentDownload); null when off.
+    downloadUrl: doc.download_enabled ? await signDocumentDownloadUrl(admin, version.storage_ref, doc.title) : null,
     version_id: version.id,
     document_id: doc.id,
     client_id: doc.client_id,
