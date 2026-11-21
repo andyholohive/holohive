@@ -13,7 +13,7 @@
  * keeps the worklist honest without deleting the history the rates use.
  */
 
-import { BUMP_STATUSES, type OutreachProspect, type OutreachStatus } from '@/lib/outreachService';
+import { BUMP_STATUSES, FIRST_SEND_STATUSES, type OutreachProspect, type OutreachStatus } from '@/lib/outreachService';
 
 /** Days after the previous send before bump 1, 2, 3 and the final bump are due. */
 export const BUMP_CADENCE_DAYS = [3, 7, 14, 21] as const;
@@ -24,7 +24,7 @@ const DAY = 86_400_000;
 
 /** The next rung on the ladder, or null once the final bump has gone out. */
 export function nextBumpStatus(status: OutreachStatus): OutreachStatus | null {
-  if (status === 'contacted') return 'bump_1_unseen';
+  if (FIRST_SEND_STATUSES.includes(status)) return 'bump_1_unseen';
   if (status === 'bump_1_unseen' || status === 'bump_1_seen') return 'bump_2_unseen';
   if (status === 'bump_2_unseen' || status === 'bump_2_seen') return 'bump_3_unseen';
   if (status === 'bump_3_unseen' || status === 'bump_3_seen') return 'final_bump';
@@ -52,7 +52,7 @@ export interface FollowUp {
  */
 export function followUpFor(p: OutreachProspect, now = Date.now()): FollowUp | null {
   if (p.parked_at) return null;
-  const onLadder = p.status === 'contacted' || BUMP_STATUSES.includes(p.status);
+  const onLadder = FIRST_SEND_STATUSES.includes(p.status) || BUMP_STATUSES.includes(p.status);
   if (!onLadder) return null;
   // Last send = the Last messaged date Yano keeps (stamped on every send,
   // editable by hand). Older rows without one fall back to the last bump,

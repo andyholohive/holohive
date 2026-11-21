@@ -17,7 +17,7 @@ import { supabase } from './supabase';
 
 export type OutreachStatus =
   // To-do
-  | 'not_started' | 'to_contact' | 'ready_to_send' | 'contacted'
+  | 'not_started' | 'to_contact' | 'ready_to_send' | 'contacted' | 'contacted_seen'
   | 'bump_1_unseen' | 'bump_1_seen' | 'bump_2_unseen' | 'bump_2_seen'
   | 'bump_3_unseen' | 'bump_3_seen' | 'final_bump'
   | 'team_engaged' | 'team_denial' | 'blocked' | 'x'
@@ -28,7 +28,7 @@ export type OutreachStatus =
   | 'lead' | 'lead_trial';
 
 export const OUTREACH_STATUSES: OutreachStatus[] = [
-  'not_started', 'to_contact', 'ready_to_send', 'contacted',
+  'not_started', 'to_contact', 'ready_to_send', 'contacted', 'contacted_seen',
   'bump_1_unseen', 'bump_1_seen', 'bump_2_unseen', 'bump_2_seen',
   'bump_3_unseen', 'bump_3_seen', 'final_bump',
   'team_engaged', 'team_denial', 'blocked', 'x',
@@ -42,6 +42,13 @@ export type Stage = 'queued' | 'ready' | 'outreached' | 'responded' | 'lead' | '
 export const DEAD_STATUSES: OutreachStatus[] = [
   'response_denial', 'response_not_working', 'team_denial', 'blocked', 'x',
 ];
+
+/**
+ * The first DM, before any bump. [2026-11-19, Andy] Split like the bump rungs:
+ * 'contacted' reads "Contacted (unseen)", 'contacted_seen' is the same send
+ * once Telegram shows it read. Seen is not a new send.
+ */
+export const FIRST_SEND_STATUSES: OutreachStatus[] = ['contacted', 'contacted_seen'];
 
 /** A bump is still outreach awaiting a reply, so it groups with 'contacted'. */
 export const BUMP_STATUSES: OutreachStatus[] = [
@@ -122,7 +129,7 @@ export function stageOf(status: OutreachStatus): Stage {
   if (status === 'lead' || status === 'lead_trial') return 'lead';
   if (status === 'response_interested' || status === 'response_referred'
       || status === 'team_engaged') return 'responded';
-  if (status === 'contacted' || BUMP_STATUSES.includes(status)) return 'outreached';
+  if (FIRST_SEND_STATUSES.includes(status) || BUMP_STATUSES.includes(status)) return 'outreached';
   if (status === 'ready_to_send') return 'ready';
   return 'queued';
 }
@@ -459,7 +466,7 @@ export class OutreachService {
     // Moving into outreach for the first time stamps the send date — the
     // denominator of all three rates is "has a date_outreached", so a
     // status that means "we sent it" must set one or the rates under-count.
-    const nowSending = status === 'contacted' || BUMP_STATUSES.includes(status);
+    const nowSending = FIRST_SEND_STATUSES.includes(status) || BUMP_STATUSES.includes(status);
     const today = new Date().toISOString().slice(0, 10);
     if (nowSending && !p.date_outreached) {
       updates.date_outreached = today;
@@ -468,7 +475,8 @@ export class OutreachService {
     // Yano edits the date by hand when a send happened outside a status move.
     const bumpIndexForSend = BUMP_STATUSES.indexOf(status);
     const newRung = bumpIndexForSend >= 0 && Math.min(4, Math.floor(bumpIndexForSend / 2) + 1) !== p.bumps_used;
-    if ((status === 'contacted' && p.status !== 'contacted') || newRung) {
+    // unseen ↔ seen on the first DM is not a send either.
+    if ((FIRST_SEND_STATUSES.includes(status) && !FIRST_SEND_STATUSES.includes(p.status)) || newRung) {
       updates.last_messaged = today;
     }
 

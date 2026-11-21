@@ -53,6 +53,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUnsavedGuard } from '@/hooks/use-unsaved-guard';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   OutreachService, OUTREACH_STATUSES, stageOf, computeRates,
   listOwnerOptions, listMessageTypes, listStatuses, addStatus, addMessageType,
@@ -73,7 +74,8 @@ const STATUS_META: Record<OutreachStatus, StatusMeta> = {
   not_started:          { label: 'Not started',     tone: 'neutral' },
   to_contact:           { label: 'To Contact',      tone: 'pink'    },
   ready_to_send:        { label: 'Ready to send',   tone: 'warning' },
-  contacted:            { label: 'Contacted',       tone: 'warning' },
+  contacted:            { label: 'Contacted (unseen)', tone: 'warning' },
+  contacted_seen:       { label: 'Contacted (seen)', tone: 'warning' },
   bump_1_unseen:        { label: 'Bump 1 (unseen)', tone: 'slate'   },
   bump_1_seen:          { label: 'Bump 1 (seen)',   tone: 'slate'   },
   bump_2_unseen:        { label: 'Bump 2 (unseen)', tone: 'slate'   },
@@ -286,6 +288,14 @@ export default function OutreachPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // [2026-11-19, Sos via Andy] Multi-select for bulk status changes. Ids,
+  // not rows, so a reload or edit doesn't drop the selection; only ids still
+  // on screen count (see selectedRows), so a filter change can't move rows
+  // the user can no longer see. Shift-click selects a range.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
   const [rateDrill, setRateDrill] = useState<RateKey | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -414,6 +424,59 @@ export default function OutreachPage() {
   }, [rateRows, view, statusCatalogue, sort]);
 
   const metrics = useMemo(() => computeRates(rateRows, statusCatalogue), [rateRows, statusCatalogue]);
+
+  const selectedRows = useMemo(() => rows.filter(r => selectedIds.has(r.id)), [rows, selectedIds]);
+  const allSelected = rows.length > 0 && selectedRows.length === rows.length;
+
+  function toggleRow(id: string, shiftKey: boolean) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const on = !prev.has(id);
+      const from = shiftKey && lastClickedId ? rows.findIndex(r => r.id === lastClickedId) : -1;
+      const to = rows.findIndex(r => r.id === id);
+      if (from >= 0 && to >= 0) {
+        const [a, b] = from < to ? [from, to] : [to, from];
+        for (const r of rows.slice(a, b + 1)) on ? next.add(r.id) : next.delete(r.id);
+      } else {
+        on ? next.add(id) : next.delete(id);
+      }
+      return next;
+    });
+    setLastClickedId(id);
+  }
+
+  // A new tab is a new worklist; carrying a hidden selection into it would
+  // reappear on the way back and surprise whoever left it there.
+  useEffect(() => { setSelectedIds(new Set()); setLastClickedId(null); }, [view]);
+
+  function toggleAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(rows.map(r => r.id)));
+  }
+
+  /** Set one status on every selected row, through setStatus like a single change. */
+  async function bulkChangeStatus(status: OutreachStatus) {
+    const targets = selectedRows.filter(p => p.status !== status);
+    if (targets.length === 0) return;
+    setBulkSaving(true);
+    const updated: OutreachProspect[] = [];
+    let failed = 0;
+    // Five at a time: fast on a few hundred rows without a request burst.
+    for (let i = 0; i < targets.length; i += 5) {
+      const results = await Promise.allSettled(targets.slice(i, i + 5).map(p => OutreachService.setStatus(p, status)));
+      for (const r of results) r.status === 'fulfilled' ? updated.push(r.value) : failed++;
+    }
+    const byId = new Map(updated.map(u => [u.id, u]));
+    setProspects(prev => prev.map(x => byId.get(x.id) ?? x));
+    setBulkSaving(false);
+    const label = metaFor(status).label;
+    if (failed > 0) {
+      toast({ title: `${updated.length} moved to ${label}, ${failed} failed`, description: 'The failed rows are still selected. Try again.', variant: 'destructive' });
+      setSelectedIds(new Set(targets.filter(t => !byId.has(t.id)).map(t => t.id)));
+    } else {
+      toast({ title: `${updated.length} moved to ${label}`, duration: 2500 });
+      setSelectedIds(new Set());
+    }
+  }
 
   // Rates are deliberately computed over parked rows too. A row parked for
   // "no reply in 90 days" is a real message that got no answer — dropping it
@@ -924,6 +987,26 @@ export default function OutreachPage() {
           it held a second copy of the same fields, which is the exact
           "where do I edit this" confusion Yano hit. */}
       <Card className="border-cream-200 overflow-hidden">
+        {selectedRows.length > 0 && (
+          <div className="p-3 border-b border-cream-200 bg-brand-soft flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-ink-warm-900 tabular-nums">{selectedRows.length} selected</span>
+            <Select value="" onValueChange={v => bulkChangeStatus(v as OutreachStatus)} disabled={bulkSaving}>
+              <SelectTrigger className="h-8 w-[200px] text-xs focus-brand bg-white" aria-label="Set status for selected">
+                <SelectValue placeholder="Set status…" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusKeys.map(k => (
+                  <SelectItem key={k} value={k}>{metaFor(k).label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {bulkSaving && <Loader2 className="h-4 w-4 animate-spin text-ink-warm-500" />}
+            <span className="text-xs text-ink-warm-500 hidden sm:inline">Shift-click to select a range.</span>
+            <Button variant="ghost" size="sm" className="h-8 ml-auto" onClick={() => setSelectedIds(new Set())} disabled={bulkSaving}>
+              Clear
+            </Button>
+          </div>
+        )}
         {rows.length === 0 ? (
           <div className="py-4">
             {visible.length === 0 ? (
@@ -952,6 +1035,13 @@ export default function OutreachPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-cream-50 hover:bg-cream-50 border-b border-cream-200">
+                  <th className="bg-cream-50 w-10 px-3 border-r border-cream-200">
+                    <Checkbox
+                      checked={allSelected ? true : selectedRows.length > 0 ? 'indeterminate' : false}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all prospects in this view"
+                    />
+                  </th>
                   {COLUMNS.map(c => (
                     <th
                       key={c.label}
@@ -1010,7 +1100,14 @@ export default function OutreachPage() {
                   );
 
                   return (
-                    <tr key={p.id} className="border-b border-cream-100 hover:bg-cream-50/40 group">
+                    <tr key={p.id} className={`border-b border-cream-100 hover:bg-cream-50/40 group ${selectedIds.has(p.id) ? 'bg-brand-soft/60' : ''}`}>
+                      <td className="w-10 px-3 border-r border-cream-200 align-middle">
+                        <Checkbox
+                          checked={selectedIds.has(p.id)}
+                          onClick={e => { e.preventDefault(); toggleRow(p.id, e.shiftKey); }}
+                          aria-label={`Select ${p.telegram}`}
+                        />
+                      </td>
                       {/* Prospect handle */}
                       {textCell('telegram', p.telegram, {
                         placeholder: '@handle',
