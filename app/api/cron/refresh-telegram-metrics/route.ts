@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { TG_URL_REGEX, fetchTelegramMetrics } from '@/lib/telegramPostMetrics';
+import { TG_URL_REGEX, fetchTelegramMetrics, METRICS_MIN_AGE_HOURS } from '@/lib/telegramPostMetrics';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -209,6 +209,15 @@ export async function GET(request: Request) {
       }
 
       const metrics = await fetchTelegramMetrics(row.content_link);
+
+      // [2026-11-24, Quazo] The date filter above is by DAY, so a post that
+      // went live late on day D passed it at 06:00 on D+2, ~30h in. Hold it
+      // until it is 48h old by Telegram's own post time.
+      if (metrics?.postedAt && Date.now() - Date.parse(metrics.postedAt) < METRICS_MIN_AGE_HOURS * 3_600_000) {
+        skipped++;
+        await new Promise(r => setTimeout(r, FETCH_THROTTLE_MS));
+        continue;
+      }
 
       if (!metrics || (metrics.views === null && metrics.reactions === null)) {
         failed++;

@@ -69,6 +69,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/telegram-metrics-first-pull",
+      "schedule": "20 * * * *"
+    },
+    {
       "path": "/api/cron/refresh-x-metrics",
       "schedule": "30 6 * * *"
     },

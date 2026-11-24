@@ -49,6 +49,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   GOOGLE_MEETING_REMINDERS: 288, // every 5 min
   DISCOVERY: 2,                // daily (sometimes 2x if runs_per_day=2)
   TELEGRAM_METRICS: 1,         // daily
+  TELEGRAM_METRICS_FIRST: 24,  // hourly — first view count once a TG post is 48h old
   X_METRICS: 1,                // daily
   EXPENSE_RECURRENCE: 1,       // daily
   BACKLOG_WEEKLY_SUMMARY: 1,   // weekly (Monday) — Phase 5 of HHP Backlog spec

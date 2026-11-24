@@ -112,7 +112,7 @@ export interface ApplyResult {
  * but NO metrics — the daily job pulls them once it's old enough, so nobody
  * has to come back and fix an early reading. Pass `minAgeHours: 0` to force.
  */
-export async function applyTelegramMetrics(db: SupabaseClient, contentId: string, opts: { minAgeHours?: number } = {}): Promise<ApplyResult> {
+export async function applyTelegramMetrics(db: SupabaseClient, contentId: string, opts: { minAgeHours?: number; requirePostTime?: boolean } = {}): Promise<ApplyResult> {
   const sb = db as any;
   const none = { views: null, reactions: null, postedAt: null, eligibleAt: null, updated: {} as ApplyResult['updated'] };
   const { data: row } = await sb.from('contents').select('id, content_link, impressions, likes, activation_date').eq('id', contentId).maybeSingle();
@@ -128,7 +128,9 @@ export async function applyTelegramMetrics(db: SupabaseClient, contentId: string
   if (!row.activation_date && m.postedAt) updated.activation_date = m.postedAt.slice(0, 10);
 
   const minAge = opts.minAgeHours ?? METRICS_MIN_AGE_HOURS;
-  const ageHours = m.postedAt ? (Date.now() - Date.parse(m.postedAt)) / 3_600_000 : Infinity;
+  // With requirePostTime, a post whose embed carried no time is treated as
+  // too new rather than old enough: the caller cannot prove it is 48h in.
+  const ageHours = m.postedAt ? (Date.now() - Date.parse(m.postedAt)) / 3_600_000 : (opts.requirePostTime ? 0 : Infinity);
   const tooNew = ageHours < minAge;
   const eligibleAt = m.postedAt ? new Date(Date.parse(m.postedAt) + minAge * 3_600_000).toISOString() : null;
   if (!tooNew) {
