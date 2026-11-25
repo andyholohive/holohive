@@ -1,5 +1,5 @@
 import { escapeHtml } from '@/lib/telegramHtml';
-import { tg, kstClock } from './tg';
+import { tg, kstClock, deletePrompt } from './tg';
 import { getDraftConfig, type DraftConfig } from './config';
 import { resolveStaff, type DraftStaff } from './resolve';
 import { isKorean, toKoreanNote } from './llm';
@@ -19,7 +19,7 @@ const DRAFT_COLS = `
   id, status, version_n, kol_chat_id, kol_thread_id, source_message_id,
   lint_flags, gloss_failed, lineup_slot_id,
   review_chat_id, review_thread_id, review_message_id, review_card_html,
-  reviewed_by, outbound_preview_message_id, send_at, outbound_sent_at,
+  reviewed_by, outbound_preview_message_id, send_at, outbound_sent_at, change_prompt_message_id,
   kol:master_kols!inner(id, name, telegram_username),
   reviewer:users!content_drafts_reviewed_by_fkey(name)
 `;
@@ -107,6 +107,7 @@ async function approve(sb: any, cfg: DraftConfig, cq: any, staff: DraftStaff, id
     .select('id');
   if (!won?.length) { await answer(await alreadyHandled(sb, id)); return; }
   await answer('Approved');
+  await deletePrompt(d.review_chat_id, d.change_prompt_message_id);
   await stampCard(d, `✅ <b>Approved by ${escapeHtml(staff.name)}</b> · ${kstClock()} KST${flagCount > 0 ? ' · with flags' : ''}`);
   await queueOutbound(sb, cfg, d, text);
 }
@@ -118,6 +119,9 @@ async function requestChanges(sb: any, cq: any, staff: DraftStaff, id: string) {
   if (d.status !== 'pending_review') { await answer(await alreadyHandled(sb, id)); return; }
   const from = cq.from || {};
   const mention = from.username ? `@${from.username}` : `<a href="tg://user?id=${from.id}">${escapeHtml(staff.name)}</a>`;
+  // A second tap replaces the first prompt; a reply to the old one would no
+  // longer match, and its ForceReply would linger.
+  await deletePrompt(d.review_chat_id, d.change_prompt_message_id);
   const prompt = await tg<{ message_id: number }>('sendMessage', {
     chat_id: d.review_chat_id,
     ...(cq.message?.message_thread_id ? { message_thread_id: cq.message.message_thread_id } : {}),
@@ -223,7 +227,11 @@ export async function handleChangeNoteReply(sb: any, message: any): Promise<bool
   const cfg = await getDraftConfig(sb);
   const d = await loadDraft(sb, hit.id);
   if (!d) return true;
-  if (d.status !== 'pending_review') { await say(escapeHtml(await alreadyHandled(sb, hit.id))); return true; }
+  if (d.status !== 'pending_review') {
+    await deletePrompt(message.chat.id, promptId);
+    await say(escapeHtml(await alreadyHandled(sb, hit.id)));
+    return true;
+  }
 
   // Korean goes out exactly as written. Anything else is translated before
   // the status changes, so a failed translation leaves the draft pending.
@@ -250,6 +258,7 @@ export async function handleChangeNoteReply(sb: any, message: any): Promise<bool
     .eq('id', hit.id).eq('status', 'pending_review')
     .select('id');
   if (!won?.length) { await say(escapeHtml(await alreadyHandled(sb, hit.id))); return true; }
+  await deletePrompt(message.chat.id, promptId);
   await stampCard(d, `✏️ <b>Changes requested by ${escapeHtml(staff.name)}</b> · ${kstClock()} KST`);
   await queueOutbound(sb, cfg, d, text);
   return true;

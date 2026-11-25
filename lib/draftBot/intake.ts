@@ -1,4 +1,4 @@
-import { tg, downloadTelegramFile } from './tg';
+import { tg, downloadTelegramFile, deletePrompt } from './tg';
 import { getDraftConfig, draftAllowedInChat, type DraftConfig } from './config';
 import { resolveKolByChat, findOpenSlots, slotDeadline, type DraftKol, type OpenSlot } from './resolve';
 import { glossDraft, matchBannedTerms, lintRules, type LintFlag, type DraftImage } from './llm';
@@ -237,7 +237,7 @@ async function createDraft(
 ): Promise<void> {
   // Version per slot; an older draft still waiting for review is superseded.
   let version = 1;
-  let superseded: Array<{ review_chat_id: number | null; review_message_id: number | null; review_card_html: string | null }> = [];
+  let superseded: Array<{ review_chat_id: number | null; review_message_id: number | null; review_card_html: string | null; change_prompt_message_id: number | null }> = [];
   if (slot) {
     const { data: last } = await sb
       .from('content_drafts').select('version_n')
@@ -248,7 +248,7 @@ async function createDraft(
       .from('content_drafts')
       .update({ status: 'superseded', updated_at: new Date().toISOString() })
       .eq('lineup_slot_id', slot.slotId).eq('status', 'pending_review')
-      .select('review_chat_id, review_message_id, review_card_html');
+      .select('review_chat_id, review_message_id, review_card_html, change_prompt_message_id');
     superseded = (old ?? []) as typeof superseded;
   }
 
@@ -285,6 +285,7 @@ async function createDraft(
   else await replyInKolChat(p, p.commandMessageId, receipt);
 
   for (const old of superseded) {
+    await deletePrompt(old.review_chat_id, old.change_prompt_message_id);
     if (!old.review_chat_id || !old.review_message_id || !old.review_card_html) continue;
     await tg('editMessageText', {
       chat_id: old.review_chat_id, message_id: old.review_message_id,

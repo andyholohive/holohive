@@ -50,3 +50,14 @@ export function kstClock(d = new Date()): string {
   const k = new Date(d.getTime() + 9 * 3_600_000);
   return `${String(k.getUTCHours()).padStart(2, '0')}:${String(k.getUTCMinutes()).padStart(2, '0')}`;
 }
+
+/**
+ * Delete a "What should change?" prompt. Its ForceReply keeps putting the
+ * reviewer's chat box back into reply mode every time they open the topic,
+ * until the message is gone (Quazo, 2026-11-26), so every path that finishes
+ * with a prompt removes it. Failures are ignored: it may already be deleted.
+ */
+export async function deletePrompt(chatId: number | string | null | undefined, messageId: number | null | undefined): Promise<void> {
+  if (!chatId || !messageId) return;
+  await tg('deleteMessage', { chat_id: chatId, message_id: messageId });
+}
