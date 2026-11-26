@@ -1,3 +1,4 @@
+import { escapeHtml } from '@/lib/telegramHtml';
 import { tg, downloadTelegramFile, deletePrompt } from './tg';
 import { getDraftConfig, draftAllowedInChat, type DraftConfig } from './config';
 import { resolveKolByChat, findOpenSlots, slotDeadline, type DraftKol, type OpenSlot } from './resolve';
@@ -140,6 +141,12 @@ async function capture(sb: any, message: any): Promise<DraftPayload | null> {
   };
 }
 
+/**
+ * What the KOL sees after /draft, whatever happens on the team side: slot
+ * found, no open slot, or a chat nobody has linked yet (Jdot, 2026-11-26).
+ */
+const RECEIPT = '✅ 초안 접수됐습니다! 검토 후 바로 안내드릴게요 ^^';
+
 async function replyInKolChat(p: { kolChatId: string; kolThreadId: number | null }, replyTo: number, text: string) {
   return tg('sendMessage', {
     chat_id: p.kolChatId,
@@ -158,7 +165,18 @@ export async function handleDraftCommand(sb: any, message: any): Promise<void> {
 
   const kol = await resolveKolByChat(sb, chatId);
   if (!kol) {
-    await replyInKolChat(where, message.message_id, "This chat isn't linked to a KOL yet. A Holo Hive team member can link it on /crm/telegram. Then /draft will work here.");
+    // The KOL gets the normal receipt; the team is told to link the chat
+    // and answer by hand. Nothing is recorded: there is no KOL to file it under.
+    await replyInKolChat(where, message.message_id, RECEIPT);
+    if (cfg.reviewChatId) {
+      const title = message.chat?.title || chatId;
+      await tg('sendMessage', {
+        chat_id: cfg.reviewChatId,
+        ...(cfg.reviewThreadId ? { message_thread_id: cfg.reviewThreadId } : {}),
+        text: `⚠ /draft from an unlinked chat (${escapeHtml(String(title))}). Link it on /crm/telegram, then reply to the KOL manually.`,
+        parse_mode: 'HTML',
+      });
+    }
     return;
   }
 
@@ -237,7 +255,9 @@ async function createDraft(
 ): Promise<void> {
   // Version per slot; an older draft still waiting for review is superseded.
   let version = 1;
-  let superseded: Array<{ review_chat_id: number | null; review_message_id: number | null; review_card_html: string | null; change_prompt_message_id: number | null }> = [];
+  type OldDraft = { review_chat_id: number | null; review_message_id: number | null; review_card_html: string | null; change_prompt_message_id: number | null; outbound_preview_message_id?: number | null };
+  let superseded: OldDraft[] = [];
+  let cancelledOutbound: OldDraft[] = [];
   if (slot) {
     const { data: last } = await sb
       .from('content_drafts').select('version_n')
@@ -250,6 +270,19 @@ async function createDraft(
       .eq('lineup_slot_id', slot.slotId).eq('status', 'pending_review')
       .select('review_chat_id, review_message_id, review_card_html, change_prompt_message_id');
     superseded = (old ?? []) as typeof superseded;
+    // A decision still inside its cancel window is overtaken too: the KOL has
+    // already moved on, so the old approve / change note must not go out.
+    // Same claim as Cancel: it only wins while the send job has not taken it.
+    const { data: queued } = await sb
+      .from('content_drafts')
+      .update({
+        status: 'superseded', outbound_kind: null, outbound_text: null, send_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('lineup_slot_id', slot.slotId).in('status', ['approved', 'changes_requested'])
+      .is('outbound_sent_at', null).not('send_at', 'is', null)
+      .select('review_chat_id, review_message_id, review_card_html, change_prompt_message_id, outbound_preview_message_id');
+    cancelledOutbound = (queued ?? []) as OldDraft[];
   }
 
   const { data: row, error } = await sb
@@ -263,6 +296,7 @@ async function createDraft(
       kol_chat_id: p.kolChatId,
       kol_thread_id: p.kolThreadId,
       source_message_id: p.sourceMessageId,
+      command_message_id: p.commandMessageId,
       submitted_by_tg_user_id: p.submittedBy,
       body_text: p.bodyText,
       media_file_ids: p.media.map(m => m.fileId).filter(Boolean),
@@ -278,9 +312,7 @@ async function createDraft(
   }
   const draftId: string = row.id;
 
-  const receipt = slot
-    ? `✅ 초안 접수됐습니다! ${slot.clientName} 팀 검토 후 바로 안내드릴게요 ^^`
-    : '현재 진행 중인 캠페인이 없어요, 담당자 확인 후 안내드릴게요!';
+  const receipt = RECEIPT;
   if (editPicker) await tg('editMessageText', { chat_id: editPicker.chatId, message_id: editPicker.messageId, text: receipt });
   else await replyInKolChat(p, p.commandMessageId, receipt);
 
@@ -292,6 +324,23 @@ async function createDraft(
       text: `${old.review_card_html}\n\n♻️ <b>Superseded by v${version}</b>`,
       parse_mode: 'HTML', link_preview_options: { is_disabled: true },
     });
+  }
+  for (const old of cancelledOutbound) {
+    if (!old.review_chat_id) continue;
+    const note = `♻️ <b>Superseded by v${version}.</b> The pending message was cancelled, nothing was sent to the KOL.`;
+    // The preview already replies to the card; rewriting it drops its Cancel button.
+    if (old.outbound_preview_message_id) {
+      await tg('editMessageText', {
+        chat_id: old.review_chat_id, message_id: old.outbound_preview_message_id,
+        text: note, parse_mode: 'HTML',
+      });
+    } else if (old.review_message_id) {
+      await tg('sendMessage', {
+        chat_id: old.review_chat_id, text: note, parse_mode: 'HTML',
+        ...(cfg.reviewThreadId ? { message_thread_id: cfg.reviewThreadId } : {}),
+        reply_parameters: { message_id: old.review_message_id, allow_sending_without_reply: true },
+      });
+    }
   }
 
   // English read. Without one, approving takes a second tap.

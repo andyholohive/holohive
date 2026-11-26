@@ -75,14 +75,17 @@ export function buildCardMessages(c: CardInput): string[] {
     if (c.weekNumber != null) bits.push(`Week ${c.weekNumber}`);
     if (c.angleIndex != null) bits.push(`Angle ${c.angleIndex}${c.angleName ? `: ${c.angleName}` : ''}`);
     head.push(`📝 <b>${escapeHtml(bits.join(' · '))}</b>`);
+    const kolBits = [`KOL: ${c.kolName}`];
+    if (c.kolHandle) kolBits.push(`@${c.kolHandle}`);
+    if (c.deadline) kolBits.push(`Deadline ${deadlineLabel(c.deadline)}`);
+    head.push(escapeHtml(kolBits.join(' · ')));
   } else {
-    head.push('📝 <b>DRAFT · UNMATCHED</b>');
+    // No slot means no deadline, so the KOL rides on the header line.
+    const bits = ['DRAFT', 'UNMATCHED', c.kolName];
+    if (c.kolHandle) bits.push(`@${c.kolHandle}`);
+    head.push(`📝 <b>${escapeHtml(bits.join(' · '))}</b>`);
     head.push('No open lineup slot for this KOL. Needs a manual check.');
   }
-  const kolBits = [`KOL: ${c.kolName}`];
-  if (c.kolHandle) kolBits.push(`@${c.kolHandle}`);
-  if (c.deadline) kolBits.push(`Deadline ${deadlineLabel(c.deadline)}`);
-  head.push(escapeHtml(kolBits.join(' · ')));
 
   // Blocks: [title, raw body]. Bodies are split, titles never are.
   const blocks: Array<{ title: string; body: string }> = [];
@@ -164,11 +167,17 @@ export function cardKeyboard(c: {
   return rows;
 }
 
-/** Messages the KOL receives. Wording is fixed by the spec. */
-export function approveMessage(handle: string | null, kolName: string): string {
-  return `${handle ? `@${handle}` : kolName} 님 초안 확인했습니다! 좋습니다, 바로 올려주셔도 됩니다 ^^\n\n포스팅 후 링크는 /submit 으로 한 번 부탁드려요~`;
+/**
+ * Messages the KOL receives. Wording is Jdot's final copy (2026-11-26): the
+ * KOL's name appears here and nowhere else, and the client name tells them
+ * which draft it is about.
+ */
+const draftOf = (clientName: string | null) => (clientName ? `${clientName} 초안` : '초안');
+
+export function approveMessage(handle: string | null, kolName: string, clientName: string | null): string {
+  return `${handle ? `@${handle}` : kolName} 님, ${draftOf(clientName)} 확인했습니다! 바로 올려주셔도 됩니다 ^^\n\n포스팅 후 링크는 /submit 으로 한 번 부탁드려요~`;
 }
 
-export function changesMessage(handle: string | null, kolName: string, noteKo: string): string {
-  return `${handle ? `@${handle}` : kolName} 님 초안 감사합니다! 몇 가지만 수정 부탁드려요~\n\n${noteKo}\n\n수정본은 /draft 로 다시 올려주시면 바로 확인드릴게요 ^^`;
+export function changesMessage(handle: string | null, kolName: string, clientName: string | null, noteKo: string): string {
+  return `${handle ? `@${handle}` : kolName} 님, ${draftOf(clientName)} 감사합니다! 몇 가지만 수정 부탁드려요~\n\n${noteKo}\n\n수정본은 /draft 로 다시 올려주시면 바로 확인드릴게요 ^^`;
 }

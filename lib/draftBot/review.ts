@@ -21,6 +21,7 @@ const DRAFT_COLS = `
   review_chat_id, review_thread_id, review_message_id, review_card_html,
   reviewed_by, outbound_preview_message_id, send_at, outbound_sent_at, change_prompt_message_id,
   kol:master_kols!inner(id, name, telegram_username),
+  campaign:campaigns(client:clients(name)),
   reviewer:users!content_drafts_reviewed_by_fkey(name)
 `;
 
@@ -29,6 +30,8 @@ async function loadDraft(sb: any, id: string): Promise<any | null> {
   if (error) console.error('[/draft] load failed:', error.message);
   return data ?? null;
 }
+
+const clientOf = (d: any): string | null => d?.campaign?.client?.name || null;
 
 const handleOf = (d: any): string | null => (d?.kol?.telegram_username || '').replace(/^@/, '') || null;
 
@@ -56,7 +59,7 @@ async function stampCard(d: any, stampHtml: string) {
  * Show the outbound message in the topic with a Cancel button and schedule
  * the send. With a zero window it goes straight out.
  */
-async function queueOutbound(sb: any, cfg: DraftConfig, d: any, text: string) {
+async function queueOutbound(sb: any, cfg: DraftConfig, d: any, text: string, noteEn: string | null = null) {
   if (cfg.cancelWindowS <= 0) {
     await sb.from('content_drafts').update({ send_at: new Date().toISOString() }).eq('id', d.id);
     await sendOutbound(sb, cfg, d.id);
@@ -65,7 +68,7 @@ async function queueOutbound(sb: any, cfg: DraftConfig, d: any, text: string) {
   const preview = await tg<{ message_id: number }>('sendMessage', {
     chat_id: d.review_chat_id,
     ...(d.review_thread_id || cfg.reviewThreadId ? { message_thread_id: d.review_thread_id || cfg.reviewThreadId } : {}),
-    text: `📤 <b>Sending to the KOL in about ${cfg.cancelWindowS}s</b>\n\n${escapeHtml(text)}`,
+    text: `📤 <b>Sending to the KOL in about ${cfg.cancelWindowS}s</b>\n\n${escapeHtml(text)}${noteEn ? `\n\n<b>Note (EN):</b> ${escapeHtml(noteEn)}` : ''}`,
     parse_mode: 'HTML', link_preview_options: { is_disabled: true },
     reply_parameters: { message_id: d.review_message_id, allow_sending_without_reply: true },
     reply_markup: { inline_keyboard: [[{ text: '✖️ Cancel', callback_data: `drf:cx:${d.id}` }]] },
@@ -93,7 +96,7 @@ async function approve(sb: any, cfg: DraftConfig, cq: any, staff: DraftStaff, id
     await answer(flagCount > 0 ? 'This draft has flags. Tap again to confirm.' : 'No English read on this draft. Tap again to confirm.');
     return;
   }
-  const text = approveMessage(handleOf(d), d.kol.name);
+  const text = approveMessage(handleOf(d), d.kol.name, clientOf(d));
   const { data: won } = await sb
     .from('content_drafts')
     .update({
@@ -216,17 +219,20 @@ export async function handleChangeNoteReply(sb: any, message: any): Promise<bool
     .maybeSingle();
   if (!hit?.id) return false;
 
+  // Replies thread under the draft's card, like every other team message.
+  let cardId: number = message.message_id;
   const say = (text: string) => tg('sendMessage', {
     chat_id: message.chat.id,
     ...(message.message_thread_id ? { message_thread_id: message.message_thread_id } : {}),
     text, parse_mode: 'HTML',
-    reply_parameters: { message_id: message.message_id, allow_sending_without_reply: true },
+    reply_parameters: { message_id: cardId, allow_sending_without_reply: true },
   });
   const staff = await resolveStaff(sb, message.from?.id);
   if (!staff) return true;
   const cfg = await getDraftConfig(sb);
   const d = await loadDraft(sb, hit.id);
   if (!d) return true;
+  if (d.review_message_id) cardId = d.review_message_id;
   if (d.status !== 'pending_review') {
     await deletePrompt(message.chat.id, promptId);
     await say(escapeHtml(await alreadyHandled(sb, hit.id)));
@@ -245,7 +251,7 @@ export async function handleChangeNoteReply(sb: any, message: any): Promise<bool
       return true;
     }
   }
-  const text = changesMessage(handleOf(d), d.kol.name, noteKo);
+  const text = changesMessage(handleOf(d), d.kol.name, clientOf(d), noteKo);
   const { data: won } = await sb
     .from('content_drafts')
     .update({
@@ -260,7 +266,9 @@ export async function handleChangeNoteReply(sb: any, message: any): Promise<bool
   if (!won?.length) { await say(escapeHtml(await alreadyHandled(sb, hit.id))); return true; }
   await deletePrompt(message.chat.id, promptId);
   await stampCard(d, `✏️ <b>Changes requested by ${escapeHtml(staff.name)}</b> · ${kstClock()} KST`);
-  await queueOutbound(sb, cfg, d, text);
+  // The reviewer's own words, when they wrote in English. A note written in
+  // Korean goes out as written, so there is nothing to show beside it.
+  await queueOutbound(sb, cfg, d, text, isKorean(note) ? null : note);
   return true;
 }
 

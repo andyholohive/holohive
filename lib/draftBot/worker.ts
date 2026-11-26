@@ -23,7 +23,7 @@ export async function sendOutbound(sb: any, cfg: DraftConfig, draftId: string): 
     .eq('id', draftId)
     .in('status', ['approved', 'changes_requested'])
     .is('outbound_sent_at', null).not('send_at', 'is', null)
-    .select('id, kol_chat_id, kol_thread_id, source_message_id, outbound_text, outbound_preview_message_id, review_chat_id, review_thread_id, review_message_id');
+    .select('id, kol_chat_id, kol_thread_id, source_message_id, command_message_id, outbound_text, outbound_preview_message_id, review_chat_id, review_thread_id, review_message_id');
   const d = (claimed as any[])?.[0];
   if (!d) return 'skipped';
 
@@ -43,7 +43,9 @@ export async function sendOutbound(sb: any, cfg: DraftConfig, draftId: string): 
     chat_id: d.kol_chat_id,
     ...(d.kol_thread_id ? { message_thread_id: d.kol_thread_id } : {}),
     text: d.outbound_text,
-    reply_parameters: { message_id: d.source_message_id, allow_sending_without_reply: true },
+    // Under the KOL's own /draft message (Jdot 2026-11-26); older rows only
+    // have the draft itself.
+    reply_parameters: { message_id: d.command_message_id ?? d.source_message_id, allow_sending_without_reply: true },
   });
   if (!sent.ok) {
     console.error('[/draft] outbound send failed:', sent.description);
